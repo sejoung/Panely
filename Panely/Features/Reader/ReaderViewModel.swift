@@ -17,6 +17,8 @@ final class ReaderViewModel {
     }
     private(set) var currentImages: [NSImage] = []
     private(set) var errorMessage: String?
+    private(set) var isLoading: Bool = false
+    private(set) var loadingMessage: String = ""
 
     private(set) var currentSourceURL: URL?
     private(set) var siblings: [URL] = []
@@ -259,6 +261,13 @@ final class ReaderViewModel {
     private func load(url: URL, knownSiblings: [URL]? = nil) async {
         preloadTask?.cancel()
 
+        isLoading = true
+        loadingMessage = "Opening…"
+        defer {
+            isLoading = false
+            loadingMessage = ""
+        }
+
         if !isInsideCurrentTree(url) {
             cleanupTempDir()
             rootScopedURL?.stopAccessingSecurityScopedResource()
@@ -277,7 +286,9 @@ final class ReaderViewModel {
             let ext = url.pathExtension.lowercased()
             let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
             if !isDir && CBZLoader.supportedExtensions.contains(ext) {
+                loadingMessage = "Analyzing archive…"
                 if let hasNested = try? await CBZLoader.hasNestedArchives(at: url), hasNested {
+                    loadingMessage = "Extracting archive…"
                     let tempDir = Self.makeTempDir()
                     do {
                         try await CBZLoader.extractAll(from: url, to: tempDir)
@@ -293,6 +304,7 @@ final class ReaderViewModel {
         let isDirectory = (try? targetURL.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
 
         if isDirectory {
+            loadingMessage = "Scanning folder…"
             let (hasImages, volumes) = await Self.analyzeFolder(targetURL)
 
             if !hasImages && !volumes.isEmpty {
@@ -312,6 +324,7 @@ final class ReaderViewModel {
         let finalIsDirectory = (try? targetURL.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
 
         do {
+            loadingMessage = "Loading pages…"
             let loaded: ComicSource
             if finalIsDirectory {
                 loaded = try await Task.detached(priority: .userInitiated) {
@@ -386,28 +399,11 @@ final class ReaderViewModel {
     }
 
     private func positionKey(for url: URL) -> String {
-        let sourcePath = url.standardizedFileURL.path
-
-        guard
-            let opened = openedSourceURL,
-            let tempDir = currentTempDir
-        else {
-            return sourcePath
-        }
-
-        let tempPath = tempDir.standardizedFileURL.path
-        let openedPath = opened.standardizedFileURL.path
-
-        if sourcePath == tempPath {
-            return openedPath
-        }
-
-        if sourcePath.hasPrefix(tempPath + "/") {
-            let relative = String(sourcePath.dropFirst(tempPath.count + 1))
-            return openedPath + "#" + relative
-        }
-
-        return sourcePath
+        PositionKey.make(
+            for: url,
+            opened: openedSourceURL,
+            tempRoot: currentTempDir
+        )
     }
 
     private func clampedRestoredIndex(for url: URL, pageCount: Int) -> Int {

@@ -1,6 +1,28 @@
 import Testing
 import Foundation
+import ZIPFoundation
 @testable import Panely
+
+// MARK: - Test fixtures helpers
+
+private enum Fixture {
+    static func makeTempDir() throws -> URL {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("panely-test-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    @discardableResult
+    static func writeFile(_ url: URL, bytes: [UInt8] = [0]) throws -> URL {
+        try Data(bytes).write(to: url)
+        return url
+    }
+
+    static func zipDirectory(_ sourceDir: URL, to zipURL: URL) throws {
+        try FileManager.default.zipItem(at: sourceDir, to: zipURL, shouldKeepParent: false)
+    }
+}
 
 // MARK: - ComicPage
 
@@ -198,5 +220,250 @@ struct NaturalSortTests {
             $0.localizedStandardCompare($1) == .orderedAscending
         }
         #expect(sorted == ["Vol 1.cbz", "Vol 2.cbz", "Vol 10.cbz"])
+    }
+}
+
+// MARK: - PositionKey (stable key across temp extractions)
+
+struct PositionKeyTests {
+    @Test func directOpenReturnsPlainPath() {
+        let url = URL(fileURLWithPath: "/Comics/Vol01.cbz")
+        let key = PositionKey.make(for: url, opened: nil, tempRoot: nil)
+        #expect(key == "/Comics/Vol01.cbz")
+    }
+
+    @Test func tempBackedVolumeUsesCompoundKey() {
+        let opened = URL(fileURLWithPath: "/Comics/series.zip")
+        let temp = URL(fileURLWithPath: "/tmp/panely-A")
+        let source = URL(fileURLWithPath: "/tmp/panely-A/Vol01.cbz")
+
+        let key = PositionKey.make(for: source, opened: opened, tempRoot: temp)
+        #expect(key == "/Comics/series.zip#Vol01.cbz")
+    }
+
+    @Test func tempRootMatchesOpenedPathDirectly() {
+        let opened = URL(fileURLWithPath: "/Comics/series.zip")
+        let temp = URL(fileURLWithPath: "/tmp/panely-A")
+
+        let key = PositionKey.make(for: temp, opened: opened, tempRoot: temp)
+        #expect(key == "/Comics/series.zip")
+    }
+
+    @Test func outsideTempFallsBackToSourcePath() {
+        let opened = URL(fileURLWithPath: "/Comics/series.zip")
+        let temp = URL(fileURLWithPath: "/tmp/panely-A")
+        let source = URL(fileURLWithPath: "/other/Vol01.cbz")
+
+        let key = PositionKey.make(for: source, opened: opened, tempRoot: temp)
+        #expect(key == "/other/Vol01.cbz")
+    }
+
+    @Test func deeplyNestedPathProducesRelativeSegments() {
+        let opened = URL(fileURLWithPath: "/Comics/super.zip")
+        let temp = URL(fileURLWithPath: "/tmp/panely-A")
+        let source = URL(fileURLWithPath: "/tmp/panely-A/middle/Vol01")
+
+        let key = PositionKey.make(for: source, opened: opened, tempRoot: temp)
+        #expect(key == "/Comics/super.zip#middle/Vol01")
+    }
+
+    @Test func siblingPathWithSimilarPrefixIsNotCollapsed() {
+        let opened = URL(fileURLWithPath: "/Comics/series.zip")
+        let temp = URL(fileURLWithPath: "/tmp/panely-A")
+        let source = URL(fileURLWithPath: "/tmp/panely-Abc/Vol01.cbz")
+
+        let key = PositionKey.make(for: source, opened: opened, tempRoot: temp)
+        #expect(key == "/tmp/panely-Abc/Vol01.cbz")
+    }
+}
+
+// MARK: - FolderLoader integration (real temp directories)
+
+struct FolderLoaderIntegrationTests {
+    @Test func filtersOutNonImageFiles() throws {
+        let dir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        try Fixture.writeFile(dir.appendingPathComponent("page1.jpg"))
+        try Fixture.writeFile(dir.appendingPathComponent("page2.png"))
+        try Fixture.writeFile(dir.appendingPathComponent("readme.txt"))
+        try Fixture.writeFile(dir.appendingPathComponent("config.json"))
+
+        let source = try FolderLoader.load(from: dir)
+        let names = Set(source.pages.map(\.displayName))
+        #expect(names == ["page1.jpg", "page2.png"])
+    }
+
+    @Test func naturalSortsByFilename() throws {
+        let dir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        try Fixture.writeFile(dir.appendingPathComponent("page10.jpg"))
+        try Fixture.writeFile(dir.appendingPathComponent("page2.jpg"))
+        try Fixture.writeFile(dir.appendingPathComponent("page1.jpg"))
+
+        let source = try FolderLoader.load(from: dir)
+        let names = source.pages.map(\.displayName)
+        #expect(names == ["page1.jpg", "page2.jpg", "page10.jpg"])
+    }
+
+    @Test func skipsHiddenFiles() throws {
+        let dir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        try Fixture.writeFile(dir.appendingPathComponent("001.jpg"))
+        try Fixture.writeFile(dir.appendingPathComponent(".DS_Store"))
+        try Fixture.writeFile(dir.appendingPathComponent("._thumbnail.jpg"))
+
+        let source = try FolderLoader.load(from: dir)
+        let names = source.pages.map(\.displayName)
+        #expect(names.contains("001.jpg"))
+        #expect(!names.contains(".DS_Store"))
+    }
+
+    @Test func titleDerivedFromFolderName() throws {
+        let parent = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: parent) }
+
+        let dir = parent.appendingPathComponent("OnePiece", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try Fixture.writeFile(dir.appendingPathComponent("001.jpg"))
+
+        let source = try FolderLoader.load(from: dir)
+        #expect(source.title == "OnePiece")
+    }
+}
+
+// MARK: - FileNode.loadTree
+
+struct FileNodeLoadTests {
+    @Test func includesArchivesAndSubfoldersButNotLooseImages() async throws {
+        let dir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        try Fixture.writeFile(dir.appendingPathComponent("cover.jpg"))
+        try Fixture.writeFile(dir.appendingPathComponent("vol01.cbz"))
+        let sub = dir.appendingPathComponent("vol02", isDirectory: true)
+        try FileManager.default.createDirectory(at: sub, withIntermediateDirectories: true)
+        try Fixture.writeFile(sub.appendingPathComponent("001.jpg"))
+
+        let nodes = await FileNode.loadTree(from: dir, maxDepth: 2)
+        let names = nodes.map(\.name)
+
+        #expect(!names.contains("cover.jpg"))
+        #expect(names.contains("vol01"))
+        #expect(names.contains("vol02"))
+    }
+
+    @Test func returnsEmptyForNonExistentDirectory() async {
+        let url = URL(fileURLWithPath: "/__panely_definitely_missing_\(UUID().uuidString)")
+        let nodes = await FileNode.loadTree(from: url)
+        #expect(nodes.isEmpty)
+    }
+
+    @Test func sortsAlphanumericallyWithNaturalOrder() async throws {
+        let dir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        try Fixture.writeFile(dir.appendingPathComponent("Vol 10.cbz"))
+        try Fixture.writeFile(dir.appendingPathComponent("Vol 1.cbz"))
+        try Fixture.writeFile(dir.appendingPathComponent("Vol 2.cbz"))
+
+        let nodes = await FileNode.loadTree(from: dir, maxDepth: 1)
+        #expect(nodes.map(\.name) == ["Vol 1", "Vol 2", "Vol 10"])
+    }
+}
+
+// MARK: - CBZLoader integration (with real zip fixtures)
+
+struct CBZLoaderIntegrationTests {
+    @Test func hasNestedArchivesFalseForFlatArchive() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+
+        let src = try Fixture.makeTempDir()
+        try Fixture.writeFile(src.appendingPathComponent("001.jpg"))
+        try Fixture.writeFile(src.appendingPathComponent("002.jpg"))
+
+        let zipURL = workDir.appendingPathComponent("book.cbz")
+        try Fixture.zipDirectory(src, to: zipURL)
+        try? FileManager.default.removeItem(at: src)
+
+        let hasNested = try await CBZLoader.hasNestedArchives(at: zipURL)
+        #expect(hasNested == false)
+    }
+
+    @Test func hasNestedArchivesTrueWhenInnerCBZPresent() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+
+        // Build inner archive
+        let innerSrc = try Fixture.makeTempDir()
+        try Fixture.writeFile(innerSrc.appendingPathComponent("001.jpg"))
+        let innerZip = workDir.appendingPathComponent("_inner_scratch.cbz")
+        try Fixture.zipDirectory(innerSrc, to: innerZip)
+        try? FileManager.default.removeItem(at: innerSrc)
+
+        // Outer that contains the inner archive
+        let outerSrc = try Fixture.makeTempDir()
+        try FileManager.default.moveItem(at: innerZip, to: outerSrc.appendingPathComponent("vol01.cbz"))
+        let outerZip = workDir.appendingPathComponent("series.cbz")
+        try Fixture.zipDirectory(outerSrc, to: outerZip)
+        try? FileManager.default.removeItem(at: outerSrc)
+
+        let hasNested = try await CBZLoader.hasNestedArchives(at: outerZip)
+        #expect(hasNested == true)
+    }
+
+    @Test func loadProducesNaturallySortedPages() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+
+        let src = try Fixture.makeTempDir()
+        try Fixture.writeFile(src.appendingPathComponent("10.jpg"))
+        try Fixture.writeFile(src.appendingPathComponent("02.jpg"))
+        try Fixture.writeFile(src.appendingPathComponent("01.jpg"))
+
+        let zipURL = workDir.appendingPathComponent("book.cbz")
+        try Fixture.zipDirectory(src, to: zipURL)
+        try? FileManager.default.removeItem(at: src)
+
+        let comic = try await CBZLoader.load(from: zipURL)
+        #expect(comic.pages.map(\.displayName) == ["01.jpg", "02.jpg", "10.jpg"])
+    }
+
+    @Test func extractAllRecursivelyUnpacksNestedArchives() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+
+        // Inner archive with images
+        let innerSrc = try Fixture.makeTempDir()
+        try Fixture.writeFile(innerSrc.appendingPathComponent("p1.jpg"))
+        let innerZip = workDir.appendingPathComponent("_inner_scratch.cbz")
+        try Fixture.zipDirectory(innerSrc, to: innerZip)
+        try? FileManager.default.removeItem(at: innerSrc)
+
+        // Outer archive containing the inner archive
+        let outerSrc = try Fixture.makeTempDir()
+        try FileManager.default.moveItem(at: innerZip, to: outerSrc.appendingPathComponent("vol01.cbz"))
+        let outerZip = workDir.appendingPathComponent("series.zip")
+        try Fixture.zipDirectory(outerSrc, to: outerZip)
+        try? FileManager.default.removeItem(at: outerSrc)
+
+        let dest = workDir.appendingPathComponent("extracted", isDirectory: true)
+        try await CBZLoader.extractAll(from: outerZip, to: dest)
+
+        // After recursive extraction: dest/vol01/ folder exists with p1.jpg inside
+        var isDir: ObjCBool = false
+        let volDir = dest.appendingPathComponent("vol01")
+        #expect(FileManager.default.fileExists(atPath: volDir.path, isDirectory: &isDir))
+        #expect(isDir.boolValue == true)
+
+        let innerImg = volDir.appendingPathComponent("p1.jpg")
+        #expect(FileManager.default.fileExists(atPath: innerImg.path))
+
+        // The original nested archive file should have been removed after extraction
+        let residualZip = dest.appendingPathComponent("vol01.cbz")
+        #expect(!FileManager.default.fileExists(atPath: residualZip.path))
     }
 }

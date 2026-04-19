@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		B263CE8A2F94F819006DD5A0 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = B263CE892F94F819006DD5A0 /* ZIPFoundation */; };
+		B263CE902F94F819006DD5A0 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = B263CE892F94F819006DD5A0 /* ZIPFoundation */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -51,6 +52,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B263CE902F94F819006DD5A0 /* ZIPFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -127,6 +129,7 @@
 			);
 			name = PanelyTests;
 			packageProductDependencies = (
+				B263CE892F94F819006DD5A0 /* ZIPFoundation */,
 			);
 			productName = PanelyTests;
 			productReference = B263CE252F94EE34006DD5A0 /* PanelyTests.xctest */;

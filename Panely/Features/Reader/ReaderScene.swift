@@ -33,6 +33,12 @@ struct ReaderScene: View {
                 showSidebarHandle
             }
         }
+        .overlay {
+            if viewModel.isLoading {
+                LoadingOverlay(message: viewModel.loadingMessage)
+            }
+        }
+        .animation(PanelyMotion.uiReveal, value: viewModel.isLoading)
         .frame(minWidth: 800, minHeight: 600)
     }
 
