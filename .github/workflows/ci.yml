@@ -3,8 +3,16 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'LICENSE'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'LICENSE'
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -14,6 +22,7 @@ jobs:
   build:
     name: Build
     runs-on: macos-latest
+    if: ${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore: release ') }}
 
     steps:
       - name: Checkout
