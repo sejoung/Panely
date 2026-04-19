@@ -24,6 +24,8 @@ final class ReaderViewModel {
     let recentItems: RecentItemsStore
 
     private var rootScopedURL: URL?
+    private(set) var libraryRefreshToken: UUID = UUID()
+    private var explicitLibraryRootURL: URL?
 
     private let imageCache: NSCache<NSString, NSImage> = {
         let cache = NSCache<NSString, NSImage>()
@@ -126,7 +128,7 @@ final class ReaderViewModel {
     }
 
     var libraryRootURL: URL? {
-        currentSourceURL?.deletingLastPathComponent()
+        explicitLibraryRootURL ?? currentSourceURL?.deletingLastPathComponent()
     }
 
     func openSource() {
@@ -150,6 +152,37 @@ final class ReaderViewModel {
     func openURL(_ url: URL) {
         recentItems.record(url, title: displayTitle(for: url))
         Task { await load(url: url) }
+    }
+
+    func requestFolderAccess() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Select"
+        panel.message = "Select a folder to browse books from."
+        if let parent = currentSourceURL?.deletingLastPathComponent() {
+            panel.directoryURL = parent
+        }
+
+        guard panel.runModal() == .OK, let folderURL = panel.url else { return }
+
+        rootScopedURL?.stopAccessingSecurityScopedResource()
+        rootScopedURL = nil
+        if folderURL.startAccessingSecurityScopedResource() {
+            rootScopedURL = folderURL
+        }
+
+        recentItems.record(folderURL, title: displayTitle(for: folderURL))
+        explicitLibraryRootURL = folderURL
+
+        Task {
+            let volumes = await Self.enumerateVolumes(in: folderURL)
+            if let current = currentSourceURL, isInsideRootScope(current) {
+                siblings = volumes.isEmpty ? [current] : volumes
+            }
+            libraryRefreshToken = UUID()
+        }
     }
 
     private func displayTitle(for url: URL) -> String {
@@ -230,6 +263,7 @@ final class ReaderViewModel {
             if url.startAccessingSecurityScopedResource() {
                 rootScopedURL = url
             }
+            explicitLibraryRootURL = nil
         }
 
         var targetURL = url

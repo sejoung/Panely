@@ -13,12 +13,14 @@ struct ReaderScene: View {
                 LibrarySidebar(
                     rootURL: viewModel.libraryRootURL,
                     activeURL: viewModel.currentSourceURL,
+                    refreshToken: viewModel.libraryRefreshToken,
                     onSelect: { url in
                         viewModel.openURL(url)
                         isFocused = true
                     },
                     onOpen: { viewModel.openSource() },
-                    onHide: { viewModel.toggleSidebar() }
+                    onHide: { viewModel.toggleSidebar() },
+                    onRequestFolderAccess: { viewModel.requestFolderAccess() }
                 )
                 .transition(.move(edge: .leading).combined(with: .opacity))
             }

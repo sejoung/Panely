@@ -3,11 +3,14 @@ import SwiftUI
 struct LibrarySidebar: View {
     let rootURL: URL?
     let activeURL: URL?
+    let refreshToken: UUID
     let onSelect: (URL) -> Void
     let onOpen: () -> Void
     let onHide: () -> Void
+    let onRequestFolderAccess: () -> Void
 
     @State private var nodes: [FileNode] = []
+    @State private var scanCompleted = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -16,14 +19,24 @@ struct LibrarySidebar: View {
             Divider()
                 .overlay(PanelyColor.borderSubtle)
 
-            if rootURL == nil {
-                emptyState
-            } else {
-                tree
-            }
+            content
         }
         .frame(width: 240)
         .background(PanelyColor.bgSecondary)
+        .task(id: taskID) {
+            await reload()
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if rootURL == nil {
+            emptyState
+        } else if scanCompleted && nodes.isEmpty {
+            accessPrompt
+        } else {
+            tree
+        }
     }
 
     private var header: some View {
@@ -53,13 +66,21 @@ struct LibrarySidebar: View {
         }
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
-        .task(id: rootURL) {
-            guard let rootURL else {
-                nodes = []
-                return
-            }
-            nodes = await FileNode.loadTree(from: rootURL, maxDepth: 3)
+    }
+
+    private var taskID: String {
+        "\(rootURL?.path ?? "")#\(refreshToken.uuidString)"
+    }
+
+    private func reload() async {
+        guard let rootURL else {
+            nodes = []
+            scanCompleted = false
+            return
         }
+        scanCompleted = false
+        nodes = await FileNode.loadTree(from: rootURL, maxDepth: 3)
+        scanCompleted = true
     }
 
     private var emptyState: some View {
@@ -82,14 +103,38 @@ struct LibrarySidebar: View {
         .frame(maxWidth: .infinity)
         .padding(PanelySpacing.md)
     }
+
+    private var accessPrompt: some View {
+        VStack(spacing: PanelySpacing.sm) {
+            Spacer()
+            Image(systemName: "folder.badge.plus")
+                .font(.system(size: 28, weight: .light))
+                .foregroundStyle(PanelyColor.textSecondary)
+            Text("No books to show")
+                .font(PanelyTypography.body)
+                .foregroundStyle(PanelyColor.textPrimary)
+            Text("Pick a folder to browse its contents.")
+                .font(PanelyTypography.caption)
+                .foregroundStyle(PanelyColor.textSecondary)
+                .multilineTextAlignment(.center)
+            Button(action: onRequestFolderAccess) {
+                Text("Pick Folder…")
+                    .font(PanelyTypography.caption)
+                    .foregroundStyle(PanelyColor.accentPrimary)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, PanelySpacing.xs)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+        .padding(PanelySpacing.md)
+    }
 }
 
 private struct FileNodeRow: View {
     let node: FileNode
     let isActive: Bool
     let onTap: () -> Void
-
-    @State private var isHovering = false
 
     var body: some View {
         Button(action: onTap) {
@@ -107,7 +152,6 @@ private struct FileNodeRow: View {
             .padding(.vertical, 2)
         }
         .buttonStyle(.plain)
-        .onHover { isHovering = $0 }
     }
 }
 
@@ -115,9 +159,11 @@ private struct FileNodeRow: View {
     LibrarySidebar(
         rootURL: URL(fileURLWithPath: "/Users/demo/Comics/OnePiece"),
         activeURL: nil,
+        refreshToken: UUID(),
         onSelect: { _ in },
         onOpen: {},
-        onHide: {}
+        onHide: {},
+        onRequestFolderAccess: {}
     )
     .frame(height: 480)
     .background(PanelyColor.bgPrimary)
