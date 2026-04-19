@@ -23,7 +23,7 @@ final class ReaderViewModel {
 
     let recentItems: RecentItemsStore
 
-    private var currentScopedURL: URL?
+    private var rootScopedURL: URL?
 
     private let imageCache: NSCache<NSString, NSImage> = {
         let cache = NSCache<NSString, NSImage>()
@@ -224,10 +224,12 @@ final class ReaderViewModel {
     private func load(url: URL, knownSiblings: [URL]? = nil) async {
         preloadTask?.cancel()
 
-        currentScopedURL?.stopAccessingSecurityScopedResource()
-        currentScopedURL = nil
-        if url.startAccessingSecurityScopedResource() {
-            currentScopedURL = url
+        if !isInsideRootScope(url) {
+            rootScopedURL?.stopAccessingSecurityScopedResource()
+            rootScopedURL = nil
+            if url.startAccessingSecurityScopedResource() {
+                rootScopedURL = url
+            }
         }
 
         var targetURL = url
@@ -281,6 +283,13 @@ final class ReaderViewModel {
             currentSourceURL = nil
             siblings = []
         }
+    }
+
+    private func isInsideRootScope(_ url: URL) -> Bool {
+        guard let root = rootScopedURL else { return false }
+        let rootPath = root.standardizedFileURL.path
+        let target = url.standardizedFileURL.path
+        return target == rootPath || target.hasPrefix(rootPath + "/")
     }
 
     private func savePosition() {
