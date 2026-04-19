@@ -8,9 +8,12 @@ final class ReaderViewModel {
     private static let layoutKey = "panely.layout"
     private static let directionKey = "panely.direction"
     private static let sidebarVisibleKey = "panely.sidebarVisible"
+    private static let positionsKey = "panely.positions"
 
     private(set) var source: ComicSource = .empty
-    private(set) var currentPageIndex: Int = 0
+    private(set) var currentPageIndex: Int = 0 {
+        didSet { savePosition() }
+    }
     private(set) var currentImages: [NSImage] = []
     private(set) var errorMessage: String?
 
@@ -225,7 +228,7 @@ final class ReaderViewModel {
             } else {
                 siblings = await Self.scanSiblings(of: targetURL)
             }
-            currentPageIndex = 0
+            currentPageIndex = clampedRestoredIndex(for: targetURL, pageCount: loaded.pageCount)
             errorMessage = loaded.isEmpty ? "No images found" : nil
             await refreshImages()
         } catch {
@@ -235,6 +238,25 @@ final class ReaderViewModel {
             currentSourceURL = nil
             siblings = []
         }
+    }
+
+    private func savePosition() {
+        guard let url = currentSourceURL else { return }
+        var positions = UserDefaults.standard.dictionary(forKey: Self.positionsKey) as? [String: Int] ?? [:]
+        positions[url.path] = currentPageIndex
+        UserDefaults.standard.set(positions, forKey: Self.positionsKey)
+    }
+
+    private func restoredIndex(for url: URL) -> Int {
+        let positions = UserDefaults.standard.dictionary(forKey: Self.positionsKey) as? [String: Int] ?? [:]
+        return positions[url.path] ?? 0
+    }
+
+    private func clampedRestoredIndex(for url: URL, pageCount: Int) -> Int {
+        guard pageCount > 0 else { return 0 }
+        let restored = restoredIndex(for: url)
+        let snapped = (restored / navigationStep) * navigationStep
+        return min(max(snapped, 0), pageCount - 1)
     }
 
     private func refreshImages() async {
