@@ -17,7 +17,8 @@ struct ReaderScene: View {
                         viewModel.openURL(url)
                         isFocused = true
                     },
-                    onOpen: { viewModel.openSource() }
+                    onOpen: { viewModel.openSource() },
+                    onHide: { viewModel.toggleSidebar() }
                 )
                 .transition(.move(edge: .leading).combined(with: .opacity))
             }
@@ -25,7 +26,22 @@ struct ReaderScene: View {
             viewerArea
         }
         .animation(PanelyMotion.uiReveal, value: viewModel.sidebarVisible)
+        .overlay(alignment: .topLeading) {
+            if !viewModel.sidebarVisible && !toolbarVisible {
+                showSidebarHandle
+            }
+        }
         .frame(minWidth: 800, minHeight: 600)
+    }
+
+    private var showSidebarHandle: some View {
+        PanelyIconButton(
+            systemImage: "sidebar.left",
+            action: { viewModel.toggleSidebar() }
+        )
+        .help("Show Library (⌃⌘S)")
+        .padding(PanelySpacing.sm)
+        .transition(.opacity)
     }
 
     private var viewerArea: some View {

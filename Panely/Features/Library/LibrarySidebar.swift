@@ -5,6 +5,7 @@ struct LibrarySidebar: View {
     let activeURL: URL?
     let onSelect: (URL) -> Void
     let onOpen: () -> Void
+    let onHide: () -> Void
 
     @State private var nodes: [FileNode] = []
 
@@ -33,10 +34,12 @@ struct LibrarySidebar: View {
                 .font(PanelyTypography.body)
                 .foregroundStyle(PanelyColor.textPrimary)
                 .lineLimit(1)
-            Spacer()
+            Spacer(minLength: 0)
+            PanelyIconButton(systemImage: "sidebar.left", action: onHide)
+                .help("Hide Library (⌃⌘S)")
         }
-        .padding(.horizontal, PanelySpacing.md)
-        .padding(.vertical, PanelySpacing.sm)
+        .padding(.horizontal, PanelySpacing.sm)
+        .padding(.vertical, PanelySpacing.xs)
     }
 
     private var tree: some View {
@@ -113,7 +116,8 @@ private struct FileNodeRow: View {
         rootURL: URL(fileURLWithPath: "/Users/demo/Comics/OnePiece"),
         activeURL: nil,
         onSelect: { _ in },
-        onOpen: {}
+        onOpen: {},
+        onHide: {}
     )
     .frame(height: 480)
     .background(PanelyColor.bgPrimary)
