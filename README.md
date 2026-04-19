@@ -10,9 +10,10 @@
 </p>
 
 <p align="center">
-  <img alt="platform" src="https://img.shields.io/badge/platform-macOS%2026%2B-blue">
+  <img alt="platform" src="https://img.shields.io/badge/platform-macOS%2014%2B-blue">
   <img alt="swift" src="https://img.shields.io/badge/swift-5-orange">
   <img alt="license" src="https://img.shields.io/badge/license-Apache%202.0-green">
+  <a href="https://github.com/sejoung/Panely/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/sejoung/Panely/actions/workflows/ci.yml/badge.svg"></a>
 </p>
 
 ---
@@ -51,8 +52,8 @@ because reading comics in a bright chrome is fatiguing.
 
 ## Requirements
 
-- **macOS 26.4** or later
-- **Xcode 26** or later (for building from source)
+- **macOS 14** (Sonoma) or later
+- **Xcode 16** or later (for building from source)
 
 ## Getting Started
 
@@ -155,6 +156,36 @@ scripts/generate-app-icon.sh
 This rasterizes the SVG at all required sizes (16–1024), embeds sRGB
 profiles, and produces `Panely/AppIcon.icns`. Requires `librsvg` and
 `imagemagick` from Homebrew.
+
+## Releasing
+
+Releases are built and published automatically by
+[`.github/workflows/release.yml`](.github/workflows/release.yml) when a tag
+matching `v*` is pushed.
+
+```bash
+# bump MARKETING_VERSION in Panely.xcodeproj if needed, then:
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The workflow will:
+
+1. Build `Panely.app` with ad-hoc signing on a `macos-latest` runner.
+2. Zip the bundle with `ditto` (preserves resource forks).
+3. Create a GitHub Release with auto-generated notes and the zip attached.
+
+Since the build uses ad-hoc signing (no Apple Developer account required),
+first-time users will need to right-click the app and choose **Open** to
+bypass Gatekeeper.
+
+### CI / storage
+
+- **CI** runs on every push/PR, builds Debug only, and **uploads no artifacts**
+  — storage footprint is essentially zero.
+- **Releases** attach a single zip (typically &lt;10 MB) to GitHub Releases.
+- **SPM cache** speeds up subsequent runs; invalidates on `Package.resolved`
+  or `project.pbxproj` changes.
 
 ## Roadmap
 

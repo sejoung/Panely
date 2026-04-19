@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Cache Swift Package Manager
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+          key: spm-${{ runner.os }}-${{ hashFiles('**/Package.resolved', '**/*.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
+
+      - name: Build Release
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Panely.xcodeproj \
+            -scheme Panely \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=YES \
+            build
+
+      - name: Package app
+        id: package
+        run: |
+          APP_PATH="build/DerivedData/Build/Products/Release/Panely.app"
+          VERSION="${GITHUB_REF_NAME#v}"
+          ZIP_NAME="Panely-${VERSION}.zip"
+
+          if [ ! -d "$APP_PATH" ]; then
+            echo "error: build output not found at $APP_PATH" >&2
+            exit 1
+          fi
+
+          ditto -c -k --keepParent --sequesterRsrc "$APP_PATH" "$ZIP_NAME"
+          ls -lh "$ZIP_NAME"
+          echo "zip_name=$ZIP_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.package.outputs.zip_name }}
+          generate_release_notes: true
+          body: |
+            ## Install
+
+            1. Download **${{ steps.package.outputs.zip_name }}** below
+            2. Unzip and drag `Panely.app` to `/Applications`
+            3. First launch: right-click → **Open** (macOS may warn about unverified developer since this build is ad-hoc signed)
