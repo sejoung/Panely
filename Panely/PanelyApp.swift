@@ -17,6 +17,13 @@ struct PanelyApp: App {
                 .keyboardShortcut("o", modifiers: .command)
             }
 
+            CommandMenu("View") {
+                Button(viewModel.sidebarVisible ? "Hide Library" : "Show Library") {
+                    viewModel.toggleSidebar()
+                }
+                .keyboardShortcut("s", modifiers: [.control, .command])
+            }
+
             CommandMenu("Go") {
                 Button("Previous Volume") {
                     viewModel.previousVolume()

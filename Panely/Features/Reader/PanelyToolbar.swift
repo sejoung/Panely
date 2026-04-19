@@ -3,11 +3,13 @@ import SwiftUI
 struct PanelyToolbar: View {
     let layout: PageLayout
     let direction: ReadingDirection
+    let sidebarVisible: Bool
     let onOpen: () -> Void
     let onPrev: () -> Void
     let onNext: () -> Void
     let onToggleLayout: () -> Void
     let onToggleDirection: () -> Void
+    let onToggleSidebar: () -> Void
 
     var showVolumeNav: Bool = false
     var canGoPreviousVolume: Bool = false
@@ -15,17 +17,17 @@ struct PanelyToolbar: View {
     var onPreviousVolume: () -> Void = {}
     var onNextVolume: () -> Void = {}
 
-    var onToggleSidebar: (() -> Void)? = nil
-
     var body: some View {
         HStack(spacing: PanelySpacing.xs) {
             PanelyIconButton(systemImage: "folder", action: onOpen)
                 .help("Open Folder or CBZ… (⌘O)")
 
-            if let onToggleSidebar {
-                PanelyIconButton(systemImage: "sidebar.left", action: onToggleSidebar)
-                    .help("Toggle Sidebar")
-            }
+            PanelyIconButton(
+                systemImage: "sidebar.left",
+                isActive: sidebarVisible,
+                action: onToggleSidebar
+            )
+            .help(sidebarVisible ? "Hide Library (⌃⌘S)" : "Show Library (⌃⌘S)")
 
             Divider()
                 .frame(height: 18)
@@ -113,17 +115,18 @@ struct PanelyToolbar: View {
     PanelyToolbar(
         layout: .double,
         direction: .rightToLeft,
+        sidebarVisible: true,
         onOpen: {},
         onPrev: {},
         onNext: {},
         onToggleLayout: {},
         onToggleDirection: {},
+        onToggleSidebar: {},
         showVolumeNav: true,
         canGoPreviousVolume: true,
         canGoNextVolume: false,
         onPreviousVolume: {},
-        onNextVolume: {},
-        onToggleSidebar: {}
+        onNextVolume: {}
     )
     .padding(PanelySpacing.xl)
     .frame(width: 640)

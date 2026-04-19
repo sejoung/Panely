@@ -8,6 +8,27 @@ struct ReaderScene: View {
     private let revealZoneHeight: CGFloat = 80
 
     var body: some View {
+        HStack(spacing: 0) {
+            if viewModel.sidebarVisible {
+                LibrarySidebar(
+                    rootURL: viewModel.libraryRootURL,
+                    activeURL: viewModel.currentSourceURL,
+                    onSelect: { url in
+                        viewModel.openURL(url)
+                        isFocused = true
+                    },
+                    onOpen: { viewModel.openSource() }
+                )
+                .transition(.move(edge: .leading).combined(with: .opacity))
+            }
+
+            viewerArea
+        }
+        .animation(PanelyMotion.uiReveal, value: viewModel.sidebarVisible)
+        .frame(minWidth: 800, minHeight: 600)
+    }
+
+    private var viewerArea: some View {
         ViewerContainer(
             images: viewModel.currentImages,
             direction: viewModel.direction
@@ -38,18 +59,22 @@ struct ReaderScene: View {
             return .handled
         }
         .onAppear { isFocused = true }
-        .frame(minWidth: 800, minHeight: 600)
+        .onChange(of: viewModel.currentSourceURL) { _, _ in
+            isFocused = true
+        }
     }
 
     private var toolbarOverlay: some View {
         PanelyToolbar(
             layout: viewModel.layout,
             direction: viewModel.direction,
+            sidebarVisible: viewModel.sidebarVisible,
             onOpen: { viewModel.openSource() },
             onPrev: { viewModel.previous() },
             onNext: { viewModel.next() },
             onToggleLayout: { viewModel.toggleLayout() },
             onToggleDirection: { viewModel.toggleDirection() },
+            onToggleSidebar: { viewModel.toggleSidebar() },
             showVolumeNav: viewModel.hasMultipleVolumes,
             canGoPreviousVolume: viewModel.canGoPreviousVolume,
             canGoNextVolume: viewModel.canGoNextVolume,

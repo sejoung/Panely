@@ -7,6 +7,7 @@ import UniformTypeIdentifiers
 final class ReaderViewModel {
     private static let layoutKey = "panely.layout"
     private static let directionKey = "panely.direction"
+    private static let sidebarVisibleKey = "panely.sidebarVisible"
 
     private(set) var source: ComicSource = .empty
     private(set) var currentPageIndex: Int = 0
@@ -26,6 +27,12 @@ final class ReaderViewModel {
         }
     }
 
+    var sidebarVisible: Bool = true {
+        didSet {
+            UserDefaults.standard.set(sidebarVisible, forKey: Self.sidebarVisibleKey)
+        }
+    }
+
     init() {
         if let raw = UserDefaults.standard.string(forKey: Self.layoutKey),
            let stored = PageLayout(rawValue: raw) {
@@ -34,6 +41,9 @@ final class ReaderViewModel {
         if let raw = UserDefaults.standard.string(forKey: Self.directionKey),
            let stored = ReadingDirection(rawValue: raw) {
             direction = stored
+        }
+        if UserDefaults.standard.object(forKey: Self.sidebarVisibleKey) != nil {
+            sidebarVisible = UserDefaults.standard.bool(forKey: Self.sidebarVisibleKey)
         }
     }
 
@@ -87,6 +97,10 @@ final class ReaderViewModel {
         return "\(vol) · \(pageCounterLabel)"
     }
 
+    var libraryRootURL: URL? {
+        currentSourceURL?.deletingLastPathComponent()
+    }
+
     func openSource() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
@@ -102,6 +116,14 @@ final class ReaderViewModel {
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
         Task { await load(url: url) }
+    }
+
+    func openURL(_ url: URL) {
+        Task { await load(url: url) }
+    }
+
+    func toggleSidebar() {
+        sidebarVisible.toggle()
     }
 
     func next() {
