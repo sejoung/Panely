@@ -20,6 +20,14 @@ final class ReaderViewModel {
     private(set) var currentSourceURL: URL?
     private(set) var siblings: [URL] = []
 
+    private let imageCache: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 10
+        return cache
+    }()
+    private var preloadTask: Task<Void, Never>?
+    private let preloadRadius = 2
+
     var layout: PageLayout = .single {
         didSet { handleLayoutChange() }
     }
@@ -187,6 +195,8 @@ final class ReaderViewModel {
     }
 
     private func load(url: URL, knownSiblings: [URL]? = nil) async {
+        preloadTask?.cancel()
+
         var targetURL = url
         var siblingsToUse = knownSiblings
 
@@ -268,13 +278,69 @@ final class ReaderViewModel {
 
         var images: [NSImage] = []
         for page in pages {
-            do {
-                images.append(try await ImageLoader.load(page))
-            } catch {
-                errorMessage = "Failed to load \(page.displayName)"
+            if let image = await loadVisibleImage(page) {
+                images.append(image)
             }
         }
         currentImages = images
+
+        schedulePreload()
+    }
+
+    private func cachedImage(for page: ComicPage) -> NSImage? {
+        imageCache.object(forKey: page.id.uuidString as NSString)
+    }
+
+    private func cacheImage(_ image: NSImage, for page: ComicPage) {
+        imageCache.setObject(image, forKey: page.id.uuidString as NSString)
+    }
+
+    private func loadVisibleImage(_ page: ComicPage) async -> NSImage? {
+        if let cached = cachedImage(for: page) {
+            return cached
+        }
+        do {
+            let image = try await ImageLoader.load(page)
+            cacheImage(image, for: page)
+            return image
+        } catch {
+            errorMessage = "Failed to load \(page.displayName)"
+            return nil
+        }
+    }
+
+    private func preloadIfNeeded(_ page: ComicPage) async {
+        if cachedImage(for: page) != nil { return }
+        guard let image = try? await ImageLoader.load(page) else { return }
+        cacheImage(image, for: page)
+    }
+
+    private func pagesToPreload() -> [ComicPage] {
+        guard !source.pages.isEmpty else { return [] }
+        let step = navigationStep
+        let visibleEnd = min(currentPageIndex + step, source.pageCount)
+        let start = max(0, currentPageIndex - preloadRadius * step)
+        let end = min(source.pageCount, visibleEnd + preloadRadius * step)
+
+        var result: [ComicPage] = []
+        let visibleRange = currentPageIndex..<visibleEnd
+        for i in start..<end where !visibleRange.contains(i) {
+            result.append(source.pages[i])
+        }
+        return result
+    }
+
+    private func schedulePreload() {
+        preloadTask?.cancel()
+        let pages = pagesToPreload()
+        guard !pages.isEmpty else { return }
+
+        preloadTask = Task { [weak self] in
+            for page in pages {
+                if Task.isCancelled { return }
+                await self?.preloadIfNeeded(page)
+            }
+        }
     }
 
     nonisolated private static func scanSiblings(of url: URL) async -> [URL] {
