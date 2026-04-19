@@ -163,6 +163,26 @@ Releases are built and published automatically by
 [`.github/workflows/release.yml`](.github/workflows/release.yml) when a tag
 matching `v*` is pushed.
 
+The easiest way is to use the helper script:
+
+```bash
+scripts/release.sh patch   # 1.0.0 -> 1.0.1
+scripts/release.sh minor   # 1.0.1 -> 1.1.0
+scripts/release.sh major   # 1.1.0 -> 2.0.0
+scripts/release.sh 1.2.3   # explicit version
+scripts/release.sh         # interactive prompt
+```
+
+The script:
+
+1. Checks that the working tree is clean and on `main`, in sync with origin.
+2. Runs local tests (set `SKIP_TESTS=1` to skip).
+3. Bumps `MARKETING_VERSION` in `project.pbxproj`.
+4. Commits (`chore: release vX.Y.Z`) and tags.
+5. Pushes `main` and the tag (set `NO_PUSH=1` to stop before pushing).
+
+If you prefer doing it by hand:
+
 ```bash
 # bump MARKETING_VERSION in Panely.xcodeproj if needed, then:
 git tag v1.0.0
