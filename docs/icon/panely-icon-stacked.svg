@@ -1,0 +1,43 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="160" y1="120" x2="864" y2="904" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1E2430"/>
+      <stop offset="1" stop-color="#11151D"/>
+    </linearGradient>
+    <linearGradient id="panelFront" x1="316" y1="262" x2="742" y2="760" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F8FBFF"/>
+      <stop offset="1" stop-color="#D8E7FF"/>
+    </linearGradient>
+    <linearGradient id="panelMid" x1="264" y1="236" x2="700" y2="734" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7EB7FF"/>
+      <stop offset="1" stop-color="#3A7BFF"/>
+    </linearGradient>
+    <linearGradient id="panelBack" x1="214" y1="212" x2="654" y2="704" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3F5C96"/>
+      <stop offset="1" stop-color="#22314D"/>
+    </linearGradient>
+    <filter id="shadow" x="98" y="114" width="828" height="776" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="22"/>
+      <feGaussianBlur stdDeviation="24"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.020 0 0 0 0 0.042 0 0 0 0 0.090 0 0 0 0.28 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_2"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_2" result="shape"/>
+    </filter>
+  </defs>
+
+  <rect x="96" y="96" width="832" height="832" rx="188" fill="url(#bg)"/>
+
+  <g filter="url(#shadow)">
+    <rect x="218" y="238" width="418" height="520" rx="44" transform="rotate(-7 218 238)" fill="url(#panelBack)"/>
+    <rect x="286" y="212" width="432" height="544" rx="48" transform="rotate(4 286 212)" fill="url(#panelMid)"/>
+    <rect x="302" y="248" width="438" height="544" rx="52" fill="url(#panelFront)"/>
+
+    <rect x="354" y="314" width="128" height="164" rx="24" fill="#2B3C5F" fill-opacity="0.18"/>
+    <rect x="510" y="314" width="178" height="84" rx="22" fill="#2B3C5F" fill-opacity="0.14"/>
+    <rect x="510" y="414" width="178" height="174" rx="26" fill="#2B3C5F" fill-opacity="0.1"/>
+    <rect x="354" y="506" width="128" height="214" rx="24" fill="#2B3C5F" fill-opacity="0.12"/>
+    <rect x="510" y="612" width="178" height="108" rx="24" fill="#2B3C5F" fill-opacity="0.16"/>
+  </g>
+</svg>
