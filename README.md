@@ -58,6 +58,10 @@ pages.
   shown with folder / archive icons
 - **Folder access grant** — when a single file is opened and siblings aren't
   visible, the sidebar offers a one-click prompt to pick the enclosing folder
+- **Window controls** — with the title bar hidden, the top 28 px strip still
+  supports native drag-to-move and double-click-to-zoom (respecting the
+  system's `AppleActionOnDoubleClick` preference); an open-hand cursor
+  makes the draggable region obvious
 
 ### State persistence
 - **Resume where you left off** — per-book page memory with a stable key that
@@ -88,10 +92,10 @@ Panely uses Swift Package Manager. The only external dependency is:
 
 Xcode resolves it automatically on first build.
 
-## Keyboard Shortcuts
+## Shortcuts &amp; Gestures
 
-| Shortcut | Action |
-|:---------|:-------|
+| Input | Action |
+|:------|:-------|
 | `⌘O` | Open folder / CBZ / ZIP |
 | `←` / `→` | Previous / next page (direction-aware) |
 | `Space` | Next page |
@@ -100,6 +104,8 @@ Xcode resolves it automatically on first build.
 | `⌃⌘S` | Toggle library sidebar |
 | Double-click on image | Toggle 1× ↔ 2× zoom |
 | Trackpad pinch | Zoom in / out |
+| Drag top 28 px strip | Move window |
+| Double-click top 28 px strip | Zoom / minimize window (per system preference) |
 
 ## Testing
 
@@ -197,6 +203,12 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
 - **`CenteringClipView`** overrides `constrainBoundsRect(_:)` to center the
   document when the viewport is larger — keeps the image in the middle when
   the sidebar is toggled.
+- **`TitleBarPassthrough`** — a thin NSView overlaying the top 28 px of the
+  viewer. `mouseDownCanMoveWindow = true` gives native window drag, an
+  `NSTrackingArea` with `.cursorUpdate` shows the open-hand cursor, and a
+  `mouseDown` override handles double-click zoom via
+  `AppleActionOnDoubleClick`. The overlay uses `.ignoresSafeArea(edges: .top)`
+  so it lines up with the actual window edge under `.hiddenTitleBar`.
 - **`FitCalculator`** — physical viewport (`scrollView.contentSize`) is
   magnification-invariant, so toggling fit modes produces stable
   magnifications (no feedback loop).

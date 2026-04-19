@@ -63,6 +63,7 @@ struct ReaderScene: View {
             .overlay(alignment: .top) {
                 TitleBarPassthrough()
                     .frame(height: 28)
+                    .ignoresSafeArea(edges: .top)
             }
             .overlay(alignment: .top) { toolbarOverlay }
             .overlay(alignment: .bottom) { sliderOverlay }

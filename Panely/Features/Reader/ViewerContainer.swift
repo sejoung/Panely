@@ -146,6 +146,23 @@ private final class TitleBarPassthroughView: NSView {
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        for area in trackingAreas {
+            removeTrackingArea(area)
+        }
+        let options: NSTrackingArea.Options = [
+            .cursorUpdate,
+            .activeInKeyWindow,
+            .inVisibleRect,
+        ]
+        addTrackingArea(NSTrackingArea(rect: .zero, options: options, owner: self, userInfo: nil))
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        NSCursor.openHand.set()
+    }
+
     override func mouseDown(with event: NSEvent) {
         if event.clickCount == 2 {
             let action = UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick")
