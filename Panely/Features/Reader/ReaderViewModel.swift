@@ -21,6 +21,10 @@ final class ReaderViewModel {
     private(set) var currentSourceURL: URL?
     private(set) var siblings: [URL] = []
 
+    let recentItems: RecentItemsStore
+
+    private var currentScopedURL: URL?
+
     private let imageCache: NSCache<NSString, NSImage> = {
         let cache = NSCache<NSString, NSImage>()
         cache.countLimit = 10
@@ -52,6 +56,8 @@ final class ReaderViewModel {
     }
 
     init() {
+        self.recentItems = RecentItemsStore()
+
         if let raw = UserDefaults.standard.string(forKey: Self.layoutKey),
            let stored = PageLayout(rawValue: raw) {
             layout = stored
@@ -137,11 +143,17 @@ final class ReaderViewModel {
         panel.allowedContentTypes = types
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
+        recentItems.record(url, title: displayTitle(for: url))
         Task { await load(url: url) }
     }
 
     func openURL(_ url: URL) {
+        recentItems.record(url, title: displayTitle(for: url))
         Task { await load(url: url) }
+    }
+
+    private func displayTitle(for url: URL) -> String {
+        url.deletingPathExtension().lastPathComponent
     }
 
     func toggleSidebar() {
@@ -211,6 +223,12 @@ final class ReaderViewModel {
 
     private func load(url: URL, knownSiblings: [URL]? = nil) async {
         preloadTask?.cancel()
+
+        currentScopedURL?.stopAccessingSecurityScopedResource()
+        currentScopedURL = nil
+        if url.startAccessingSecurityScopedResource() {
+            currentScopedURL = url
+        }
 
         var targetURL = url
         var siblingsToUse = knownSiblings
