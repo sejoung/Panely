@@ -96,17 +96,18 @@ private struct AppKitImageScroller: NSViewRepresentable {
     private func applyFit(scrollView: NSScrollView, coordinator: Coordinator, force: Bool) {
         guard let content = scrollView.documentView else { return }
         let docSize = content.frame.size
-        let viewport = scrollView.contentView.bounds.size
+        // contentSize is the physical viewport (magnification-invariant); using
+        // contentView.bounds.size here would feed back into itself because it
+        // scales inversely with magnification, causing toggled fits to drift.
+        let viewport = scrollView.contentSize
         guard docSize.width > 0, docSize.height > 0,
               viewport.width > 0, viewport.height > 0 else { return }
 
-        let fit: CGFloat
-        switch fitMode {
-        case .fitScreen:
-            fit = min(viewport.width / docSize.width, viewport.height / docSize.height)
-        case .fitWidth:
-            fit = viewport.width / docSize.width
-        }
+        let fit = FitCalculator.magnification(
+            docSize: docSize,
+            viewport: viewport,
+            fitMode: fitMode
+        )
 
         let userHasZoomed = abs(scrollView.magnification - coordinator.baseMagnification) > 0.001
         if force || !userHasZoomed {
