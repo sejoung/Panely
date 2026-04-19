@@ -8,7 +8,9 @@ struct PanelyApp: App {
         WindowGroup {
             ContentView()
                 .environment(viewModel)
+                .preferredColorScheme(.dark)
         }
+        .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("Open…") {

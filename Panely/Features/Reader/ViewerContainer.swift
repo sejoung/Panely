@@ -54,6 +54,7 @@ private struct AppKitImageScroller: NSViewRepresentable {
 
     func makeNSView(context: Context) -> PanelyScrollView {
         let scrollView = PanelyScrollView()
+        scrollView.contentView = CenteringClipView()
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
         scrollView.autohidesScrollers = true
@@ -128,6 +129,25 @@ private struct AppKitImageScroller: NSViewRepresentable {
 
 private final class PanelyScrollView: NSScrollView {
     override var acceptsFirstResponder: Bool { false }
+}
+
+// MARK: - Clip view that centers the document when it's smaller than the viewport
+
+final class CenteringClipView: NSClipView {
+    override func constrainBoundsRect(_ proposedBounds: NSRect) -> NSRect {
+        var rect = super.constrainBoundsRect(proposedBounds)
+        guard let documentView else { return rect }
+
+        let docFrame = documentView.frame
+
+        if rect.size.width > docFrame.size.width {
+            rect.origin.x = docFrame.midX - rect.size.width / 2
+        }
+        if rect.size.height > docFrame.size.height {
+            rect.origin.y = docFrame.midY - rect.size.height / 2
+        }
+        return rect
+    }
 }
 
 // MARK: - Image stack NSView
