@@ -24,6 +24,8 @@ final class ReaderViewModel {
     let recentItems: RecentItemsStore
 
     private var rootScopedURL: URL?
+    private var currentTempDir: URL?
+    private var openedSourceURL: URL?
     private(set) var libraryRefreshToken: UUID = UUID()
     private var explicitLibraryRootURL: URL?
 
@@ -257,22 +259,41 @@ final class ReaderViewModel {
     private func load(url: URL, knownSiblings: [URL]? = nil) async {
         preloadTask?.cancel()
 
-        if !isInsideRootScope(url) {
+        if !isInsideCurrentTree(url) {
+            cleanupTempDir()
             rootScopedURL?.stopAccessingSecurityScopedResource()
             rootScopedURL = nil
             if url.startAccessingSecurityScopedResource() {
                 rootScopedURL = url
             }
             explicitLibraryRootURL = nil
+            openedSourceURL = url
         }
 
         var targetURL = url
         var siblingsToUse = knownSiblings
 
-        let isDirectory = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
+        if currentTempDir == nil {
+            let ext = url.pathExtension.lowercased()
+            let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
+            if !isDir && CBZLoader.supportedExtensions.contains(ext) {
+                if let hasNested = try? await CBZLoader.hasNestedArchives(at: url), hasNested {
+                    let tempDir = Self.makeTempDir()
+                    do {
+                        try await CBZLoader.extractAll(from: url, to: tempDir)
+                        currentTempDir = tempDir
+                        targetURL = tempDir
+                    } catch {
+                        try? FileManager.default.removeItem(at: tempDir)
+                    }
+                }
+            }
+        }
+
+        let isDirectory = (try? targetURL.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
 
         if isDirectory {
-            let (hasImages, volumes) = await Self.analyzeFolder(url)
+            let (hasImages, volumes) = await Self.analyzeFolder(targetURL)
 
             if !hasImages && !volumes.isEmpty {
                 guard let first = volumes.first else { return }
@@ -326,16 +347,67 @@ final class ReaderViewModel {
         return target == rootPath || target.hasPrefix(rootPath + "/")
     }
 
+    private func isInsideCurrentTree(_ url: URL) -> Bool {
+        let target = url.standardizedFileURL.path
+
+        if let temp = currentTempDir {
+            let tempPath = temp.standardizedFileURL.path
+            if target == tempPath || target.hasPrefix(tempPath + "/") {
+                return true
+            }
+        }
+
+        return isInsideRootScope(url)
+    }
+
+    private func cleanupTempDir() {
+        guard let dir = currentTempDir else { return }
+        try? FileManager.default.removeItem(at: dir)
+        currentTempDir = nil
+    }
+
+    private static func makeTempDir() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("panely-\(UUID().uuidString)", isDirectory: true)
+    }
+
     private func savePosition() {
         guard let url = currentSourceURL else { return }
+        let key = positionKey(for: url)
         var positions = UserDefaults.standard.dictionary(forKey: Self.positionsKey) as? [String: Int] ?? [:]
-        positions[url.path] = currentPageIndex
+        positions[key] = currentPageIndex
         UserDefaults.standard.set(positions, forKey: Self.positionsKey)
     }
 
     private func restoredIndex(for url: URL) -> Int {
+        let key = positionKey(for: url)
         let positions = UserDefaults.standard.dictionary(forKey: Self.positionsKey) as? [String: Int] ?? [:]
-        return positions[url.path] ?? 0
+        return positions[key] ?? 0
+    }
+
+    private func positionKey(for url: URL) -> String {
+        let sourcePath = url.standardizedFileURL.path
+
+        guard
+            let opened = openedSourceURL,
+            let tempDir = currentTempDir
+        else {
+            return sourcePath
+        }
+
+        let tempPath = tempDir.standardizedFileURL.path
+        let openedPath = opened.standardizedFileURL.path
+
+        if sourcePath == tempPath {
+            return openedPath
+        }
+
+        if sourcePath.hasPrefix(tempPath + "/") {
+            let relative = String(sourcePath.dropFirst(tempPath.count + 1))
+            return openedPath + "#" + relative
+        }
+
+        return sourcePath
     }
 
     private func clampedRestoredIndex(for url: URL, pageCount: Int) -> Int {

@@ -47,40 +47,44 @@ struct ReaderScene: View {
     }
 
     private var viewerArea: some View {
-        ViewerContainer(
-            images: viewModel.currentImages,
-            direction: viewModel.direction,
-            fitMode: viewModel.fitMode,
-            identity: viewerIdentity
-        )
-        .overlay(alignment: .top) { toolbarOverlay }
-        .overlay(alignment: .bottom) { sliderOverlay }
-        .onContinuousHover { phase in
-            switch phase {
-            case .active(let location):
-                toolbarVisible = location.y < revealZoneHeight
-            case .ended:
-                toolbarVisible = false
+        GeometryReader { geo in
+            ViewerContainer(
+                images: viewModel.currentImages,
+                direction: viewModel.direction,
+                fitMode: viewModel.fitMode,
+                identity: viewerIdentity
+            )
+            .overlay(alignment: .top) { toolbarOverlay }
+            .overlay(alignment: .bottom) { sliderOverlay }
+            .onContinuousHover { phase in
+                switch phase {
+                case .active(let location):
+                    let isTop = location.y < revealZoneHeight
+                    let isBottom = location.y > geo.size.height - revealZoneHeight
+                    toolbarVisible = isTop || isBottom
+                case .ended:
+                    toolbarVisible = false
+                }
             }
-        }
-        .focusable()
-        .focused($isFocused)
-        .focusEffectDisabled()
-        .onKeyPress(.leftArrow) {
-            viewModel.direction.isRTL ? viewModel.next() : viewModel.previous()
-            return .handled
-        }
-        .onKeyPress(.rightArrow) {
-            viewModel.direction.isRTL ? viewModel.previous() : viewModel.next()
-            return .handled
-        }
-        .onKeyPress(.space) {
-            viewModel.next()
-            return .handled
-        }
-        .onAppear { isFocused = true }
-        .onChange(of: viewModel.currentSourceURL) { _, _ in
-            isFocused = true
+            .focusable()
+            .focused($isFocused)
+            .focusEffectDisabled()
+            .onKeyPress(.leftArrow) {
+                viewModel.direction.isRTL ? viewModel.next() : viewModel.previous()
+                return .handled
+            }
+            .onKeyPress(.rightArrow) {
+                viewModel.direction.isRTL ? viewModel.previous() : viewModel.next()
+                return .handled
+            }
+            .onKeyPress(.space) {
+                viewModel.next()
+                return .handled
+            }
+            .onAppear { isFocused = true }
+            .onChange(of: viewModel.currentSourceURL) { _, _ in
+                isFocused = true
+            }
         }
     }
 
