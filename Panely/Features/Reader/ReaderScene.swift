@@ -47,7 +47,9 @@ struct ReaderScene: View {
     private var viewerArea: some View {
         ViewerContainer(
             images: viewModel.currentImages,
-            direction: viewModel.direction
+            direction: viewModel.direction,
+            fitMode: viewModel.fitMode,
+            identity: viewerIdentity
         )
         .overlay(alignment: .top) { toolbarOverlay }
         .overlay(alignment: .bottom) { sliderOverlay }
@@ -84,12 +86,14 @@ struct ReaderScene: View {
         PanelyToolbar(
             layout: viewModel.layout,
             direction: viewModel.direction,
+            fitMode: viewModel.fitMode,
             sidebarVisible: viewModel.sidebarVisible,
             onOpen: { viewModel.openSource() },
             onPrev: { viewModel.previous() },
             onNext: { viewModel.next() },
             onToggleLayout: { viewModel.toggleLayout() },
             onToggleDirection: { viewModel.toggleDirection() },
+            onToggleFitMode: { viewModel.toggleFitMode() },
             onToggleSidebar: { viewModel.toggleSidebar() },
             showVolumeNav: viewModel.hasMultipleVolumes,
             canGoPreviousVolume: viewModel.canGoPreviousVolume,
@@ -127,6 +131,10 @@ struct ReaderScene: View {
             get: { Double(viewModel.currentPageIndex) },
             set: { viewModel.jump(to: Int($0.rounded())) }
         )
+    }
+
+    private var viewerIdentity: String {
+        "\(viewModel.currentSourceURL?.path ?? "")#\(viewModel.currentPageIndex)"
     }
 }
 

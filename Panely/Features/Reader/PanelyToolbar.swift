@@ -3,12 +3,14 @@ import SwiftUI
 struct PanelyToolbar: View {
     let layout: PageLayout
     let direction: ReadingDirection
+    let fitMode: FitMode
     let sidebarVisible: Bool
     let onOpen: () -> Void
     let onPrev: () -> Void
     let onNext: () -> Void
     let onToggleLayout: () -> Void
     let onToggleDirection: () -> Void
+    let onToggleFitMode: () -> Void
     let onToggleSidebar: () -> Void
 
     var showVolumeNav: Bool = false
@@ -45,6 +47,12 @@ struct PanelyToolbar: View {
                 action: onToggleDirection
             )
             .help(directionHelp)
+
+            PanelyIconButton(
+                systemImage: fitSymbol,
+                action: onToggleFitMode
+            )
+            .help(fitHelp)
 
             Spacer()
 
@@ -102,6 +110,20 @@ struct PanelyToolbar: View {
         direction.isRTL ? "Read Left to Right" : "Read Right to Left"
     }
 
+    private var fitSymbol: String {
+        switch fitMode {
+        case .fitScreen: return "rectangle.arrowtriangle.2.inward"
+        case .fitWidth:  return "arrow.left.and.right.square"
+        }
+    }
+
+    private var fitHelp: String {
+        switch fitMode {
+        case .fitScreen: return "Switch to Fit Width (⌘2)"
+        case .fitWidth:  return "Switch to Fit Screen (⌘1)"
+        }
+    }
+
     private var previousKeyHint: String {
         direction.isRTL ? "→" : "←"
     }
@@ -115,12 +137,14 @@ struct PanelyToolbar: View {
     PanelyToolbar(
         layout: .double,
         direction: .rightToLeft,
+        fitMode: .fitScreen,
         sidebarVisible: true,
         onOpen: {},
         onPrev: {},
         onNext: {},
         onToggleLayout: {},
         onToggleDirection: {},
+        onToggleFitMode: {},
         onToggleSidebar: {},
         showVolumeNav: true,
         canGoPreviousVolume: true,

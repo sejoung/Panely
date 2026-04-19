@@ -9,6 +9,7 @@ final class ReaderViewModel {
     private static let directionKey = "panely.direction"
     private static let sidebarVisibleKey = "panely.sidebarVisible"
     private static let positionsKey = "panely.positions"
+    private static let fitModeKey = "panely.fitMode"
 
     private(set) var source: ComicSource = .empty
     private(set) var currentPageIndex: Int = 0 {
@@ -44,6 +45,12 @@ final class ReaderViewModel {
         }
     }
 
+    var fitMode: FitMode = .fitScreen {
+        didSet {
+            UserDefaults.standard.set(fitMode.rawValue, forKey: Self.fitModeKey)
+        }
+    }
+
     init() {
         if let raw = UserDefaults.standard.string(forKey: Self.layoutKey),
            let stored = PageLayout(rawValue: raw) {
@@ -55,6 +62,10 @@ final class ReaderViewModel {
         }
         if UserDefaults.standard.object(forKey: Self.sidebarVisibleKey) != nil {
             sidebarVisible = UserDefaults.standard.bool(forKey: Self.sidebarVisibleKey)
+        }
+        if let raw = UserDefaults.standard.string(forKey: Self.fitModeKey),
+           let stored = FitMode(rawValue: raw) {
+            fitMode = stored
         }
     }
 
@@ -185,6 +196,10 @@ final class ReaderViewModel {
 
     func toggleDirection() {
         direction = direction.isRTL ? .leftToRight : .rightToLeft
+    }
+
+    func toggleFitMode() {
+        fitMode = fitMode == .fitScreen ? .fitWidth : .fitScreen
     }
 
     private func handleLayoutChange() {

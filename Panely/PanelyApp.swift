@@ -22,6 +22,20 @@ struct PanelyApp: App {
                     viewModel.toggleSidebar()
                 }
                 .keyboardShortcut("s", modifiers: [.control, .command])
+
+                Divider()
+
+                Button("Fit to Screen") {
+                    viewModel.fitMode = .fitScreen
+                }
+                .keyboardShortcut("1", modifiers: .command)
+                .disabled(viewModel.fitMode == .fitScreen)
+
+                Button("Fit to Width") {
+                    viewModel.fitMode = .fitWidth
+                }
+                .keyboardShortcut("2", modifiers: .command)
+                .disabled(viewModel.fitMode == .fitWidth)
             }
 
             CommandMenu("Go") {
