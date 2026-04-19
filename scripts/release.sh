@@ -114,7 +114,6 @@ else
         -project Panely.xcodeproj \
         -scheme Panely \
         -destination 'platform=macOS' \
-        -skip-testing:PanelyUITests \
         CODE_SIGN_IDENTITY="-" \
         -quiet
     echo "✓ tests passed"

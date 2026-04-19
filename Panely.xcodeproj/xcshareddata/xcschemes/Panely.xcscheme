@@ -39,16 +39,6 @@
                ReferencedContainer = "container:Panely.xcodeproj">
             </BuildableReference>
          </TestableReference>
-         <TestableReference
-            skipped = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "B263CE2E2F94EE34006DD5A0"
-               BuildableName = "PanelyUITests.xctest"
-               BlueprintName = "PanelyUITests"
-               ReferencedContainer = "container:Panely.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

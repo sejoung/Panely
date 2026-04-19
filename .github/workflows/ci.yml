@@ -22,7 +22,7 @@ jobs:
   build:
     name: Build
     runs-on: macos-latest
-    if: ${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore: release ') }}
+    if: "${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore: release ') }}"
 
     steps:
       - name: Checkout
@@ -49,6 +49,5 @@ jobs:
             -scheme Panely \
             -configuration Debug \
             -destination 'platform=macOS' \
-            -skip-testing:PanelyUITests \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=YES
