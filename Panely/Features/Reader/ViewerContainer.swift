@@ -131,6 +131,38 @@ private final class PanelyScrollView: NSScrollView {
     override var acceptsFirstResponder: Bool { false }
 }
 
+// MARK: - Transparent top strip that forwards window drag / double-click-zoom
+
+struct TitleBarPassthrough: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        TitleBarPassthroughView()
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
+private final class TitleBarPassthroughView: NSView {
+    override var mouseDownCanMoveWindow: Bool { true }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func mouseDown(with event: NSEvent) {
+        if event.clickCount == 2 {
+            let action = UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick")
+            switch action {
+            case "Minimize":
+                window?.performMiniaturize(nil)
+            case "None":
+                break
+            default:
+                window?.performZoom(nil)
+            }
+            return
+        }
+        super.mouseDown(with: event)
+    }
+}
+
 // MARK: - Clip view that centers the document when it's smaller than the viewport
 
 final class CenteringClipView: NSClipView {

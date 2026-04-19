@@ -60,6 +60,10 @@ struct ReaderScene: View {
                 fitMode: viewModel.fitMode,
                 identity: viewerIdentity
             )
+            .overlay(alignment: .top) {
+                TitleBarPassthrough()
+                    .frame(height: 28)
+            }
             .overlay(alignment: .top) { toolbarOverlay }
             .overlay(alignment: .bottom) { sliderOverlay }
             .onContinuousHover { phase in
@@ -115,6 +119,7 @@ struct ReaderScene: View {
         )
         .padding(PanelySpacing.md)
         .opacity(toolbarVisible ? 1 : 0)
+        .allowsHitTesting(toolbarVisible)
         .animation(PanelyMotion.uiReveal, value: toolbarVisible)
     }
 
@@ -134,6 +139,7 @@ struct ReaderScene: View {
             .padding(.horizontal, PanelySpacing.xl)
             .padding(.bottom, PanelySpacing.lg)
             .opacity(toolbarVisible ? 1 : 0)
+            .allowsHitTesting(toolbarVisible)
             .animation(PanelyMotion.uiReveal, value: toolbarVisible)
         }
     }
