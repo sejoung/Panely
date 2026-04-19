@@ -24,6 +24,10 @@
 /* Begin PBXFileReference section */
 		B263CE162F94EE33006DD5A0 /* Panely.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Panely.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B263CE252F94EE34006DD5A0 /* PanelyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PanelyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B263CEA32F94F900006DD5A0 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		B263CEA42F94F900006DD5A0 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
+		B263CEA52F94F900006DD5A0 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B263CEA62F94F900006DD5A0 /* Panely.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Panely.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -35,6 +39,21 @@
 		B263CE282F94EE34006DD5A0 /* PanelyTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = PanelyTests;
+			sourceTree = "<group>";
+		};
+		B263CEA02F94F900006DD5A0 /* docs */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = docs;
+			sourceTree = "<group>";
+		};
+		B263CEA12F94F900006DD5A0 /* scripts */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = scripts;
+			sourceTree = "<group>";
+		};
+		B263CEA22F94F900006DD5A0 /* .github */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = .github;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -64,6 +83,13 @@
 			children = (
 				B263CE182F94EE33006DD5A0 /* Panely */,
 				B263CE282F94EE34006DD5A0 /* PanelyTests */,
+				B263CEA02F94F900006DD5A0 /* docs */,
+				B263CEA12F94F900006DD5A0 /* scripts */,
+				B263CEA22F94F900006DD5A0 /* .github */,
+				B263CEA52F94F900006DD5A0 /* Info.plist */,
+				B263CEA62F94F900006DD5A0 /* Panely.entitlements */,
+				B263CEA32F94F900006DD5A0 /* README.md */,
+				B263CEA42F94F900006DD5A0 /* LICENSE */,
 				B263CE882F94F819006DD5A0 /* Frameworks */,
 				B263CE172F94EE33006DD5A0 /* Products */,
 			);
