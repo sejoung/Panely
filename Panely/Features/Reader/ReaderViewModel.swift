@@ -12,8 +12,11 @@ final class ReaderViewModel {
     private static let positionsKey = "panely.positions"
     private static let fitModeKey = "panely.fitMode"
 
-    private(set) var source: ComicSource = .empty
-    private(set) var currentPageIndex: Int = 0 {
+    // setter is module-internal so tests can stage a source/page without
+    // going through the full file-load pipeline. Production callers should
+    // still treat this as read-only and mutate via load(url:) / next() etc.
+    var source: ComicSource = .empty
+    var currentPageIndex: Int = 0 {
         didSet { savePosition() }
     }
     private(set) var currentImages: [NSImage] = []
@@ -48,6 +51,14 @@ final class ReaderViewModel {
         didSet {
             UserDefaults.standard.set(direction.rawValue, forKey: Self.directionKey)
         }
+    }
+
+    /// Direction used for navigation/page-ordering decisions. In continuous
+    /// (vertical) layouts the user's RTL preference doesn't apply — webtoons
+    /// are top-to-bottom — but the underlying `direction` is preserved so it
+    /// returns once paged mode resumes.
+    var effectiveDirection: ReadingDirection {
+        layout.isContinuous ? .leftToRight : direction
     }
 
     private var sidebarMode = SidebarMode() {
@@ -92,11 +103,12 @@ final class ReaderViewModel {
     var totalPages: Int { source.pageCount }
     var hasSource: Bool { !source.isEmpty }
 
-    var navigationStep: Int {
-        layout == .double ? 2 : 1
-    }
+    var navigationStep: Int { layout.navigationStep }
 
     var visiblePages: [ComicPage] {
+        if layout.isContinuous {
+            return source.pages
+        }
         let start = currentPageIndex
         guard source.pages.indices.contains(start) else { return [] }
         let end = min(start + navigationStep, source.pageCount)
@@ -201,6 +213,17 @@ final class ReaderViewModel {
         url.deletingPathExtension().lastPathComponent
     }
 
+    /// Sync the page index with the viewer's current scroll position in
+    /// continuous (vertical) layouts. Updates `currentPageIndex` (and thus
+    /// the saved position) without triggering an image refresh, since all
+    /// pages are already loaded in the strip.
+    func setCurrentPageFromScroll(_ index: Int) {
+        guard layout.isContinuous else { return }
+        guard source.pages.indices.contains(index) else { return }
+        guard index != currentPageIndex else { return }
+        currentPageIndex = index
+    }
+
     func toggleSidebarPin() {
         sidebarMode.togglePin()
     }
@@ -217,7 +240,7 @@ final class ReaderViewModel {
         let target = currentPageIndex + navigationStep
         guard target < source.pageCount else { return }
         currentPageIndex = target
-        Task { await refreshImages() }
+        scheduleRefreshIfPaged()
     }
 
     func previous() {
@@ -225,11 +248,11 @@ final class ReaderViewModel {
         guard target >= 0 else {
             guard currentPageIndex > 0 else { return }
             currentPageIndex = 0
-            Task { await refreshImages() }
+            scheduleRefreshIfPaged()
             return
         }
         currentPageIndex = target
-        Task { await refreshImages() }
+        scheduleRefreshIfPaged()
     }
 
     func jump(to index: Int) {
@@ -238,6 +261,14 @@ final class ReaderViewModel {
         let clamped = min(max(snapped, 0), max(0, source.pageCount - 1))
         guard clamped != currentPageIndex else { return }
         currentPageIndex = clamped
+        scheduleRefreshIfPaged()
+    }
+
+    /// In continuous (vertical) layouts the entire strip is already loaded,
+    /// so paging just means scrolling — no need to re-iterate every page
+    /// through ImageLoader on every keystroke.
+    private func scheduleRefreshIfPaged() {
+        guard !layout.isContinuous else { return }
         Task { await refreshImages() }
     }
 
@@ -256,10 +287,19 @@ final class ReaderViewModel {
     }
 
     func toggleLayout() {
-        layout = layout == .single ? .double : .single
+        let target = layout.next
+        if target.isContinuous {
+            // Webtoon strips have heterogeneous heights — fit-screen makes
+            // no sense, so we lock fit-width on entering vertical mode.
+            fitMode = .fitWidth
+        }
+        layout = target
     }
 
     func toggleDirection() {
+        // Vertical strips have no left/right semantics — let the user keep
+        // their preference for when they return to a paged layout.
+        guard !layout.isContinuous else { return }
         direction = direction.isRTL ? .leftToRight : .rightToLeft
     }
 

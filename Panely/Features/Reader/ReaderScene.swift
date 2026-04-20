@@ -76,9 +76,12 @@ struct ReaderScene: View {
         GeometryReader { geo in
             ViewerContainer(
                 images: viewModel.currentImages,
-                direction: viewModel.direction,
+                direction: viewModel.effectiveDirection,
                 fitMode: viewModel.fitMode,
-                identity: viewerIdentity
+                layout: viewModel.layout,
+                pageIndex: viewModel.currentPageIndex,
+                identity: viewerIdentity,
+                onPageIndexChanged: { idx in viewModel.setCurrentPageFromScroll(idx) }
             )
             .overlay(alignment: .top) {
                 TitleBarPassthrough()
@@ -101,11 +104,11 @@ struct ReaderScene: View {
             .focused($isFocused)
             .focusEffectDisabled()
             .onKeyPress(.leftArrow) {
-                viewModel.direction.isRTL ? viewModel.next() : viewModel.previous()
+                viewModel.effectiveDirection.isRTL ? viewModel.next() : viewModel.previous()
                 return .handled
             }
             .onKeyPress(.rightArrow) {
-                viewModel.direction.isRTL ? viewModel.previous() : viewModel.next()
+                viewModel.effectiveDirection.isRTL ? viewModel.previous() : viewModel.next()
                 return .handled
             }
             .onKeyPress(.space) {
@@ -180,7 +183,9 @@ struct ReaderScene: View {
     }
 
     private var viewerIdentity: String {
-        "\(viewModel.currentSourceURL?.path ?? "")#\(viewModel.currentPageIndex)"
+        // Include layout so the viewer rebuilds the image stack when toggling
+        // between paged and vertical modes (different visiblePages set).
+        "\(viewModel.currentSourceURL?.path ?? "")#\(viewModel.layout.rawValue)"
     }
 
     private func scheduleSidebarDismiss() {

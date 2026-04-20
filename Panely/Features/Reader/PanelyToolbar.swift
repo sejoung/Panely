@@ -46,6 +46,7 @@ struct PanelyToolbar: View {
                 systemImage: directionSymbol,
                 action: onToggleDirection
             )
+            .disabled(layout.isContinuous)
             .help(directionHelp)
 
             PanelyIconButton(
@@ -101,13 +102,16 @@ struct PanelyToolbar: View {
     private var layoutHelp: String {
         switch layout {
         case .single:   return "Switch to Double Page"
-        case .double:   return "Switch to Single Page"
+        case .double:   return "Switch to Vertical Scroll"
         case .vertical: return "Switch to Single Page"
         }
     }
 
     private var directionHelp: String {
-        direction.isRTL ? "Read Left to Right" : "Read Right to Left"
+        if layout.isContinuous {
+            return "Reading direction is fixed in vertical mode"
+        }
+        return direction.isRTL ? "Read Left to Right" : "Read Right to Left"
     }
 
     private var fitSymbol: String {
