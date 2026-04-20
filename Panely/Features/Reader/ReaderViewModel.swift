@@ -7,7 +7,8 @@ import UniformTypeIdentifiers
 final class ReaderViewModel {
     private static let layoutKey = "panely.layout"
     private static let directionKey = "panely.direction"
-    private static let sidebarVisibleKey = "panely.sidebarVisible"
+    private static let sidebarPinnedKey = "panely.sidebarPinned"
+    private static let legacySidebarVisibleKey = "panely.sidebarVisible"
     private static let positionsKey = "panely.positions"
     private static let fitModeKey = "panely.fitMode"
 
@@ -49,11 +50,15 @@ final class ReaderViewModel {
         }
     }
 
-    var sidebarVisible: Bool = true {
+    private var sidebarMode = SidebarMode() {
         didSet {
-            UserDefaults.standard.set(sidebarVisible, forKey: Self.sidebarVisibleKey)
+            UserDefaults.standard.set(sidebarMode.pinned, forKey: Self.sidebarPinnedKey)
         }
     }
+
+    var sidebarVisible: Bool { sidebarMode.visible }
+    var sidebarPinned: Bool { sidebarMode.pinned }
+    var sidebarOverlayVisible: Bool { sidebarMode.overlayVisible }
 
     var fitMode: FitMode = .fitScreen {
         didSet {
@@ -72,8 +77,11 @@ final class ReaderViewModel {
            let stored = ReadingDirection(rawValue: raw) {
             direction = stored
         }
-        if UserDefaults.standard.object(forKey: Self.sidebarVisibleKey) != nil {
-            sidebarVisible = UserDefaults.standard.bool(forKey: Self.sidebarVisibleKey)
+        if UserDefaults.standard.object(forKey: Self.sidebarPinnedKey) != nil {
+            sidebarMode.pinned = UserDefaults.standard.bool(forKey: Self.sidebarPinnedKey)
+        } else if UserDefaults.standard.object(forKey: Self.legacySidebarVisibleKey) != nil {
+            // Migrate prior "always visible" preference to the new pinned mode.
+            sidebarMode.pinned = UserDefaults.standard.bool(forKey: Self.legacySidebarVisibleKey)
         }
         if let raw = UserDefaults.standard.string(forKey: Self.fitModeKey),
            let stored = FitMode(rawValue: raw) {
@@ -193,8 +201,16 @@ final class ReaderViewModel {
         url.deletingPathExtension().lastPathComponent
     }
 
-    func toggleSidebar() {
-        sidebarVisible.toggle()
+    func toggleSidebarPin() {
+        sidebarMode.togglePin()
+    }
+
+    func revealSidebarOverlay() {
+        sidebarMode.revealOverlay()
+    }
+
+    func dismissSidebarOverlay() {
+        sidebarMode.dismissOverlay()
     }
 
     func next() {

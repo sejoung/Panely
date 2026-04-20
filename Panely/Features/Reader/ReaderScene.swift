@@ -3,36 +3,46 @@ import SwiftUI
 struct ReaderScene: View {
     @Environment(ReaderViewModel.self) private var viewModel
     @State private var toolbarVisible = false
+    @State private var sidebarDismissTask: Task<Void, Never>?
     @FocusState private var isFocused: Bool
 
     private let revealZoneHeight: CGFloat = 80
+    private let sidebarRevealDelayMs: Int = 200
+    private let sidebarDismissDelayMs: Int = 300
 
     var body: some View {
-        HStack(spacing: 0) {
-            if viewModel.sidebarVisible {
-                LibrarySidebar(
-                    rootURL: viewModel.libraryRootURL,
-                    activeURL: viewModel.currentSourceURL,
-                    refreshToken: viewModel.libraryRefreshToken,
-                    onSelect: { url in
-                        viewModel.openURL(url)
-                        isFocused = true
-                    },
-                    onOpen: { viewModel.openSource() },
-                    onHide: { viewModel.toggleSidebar() },
-                    onRequestFolderAccess: { viewModel.requestFolderAccess() }
-                )
-                .transition(.move(edge: .leading).combined(with: .opacity))
+        ZStack(alignment: .leading) {
+            HStack(spacing: 0) {
+                if viewModel.sidebarPinned {
+                    sidebarView
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                }
+                viewerArea
             }
 
-            viewerArea
-        }
-        .animation(PanelyMotion.uiReveal, value: viewModel.sidebarVisible)
-        .overlay(alignment: .topLeading) {
-            if !viewModel.sidebarVisible && !toolbarVisible {
-                showSidebarHandle
+            if !viewModel.sidebarPinned {
+                HotEdgeReveal(
+                    delayMs: sidebarRevealDelayMs,
+                    onReveal: { viewModel.revealSidebarOverlay() }
+                )
+                .frame(width: 12)
+            }
+
+            if !viewModel.sidebarPinned && viewModel.sidebarOverlayVisible {
+                sidebarView
+                    .shadow(color: .black.opacity(0.45), radius: 14, x: 4, y: 0)
+                    .transition(.move(edge: .leading))
+                    .onHover { hovering in
+                        if hovering {
+                            cancelSidebarDismiss()
+                        } else {
+                            scheduleSidebarDismiss()
+                        }
+                    }
             }
         }
+        .animation(PanelyMotion.uiReveal, value: viewModel.sidebarPinned)
+        .animation(PanelyMotion.uiReveal, value: viewModel.sidebarOverlayVisible)
         .overlay {
             if viewModel.isLoading {
                 LoadingOverlay(message: viewModel.loadingMessage)
@@ -42,14 +52,24 @@ struct ReaderScene: View {
         .frame(minWidth: 800, minHeight: 600)
     }
 
-    private var showSidebarHandle: some View {
-        PanelyIconButton(
-            systemImage: "sidebar.left",
-            action: { viewModel.toggleSidebar() }
+    private var sidebarView: some View {
+        LibrarySidebar(
+            rootURL: viewModel.libraryRootURL,
+            activeURL: viewModel.currentSourceURL,
+            refreshToken: viewModel.libraryRefreshToken,
+            pinned: viewModel.sidebarPinned,
+            onSelect: { url in
+                viewModel.openURL(url)
+                viewModel.dismissSidebarOverlay()
+                isFocused = true
+            },
+            onOpen: {
+                viewModel.openSource()
+                viewModel.dismissSidebarOverlay()
+            },
+            onTogglePin: { viewModel.toggleSidebarPin() },
+            onRequestFolderAccess: { viewModel.requestFolderAccess() }
         )
-        .help("Show Library (⌃⌘S)")
-        .padding(PanelySpacing.sm)
-        .transition(.opacity)
     }
 
     private var viewerArea: some View {
@@ -92,6 +112,13 @@ struct ReaderScene: View {
                 viewModel.next()
                 return .handled
             }
+            .onKeyPress(.escape) {
+                if viewModel.sidebarOverlayVisible {
+                    viewModel.dismissSidebarOverlay()
+                    return .handled
+                }
+                return .ignored
+            }
             .onAppear { isFocused = true }
             .onChange(of: viewModel.currentSourceURL) { _, _ in
                 isFocused = true
@@ -104,14 +131,14 @@ struct ReaderScene: View {
             layout: viewModel.layout,
             direction: viewModel.direction,
             fitMode: viewModel.fitMode,
-            sidebarVisible: viewModel.sidebarVisible,
+            sidebarPinned: viewModel.sidebarPinned,
             onOpen: { viewModel.openSource() },
             onPrev: { viewModel.previous() },
             onNext: { viewModel.next() },
             onToggleLayout: { viewModel.toggleLayout() },
             onToggleDirection: { viewModel.toggleDirection() },
             onToggleFitMode: { viewModel.toggleFitMode() },
-            onToggleSidebar: { viewModel.toggleSidebar() },
+            onToggleSidebarPin: { viewModel.toggleSidebarPin() },
             showVolumeNav: viewModel.hasMultipleVolumes,
             canGoPreviousVolume: viewModel.canGoPreviousVolume,
             canGoNextVolume: viewModel.canGoNextVolume,
@@ -154,6 +181,52 @@ struct ReaderScene: View {
 
     private var viewerIdentity: String {
         "\(viewModel.currentSourceURL?.path ?? "")#\(viewModel.currentPageIndex)"
+    }
+
+    private func scheduleSidebarDismiss() {
+        sidebarDismissTask?.cancel()
+        let delay = sidebarDismissDelayMs
+        sidebarDismissTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(delay))
+            guard !Task.isCancelled else { return }
+            viewModel.dismissSidebarOverlay()
+        }
+    }
+
+    private func cancelSidebarDismiss() {
+        sidebarDismissTask?.cancel()
+        sidebarDismissTask = nil
+    }
+}
+
+private struct HotEdgeReveal: View {
+    let delayMs: Int
+    let onReveal: () -> Void
+    @State private var hoverTask: Task<Void, Never>?
+    @State private var hovering = false
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            Color.clear
+                .contentShape(Rectangle())
+            Rectangle()
+                .fill(hovering ? PanelyColor.accentPrimary.opacity(0.35) : Color.clear)
+                .frame(width: 3)
+                .allowsHitTesting(false)
+        }
+        .onHover { isHovering in
+            hovering = isHovering
+            hoverTask?.cancel()
+            if isHovering {
+                let delay = delayMs
+                hoverTask = Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(delay))
+                    guard !Task.isCancelled else { return }
+                    onReveal()
+                }
+            }
+        }
+        .animation(.easeInOut(duration: 0.15), value: hovering)
     }
 }
 

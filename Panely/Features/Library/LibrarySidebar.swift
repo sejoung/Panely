@@ -4,9 +4,10 @@ struct LibrarySidebar: View {
     let rootURL: URL?
     let activeURL: URL?
     let refreshToken: UUID
+    let pinned: Bool
     let onSelect: (URL) -> Void
     let onOpen: () -> Void
-    let onHide: () -> Void
+    let onTogglePin: () -> Void
     let onRequestFolderAccess: () -> Void
 
     @State private var nodes: [FileNode] = []
@@ -48,8 +49,12 @@ struct LibrarySidebar: View {
                 .foregroundStyle(PanelyColor.textPrimary)
                 .lineLimit(1)
             Spacer(minLength: 0)
-            PanelyIconButton(systemImage: "sidebar.left", action: onHide)
-                .help("Hide Library (⌃⌘S)")
+            PanelyIconButton(
+                systemImage: pinned ? "pin.fill" : "pin",
+                isActive: pinned,
+                action: onTogglePin
+            )
+            .help(pinned ? "Unpin Library (⌃⌘S)" : "Pin Library Open (⌃⌘S)")
         }
         .padding(.horizontal, PanelySpacing.sm)
         .padding(.vertical, PanelySpacing.xs)
@@ -165,9 +170,10 @@ private struct FileNodeRow: View {
         rootURL: URL(fileURLWithPath: "/Users/demo/Comics/OnePiece"),
         activeURL: nil,
         refreshToken: UUID(),
+        pinned: false,
         onSelect: { _ in },
         onOpen: {},
-        onHide: {},
+        onTogglePin: {},
         onRequestFolderAccess: {}
     )
     .frame(height: 480)

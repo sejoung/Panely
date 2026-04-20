@@ -40,8 +40,8 @@ struct PanelyApp: App {
             }
 
             CommandMenu("View") {
-                Button(viewModel.sidebarVisible ? "Hide Library" : "Show Library") {
-                    viewModel.toggleSidebar()
+                Button(viewModel.sidebarPinned ? "Unpin Library" : "Pin Library") {
+                    viewModel.toggleSidebarPin()
                 }
                 .keyboardShortcut("s", modifiers: [.control, .command])
 

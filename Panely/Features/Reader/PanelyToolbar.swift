@@ -4,14 +4,14 @@ struct PanelyToolbar: View {
     let layout: PageLayout
     let direction: ReadingDirection
     let fitMode: FitMode
-    let sidebarVisible: Bool
+    let sidebarPinned: Bool
     let onOpen: () -> Void
     let onPrev: () -> Void
     let onNext: () -> Void
     let onToggleLayout: () -> Void
     let onToggleDirection: () -> Void
     let onToggleFitMode: () -> Void
-    let onToggleSidebar: () -> Void
+    let onToggleSidebarPin: () -> Void
 
     var showVolumeNav: Bool = false
     var canGoPreviousVolume: Bool = false
@@ -25,11 +25,11 @@ struct PanelyToolbar: View {
                 .help("Open Folder, CBZ, or ZIP… (⌘O)")
 
             PanelyIconButton(
-                systemImage: "sidebar.left",
-                isActive: sidebarVisible,
-                action: onToggleSidebar
+                systemImage: sidebarPinned ? "pin.fill" : "pin",
+                isActive: sidebarPinned,
+                action: onToggleSidebarPin
             )
-            .help(sidebarVisible ? "Hide Library (⌃⌘S)" : "Show Library (⌃⌘S)")
+            .help(sidebarPinned ? "Unpin Library (⌃⌘S)" : "Pin Library (⌃⌘S)")
 
             Divider()
                 .frame(height: 18)
@@ -138,14 +138,14 @@ struct PanelyToolbar: View {
         layout: .double,
         direction: .rightToLeft,
         fitMode: .fitScreen,
-        sidebarVisible: true,
+        sidebarPinned: true,
         onOpen: {},
         onPrev: {},
         onNext: {},
         onToggleLayout: {},
         onToggleDirection: {},
         onToggleFitMode: {},
-        onToggleSidebar: {},
+        onToggleSidebarPin: {},
         showVolumeNav: true,
         canGoPreviousVolume: true,
         canGoNextVolume: false,
