@@ -34,7 +34,11 @@ pages.
 ### Reading
 - **Single page** and **double-page spread** layouts
 - **Left-to-right** or **right-to-left** reading (manga-friendly)
-- **Fit to screen** / **fit to width** — stable across toggles and window resizes
+- **Fit to screen** / **fit to width** — stable across toggles, with no
+  feedback drift on repeated mode switches
+- **Auto-refit on viewport resize** — when the window or sidebar size changes,
+  the image instantly snaps to the new fit. Manual zoom is preserved across
+  resizes (only the next reset is recalibrated)
 - **Pinch zoom** via trackpad, **double-click** to toggle 1× ↔ 2×
 - **Auto-centering** — image stays centered when the viewport is larger
 - **Preload ±2 pages** so the next flip is instant
@@ -50,12 +54,20 @@ pages.
 
 ### Navigation
 - **Keyboard-first** — `← → Space` for pages, `⌘[ ⌘]` for volumes,
-  `⌘1 ⌘2` for fit modes, `⌃⌘S` for sidebar, `⌘O` to open
-- **Library sidebar** — hierarchical file tree of the opened source's folder,
-  with the currently active book highlighted
+  `⌘1 ⌘2` for fit modes, `⌃⌘S` to pin the sidebar, `⌘O` to open
+- **Auto-hide library sidebar** — hidden by default to give the page maximum
+  room. Hover the **left edge** (200 ms) and the sidebar slides in as an
+  overlay (with drop shadow, no page shift). Mouse-out auto-dismisses after
+  300 ms; `ESC` dismisses immediately
+- **Pin mode** — click the pin button in the sidebar header (or press `⌃⌘S`)
+  to lock it into push-layout where it always stays visible. Pin state
+  persists across launches
+- **Sidebar tree** — folders and archives are visually disambiguated:
+  `folder` vs `doc.zipper` icons, plus a faint `.cbz` / `.zip` suffix on
+  archives for quick reading
 - **Volume navigation** between sibling books in the same folder
 - **Recent items** — persistent across launches via security-scoped bookmarks,
-  shown with folder / archive icons
+  shown with the same icon scheme
 - **Folder access grant** — when a single file is opened and siblings aren't
   visible, the sidebar offers a one-click prompt to pick the enclosing folder
 - **Window controls** — with the title bar hidden, the top 28 px strip still
@@ -66,7 +78,8 @@ pages.
 ### State persistence
 - **Resume where you left off** — per-book page memory with a stable key that
   survives temp-directory extractions
-- **Layout + direction + fit mode + sidebar visibility** all persisted
+- **Layout + direction + fit mode + sidebar pin state** all persisted (the
+  legacy `panely.sidebarVisible` key auto-migrates to the new pin flag)
 - Entirely sandbox-compliant (user-selected files + app-scoped bookmarks)
 
 ## Requirements
@@ -101,7 +114,9 @@ Xcode resolves it automatically on first build.
 | `Space` | Next page |
 | `⌘[` / `⌘]` | Previous / next volume |
 | `⌘1` / `⌘2` | Fit to screen / fit to width |
-| `⌃⌘S` | Toggle library sidebar |
+| `⌃⌘S` | Pin / unpin library sidebar |
+| Hover left edge | Reveal sidebar as overlay (auto-hide mode) |
+| `ESC` | Dismiss sidebar overlay (when unpinned) |
 | Double-click on image | Toggle 1× ↔ 2× zoom |
 | Trackpad pinch | Zoom in / out |
 | Drag top 28 px strip | Move window |
@@ -117,18 +132,29 @@ xcodebuild test \
   CODE_SIGN_IDENTITY="-"
 ```
 
-**48 tests across 16 suites** cover:
+**63 tests across 18 suites** cover:
 
 - Pure data types (`ComicPage`, `ComicSource`, `RecentItem`, enum raw values)
 - Natural-sort contract (Foundation behaviour Panely relies on)
 - **Position-key stability** across temp-dir extractions (zip-in-zip scenarios)
 - **FolderLoader** integration with real temp directories
-- **FileNode.loadTree** scanning, sorting, empty/unreadable cases
+- **FileNode.loadTree** scanning, sorting, empty/unreadable cases, and the
+  `fileExtension` exposure used for sidebar badges
 - **CBZLoader** integration with programmatically-built zip fixtures,
   including recursive nested-archive extraction
 - **FitCalculator** pure math across aspect ratios and zero-inputs
 - **NSScrollView** magnification stability on repeated fit-mode toggles
+- **Viewer resize auto-fit** — magnification follows the viewport when
+  unzoomed, preserves manual zoom on resize, releases its
+  `frameDidChangeNotification` observer on Coordinator deinit
 - **CenteringClipView** — document centering when smaller than the viewport
+- **SidebarMode** — pure value-type covering pinned / overlay state
+  transitions (default unpinned, pin idempotency, overlay no-op while
+  pinned, unpin clears any lingering overlay)
+
+Tests are organized to mirror the source tree under `PanelyTests/Core/`,
+`PanelyTests/Features/Library/`, and `PanelyTests/Features/Reader/`, with
+shared fixtures in `PanelyTests/TestFixtures.swift`.
 
 `RecentItem.Codable` includes a `decodeIfPresent` path for `isDirectory` so
 old stored entries survive a schema bump.
@@ -146,16 +172,17 @@ Panely/
 ├── Features/
 │   ├── Reader/
 │   │   ├── ReaderViewModel.swift       # @Observable @MainActor
-│   │   ├── ReaderScene.swift
+│   │   ├── ReaderScene.swift           # ZStack layout + hot-edge reveal
 │   │   ├── ViewerContainer.swift       # SwiftUI shell around AppKit viewer
 │   │   ├── PanelyToolbar.swift
 │   │   ├── LoadingOverlay.swift
 │   │   ├── PageLayout.swift / ReadingDirection.swift / FitMode.swift
 │   │   ├── FitCalculator.swift         # pure magnification math
-│   │   └── PositionKey.swift           # stable per-book position keys
+│   │   ├── PositionKey.swift           # stable per-book position keys
+│   │   └── SidebarMode.swift           # pinned / overlay state value-type
 │   └── Library/
-│       ├── LibrarySidebar.swift
-│       ├── FileNode.swift
+│       ├── LibrarySidebar.swift        # pin button + extension badge row
+│       ├── FileNode.swift              # iconName + fileExtension
 │       ├── RecentItem.swift
 │       └── RecentItemsStore.swift
 └── Core/
@@ -167,7 +194,12 @@ Panely/
         └── ImageLoader.swift           # async NSImage with Task.detached
 
 PanelyTests/
-└── PanelyTests.swift                   # 48 tests (Swift Testing)
+├── TestFixtures.swift                  # shared temp-dir / zip helpers
+├── Core/Comic/                         # ComicModel, Loader extension, FolderLoader, CBZLoader
+├── Features/Library/                   # RecentItem, FileNode
+└── Features/Reader/                    # enums, NaturalSort, PositionKey, FitCalculator,
+                                        # FitMagnificationStability, CenteringClipView,
+                                        # ViewerResizeFit, SidebarMode
 
 docs/
 ├── panely_prd_product_requirements_document.md
@@ -212,6 +244,17 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
 - **`FitCalculator`** — physical viewport (`scrollView.contentSize`) is
   magnification-invariant, so toggling fit modes produces stable
   magnifications (no feedback loop).
+- **Viewer auto-refit on resize** — `AppKitImageScroller` subscribes to its
+  `NSScrollView`'s `frameDidChangeNotification`. The handler hops onto
+  `MainActor`, recomputes the fit, and only writes magnification when the
+  user has not manually zoomed (so resizing the window doesn't clobber
+  intentional zoom). The Coordinator removes its observer on deinit.
+- **`SidebarMode`** — a tiny pure value-type owning `pinned` and
+  `overlayVisible`; `ReaderViewModel` holds an instance and persists only
+  `pinned`. UI composes it via `sidebarVisible` (computed). Hot-edge hover
+  reveal lives in `ReaderScene` as a small `HotEdgeReveal` SwiftUI view that
+  fires `revealSidebarOverlay()` after a 200 ms delay; mouse-out from the
+  overlay schedules a 300 ms dismiss.
 - **`PositionKey.make(for:opened:tempRoot:)`** — for sources extracted to
   `/tmp`, the key is derived from the opened URL plus the relative path
   inside the temp root so reading progress survives re-extraction.
@@ -265,7 +308,7 @@ git push origin v1.0.0
 ### CI / storage
 
 - **CI** runs on every push/PR (skips `**/*.md` and `docs/**`), builds
-  Debug with ad-hoc signing, runs all 48 tests, and uploads no artifacts —
+  Debug with ad-hoc signing, runs all 63 tests, and uploads no artifacts —
   storage footprint is essentially zero.
 - **Releases** attach a single zip (~5–10 MB) to GitHub Releases using
   `ditto` so resource forks are preserved.
