@@ -9,6 +9,8 @@ struct ViewerContainer: View {
     var pageIndex: Int = 0
     var identity: String = ""
     var onPageIndexChanged: (Int) -> Void = { _ in }
+    var onVisibleRangeChanged: (Range<Int>) -> Void = { _ in }
+    var autoFitOnResize: Bool = true
     var viewerController: ViewerController? = nil
 
     var body: some View {
@@ -27,6 +29,8 @@ struct ViewerContainer: View {
                     pageIndex: pageIndex,
                     identity: identity,
                     onPageIndexChanged: onPageIndexChanged,
+                    onVisibleRangeChanged: onVisibleRangeChanged,
+                    autoFitOnResize: autoFitOnResize,
                     viewerController: viewerController
                 )
             }
@@ -58,6 +62,8 @@ struct AppKitImageScroller: NSViewRepresentable {
     let pageIndex: Int
     let identity: String
     var onPageIndexChanged: (Int) -> Void = { _ in }
+    var onVisibleRangeChanged: (Range<Int>) -> Void = { _ in }
+    var autoFitOnResize: Bool = true
     var viewerController: ViewerController? = nil
 
     func makeCoordinator() -> Coordinator {
@@ -98,7 +104,9 @@ struct AppKitImageScroller: NSViewRepresentable {
             queue: .main
         ) { [weak coordinator = context.coordinator] _ in
             MainActor.assumeIsolated {
-                guard let coordinator, let sv = coordinator.scrollView else { return }
+                guard let coordinator,
+                      let sv = coordinator.scrollView,
+                      coordinator.autoFitOnResize else { return }
                 Self.applyFit(
                     scrollView: sv,
                     coordinator: coordinator,
@@ -111,6 +119,7 @@ struct AppKitImageScroller: NSViewRepresentable {
         scrollView.contentView.postsBoundsChangedNotifications = true
         let coordinator = context.coordinator
         coordinator.onPageIndexChanged = onPageIndexChanged
+        coordinator.onVisibleRangeChanged = onVisibleRangeChanged
         // queue: nil → synchronous on the posting thread (always main here),
         // so currentPageIndex is always fresh when the user clicks a button.
         coordinator.boundsObserver = NotificationCenter.default.addObserver(
@@ -122,14 +131,28 @@ struct AppKitImageScroller: NSViewRepresentable {
                 guard let coordinator,
                       let sv = coordinator.scrollView,
                       coordinator.lastLayout.isContinuous,
-                      !coordinator.isProgrammaticallyScrolling,
                       let stack = sv.documentView as? ImageStackView else { return }
                 let visibleRect = sv.documentVisibleRect
-                let centerY = visibleRect.midY
-                let visibleIndex = stack.pageIndex(forViewportY: centerY)
-                guard visibleIndex != coordinator.lastPageIndex else { return }
-                coordinator.lastPageIndex = visibleIndex
-                coordinator.onPageIndexChanged(visibleIndex)
+
+                // Page-index callback is suppressed during programmatic
+                // scroll so the model doesn't feedback-loop.
+                if !coordinator.isProgrammaticallyScrolling {
+                    let centerY = visibleRect.midY
+                    let visibleIndex = stack.pageIndex(forViewportY: centerY)
+                    if visibleIndex != coordinator.lastPageIndex {
+                        coordinator.lastPageIndex = visibleIndex
+                        coordinator.onPageIndexChanged(visibleIndex)
+                    }
+                }
+
+                // Visible-range callback always fires — required for lazy
+                // loading to populate slots after auto-scroll to a restored
+                // position or after large jumps.
+                let visibleRange = stack.pageIndexRange(visibleIn: visibleRect)
+                if visibleRange != coordinator.lastVisibleRange {
+                    coordinator.lastVisibleRange = visibleRange
+                    coordinator.onVisibleRangeChanged(visibleRange)
+                }
             }
         }
 
@@ -142,6 +165,8 @@ struct AppKitImageScroller: NSViewRepresentable {
         // Keep the closure fresh — SwiftUI rebuilds props each tick, but the
         // observer only retains what we hand it at registration time.
         context.coordinator.onPageIndexChanged = onPageIndexChanged
+        context.coordinator.onVisibleRangeChanged = onVisibleRangeChanged
+        context.coordinator.autoFitOnResize = autoFitOnResize
         context.coordinator.viewerController = viewerController
         viewerController?.attach(scrollView: scrollView)
 
@@ -150,15 +175,27 @@ struct AppKitImageScroller: NSViewRepresentable {
         let ordered = (direction.isRTL && !layout.isContinuous) ? images.reversed() : images
         content.setImages(ordered, axis: axis)
 
-        let resetNeeded = context.coordinator.lastIdentity != identity ||
-                          context.coordinator.lastFitMode != fitMode ||
-                          context.coordinator.lastLayout != layout
+        // resetNeeded drives setImages' identity check + applyFit's force.
+        // We split the "should we force-reset magnification" decision so that
+        // a layout-only change (e.g., single → vertical) preserves a user's
+        // manual zoom; only identity (new book) or fitMode (user pressed
+        // ⌘1/⌘2/⌘3) explicitly resets.
+        let identityChanged = context.coordinator.lastIdentity != identity
+        let fitModeChanged = context.coordinator.lastFitMode != fitMode
+        let layoutChanged = context.coordinator.lastLayout != layout
+        let resetNeeded = identityChanged || fitModeChanged || layoutChanged
+        let forceFitReset = identityChanged || fitModeChanged
         context.coordinator.lastIdentity = identity
         context.coordinator.lastFitMode = fitMode
         context.coordinator.lastLayout = layout
 
+        // Note: don't pre-set lastPageIndex here. We only mark a page as
+        // "successfully shown" after the scroll actually lands (see below),
+        // otherwise initial vertical renders that happen before the strip
+        // has the target index in its stack would be silently dropped on
+        // subsequent ticks (pageChanged would be false even though we never
+        // scrolled).
         let pageChanged = context.coordinator.lastPageIndex != pageIndex
-        context.coordinator.lastPageIndex = pageIndex
 
         // Apply fit synchronously so the user never sees a frame at the
         // previous magnification (which manifested as the image briefly
@@ -168,19 +205,41 @@ struct AppKitImageScroller: NSViewRepresentable {
             scrollView: scrollView,
             coordinator: context.coordinator,
             fitMode: fitMode,
-            force: resetNeeded
+            force: forceFitReset
         )
 
         if layout.isContinuous && pageChanged,
            let frame = content.frame(forPageAt: pageIndex) {
-            // Suppress the bounds observer for the duration of this scroll so
-            // it doesn't fire back into the model with the in-flight position.
+            // Suppress only the page-index callback during programmatic
+            // scroll (avoids feedback). Visible-range callback is allowed to
+            // fire so lazy loading kicks in for the newly-visible window —
+            // critical when restoring a saved position into a strip that's
+            // mostly placeholders.
             context.coordinator.isProgrammaticallyScrolling = true
-            // Preserve horizontal pan when the user has zoomed in past fit-width.
             let currentX = scrollView.contentView.bounds.origin.x
             scrollView.contentView.scroll(to: NSPoint(x: currentX, y: frame.minY))
             scrollView.reflectScrolledClipView(scrollView.contentView)
             context.coordinator.isProgrammaticallyScrolling = false
+            context.coordinator.lastPageIndex = pageIndex
+        } else if !layout.isContinuous {
+            // Paged mode never scrolls itself; just record the index.
+            context.coordinator.lastPageIndex = pageIndex
+        }
+        // Vertical with no frame yet (stack still being populated): leave
+        // lastPageIndex stale so the next updateNSView retries.
+
+        // Ensure lazy loading kicks in for whatever's currently visible —
+        // the bounds observer doesn't always fire on the first vertical
+        // render (stack just installed, no actual scroll movement yet), so
+        // we recompute and dispatch the range here too. Cheap when nothing
+        // changed (range == lastVisibleRange short-circuits the callback).
+        if layout.isContinuous {
+            let visibleRect = scrollView.documentVisibleRect
+            let range = content.pageIndexRange(visibleIn: visibleRect)
+            if range != context.coordinator.lastVisibleRange {
+                context.coordinator.lastVisibleRange = range
+                onVisibleRangeChanged(range)
+            }
         }
     }
 
@@ -217,7 +276,22 @@ struct AppKitImageScroller: NSViewRepresentable {
         )
 
         let userHasZoomed = abs(scrollView.magnification - coordinator.baseMagnification) > 0.001
-        if force || !userHasZoomed {
+
+        // Force (identity / fitMode change) always wins — those are explicit
+        // user actions or fundamental content changes. Otherwise the lock
+        // (autoFitOnResize=false) preserves the current magnification even
+        // when the user hasn't manually zoomed yet — that's the whole point
+        // of locking the view size.
+        let shouldReset: Bool
+        if force {
+            shouldReset = true
+        } else if !coordinator.autoFitOnResize {
+            shouldReset = false
+        } else {
+            shouldReset = !userHasZoomed
+        }
+
+        if shouldReset {
             scrollView.magnification = fit
         }
         coordinator.baseMagnification = fit
@@ -230,13 +304,16 @@ struct AppKitImageScroller: NSViewRepresentable {
         var lastFitMode: FitMode = .fitScreen
         var lastLayout: PageLayout = .single
         var lastPageIndex: Int = -1
+        var lastVisibleRange: Range<Int> = 0..<0
         var baseMagnification: CGFloat = 1.0
         var isProgrammaticallyScrolling: Bool = false
+        var autoFitOnResize: Bool = true
         weak var scrollView: NSScrollView?
         weak var viewerController: ViewerController?
         var frameObserver: NSObjectProtocol?
         var boundsObserver: NSObjectProtocol?
         var onPageIndexChanged: (Int) -> Void = { _ in }
+        var onVisibleRangeChanged: (Range<Int>) -> Void = { _ in }
 
         deinit {
             if let frameObserver {
@@ -372,9 +449,21 @@ final class ImageStackView: NSView {
     func setImages(_ newImages: [NSImage], axis: Axis) {
         let sameCount = newImages.count == currentImages.count
         let sameAxis = self.axis == axis
-        let sameIdentity = sameCount && zip(newImages, currentImages).allSatisfy { $0.0 === $0.1 }
-        if sameIdentity && sameAxis { return }
 
+        // Fast path: count + axis unchanged → swap NSImage references in
+        // place. No subview tear-down, no relayout. Used during lazy loading
+        // where placeholders are progressively replaced with real images.
+        if sameCount && sameAxis {
+            for i in 0..<newImages.count where currentImages[i] !== newImages[i] {
+                if imageViews.indices.contains(i) {
+                    imageViews[i].image = newImages[i]
+                }
+            }
+            currentImages = newImages
+            return
+        }
+
+        // Slow path: structural change → full relayout.
         self.axis = axis
         currentImages = newImages
 
@@ -401,6 +490,18 @@ final class ImageStackView: NSView {
             }
         }
         return imageViews.count - 1
+    }
+
+    /// Half-open range of page indices whose frames intersect `rect`.
+    /// Used by the viewer to ask the model to load every page currently
+    /// visible (not just whichever one is at viewport center).
+    func pageIndexRange(visibleIn rect: NSRect) -> Range<Int> {
+        guard !imageViews.isEmpty else { return 0..<0 }
+        let topIndex = pageIndex(forViewportY: rect.minY)
+        let bottomIndex = pageIndex(forViewportY: rect.maxY)
+        let lower = max(0, min(topIndex, bottomIndex))
+        let upper = min(imageViews.count, max(topIndex, bottomIndex) + 1)
+        return lower..<upper
     }
 
     private func layoutHorizontally() {

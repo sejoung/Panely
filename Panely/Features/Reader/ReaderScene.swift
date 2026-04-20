@@ -83,6 +83,8 @@ struct ReaderScene: View {
                 pageIndex: viewModel.currentPageIndex,
                 identity: viewerIdentity,
                 onPageIndexChanged: { idx in viewModel.setCurrentPageFromScroll(idx) },
+                onVisibleRangeChanged: { range in viewModel.setVisibleRange(range) },
+                autoFitOnResize: viewModel.autoFitOnResize,
                 viewerController: viewerController
             )
             .overlay(alignment: .top) {
@@ -146,6 +148,8 @@ struct ReaderScene: View {
             onToggleSidebarPin: { viewModel.toggleSidebarPin() },
             onZoomIn: { viewerController.zoomIn() },
             onZoomOut: { viewerController.zoomOut() },
+            autoFitOnResize: viewModel.autoFitOnResize,
+            onToggleAutoFit: { viewModel.toggleAutoFitOnResize() },
             showVolumeNav: viewModel.hasMultipleVolumes,
             canGoPreviousVolume: viewModel.canGoPreviousVolume,
             canGoNextVolume: viewModel.canGoNextVolume,
@@ -187,9 +191,13 @@ struct ReaderScene: View {
     }
 
     private var viewerIdentity: String {
-        // Include layout so the viewer rebuilds the image stack when toggling
-        // between paged and vertical modes (different visiblePages set).
-        "\(viewModel.currentSourceURL?.path ?? "")#\(viewModel.layout.rawValue)"
+        // Identity changes ONLY when the source changes — that's what
+        // triggers force-reset of magnification (a new book legitimately
+        // resets fit). Layout-driven stack rebuilds happen automatically
+        // inside ImageStackView.setImages (count + axis comparison), no
+        // need to encode the layout here. Including it would otherwise
+        // override the lock and defeat user-zoom preservation.
+        viewModel.currentSourceURL?.path ?? ""
     }
 
     private func scheduleSidebarDismiss() {

@@ -14,6 +14,8 @@ struct PanelyToolbar: View {
     let onToggleSidebarPin: () -> Void
     var onZoomIn: () -> Void = {}
     var onZoomOut: () -> Void = {}
+    var autoFitOnResize: Bool = true
+    var onToggleAutoFit: () -> Void = {}
 
     var showVolumeNav: Bool = false
     var canGoPreviousVolume: Bool = false
@@ -68,6 +70,15 @@ struct PanelyToolbar: View {
                 action: onZoomIn
             )
             .help("Zoom In (⌘+)")
+
+            PanelyIconButton(
+                systemImage: autoFitOnResize ? "lock.open" : "lock.fill",
+                isActive: !autoFitOnResize,
+                action: onToggleAutoFit
+            )
+            .help(autoFitOnResize
+                  ? "Lock view size (don't auto-fit on resize) (⌘L)"
+                  : "Unlock view size (auto-fit on resize) (⌘L)")
 
             Spacer()
 

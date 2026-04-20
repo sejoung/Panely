@@ -11,6 +11,7 @@ final class ReaderViewModel {
     private static let legacySidebarVisibleKey = "panely.sidebarVisible"
     private static let positionsKey = "panely.positions"
     private static let fitModeKey = "panely.fitMode"
+    private static let autoFitOnResizeKey = "panely.autoFitOnResize"
 
     // setter is module-internal so tests can stage a source/page without
     // going through the full file-load pipeline. Production callers should
@@ -43,8 +44,24 @@ final class ReaderViewModel {
     private var preloadTask: Task<Void, Never>?
     private let preloadRadius = 2
 
+    /// Vertical-mode lazy-load state. `pageDimensions` is populated up-front
+    /// (cheap header reads); `currentImages` starts as same-sized placeholder
+    /// `NSImage(size:)` instances and is replaced one-by-one as real images
+    /// are decoded inside the visible window. `loadedPageIndices` tracks
+    /// which slots already hold real (non-placeholder) images.
+    private(set) var pageDimensions: [CGSize] = []
+    private var loadedPageIndices: Set<Int> = []
+    private let lazyWindowRadius = 3
+    private var lazyLoadTask: Task<Void, Never>?
+
+    /// Set to true at the end of init. Gates `handleLayoutChange` so that
+    /// reading layout back from UserDefaults during init doesn't fire a
+    /// premature handleLayoutChange (which would set isLoading=true with no
+    /// source loaded — visible to tests and producing a wasted Task).
+    private var isFullyInitialized = false
+
     var layout: PageLayout = .single {
-        didSet { handleLayoutChange() }
+        didSet { handleLayoutChange(from: oldValue) }
     }
 
     var direction: ReadingDirection = .leftToRight {
@@ -77,6 +94,16 @@ final class ReaderViewModel {
         }
     }
 
+    /// When true (default), the viewer re-applies the current fit mode on
+    /// window/sidebar resize. When false, the user's magnification is left
+    /// alone — useful when they've manually zoomed and want their view
+    /// preserved across layout shifts.
+    var autoFitOnResize: Bool = true {
+        didSet {
+            UserDefaults.standard.set(autoFitOnResize, forKey: Self.autoFitOnResizeKey)
+        }
+    }
+
     init() {
         self.recentItems = RecentItemsStore()
 
@@ -98,6 +125,11 @@ final class ReaderViewModel {
            let stored = FitMode(rawValue: raw) {
             fitMode = stored
         }
+        if UserDefaults.standard.object(forKey: Self.autoFitOnResizeKey) != nil {
+            autoFitOnResize = UserDefaults.standard.bool(forKey: Self.autoFitOnResizeKey)
+        }
+
+        isFullyInitialized = true
     }
 
     var totalPages: Int { source.pageCount }
@@ -214,14 +246,71 @@ final class ReaderViewModel {
     }
 
     /// Sync the page index with the viewer's current scroll position in
-    /// continuous (vertical) layouts. Updates `currentPageIndex` (and thus
-    /// the saved position) without triggering an image refresh, since all
-    /// pages are already loaded in the strip.
+    /// continuous (vertical) layouts. Just updates the page counter / saved
+    /// position — actual loading is driven by `setVisibleRange(_:)` so that
+    /// zoomed-out viewports get every visible slot loaded, not just ±radius
+    /// around the center page.
     func setCurrentPageFromScroll(_ index: Int) {
         guard layout.isContinuous else { return }
         guard source.pages.indices.contains(index) else { return }
         guard index != currentPageIndex else { return }
         currentPageIndex = index
+    }
+
+    /// Called when the visible page range in the viewer changes (scroll or
+    /// magnification). Loads every page in `range` plus a small buffer so
+    /// pages just outside the viewport are ready when the user scrolls.
+    /// Cancels any prior in-flight load so fast zoom/scroll doesn't pile
+    /// up tasks all racing to finish.
+    func setVisibleRange(_ range: Range<Int>) {
+        guard layout.isContinuous else { return }
+        guard !range.isEmpty else { return }
+        let buffer = 2
+        let lower = max(0, range.lowerBound - buffer)
+        let upper = min(source.pageCount, range.upperBound + buffer)
+        let needed = (lower..<upper).filter { !loadedPageIndices.contains($0) }
+        guard !needed.isEmpty else { return }
+
+        lazyLoadTask?.cancel()
+        lazyLoadTask = Task { [weak self] in
+            await self?.loadPagesBatched(needed)
+        }
+    }
+
+    /// Load `indices` concurrently and apply ALL results in a single
+    /// `currentImages` assignment. Single SwiftUI render = single
+    /// updateNSView = single setImages incremental swap, regardless of how
+    /// many pages were just loaded. Critical when zoom-out triggers many
+    /// pages to load at once — without batching, each completion fires its
+    /// own re-render and the main thread saturates.
+    private func loadPagesBatched(_ indices: [Int]) async {
+        guard !indices.isEmpty else { return }
+        let count = currentImages.count
+        var loaded: [(Int, NSImage)] = []
+
+        await withTaskGroup(of: (Int, NSImage?).self) { group in
+            for i in indices where !loadedPageIndices.contains(i) && source.pages.indices.contains(i) {
+                let page = source.pages[i]
+                group.addTask {
+                    let image = await self.loadVisibleImage(page)
+                    return (i, image)
+                }
+            }
+            for await (i, image) in group {
+                guard !Task.isCancelled else { return }
+                if let image {
+                    loaded.append((i, image))
+                    loadedPageIndices.insert(i)
+                }
+            }
+        }
+
+        guard !Task.isCancelled, !loaded.isEmpty else { return }
+        var newImages = currentImages
+        for (i, image) in loaded where i < count {
+            newImages[i] = image
+        }
+        currentImages = newImages
     }
 
     func toggleSidebarPin() {
@@ -287,16 +376,12 @@ final class ReaderViewModel {
     }
 
     func toggleLayout() {
-        let target = layout.next
-        if target.isContinuous {
-            // Vertical default = fit-screen. The viewer interprets fit
-            // computations against the first image (not the entire strip),
-            // so fit-screen means "first image fully visible in viewport"
-            // — comfortable to read without overflowing tall pages.
-            // The user can switch to fit-width manually if they prefer.
-            fitMode = .fitScreen
-        }
-        layout = target
+        // Don't auto-change fitMode on layout transitions — the user's last
+        // explicit fit choice is preserved. If they want a different fit
+        // for the new mode they can press ⌘1/⌘2/⌘3. Combined with applyFit
+        // not force-resetting magnification on layout-only changes, this
+        // means a manually-zoomed viewer stays at that zoom across modes.
+        layout = layout.next
     }
 
     func toggleDirection() {
@@ -310,10 +395,30 @@ final class ReaderViewModel {
         fitMode = fitMode.next
     }
 
-    private func handleLayoutChange() {
+    func toggleAutoFitOnResize() {
+        autoFitOnResize.toggle()
+    }
+
+    private func handleLayoutChange(from oldLayout: PageLayout) {
+        // Skip when init is restoring from UserDefaults — there's no source
+        // to refresh and we don't want a phantom isLoading=true.
+        guard isFullyInitialized else { return }
+
         UserDefaults.standard.set(layout.rawValue, forKey: Self.layoutKey)
         let step = navigationStep
         currentPageIndex = (currentPageIndex / step) * step
+
+        // Going from paged to vertical: clear stale paged images and show
+        // a loading indicator immediately. Without this the user sees the
+        // viewer's empty state for the duration of the dimension fetch +
+        // initial window load (which can be a noticeable beat for big
+        // folders). refreshVerticalLazily / refreshImages clear isLoading
+        // when they finish.
+        if layout.isContinuous && !oldLayout.isContinuous {
+            currentImages = []
+            isLoading = true
+            loadingMessage = "Building vertical strip…"
+        }
         Task { await refreshImages() }
     }
 
@@ -476,7 +581,27 @@ final class ReaderViewModel {
     }
 
     private func refreshImages() async {
+        // Cancel any in-flight lazy-load from a previous source/layout.
+        lazyLoadTask?.cancel()
+        lazyLoadTask = nil
+        loadedPageIndices.removeAll()
+
+        if layout.isContinuous {
+            await refreshVerticalLazily()
+        } else {
+            await refreshPaged()
+        }
+
+        // Always clear the loading flag when refresh completes — covers the
+        // toggleLayout-driven path where handleLayoutChange set it to true.
+        // load() also clears via its own defer; double-clear is harmless.
+        isLoading = false
+        loadingMessage = ""
+    }
+
+    private func refreshPaged() async {
         let pages = visiblePages
+        pageDimensions = []
         guard !pages.isEmpty else {
             currentImages = []
             return
@@ -491,6 +616,73 @@ final class ReaderViewModel {
         currentImages = images
 
         schedulePreload()
+    }
+
+    /// Vertical mode: fetch all page dimensions concurrently (header-only,
+    /// fast), populate the strip with same-sized placeholder NSImages so the
+    /// layout is correct from frame 1, then load real images for the window
+    /// around `currentPageIndex`. Subsequent loads are triggered by
+    /// `setCurrentPageFromScroll` as the user scrolls.
+    private func refreshVerticalLazily() async {
+        let pages = source.pages
+        guard !pages.isEmpty else {
+            currentImages = []
+            pageDimensions = []
+            return
+        }
+
+        // 1. Fetch dimensions concurrently. Falls back to a generic portrait
+        //    aspect for any page whose header read fails so layout still holds.
+        let fallbackSize = CGSize(width: 1000, height: 1500)
+        let dims: [CGSize] = await withTaskGroup(
+            of: (Int, CGSize).self,
+            returning: [CGSize].self
+        ) { group in
+            for (i, page) in pages.enumerated() {
+                group.addTask {
+                    let size = (try? await ImageLoader.dimensions(for: page)) ?? fallbackSize
+                    return (i, size)
+                }
+            }
+            var results = Array(repeating: fallbackSize, count: pages.count)
+            for await (i, size) in group {
+                results[i] = size
+            }
+            return results
+        }
+        pageDimensions = dims
+
+        // 2. Placeholders give ImageStackView the right frame for every slot.
+        //    Use a visible neutral gray so unloaded slots look intentional
+        //    instead of empty black voids during the brief load window.
+        currentImages = dims.map { Self.makePlaceholder(size: $0) }
+
+        // 3. Load the window around the restored page index.
+        await ensureWindowLoaded(around: currentPageIndex)
+    }
+
+    /// Load real images for pages in `[index - radius ... index + radius]`
+    /// that aren't already loaded. Concurrent with bounded fan-out.
+    /// Updates `currentImages` once at the end so SwiftUI re-renders the
+    /// strip a single time instead of per loaded image.
+    private func ensureWindowLoaded(around index: Int) async {
+        let lower = max(0, index - lazyWindowRadius)
+        let upper = min(source.pageCount - 1, index + lazyWindowRadius)
+        guard lower <= upper else { return }
+        let needed = (lower...upper).filter { !loadedPageIndices.contains($0) }
+        guard !needed.isEmpty else { return }
+
+        await loadPagesBatched(needed)
+    }
+
+    private static func makePlaceholder(size: CGSize) -> NSImage {
+        // drawingHandler is invoked lazily by AppKit when the image is actually
+        // drawn, so this stays cheap (no upfront pixel allocation).
+        NSImage(size: size, flipped: false) { rect in
+            NSColor(white: 0.13, alpha: 1).setFill()
+            rect.fill()
+            return true
+        }
     }
 
     private func cachedImage(for page: ComicPage) -> NSImage? {

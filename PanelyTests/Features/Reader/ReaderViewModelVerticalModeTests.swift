@@ -60,11 +60,10 @@ struct ReaderViewModelVerticalModeTests {
 
     // MARK: toggleLayout side effects when entering vertical
 
-    @Test func togglingIntoVerticalForcesFitScreen() {
-        // fit-screen in vertical means "first image fully visible in viewport"
-        // (with reference-image math in the viewer). fit-width would fill the
-        // whole viewport width and overflow tall images vertically — too much
-        // on entry. The user can still toggle to fit-width manually.
+    @Test func togglingIntoVerticalPreservesFitMode() {
+        // Layout transitions don't change fitMode anymore — the user's
+        // explicit fit choice (or zoom) survives mode flips. Auto-defaulting
+        // to fit-screen on entry would clobber a user who'd manually zoomed.
         let vm = ReaderViewModel()
         vm.layout = .double
         vm.fitMode = .fitWidth
@@ -72,7 +71,7 @@ struct ReaderViewModelVerticalModeTests {
         vm.toggleLayout() // .double → .vertical
 
         #expect(vm.layout == .vertical)
-        #expect(vm.fitMode == .fitScreen)
+        #expect(vm.fitMode == .fitWidth) // preserved
     }
 
     @Test func togglingFromSingleSkipsVerticalFitChange() {
@@ -84,6 +83,36 @@ struct ReaderViewModelVerticalModeTests {
 
         #expect(vm.layout == .double)
         #expect(vm.fitMode == .fitScreen) // didn't enter vertical
+    }
+
+    // MARK: loading indicator surfaces immediately on paged → vertical entry
+
+    @Test func togglingFromPagedToVerticalShowsLoadingIndicatorImmediately() {
+        // Vertical entry pre-fetches dimensions for every page (one trip
+        // through CGImageSource per file) which can be a noticeable beat on
+        // a 100-page folder. handleLayoutChange flips isLoading + the
+        // "Building vertical strip…" message synchronously so the UI shows
+        // the LoadingOverlay during that work instead of the empty state.
+        let vm = makeViewModel(pageCount: 10)
+        vm.layout = .double // start in paged
+
+        vm.toggleLayout() // double → vertical
+
+        #expect(vm.layout == .vertical)
+        #expect(vm.isLoading == true)
+        #expect(vm.loadingMessage == "Building vertical strip…")
+    }
+
+    @Test func togglingBetweenPagedLayoutsDoesNotShowLoadingIndicator() {
+        // Paged ↔ paged transitions are cheap (single page reload) and
+        // shouldn't flash a loading overlay.
+        let vm = makeViewModel(pageCount: 10)
+        vm.layout = .single
+
+        vm.toggleLayout() // single → double
+
+        #expect(vm.layout == .double)
+        #expect(vm.isLoading == false)
     }
 
     @Test func togglingOutOfVerticalDoesNotResetFitMode() {

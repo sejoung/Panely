@@ -83,6 +83,13 @@ struct PanelyApp: App {
                     viewerController.resetZoom()
                 }
                 .keyboardShortcut("0", modifiers: .command)
+
+                Divider()
+
+                Button(viewModel.autoFitOnResize ? "Lock View Size" : "Unlock View Size") {
+                    viewModel.toggleAutoFitOnResize()
+                }
+                .keyboardShortcut("l", modifiers: .command)
             }
 
             CommandMenu("Go") {
