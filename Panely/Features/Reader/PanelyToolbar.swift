@@ -22,7 +22,7 @@ struct PanelyToolbar: View {
     var body: some View {
         HStack(spacing: PanelySpacing.xs) {
             PanelyIconButton(systemImage: "folder", action: onOpen)
-                .help("Open Folder or CBZ… (⌘O)")
+                .help("Open Folder, CBZ, or ZIP… (⌘O)")
 
             PanelyIconButton(
                 systemImage: "sidebar.left",
