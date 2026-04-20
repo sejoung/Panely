@@ -36,18 +36,33 @@ pages.
 ## Features
 
 ### Reading
-- **Single page** and **double-page spread** layouts
-- **Left-to-right** or **right-to-left** reading (manga-friendly)
-- **Fit to screen** / **fit to width** — stable across toggles, with no
-  feedback drift on repeated mode switches
-- **Auto-refit on viewport resize** — when the window or sidebar size changes,
-  the image instantly snaps to the new fit. Manual zoom is preserved across
-  resizes (only the next reset is recalibrated)
-- **Pinch zoom** via trackpad, **double-click** to toggle 1× ↔ 2×
+- **Single page**, **double-page spread**, and **vertical scroll** (webtoon)
+  layouts — toolbar button cycles `single → double → vertical → single`
+- **Left-to-right** or **right-to-left** reading (manga-friendly). RTL is
+  ignored in vertical mode (webtoons are top-to-bottom) and the direction
+  toggle disables itself there
+- **Three fit modes** with distinct arrow icons and `⌘1`/`⌘2`/`⌘3` shortcuts:
+  - **Fit to screen** — entire page visible
+  - **Fit to width** — fills viewport width
+  - **Fit to height** — fills viewport height
+- **Vertical mode lazy windowing** — page dimensions are pre-fetched
+  (header-only on folders) so the strip lays out immediately with gray
+  placeholders, then real images stream in concurrently for the visible
+  range and update in batched SwiftUI passes (no per-image relayout storm)
+- **Zoom controls** — `⌘+` / `⌘-` / `⌘0` (reset to fit) plus toolbar
+  buttons; `⌘ + scroll wheel` zooms centered at the cursor (continuous, ~1%
+  per scroll unit). Trackpad pinch and double-click 1× ↔ 2× still work
+- **View-size lock (`⌘L`)** — opt-in toggle that pins the current
+  magnification across window/sidebar resizes and layout flips. Force
+  resets (new book, explicit `⌘1`/`⌘2`/`⌘3`) still apply
+- **Auto-refit on viewport resize** (when unlocked) — when the window or
+  sidebar size changes, the image snaps to the new fit. Manual zoom is
+  preserved by default
 - **Auto-centering** — image stays centered when the viewport is larger
-- **Preload ±2 pages** so the next flip is instant
-- **Progress overlay** — stage-aware messages (Opening / Extracting / Loading)
-  while big archives are being processed, all on background threads
+- **Preload ±2 pages** in paged modes so the next flip is instant
+- **Progress overlay** — stage-aware messages (Opening / Extracting /
+  Loading / Building vertical strip) while big sources are processed,
+  all on background threads
 
 ### File support
 - Open **folder**, **CBZ**, or **ZIP**
@@ -58,17 +73,22 @@ pages.
 
 ### Navigation
 - **Keyboard-first** — `← → Space` for pages, `⌘[ ⌘]` for volumes,
-  `⌘1 ⌘2` for fit modes, `⌃⌘S` to pin the sidebar, `⌘O` to open
+  `⌘1 ⌘2 ⌘3` for fit modes, `⌘+ ⌘- ⌘0` for zoom, `⌃⌘S` to pin the sidebar,
+  `⌃⌘T` to pin the toolbar, `⌘L` to lock view size, `⌘O` to open
 - **Auto-hide library sidebar** — hidden by default to give the page maximum
   room. Hover the **left edge** (200 ms) and the sidebar slides in as an
   overlay (with drop shadow, no page shift). Mouse-out auto-dismisses after
   300 ms; `ESC` dismisses immediately
-- **Pin mode** — click the pin button in the sidebar header (or press `⌃⌘S`)
-  to lock it into push-layout where it always stays visible. Pin state
-  persists across launches
+- **Auto-hide toolbar + slider** — float in only when the cursor is near the
+  top or bottom of the viewer. `⌃⌘T` (or the pin button) keeps both visible
+- **Sidebar / toolbar pin** — both follow the same `pin` ↔ `pin.fill` toggle
+  pattern. Pin state persists across launches
 - **Sidebar tree** — folders and archives are visually disambiguated:
   `folder` vs `doc.zipper` icons, plus a faint `.cbz` / `.zip` suffix on
   archives for quick reading
+- **Vertical-mode page navigation** — `← → Space` scroll to the previous /
+  next image in the strip (working from the page currently centered in
+  the viewport, not the last one keyboard-navigated)
 - **Volume navigation** between sibling books in the same folder
 - **Recent items** — persistent across launches via security-scoped bookmarks,
   shown with the same icon scheme
@@ -82,8 +102,9 @@ pages.
 ### State persistence
 - **Resume where you left off** — per-book page memory with a stable key that
   survives temp-directory extractions
-- **Layout + direction + fit mode + sidebar pin state** all persisted (the
-  legacy `panely.sidebarVisible` key auto-migrates to the new pin flag)
+- **Layout + direction + fit mode + sidebar pin + toolbar pin + auto-fit
+  lock** all persisted (the legacy `panely.sidebarVisible` key auto-migrates
+  to the new pin flag)
 - Entirely sandbox-compliant (user-selected files + app-scoped bookmarks)
 
 ## Requirements
@@ -114,11 +135,16 @@ Xcode resolves it automatically on first build.
 | Input | Action |
 |:------|:-------|
 | `⌘O` | Open folder / CBZ / ZIP |
-| `←` / `→` | Previous / next page (direction-aware) |
-| `Space` | Next page |
+| `←` / `→` | Previous / next page (direction-aware in paged modes; image-by-image in vertical) |
+| `Space` | Next page (or scroll to next image in vertical) |
 | `⌘[` / `⌘]` | Previous / next volume |
-| `⌘1` / `⌘2` | Fit to screen / fit to width |
+| `⌘1` / `⌘2` / `⌘3` | Fit to screen / fit to width / fit to height |
+| `⌘+` / `⌘-` | Zoom in / out (one step, viewport-centered) |
+| `⌘0` | Reset zoom to current fit mode |
+| `⌘ + scroll wheel` | Continuous zoom centered at cursor |
+| `⌘L` | Lock / unlock view size (preserves zoom across resizes & layout flips) |
 | `⌃⌘S` | Pin / unpin library sidebar |
+| `⌃⌘T` | Pin / unpin toolbar (and bottom slider) |
 | Hover left edge | Reveal sidebar as overlay (auto-hide mode) |
 | `ESC` | Dismiss sidebar overlay (when unpinned) |
 | Double-click on image | Toggle 1× ↔ 2× zoom |
@@ -136,7 +162,7 @@ xcodebuild test \
   CODE_SIGN_IDENTITY="-"
 ```
 
-**63 tests across 18 suites** cover:
+**126 tests across 25 suites** cover:
 
 - Pure data types (`ComicPage`, `ComicSource`, `RecentItem`, enum raw values)
 - Natural-sort contract (Foundation behaviour Panely relies on)
@@ -146,19 +172,40 @@ xcodebuild test \
   `fileExtension` exposure used for sidebar badges
 - **CBZLoader** integration with programmatically-built zip fixtures,
   including recursive nested-archive extraction
+- **ImageLoader.dimensions** — header-only size reads for both file URLs
+  and archive entries
 - **FitCalculator** pure math across aspect ratios and zero-inputs
+  (including fit-height parity with fit-screen on portrait sources)
 - **NSScrollView** magnification stability on repeated fit-mode toggles
 - **Viewer resize auto-fit** — magnification follows the viewport when
-  unzoomed, preserves manual zoom on resize, releases its
-  `frameDidChangeNotification` observer on Coordinator deinit
+  unzoomed, preserves manual zoom on resize, lock (`⌘L`) preserves on
+  doc-size change, force still resets, releases observer on deinit
 - **CenteringClipView** — document centering when smaller than the viewport
 - **SidebarMode** — pure value-type covering pinned / overlay state
   transitions (default unpinned, pin idempotency, overlay no-op while
   pinned, unpin clears any lingering overlay)
+- **PageLayout cycle** — `single → double → vertical → single` ordering,
+  per-mode `navigationStep`, `isContinuous` flag for vertical
+- **`ReaderViewModel` paged-mode behavior** — `visiblePages` slicing,
+  `setCurrentPageFromScroll` no-op outside vertical, `toggleDirection`
+  works in paged
+- **`ReaderViewModel` vertical-mode behavior** — `visiblePages` returns
+  full strip, `setCurrentPageFromScroll` updates index, `effectiveDirection`
+  is always LTR, paged → vertical transition shows loading indicator
+  immediately, applyFit uses first-image reference for fit calculations
+- **`ImageStackView` vertical layout** — `pageIndex(forViewportY:)`,
+  `pageIndexRange(visibleIn:)`, incremental `setImages` swap (count + axis
+  match → no view rebuild) vs full rebuild on axis change
+- **`ViewerController`** — zoom in / out / reset against `NSScrollView`
+  with min/max clamping
+- **`ScrollZoomCalculator`** — multiplicative zoom factor math from
+  scroll-wheel delta with min/max clamp
+- **Toolbar pin state** — default unpinned, toggle flips persisted flag
 
 Tests are organized to mirror the source tree under `PanelyTests/Core/`,
 `PanelyTests/Features/Library/`, and `PanelyTests/Features/Reader/`, with
-shared fixtures in `PanelyTests/TestFixtures.swift`.
+shared fixtures (including a real PNG generator) in
+`PanelyTests/TestFixtures.swift`.
 
 `RecentItem.Codable` includes a `decodeIfPresent` path for `isDirectory` so
 old stored entries survive a schema bump.
@@ -175,12 +222,14 @@ Panely/
 │   └── Primitives/                     # Icon button, slider
 ├── Features/
 │   ├── Reader/
-│   │   ├── ReaderViewModel.swift       # @Observable @MainActor
+│   │   ├── ReaderViewModel.swift       # @Observable @MainActor + lazy windowing
 │   │   ├── ReaderScene.swift           # ZStack layout + hot-edge reveal
-│   │   ├── ViewerContainer.swift       # SwiftUI shell around AppKit viewer
-│   │   ├── PanelyToolbar.swift
+│   │   ├── ViewerContainer.swift       # SwiftUI shell + AppKitImageScroller
+│   │   ├── ViewerController.swift      # Zoom remote control (⌘+/-/0, scroll-wheel)
+│   │   ├── PanelyToolbar.swift         # cycle layout / fit / zoom / pin buttons
 │   │   ├── LoadingOverlay.swift
-│   │   ├── PageLayout.swift / ReadingDirection.swift / FitMode.swift
+│   │   ├── PageLayout.swift            # single/double/vertical + cycle + isContinuous
+│   │   ├── ReadingDirection.swift / FitMode.swift  # FitMode: 3 cases + cycle
 │   │   ├── FitCalculator.swift         # pure magnification math
 │   │   ├── PositionKey.swift           # stable per-book position keys
 │   │   └── SidebarMode.swift           # pinned / overlay state value-type
@@ -198,16 +247,21 @@ Panely/
         └── ImageLoader.swift           # async NSImage with Task.detached
 
 PanelyTests/
-├── TestFixtures.swift                  # shared temp-dir / zip helpers
-├── Core/Comic/                         # ComicModel, Loader extension, FolderLoader, CBZLoader
+├── TestFixtures.swift                  # shared temp-dir / zip / PNG helpers
+├── Core/Comic/                         # ComicModel, Loader extension, FolderLoader,
+│                                       # CBZLoader, ImageLoaderDimensions
 ├── Features/Library/                   # RecentItem, FileNode
 └── Features/Reader/                    # enums, NaturalSort, PositionKey, FitCalculator,
                                         # FitMagnificationStability, CenteringClipView,
-                                        # ViewerResizeFit, SidebarMode
+                                        # ViewerResizeFit, SidebarMode, ViewerController,
+                                        # ScrollZoomCalculator, ImageStackVertical,
+                                        # ReaderViewModelPagedMode / VerticalMode,
+                                        # ReaderViewModelToolbarPin
 
 docs/
 ├── panely_prd_product_requirements_document.md
 ├── panely_design_system_mac_os.md
+├── performance-audit.md                # prioritized perf TODO with checkboxes
 └── icon/panely-icon-stacked.svg
 
 scripts/
@@ -251,14 +305,37 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
 - **Viewer auto-refit on resize** — `AppKitImageScroller` subscribes to its
   `NSScrollView`'s `frameDidChangeNotification`. The handler hops onto
   `MainActor`, recomputes the fit, and only writes magnification when the
-  user has not manually zoomed (so resizing the window doesn't clobber
-  intentional zoom). The Coordinator removes its observer on deinit.
+  user has not manually zoomed *and* the view-size lock is off. `applyFit`
+  itself decomposes its `force` flag: identity (new book) or fit-mode
+  change forces reset; layout-only change defers to lock + zoom state.
+- **Vertical (webtoon) lazy windowing** — entering vertical mode pre-fetches
+  every page's pixel dimensions concurrently (`CGImageSource` header read
+  on file URLs is microseconds). `currentImages` is filled with same-sized
+  gray placeholder `NSImage`s (lazy `drawingHandler` — no eager bitmap),
+  then a bounds observer drives `setVisibleRange(...)` which loads real
+  images for the visible page range plus a small buffer. Concurrent loads
+  fan out via `withTaskGroup` and **all results are committed to
+  `currentImages` in a single assignment** — one SwiftUI render per batch
+  instead of N. Previous in-flight tasks are cancelled when the visible
+  range changes again so fast scroll/zoom doesn't pile up work.
+- **`ImageStackView` incremental swap** — when count + axis match, real
+  images replace placeholders by mutating `imageView.image` directly (no
+  `removeFromSuperview` / re-layout), so per-page lazy loads cost a
+  pointer write each. Layout shifts are avoided because placeholder size
+  matches the header-reported size.
+- **`ViewerController`** — `@Observable @MainActor` remote control owned by
+  `PanelyApp` and shared via environment. Holds a weak `NSScrollView` ref
+  + `baseMagnification` synced by `applyFit`, exposes `zoomIn`/`zoomOut`
+  (1.25× clamped to min/max, viewport-centered) and `resetZoom` so toolbar
+  buttons + menu shortcuts (`⌘+`/`⌘-`/`⌘0`) and `⌘ + scroll wheel` all hit
+  the same code path.
 - **`SidebarMode`** — a tiny pure value-type owning `pinned` and
   `overlayVisible`; `ReaderViewModel` holds an instance and persists only
   `pinned`. UI composes it via `sidebarVisible` (computed). Hot-edge hover
   reveal lives in `ReaderScene` as a small `HotEdgeReveal` SwiftUI view that
   fires `revealSidebarOverlay()` after a 200 ms delay; mouse-out from the
-  overlay schedules a 300 ms dismiss.
+  overlay schedules a 300 ms dismiss. The toolbar follows the same pin
+  pattern (`toolbarPinned`) and shares the auto-hide / pin overlay logic.
 - **`PositionKey.make(for:opened:tempRoot:)`** — for sources extracted to
   `/tmp`, the key is derived from the opened URL plus the relative path
   inside the temp root so reading progress survives re-extraction.
@@ -314,7 +391,7 @@ git push origin v1.0.0
 ### CI / storage
 
 - **CI** runs on every push/PR (skips `**/*.md` and `docs/**`), builds
-  Debug with ad-hoc signing, runs all 63 tests, and uploads no artifacts —
+  Debug with ad-hoc signing, runs all 126 tests, and uploads no artifacts —
   storage footprint is essentially zero.
 - **Releases** attach a single zip (~5–10 MB) to GitHub Releases using
   `ditto` so resource forks are preserved.
@@ -338,13 +415,24 @@ Requires `librsvg` and `imagemagick` from Homebrew.
 - [x] AppKit-backed viewer with native magnification
 - [x] Nested-archive support (zip-in-zip)
 - [x] Position memory stable across temp extractions
-- [x] Library sidebar with folder access grant
+- [x] Library sidebar with folder access grant + pin mode
 - [x] Recent items with persistent bookmarks
 - [x] Loading overlay with stage messages
-- [ ] **Vertical scroll mode** — webtoon-style continuous scroll
+- [x] **Vertical scroll mode** — webtoon-style continuous scroll with lazy
+      windowing (header-only dimension fetch + viewport-driven decode)
+- [x] **Three fit modes** — fit-screen / fit-width / fit-height with
+      `⌘1`/`⌘2`/`⌘3` and a cycling toolbar button
+- [x] **Zoom controls** — `⌘+`/`⌘-`/`⌘0` + `⌘ + scroll wheel` continuous zoom
+- [x] **View-size lock** — preserve magnification across resizes / mode flips
+- [x] **Toolbar pin** — keep toolbar + page slider visible (`⌃⌘T`)
 - [ ] **Thumbnail sidebar** — page-level preview panel
 - [ ] **Bookmarks / favorites** — pin specific pages or books
 - [ ] **Persistent library root** — set a home library folder once
+- [ ] **Performance** — open items in
+      [`docs/performance-audit.md`](docs/performance-audit.md) (currentImages
+      window eviction, view-recycling for vertical strip, partial-read
+      dimensions for archive entries, capped TaskGroup fan-out, lazy
+      `FileNode.loadTree` expansion)
 - [ ] **WebP / HEIC** — verify first-class support end-to-end
 
 ## Contributing
