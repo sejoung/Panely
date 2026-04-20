@@ -109,19 +109,46 @@ fi
 if [[ "${SKIP_TESTS:-0}" == "1" ]]; then
     echo "→ tests skipped (SKIP_TESTS=1)"
 else
+    test_log="$REPO_ROOT/build/release-test.log"
+    mkdir -p "$(dirname "$test_log")"
     echo "→ running tests (set SKIP_TESTS=1 to skip)..."
+    echo "  log: $test_log"
+
+    # Pin the destination to the host arch — `platform=macOS` alone matches
+    # both arm64 and x86_64 destinations on Apple Silicon and prints a
+    # WARNING. Use uname for a stable single-destination spec.
+    arch=$(uname -m)
+    case "$arch" in
+        arm64)  destination='platform=macOS,arch=arm64' ;;
+        x86_64) destination='platform=macOS,arch=x86_64' ;;
+        *)      destination='platform=macOS' ;;
+    esac
+
+    # Save the full log; suppress only the noisiest build-system chatter so
+    # actual test failures stay visible. Don't grep for specific result
+    # markers — that hides anything that doesn't match the assumed format
+    # and was the cause of false-positive "tests failed" reports.
+    set +e
     xcodebuild test \
         -project Panely.xcodeproj \
         -scheme Panely \
-        -destination 'platform=macOS' \
+        -destination "$destination" \
         CODE_SIGN_IDENTITY="-" \
-        -quiet
+        CODE_SIGNING_REQUIRED=NO \
+        2>&1 | tee "$test_log" \
+             | grep -vE '^(builtin-|/Applications/Xcode|cd |export |    )' \
+             | grep -vE '(SwiftCompile|SwiftDriver|SwiftMergeGeneratedHeaders|CodeSign|Touch |GenerateDSYM|CompileC |ProcessInfoPlist|RegisterExecutionPolicyException|CopySwiftLibs|CreateBuildDirectory)'
+    test_exit=${PIPESTATUS[0]}
+    set -e
+
+    if [[ $test_exit -ne 0 ]]; then
+        die "tests failed (xcodebuild exit $test_exit) — see $test_log"
+    fi
+    if ! grep -q '\*\* TEST SUCCEEDED \*\*' "$test_log"; then
+        die "tests did not produce success marker — see $test_log"
+    fi
     echo "✓ tests passed"
 fi
-
-# --- confirm ---
-echo
-confirm "release $tag?" || { echo "aborted."; exit 0; }
 
 # --- bump version ---
 # Replace all MARKETING_VERSION lines. BSD sed (macOS) requires the -i '' form.
@@ -134,10 +161,27 @@ grep -q "MARKETING_VERSION = $new_version;" "$PBXPROJ" \
 
 echo "✓ bumped MARKETING_VERSION to $new_version"
 
+# Restore pbxproj if user aborts before committing — keeps the working tree
+# clean even on Ctrl-C between bump and commit.
+trap 'echo; echo "→ restoring $PBXPROJ"; git checkout -- "$PBXPROJ" 2>/dev/null || true' ERR INT
+
+# --- show diff + confirm ---
+echo
+echo "→ pending change:"
+git --no-pager diff --color=always -- "$PBXPROJ"
+echo
+
+if ! confirm "commit + tag $tag?"; then
+    echo "aborted. reverting version bump..."
+    git checkout -- "$PBXPROJ"
+    exit 0
+fi
+
 # --- commit + tag ---
 git add "$PBXPROJ"
 git commit -m "chore: release $tag"
 git tag -a "$tag" -m "Release $tag"
+trap - ERR INT
 echo "✓ committed and tagged $tag"
 
 # --- push ---
