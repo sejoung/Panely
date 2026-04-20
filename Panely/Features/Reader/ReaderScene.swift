@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ReaderScene: View {
     @Environment(ReaderViewModel.self) private var viewModel
+    @Environment(ViewerController.self) private var viewerController
     @State private var toolbarVisible = false
     @State private var sidebarDismissTask: Task<Void, Never>?
     @FocusState private var isFocused: Bool
@@ -81,7 +82,8 @@ struct ReaderScene: View {
                 layout: viewModel.layout,
                 pageIndex: viewModel.currentPageIndex,
                 identity: viewerIdentity,
-                onPageIndexChanged: { idx in viewModel.setCurrentPageFromScroll(idx) }
+                onPageIndexChanged: { idx in viewModel.setCurrentPageFromScroll(idx) },
+                viewerController: viewerController
             )
             .overlay(alignment: .top) {
                 TitleBarPassthrough()
@@ -142,6 +144,8 @@ struct ReaderScene: View {
             onToggleDirection: { viewModel.toggleDirection() },
             onToggleFitMode: { viewModel.toggleFitMode() },
             onToggleSidebarPin: { viewModel.toggleSidebarPin() },
+            onZoomIn: { viewerController.zoomIn() },
+            onZoomOut: { viewerController.zoomOut() },
             showVolumeNav: viewModel.hasMultipleVolumes,
             canGoPreviousVolume: viewModel.canGoPreviousVolume,
             canGoNextVolume: viewModel.canGoNextVolume,
@@ -238,4 +242,5 @@ private struct HotEdgeReveal: View {
 #Preview {
     ReaderScene()
         .environment(ReaderViewModel())
+        .environment(ViewerController())
 }

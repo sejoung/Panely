@@ -9,6 +9,7 @@ struct ViewerContainer: View {
     var pageIndex: Int = 0
     var identity: String = ""
     var onPageIndexChanged: (Int) -> Void = { _ in }
+    var viewerController: ViewerController? = nil
 
     var body: some View {
         ZStack {
@@ -25,7 +26,8 @@ struct ViewerContainer: View {
                     layout: layout,
                     pageIndex: pageIndex,
                     identity: identity,
-                    onPageIndexChanged: onPageIndexChanged
+                    onPageIndexChanged: onPageIndexChanged,
+                    viewerController: viewerController
                 )
             }
         }
@@ -56,6 +58,7 @@ struct AppKitImageScroller: NSViewRepresentable {
     let pageIndex: Int
     let identity: String
     var onPageIndexChanged: (Int) -> Void = { _ in }
+    var viewerController: ViewerController? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -86,6 +89,9 @@ struct AppKitImageScroller: NSViewRepresentable {
         scrollView.documentView = content
 
         context.coordinator.scrollView = scrollView
+        context.coordinator.viewerController = viewerController
+        viewerController?.attach(scrollView: scrollView)
+
         context.coordinator.frameObserver = NotificationCenter.default.addObserver(
             forName: NSView.frameDidChangeNotification,
             object: scrollView,
@@ -136,6 +142,8 @@ struct AppKitImageScroller: NSViewRepresentable {
         // Keep the closure fresh — SwiftUI rebuilds props each tick, but the
         // observer only retains what we hand it at registration time.
         context.coordinator.onPageIndexChanged = onPageIndexChanged
+        context.coordinator.viewerController = viewerController
+        viewerController?.attach(scrollView: scrollView)
 
         let axis: ImageStackView.Axis = layout.isContinuous ? .vertical : .horizontal
         // RTL only applies to paged horizontal modes — webtoon strips are top-to-bottom.
@@ -213,6 +221,7 @@ struct AppKitImageScroller: NSViewRepresentable {
             scrollView.magnification = fit
         }
         coordinator.baseMagnification = fit
+        coordinator.viewerController?.baseMagnification = fit
     }
 
     @MainActor
@@ -224,6 +233,7 @@ struct AppKitImageScroller: NSViewRepresentable {
         var baseMagnification: CGFloat = 1.0
         var isProgrammaticallyScrolling: Bool = false
         weak var scrollView: NSScrollView?
+        weak var viewerController: ViewerController?
         var frameObserver: NSObjectProtocol?
         var boundsObserver: NSObjectProtocol?
         var onPageIndexChanged: (Int) -> Void = { _ in }
@@ -243,6 +253,38 @@ struct AppKitImageScroller: NSViewRepresentable {
 
 final class PanelyScrollView: NSScrollView {
     override var acceptsFirstResponder: Bool { false }
+
+    /// Sensitivity of cmd-scroll zoom. ~1% per scroll-delta unit feels right
+    /// for both trackpad inertia and discrete mouse-wheel notches.
+    static let zoomScrollSensitivity: CGFloat = 0.01
+
+    static func zoomTarget(
+        currentMagnification: CGFloat,
+        scrollDelta: CGFloat,
+        minMag: CGFloat,
+        maxMag: CGFloat
+    ) -> CGFloat {
+        let factor = 1.0 + (scrollDelta * zoomScrollSensitivity)
+        return min(max(currentMagnification * factor, minMag), maxMag)
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        // ⌘ + scroll = zoom centered at the cursor (standard macOS gesture).
+        if event.modifierFlags.contains(.command) && allowsMagnification {
+            let delta = event.scrollingDeltaY
+            guard delta != 0 else { return }
+            let target = Self.zoomTarget(
+                currentMagnification: magnification,
+                scrollDelta: delta,
+                minMag: minMagnification,
+                maxMag: maxMagnification
+            )
+            let center = convert(event.locationInWindow, from: nil)
+            setMagnification(target, centeredAt: center)
+            return
+        }
+        super.scrollWheel(with: event)
+    }
 }
 
 // MARK: - Transparent top strip that forwards window drag / double-click-zoom

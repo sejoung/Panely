@@ -22,6 +22,8 @@ nonisolated enum FitCalculator {
             return min(viewport.width / docSize.width, viewport.height / docSize.height)
         case .fitWidth:
             return viewport.width / docSize.width
+        case .fitHeight:
+            return viewport.height / docSize.height
         }
     }
 }

@@ -33,6 +33,30 @@ struct FitCalculatorTests {
         #expect(abs(mag - 0.8) < 0.0001)
     }
 
+    @Test func fitHeightUsesHeightRatio() {
+        let mag = FitCalculator.magnification(
+            docSize: CGSize(width: 1000, height: 1500),
+            viewport: CGSize(width: 800, height: 600),
+            fitMode: .fitHeight
+        )
+        // 600 / 1500 = 0.4
+        #expect(abs(mag - 0.4) < 0.0001)
+    }
+
+    @Test func fitHeightDiffersFromFitScreenForLandscapeDocument() {
+        // Wide doc: fit-screen picks the smaller (width) ratio; fit-height
+        // ignores width entirely and may exceed viewport horizontally.
+        let landscape = CGSize(width: 2000, height: 1000)
+        let viewport = CGSize(width: 800, height: 600)
+
+        let screen = FitCalculator.magnification(docSize: landscape, viewport: viewport, fitMode: .fitScreen)
+        let height = FitCalculator.magnification(docSize: landscape, viewport: viewport, fitMode: .fitHeight)
+
+        #expect(abs(screen - 0.4) < 0.0001) // 800/2000
+        #expect(abs(height - 0.6) < 0.0001) // 600/1000
+        #expect(height > screen)
+    }
+
     @Test func zeroViewportFallsBackToIdentity() {
         let mag = FitCalculator.magnification(
             docSize: CGSize(width: 1000, height: 1500),

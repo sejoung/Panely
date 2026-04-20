@@ -54,5 +54,12 @@ struct FitModeTests {
     @Test func rawValuesAreStable() {
         #expect(FitMode.fitScreen.rawValue == "fitScreen")
         #expect(FitMode.fitWidth.rawValue == "fitWidth")
+        #expect(FitMode.fitHeight.rawValue == "fitHeight")
+    }
+
+    @Test func cycleVisitsAllThreeModesInOrder() {
+        #expect(FitMode.fitScreen.next == .fitWidth)
+        #expect(FitMode.fitWidth.next == .fitHeight)
+        #expect(FitMode.fitHeight.next == .fitScreen)
     }
 }

@@ -307,7 +307,7 @@ final class ReaderViewModel {
     }
 
     func toggleFitMode() {
-        fitMode = fitMode == .fitScreen ? .fitWidth : .fitScreen
+        fitMode = fitMode.next
     }
 
     private func handleLayoutChange() {

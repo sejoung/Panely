@@ -3,11 +3,13 @@ import SwiftUI
 @main
 struct PanelyApp: App {
     @State private var viewModel = ReaderViewModel()
+    @State private var viewerController = ViewerController()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environment(viewModel)
+                .environment(viewerController)
                 .preferredColorScheme(.dark)
         }
         .windowStyle(.hiddenTitleBar)
@@ -58,6 +60,29 @@ struct PanelyApp: App {
                 }
                 .keyboardShortcut("2", modifiers: .command)
                 .disabled(viewModel.fitMode == .fitWidth)
+
+                Button("Fit to Height") {
+                    viewModel.fitMode = .fitHeight
+                }
+                .keyboardShortcut("3", modifiers: .command)
+                .disabled(viewModel.fitMode == .fitHeight)
+
+                Divider()
+
+                Button("Zoom In") {
+                    viewerController.zoomIn()
+                }
+                .keyboardShortcut("+", modifiers: .command)
+
+                Button("Zoom Out") {
+                    viewerController.zoomOut()
+                }
+                .keyboardShortcut("-", modifiers: .command)
+
+                Button("Reset Zoom") {
+                    viewerController.resetZoom()
+                }
+                .keyboardShortcut("0", modifiers: .command)
             }
 
             CommandMenu("Go") {

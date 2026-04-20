@@ -12,6 +12,8 @@ struct PanelyToolbar: View {
     let onToggleDirection: () -> Void
     let onToggleFitMode: () -> Void
     let onToggleSidebarPin: () -> Void
+    var onZoomIn: () -> Void = {}
+    var onZoomOut: () -> Void = {}
 
     var showVolumeNav: Bool = false
     var canGoPreviousVolume: Bool = false
@@ -54,6 +56,18 @@ struct PanelyToolbar: View {
                 action: onToggleFitMode
             )
             .help(fitHelp)
+
+            PanelyIconButton(
+                systemImage: "minus.magnifyingglass",
+                action: onZoomOut
+            )
+            .help("Zoom Out (⌘−)")
+
+            PanelyIconButton(
+                systemImage: "plus.magnifyingglass",
+                action: onZoomIn
+            )
+            .help("Zoom In (⌘+)")
 
             Spacer()
 
@@ -116,15 +130,17 @@ struct PanelyToolbar: View {
 
     private var fitSymbol: String {
         switch fitMode {
-        case .fitScreen: return "rectangle.arrowtriangle.2.inward"
-        case .fitWidth:  return "arrow.left.and.right.square"
+        case .fitScreen: return "arrow.up.left.and.arrow.down.right"
+        case .fitWidth:  return "arrow.left.and.right"
+        case .fitHeight: return "arrow.up.and.down"
         }
     }
 
     private var fitHelp: String {
         switch fitMode {
-        case .fitScreen: return "Switch to Fit Width (⌘2)"
-        case .fitWidth:  return "Switch to Fit Screen (⌘1)"
+        case .fitScreen: return "Fit to Screen — switch to Fit Width (⌘2)"
+        case .fitWidth:  return "Fit Width — switch to Fit Height (⌘3)"
+        case .fitHeight: return "Fit Height — switch to Fit Screen (⌘1)"
         }
     }
 
