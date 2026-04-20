@@ -14,6 +14,10 @@
   <img alt="swift" src="https://img.shields.io/badge/swift-5-orange">
   <img alt="license" src="https://img.shields.io/badge/license-Apache%202.0-green">
   <a href="https://github.com/sejoung/Panely/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/sejoung/Panely/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/sejoung/Panely/actions/workflows/release.yml"><img alt="Release" src="https://github.com/sejoung/Panely/actions/workflows/release.yml/badge.svg"></a>
+  <a href="https://github.com/sejoung/Panely/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/sejoung/Panely?label=latest&color=brightgreen"></a>
+  <a href="https://github.com/sejoung/Panely/releases/latest"><img alt="Release date" src="https://img.shields.io/github/release-date/sejoung/Panely?color=blue"></a>
+  <a href="https://github.com/sejoung/Panely/releases"><img alt="Total downloads" src="https://img.shields.io/github/downloads/sejoung/Panely/total?color=brightgreen"></a>
 </p>
 
 ---
@@ -294,9 +298,11 @@ The script:
 4. Commits (`chore: release vX.Y.Z`) and creates an annotated tag.
 5. Pushes `main` and the tag (set `NO_PUSH=1` to stop before pushing).
 
-The release commit message is matched by CI's `if:` filter so the bump
-itself doesn't re-trigger the build pipeline — the tag push kicks off
-`release.yml` only.
+The release commit and the tag push trigger `ci.yml` (Debug build + tests)
+and `release.yml` (Release build + zip + GitHub Release) respectively.
+Both are intentional: CI on the bump commit verifies the release source
+tree builds cleanly under Debug, and `release.yml` produces the shipped
+artifact.
 
 If you prefer doing it by hand:
 

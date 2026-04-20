@@ -22,7 +22,6 @@ jobs:
   build:
     name: Build
     runs-on: macos-latest
-    if: "${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'chore: release ') }}"
 
     steps:
       - name: Checkout
