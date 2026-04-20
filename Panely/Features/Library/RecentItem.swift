@@ -9,7 +9,7 @@ nonisolated struct RecentItem: Identifiable, Sendable, Codable {
     var isDirectory: Bool
 
     var iconName: String {
-        isDirectory ? "folder" : "book.closed"
+        isDirectory ? "folder" : "doc.zipper"
     }
 
     init(

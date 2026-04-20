@@ -52,7 +52,7 @@ struct RecentItemTests {
         #expect(item.iconName == "folder")
     }
 
-    @Test func archiveItemUsesBookIcon() {
+    @Test func archiveItemUsesDocZipperIcon() {
         let item = RecentItem(
             id: UUID(),
             path: "/Book.cbz",
@@ -61,6 +61,6 @@ struct RecentItemTests {
             bookmarkData: Data(),
             isDirectory: false
         )
-        #expect(item.iconName == "book.closed")
+        #expect(item.iconName == "doc.zipper")
     }
 }

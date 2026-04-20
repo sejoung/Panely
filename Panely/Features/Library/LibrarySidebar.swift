@@ -146,6 +146,11 @@ private struct FileNodeRow: View {
                     .font(PanelyTypography.body)
                     .foregroundStyle(isActive ? PanelyColor.accentPrimary : PanelyColor.textPrimary)
                     .lineLimit(1)
+                if let ext = node.fileExtension {
+                    Text(".\(ext)")
+                        .font(PanelyTypography.caption)
+                        .foregroundStyle(PanelyColor.textSecondary.opacity(0.6))
+                }
                 Spacer(minLength: 0)
             }
             .contentShape(Rectangle())

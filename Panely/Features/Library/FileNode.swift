@@ -15,8 +15,14 @@ nonisolated struct FileNode: Identifiable, Hashable, Sendable {
     var iconName: String {
         switch kind {
         case .folder:  return "folder"
-        case .archive: return "book.closed"
+        case .archive: return "doc.zipper"
         }
+    }
+
+    var fileExtension: String? {
+        guard kind == .archive else { return nil }
+        let ext = url.pathExtension
+        return ext.isEmpty ? nil : ext.lowercased()
     }
 
     static func loadTree(from url: URL, maxDepth: Int = 3) async -> [FileNode] {
