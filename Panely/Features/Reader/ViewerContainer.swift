@@ -183,7 +183,18 @@ struct AppKitImageScroller: NSViewRepresentable {
         force: Bool
     ) {
         guard let content = scrollView.documentView else { return }
-        let docSize = content.frame.size
+        // For vertical (continuous) strips, fitting against the entire stack
+        // height collapses everything to a sliver. Use the first image as the
+        // reference instead so fit-screen means "first page visible" and
+        // fit-width means "first page fills viewport width".
+        let docSize: CGSize
+        if let stack = content as? ImageStackView,
+           stack.axis == .vertical,
+           let firstFrame = stack.frame(forPageAt: 0) {
+            docSize = firstFrame.size
+        } else {
+            docSize = content.frame.size
+        }
         // contentSize is the physical viewport (magnification-invariant); using
         // contentView.bounds.size here would feed back into itself because it
         // scales inversely with magnification, causing toggled fits to drift.

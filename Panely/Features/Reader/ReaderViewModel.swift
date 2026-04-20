@@ -289,9 +289,12 @@ final class ReaderViewModel {
     func toggleLayout() {
         let target = layout.next
         if target.isContinuous {
-            // Webtoon strips have heterogeneous heights — fit-screen makes
-            // no sense, so we lock fit-width on entering vertical mode.
-            fitMode = .fitWidth
+            // Vertical default = fit-screen. The viewer interprets fit
+            // computations against the first image (not the entire strip),
+            // so fit-screen means "first image fully visible in viewport"
+            // — comfortable to read without overflowing tall pages.
+            // The user can switch to fit-width manually if they prefer.
+            fitMode = .fitScreen
         }
         layout = target
     }
