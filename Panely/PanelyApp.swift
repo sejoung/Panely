@@ -47,6 +47,11 @@ struct PanelyApp: App {
                 }
                 .keyboardShortcut("s", modifiers: [.control, .command])
 
+                Button(viewModel.toolbarPinned ? "Unpin Toolbar" : "Pin Toolbar") {
+                    viewModel.toggleToolbarPin()
+                }
+                .keyboardShortcut("t", modifiers: [.control, .command])
+
                 Divider()
 
                 Button("Fit to Screen") {

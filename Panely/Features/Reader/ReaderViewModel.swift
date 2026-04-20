@@ -12,6 +12,7 @@ final class ReaderViewModel {
     private static let positionsKey = "panely.positions"
     private static let fitModeKey = "panely.fitMode"
     private static let autoFitOnResizeKey = "panely.autoFitOnResize"
+    private static let toolbarPinnedKey = "panely.toolbarPinned"
 
     // setter is module-internal so tests can stage a source/page without
     // going through the full file-load pipeline. Production callers should
@@ -104,6 +105,16 @@ final class ReaderViewModel {
         }
     }
 
+    /// When true, the floating toolbar (and bottom slider) stays visible
+    /// instead of auto-hiding. Default false matches the distraction-free
+    /// reading experience; opt-in for users who want quick access to
+    /// controls or progress info while reading.
+    var toolbarPinned: Bool = false {
+        didSet {
+            UserDefaults.standard.set(toolbarPinned, forKey: Self.toolbarPinnedKey)
+        }
+    }
+
     init() {
         self.recentItems = RecentItemsStore()
 
@@ -127,6 +138,9 @@ final class ReaderViewModel {
         }
         if UserDefaults.standard.object(forKey: Self.autoFitOnResizeKey) != nil {
             autoFitOnResize = UserDefaults.standard.bool(forKey: Self.autoFitOnResizeKey)
+        }
+        if UserDefaults.standard.object(forKey: Self.toolbarPinnedKey) != nil {
+            toolbarPinned = UserDefaults.standard.bool(forKey: Self.toolbarPinnedKey)
         }
 
         isFullyInitialized = true
@@ -397,6 +411,10 @@ final class ReaderViewModel {
 
     func toggleAutoFitOnResize() {
         autoFitOnResize.toggle()
+    }
+
+    func toggleToolbarPin() {
+        toolbarPinned.toggle()
     }
 
     private func handleLayoutChange(from oldLayout: PageLayout) {

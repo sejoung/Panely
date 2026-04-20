@@ -16,6 +16,8 @@ struct PanelyToolbar: View {
     var onZoomOut: () -> Void = {}
     var autoFitOnResize: Bool = true
     var onToggleAutoFit: () -> Void = {}
+    var toolbarPinned: Bool = false
+    var onToggleToolbarPin: () -> Void = {}
 
     var showVolumeNav: Bool = false
     var canGoPreviousVolume: Bool = false
@@ -34,6 +36,13 @@ struct PanelyToolbar: View {
                 action: onToggleSidebarPin
             )
             .help(sidebarPinned ? "Unpin Library (⌃⌘S)" : "Pin Library (⌃⌘S)")
+
+            PanelyIconButton(
+                systemImage: toolbarPinned ? "pin.square.fill" : "pin.square",
+                isActive: toolbarPinned,
+                action: onToggleToolbarPin
+            )
+            .help(toolbarPinned ? "Unpin Toolbar (⌃⌘T)" : "Pin Toolbar (⌃⌘T)")
 
             Divider()
                 .frame(height: 18)

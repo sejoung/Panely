@@ -133,6 +133,9 @@ struct ReaderScene: View {
         }
     }
 
+    /// Combined visibility — pinned overrides hover-driven auto-hide.
+    private var toolbarShown: Bool { toolbarVisible || viewModel.toolbarPinned }
+
     private var toolbarOverlay: some View {
         PanelyToolbar(
             layout: viewModel.layout,
@@ -150,6 +153,8 @@ struct ReaderScene: View {
             onZoomOut: { viewerController.zoomOut() },
             autoFitOnResize: viewModel.autoFitOnResize,
             onToggleAutoFit: { viewModel.toggleAutoFitOnResize() },
+            toolbarPinned: viewModel.toolbarPinned,
+            onToggleToolbarPin: { viewModel.toggleToolbarPin() },
             showVolumeNav: viewModel.hasMultipleVolumes,
             canGoPreviousVolume: viewModel.canGoPreviousVolume,
             canGoNextVolume: viewModel.canGoNextVolume,
@@ -157,9 +162,9 @@ struct ReaderScene: View {
             onNextVolume: { viewModel.nextVolume() }
         )
         .padding(PanelySpacing.md)
-        .opacity(toolbarVisible ? 1 : 0)
-        .allowsHitTesting(toolbarVisible)
-        .animation(PanelyMotion.uiReveal, value: toolbarVisible)
+        .opacity(toolbarShown ? 1 : 0)
+        .allowsHitTesting(toolbarShown)
+        .animation(PanelyMotion.uiReveal, value: toolbarShown)
     }
 
     @ViewBuilder
@@ -177,9 +182,9 @@ struct ReaderScene: View {
             }
             .padding(.horizontal, PanelySpacing.xl)
             .padding(.bottom, PanelySpacing.lg)
-            .opacity(toolbarVisible ? 1 : 0)
-            .allowsHitTesting(toolbarVisible)
-            .animation(PanelyMotion.uiReveal, value: toolbarVisible)
+            .opacity(toolbarShown ? 1 : 0)
+            .allowsHitTesting(toolbarShown)
+            .animation(PanelyMotion.uiReveal, value: toolbarShown)
         }
     }
 
