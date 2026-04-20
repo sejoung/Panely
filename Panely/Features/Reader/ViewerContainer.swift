@@ -42,7 +42,7 @@ struct ViewerContainer: View {
 
 // MARK: - AppKit-backed scroller
 
-private struct AppKitImageScroller: NSViewRepresentable {
+struct AppKitImageScroller: NSViewRepresentable {
     let images: [NSImage]
     let direction: ReadingDirection
     let fitMode: FitMode
@@ -64,6 +64,7 @@ private struct AppKitImageScroller: NSViewRepresentable {
         scrollView.maxMagnification = 10.0
         scrollView.drawsBackground = false
         scrollView.borderType = .noBorder
+        scrollView.postsFrameChangedNotifications = true
 
         let content = ImageStackView()
         content.onDoubleClick = { [weak scrollView] localPoint in
@@ -74,6 +75,23 @@ private struct AppKitImageScroller: NSViewRepresentable {
             scrollView.setMagnification(target, centeredAt: localPoint)
         }
         scrollView.documentView = content
+
+        context.coordinator.scrollView = scrollView
+        context.coordinator.frameObserver = NotificationCenter.default.addObserver(
+            forName: NSView.frameDidChangeNotification,
+            object: scrollView,
+            queue: .main
+        ) { [weak coordinator = context.coordinator] _ in
+            MainActor.assumeIsolated {
+                guard let coordinator, let sv = coordinator.scrollView else { return }
+                Self.applyFit(
+                    scrollView: sv,
+                    coordinator: coordinator,
+                    fitMode: coordinator.lastFitMode,
+                    force: false
+                )
+            }
+        }
 
         return scrollView
     }
@@ -89,13 +107,24 @@ private struct AppKitImageScroller: NSViewRepresentable {
         context.coordinator.lastIdentity = identity
         context.coordinator.lastFitMode = fitMode
 
+        let currentFitMode = fitMode
         DispatchQueue.main.async { [weak scrollView] in
             guard let scrollView else { return }
-            applyFit(scrollView: scrollView, coordinator: context.coordinator, force: resetNeeded)
+            Self.applyFit(
+                scrollView: scrollView,
+                coordinator: context.coordinator,
+                fitMode: currentFitMode,
+                force: resetNeeded
+            )
         }
     }
 
-    private func applyFit(scrollView: NSScrollView, coordinator: Coordinator, force: Bool) {
+    static func applyFit(
+        scrollView: NSScrollView,
+        coordinator: Coordinator,
+        fitMode: FitMode,
+        force: Bool
+    ) {
         guard let content = scrollView.documentView else { return }
         let docSize = content.frame.size
         // contentSize is the physical viewport (magnification-invariant); using
@@ -123,12 +152,20 @@ private struct AppKitImageScroller: NSViewRepresentable {
         var lastIdentity: String = ""
         var lastFitMode: FitMode = .fitScreen
         var baseMagnification: CGFloat = 1.0
+        weak var scrollView: NSScrollView?
+        var frameObserver: NSObjectProtocol?
+
+        deinit {
+            if let frameObserver {
+                NotificationCenter.default.removeObserver(frameObserver)
+            }
+        }
     }
 }
 
 // MARK: - NSScrollView that forwards key events to SwiftUI
 
-private final class PanelyScrollView: NSScrollView {
+final class PanelyScrollView: NSScrollView {
     override var acceptsFirstResponder: Bool { false }
 }
 
