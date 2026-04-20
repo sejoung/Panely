@@ -296,6 +296,7 @@ final class ReaderViewModel {
                         targetURL = tempDir
                     } catch {
                         try? FileManager.default.removeItem(at: tempDir)
+                        errorMessage = "Failed to extract archive: \(error.localizedDescription)"
                     }
                 }
             }
@@ -350,6 +351,8 @@ final class ReaderViewModel {
             currentImages = []
             currentSourceURL = nil
             siblings = []
+            rootScopedURL?.stopAccessingSecurityScopedResource()
+            rootScopedURL = nil
         }
     }
 

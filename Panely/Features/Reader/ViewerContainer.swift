@@ -89,7 +89,8 @@ private struct AppKitImageScroller: NSViewRepresentable {
         context.coordinator.lastIdentity = identity
         context.coordinator.lastFitMode = fitMode
 
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak scrollView] in
+            guard let scrollView else { return }
             applyFit(scrollView: scrollView, coordinator: context.coordinator, force: resetNeeded)
         }
     }
