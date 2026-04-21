@@ -96,35 +96,35 @@ Items grouped by impact. Check off as completed.
 - **Fix**: Cache last `documentView.frame.size`, short-circuit when unchanged.
 - **Impact**: SMALL (5–10% scroll latency)
 - **Risk**: LOW
-- [ ] Done
+- [x] Skipped — re-evaluated. The function is already 4 ops (super call + frame access + 2 conditional adjustments). `proposedBounds` differs every scroll tick, so a cache key would never hit. Caching just `documentView.frame.size` doesn't help because the size lookup is a single struct-field access (nanoseconds). Not worth the bookkeeping.
 
 ### 10. `HotEdgeReveal` `Task.sleep` doesn't check `isCancelled` post-sleep
 - **File**: `Panely/Features/Reader/ReaderScene.swift` — `HotEdgeReveal`
 - **Fix**: `guard !Task.isCancelled else { return }` after `await Task.sleep`.
 - **Impact**: NEGLIGIBLE
 - **Risk**: LOW
-- [ ] Done
+- [x] Done — already in place (`guard !Task.isCancelled else { return }` after `try? await Task.sleep`). Audit caught a stale assumption.
 
 ### 11. `RecentItemsStore.record` recreates bookmark even when item already exists
 - **File**: `Panely/Features/Library/RecentItemsStore.swift:16-45`
 - **Fix**: If path already in items, just reorder; skip `bookmarkData(...)`.
 - **Impact**: SMALL (only repeat opens)
 - **Risk**: LOW
-- [ ] Done
+- [x] Done — `record(_:title:)` checks for an existing entry by path first; if found, bumps `openedAt` + title and reorders to the front without re-creating the security-scoped bookmark.
 
 ### 12. `FitCalculator.magnification` not memoized
 - **File**: `Panely/Features/Reader/FitCalculator.swift`
 - **Fix**: Cache `(docSize, viewport, fitMode) -> CGFloat` on Coordinator (1-entry cache).
 - **Impact**: SMALL
 - **Risk**: LOW
-- [ ] Done
+- [x] Skipped — re-evaluated. `magnification` is one min/division per call. Cache key check (3 struct comparisons) plus storage cost would equal or exceed the computation. Also `applyFit` is only called from `updateNSView` and `frameDidChangeNotification` — not from the bounds observer that fires per scroll — so call frequency is low.
 
 ### 13. `localizedStandardCompare` results not cached during sort
 - **File**: `FileNode.swift`, `CBZLoader.swift`, `FolderLoader.swift`
 - **Fix**: Skip unless profiling shows a hotspot — sorts happen once per load.
 - **Impact**: NEGLIGIBLE
 - **Risk**: N/A
-- [ ] Done
+- [x] Skipped — per audit recommendation. Sorts run once per source/sidebar load.
 
 ---
 

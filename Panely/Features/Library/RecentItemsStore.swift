@@ -13,6 +13,18 @@ final class RecentItemsStore {
     }
 
     func record(_ url: URL, title: String) {
+        // Re-opening a recently used item: skip the security-scoped bookmark
+        // creation (the most expensive part of this method) and just bump
+        // the existing entry to the top. Bookmark data is unchanged.
+        if let existingIndex = items.firstIndex(where: { $0.path == url.path }) {
+            var existing = items.remove(at: existingIndex)
+            existing.openedAt = Date()
+            existing.title = title
+            items.insert(existing, at: 0)
+            save()
+            return
+        }
+
         do {
             let bookmark = try url.bookmarkData(
                 options: .withSecurityScope,
@@ -21,8 +33,6 @@ final class RecentItemsStore {
             )
 
             let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
-
-            items.removeAll { $0.path == url.path }
 
             let item = RecentItem(
                 id: UUID(),
