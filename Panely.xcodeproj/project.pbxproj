@@ -22,6 +22,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		B11B6EFA2F97336200BBCFA5 /* README.ko.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.ko.md; sourceTree = "<group>"; };
 		B263CE162F94EE33006DD5A0 /* Panely.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Panely.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B263CE252F94EE34006DD5A0 /* PanelyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PanelyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B263CEA32F94F900006DD5A0 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
@@ -81,6 +82,7 @@
 		B263CE0D2F94EE33006DD5A0 = {
 			isa = PBXGroup;
 			children = (
+				B11B6EFA2F97336200BBCFA5 /* README.ko.md */,
 				B263CE182F94EE33006DD5A0 /* Panely */,
 				B263CE282F94EE34006DD5A0 /* PanelyTests */,
 				B263CEA02F94F900006DD5A0 /* docs */,
