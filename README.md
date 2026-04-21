@@ -167,7 +167,7 @@ xcodebuild test \
   CODE_SIGN_IDENTITY="-"
 ```
 
-**163 tests across 31 suites** cover:
+**168 tests across 33 suites** cover:
 
 - Pure data types (`ComicPage`, `ComicSource`, `RecentItem`, enum raw values)
 - Natural-sort contract (Foundation behaviour Panely relies on)
@@ -221,6 +221,11 @@ xcodebuild test \
 - **`ReaderViewModel` bookmark guards** — `toggle*`, `canGo*Bookmark`,
   `currentPositionKey` behave as no-ops / false / nil when no source is
   loaded
+- **`ThumbnailLoader`** — nil for unreachable URLs, non-nil for a real PNG,
+  same `ComicPage.id` returns the cached `NSImage` via `===`, distinct
+  pages get distinct cache entries
+- **`PanelyAppDelegate`** — `applicationShouldTerminateAfterLastWindowClosed`
+  returns true so the red close button quits the app
 
 Tests are organized to mirror the source tree under `PanelyTests/Core/`,
 `PanelyTests/Features/Library/`, and `PanelyTests/Features/Reader/`, with
@@ -436,7 +441,7 @@ git push origin v1.0.0
 ### CI / storage
 
 - **CI** runs on every push/PR (skips `**/*.md` and `docs/**`), builds
-  Debug with ad-hoc signing, runs all 163 tests, and uploads no artifacts —
+  Debug with ad-hoc signing, runs all 168 tests, and uploads no artifacts —
   storage footprint is essentially zero.
 - **Releases** attach a single zip (~5–10 MB) to GitHub Releases using
   `ditto` so resource forks are preserved.

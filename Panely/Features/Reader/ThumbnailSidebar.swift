@@ -71,6 +71,14 @@ struct ThumbnailSidebar: View {
                     proxy.scrollTo(new, anchor: .center)
                 }
             }
+            .onChange(of: pages.first?.id) { _, _ in
+                // Book switch: the pages array is brand-new (fresh UUIDs).
+                // Re-anchor the scroll to the restored page for the new book
+                // instead of leaving the sidebar stuck on the old scroll
+                // offset. `.onAppear` only fires once per mount, so without
+                // this the user would see the wrong region on book change.
+                proxy.scrollTo(currentPageIndex, anchor: .center)
+            }
             .onAppear {
                 proxy.scrollTo(currentPageIndex, anchor: .center)
             }

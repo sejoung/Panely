@@ -14,6 +14,13 @@ nonisolated struct FavoriteBook: Identifiable, Sendable, Codable {
         isDirectory ? "folder" : "doc.zipper"
     }
 
+    // Explicit `CodingKeys` so future schema evolution is visible in code
+    // review (renames/removals show up as diff hunks instead of silently
+    // changing the serialised shape).
+    private enum CodingKeys: String, CodingKey {
+        case id, path, title, addedAt, bookmarkData, isDirectory
+    }
+
     init(
         id: UUID,
         path: String,
