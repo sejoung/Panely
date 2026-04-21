@@ -18,6 +18,11 @@ final class ThumbnailLoader {
         // worst-case), so we can keep plenty of them around for smooth scroll
         // in the sidebar. NSCache still evicts under memory pressure.
         cache.countLimit = 400
+        // Cap total bytes at ~60 MB so a book with very wide/tall pages can't
+        // blow past a reasonable working-set size even if 400 entries each
+        // happen to be near-worst-case. `setObject(_:forKey:cost:)` feeds
+        // per-entry estimates into this limit.
+        cache.totalCostLimit = 60 * 1024 * 1024
         return cache
     }()
 
@@ -30,7 +35,12 @@ final class ThumbnailLoader {
         }
         do {
             let image = try await Self.generate(for: page, maxPixelSize: maxPixelSize)
-            cache.setObject(image, forKey: key)
+            // Estimate decoded byte cost so `totalCostLimit` is honoured. The
+            // NSImage size is in points; multiply by ~4× to approximate the
+            // backing bitmap area. A rough figure is fine — NSCache treats it
+            // as a hint, not a strict budget.
+            let cost = Int(image.size.width * image.size.height * 4)
+            cache.setObject(image, forKey: key, cost: cost)
             return image
         } catch {
             return nil

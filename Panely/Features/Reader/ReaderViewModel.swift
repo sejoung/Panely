@@ -64,6 +64,13 @@ final class ReaderViewModel {
     var preloadTask: Task<Void, Never>?
     let preloadRadius = 2
 
+    /// Coalesces rapid `currentPageIndex` changes (e.g., continuous vertical
+    /// scrolling fires `setCurrentPageFromScroll` at up to ~60 Hz) into a
+    /// single `UserDefaults` write. Without this, each scroll tick walks the
+    /// positions dictionary and rewrites it — measurable frame-time pressure
+    /// during long strips.
+    var pendingSaveTask: Task<Void, Never>?
+
     // MARK: - Vertical lazy window
 
     /// Vertical-mode lazy-load state. `pageDimensions` is populated up-front
@@ -200,5 +207,20 @@ final class ReaderViewModel {
         }
 
         isFullyInitialized = true
+
+        observeAppTermination()
+    }
+
+    /// Flush any pending debounced save when the process is about to exit.
+    /// The Task is captured weakly via the notification stream's self-capture
+    /// pattern — once the VM is gone the handler is a no-op, so the wait
+    /// doesn't extend the VM's lifetime.
+    private func observeAppTermination() {
+        Task { @MainActor [weak self] in
+            for await _ in NotificationCenter.default.notifications(named: NSApplication.willTerminateNotification) {
+                self?.flushPositionImmediately()
+                break
+            }
+        }
     }
 }

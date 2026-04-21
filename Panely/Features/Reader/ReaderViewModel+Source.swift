@@ -250,7 +250,29 @@ extension ReaderViewModel {
 
     // MARK: - Per-book position memory
 
+    /// Scheduled from the `currentPageIndex` didSet. Debounces the actual
+    /// UserDefaults write so that dragging through a vertical strip at 60 Hz
+    /// doesn't thrash the positions dictionary. A quick quit-during-scroll
+    /// can lose ~300 ms of progress; flushPositionImmediately() is called on
+    /// app termination to cover that window.
     func savePosition() {
+        pendingSaveTask?.cancel()
+        pendingSaveTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            self?.writePositionNow()
+        }
+    }
+
+    /// Synchronous write used by the debounced path (after the sleep) and by
+    /// the app-terminate flush.
+    func flushPositionImmediately() {
+        pendingSaveTask?.cancel()
+        pendingSaveTask = nil
+        writePositionNow()
+    }
+
+    private func writePositionNow() {
         guard let url = currentSourceURL else { return }
         let key = positionKey(for: url)
         var positions = UserDefaults.standard.dictionary(forKey: Self.positionsKey) as? [String: Int] ?? [:]
