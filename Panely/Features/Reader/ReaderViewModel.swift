@@ -13,6 +13,7 @@ final class ReaderViewModel {
     private static let fitModeKey = "panely.fitMode"
     private static let autoFitOnResizeKey = "panely.autoFitOnResize"
     private static let toolbarPinnedKey = "panely.toolbarPinned"
+    private static let thumbnailSidebarVisibleKey = "panely.thumbnailSidebarVisible"
 
     // setter is module-internal so tests can stage a source/page without
     // going through the full file-load pipeline. Production callers should
@@ -30,6 +31,7 @@ final class ReaderViewModel {
     private(set) var siblings: [URL] = []
 
     let recentItems: RecentItemsStore
+    let bookmarks: BookmarksStore
 
     private var rootScopedURL: URL?
     private var currentTempDir: URL?
@@ -120,8 +122,18 @@ final class ReaderViewModel {
         }
     }
 
+    /// Right-side thumbnail panel visibility. Off by default — users opt in
+    /// via the toolbar button or `⌃⌘P`. Persisted so the preference survives
+    /// app restarts.
+    var thumbnailSidebarVisible: Bool = false {
+        didSet {
+            UserDefaults.standard.set(thumbnailSidebarVisible, forKey: Self.thumbnailSidebarVisibleKey)
+        }
+    }
+
     init() {
         self.recentItems = RecentItemsStore()
+        self.bookmarks = BookmarksStore()
 
         // Snapshot once. Each individual `UserDefaults.standard.string(...)`
         // / `.bool(...)` / `.object(...)` call is a syscall + KVO check; on
@@ -154,6 +166,9 @@ final class ReaderViewModel {
         if let value = defaults[Self.toolbarPinnedKey] as? Bool {
             toolbarPinned = value
         }
+        if let value = defaults[Self.thumbnailSidebarVisibleKey] as? Bool {
+            thumbnailSidebarVisible = value
+        }
 
         isFullyInitialized = true
     }
@@ -179,6 +194,97 @@ final class ReaderViewModel {
         let first = currentPageIndex + 1
         let last = min(currentPageIndex + navigationStep, count)
         return first == last ? "\(first) / \(count)" : "\(first)-\(last) / \(count)"
+    }
+
+    /// 1-indexed first page in the currently visible span.
+    var currentPageNumber: Int {
+        source.isEmpty ? 0 : currentPageIndex + 1
+    }
+
+    /// 1-indexed last page in the currently visible span. Matches
+    /// `currentPageNumber` outside double-page mode.
+    var currentPageRangeEndNumber: Int {
+        guard !source.isEmpty else { return 0 }
+        return min(currentPageIndex + navigationStep, totalPages)
+    }
+
+    /// Jump to a 1-indexed page number. Clamps silently, so callers can pass
+    /// user input without pre-validation.
+    func jump(toPageNumber pageNumber: Int) {
+        guard totalPages > 0 else { return }
+        let clamped = min(max(pageNumber, 1), totalPages)
+        jump(to: clamped - 1)
+    }
+
+    // MARK: - Bookmarks
+
+    /// Stable key for the current book. Nil when no source is open.
+    var currentPositionKey: String? {
+        guard let url = currentSourceURL else { return nil }
+        return positionKey(for: url)
+    }
+
+    var isCurrentBookFavorite: Bool {
+        guard let url = currentSourceURL else { return false }
+        return bookmarks.isFavorite(url: url)
+    }
+
+    func toggleFavoriteForCurrentBook() {
+        guard let url = currentSourceURL else { return }
+        bookmarks.toggleFavorite(url: url, title: displayTitle(for: url))
+    }
+
+    var isCurrentPageBookmarked: Bool {
+        guard let key = currentPositionKey else { return false }
+        return bookmarks.isPageBookmarked(key: key, pageIndex: currentPageIndex)
+    }
+
+    func toggleCurrentPageBookmark() {
+        guard let key = currentPositionKey else { return }
+        bookmarks.togglePageBookmark(key: key, pageIndex: currentPageIndex)
+    }
+
+    var currentBookPageBookmarks: [PageBookmark] {
+        guard let key = currentPositionKey else { return [] }
+        return bookmarks.pageBookmarks(forKey: key)
+    }
+
+    var hasPageBookmarks: Bool {
+        !currentBookPageBookmarks.isEmpty
+    }
+
+    var canGoNextBookmark: Bool {
+        guard let key = currentPositionKey else { return false }
+        return bookmarks.nextBookmark(forKey: key, after: currentPageIndex) != nil
+    }
+
+    var canGoPreviousBookmark: Bool {
+        guard let key = currentPositionKey else { return false }
+        return bookmarks.previousBookmark(forKey: key, before: currentPageIndex) != nil
+    }
+
+    func jumpToNextBookmark() {
+        guard let key = currentPositionKey,
+              let bm = bookmarks.nextBookmark(forKey: key, after: currentPageIndex) else { return }
+        jump(to: bm.pageIndex)
+    }
+
+    func jumpToPreviousBookmark() {
+        guard let key = currentPositionKey,
+              let bm = bookmarks.previousBookmark(forKey: key, before: currentPageIndex) else { return }
+        jump(to: bm.pageIndex)
+    }
+
+    func jumpToBookmark(_ bookmark: PageBookmark) {
+        jump(to: bookmark.pageIndex)
+    }
+
+    /// Open a favorite book, resolving its security-scoped bookmark the same
+    /// way recent items do.
+    func openFavorite(_ favorite: FavoriteBook) {
+        guard let url = bookmarks.resolve(favorite) else { return }
+        recentItems.record(url, title: displayTitle(for: url))
+        Task { await load(url: url) }
     }
 
     var currentSiblingIndex: Int? {
@@ -476,6 +582,10 @@ final class ReaderViewModel {
 
     func toggleToolbarPin() {
         toolbarPinned.toggle()
+    }
+
+    func toggleThumbnailSidebar() {
+        thumbnailSidebarVisible.toggle()
     }
 
     private func handleLayoutChange(from oldLayout: PageLayout) {

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 @main
@@ -13,7 +14,11 @@ struct PanelyApp: App {
                 .preferredColorScheme(.dark)
         }
         .windowStyle(.hiddenTitleBar)
-        .commands {
+        .commands { panelyCommands }
+    }
+
+    @CommandsBuilder
+    private var panelyCommands: some Commands {
             CommandGroup(replacing: .newItem) {
                 Button("Open…") {
                     viewModel.openSource()
@@ -51,6 +56,12 @@ struct PanelyApp: App {
                     viewModel.toggleToolbarPin()
                 }
                 .keyboardShortcut("t", modifiers: [.control, .command])
+
+                Button(viewModel.thumbnailSidebarVisible ? "Hide Thumbnails" : "Show Thumbnails") {
+                    viewModel.toggleThumbnailSidebar()
+                }
+                .keyboardShortcut("p", modifiers: [.control, .command])
+                .disabled(!viewModel.hasSource)
 
                 Divider()
 
@@ -98,6 +109,42 @@ struct PanelyApp: App {
             }
 
             CommandMenu("Go") {
+                Button("Go to Page…") {
+                    promptJumpToPage(viewModel: viewModel)
+                }
+                .keyboardShortcut("g", modifiers: .command)
+                .disabled(!viewModel.hasSource || viewModel.totalPages <= 1)
+
+                Divider()
+
+                Button(viewModel.isCurrentPageBookmarked ? "Remove Page Bookmark" : "Add Page Bookmark") {
+                    viewModel.toggleCurrentPageBookmark()
+                }
+                .keyboardShortcut("d", modifiers: .command)
+                .disabled(!viewModel.hasSource)
+
+                Button("Previous Bookmark") {
+                    viewModel.jumpToPreviousBookmark()
+                }
+                .keyboardShortcut("[", modifiers: [.command, .shift])
+                .disabled(!viewModel.canGoPreviousBookmark)
+
+                Button("Next Bookmark") {
+                    viewModel.jumpToNextBookmark()
+                }
+                .keyboardShortcut("]", modifiers: [.command, .shift])
+                .disabled(!viewModel.canGoNextBookmark)
+
+                Divider()
+
+                Button(viewModel.isCurrentBookFavorite ? "Remove from Favorites" : "Add to Favorites") {
+                    viewModel.toggleFavoriteForCurrentBook()
+                }
+                .keyboardShortcut("d", modifiers: [.command, .shift])
+                .disabled(!viewModel.hasSource)
+
+                Divider()
+
                 Button("Previous Volume") {
                     viewModel.previousVolume()
                 }
@@ -110,6 +157,28 @@ struct PanelyApp: App {
                 .keyboardShortcut("]", modifiers: .command)
                 .disabled(!viewModel.canGoNextVolume)
             }
-        }
     }
+}
+
+@MainActor
+private func promptJumpToPage(viewModel: ReaderViewModel) {
+    guard viewModel.hasSource, viewModel.totalPages > 1 else { return }
+
+    let alert = NSAlert()
+    alert.messageText = "Go to Page"
+    alert.informativeText = "Enter a page number (1 – \(viewModel.totalPages)):"
+    alert.addButton(withTitle: "Go")
+    alert.addButton(withTitle: "Cancel")
+
+    let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 220, height: 24))
+    field.placeholderString = "\(viewModel.currentPageNumber)"
+    field.stringValue = "\(viewModel.currentPageNumber)"
+    field.alignment = .center
+    alert.accessoryView = field
+    alert.window.initialFirstResponder = field
+
+    guard alert.runModal() == .alertFirstButtonReturn else { return }
+    let trimmed = field.stringValue.trimmingCharacters(in: .whitespaces)
+    guard let parsed = Int(trimmed) else { return }
+    viewModel.jump(toPageNumber: parsed)
 }

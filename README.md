@@ -138,6 +138,10 @@ Xcode resolves it automatically on first build.
 | `←` / `→` | Previous / next page (direction-aware in paged modes; image-by-image in vertical) |
 | `Space` | Next page (or scroll to next image in vertical) |
 | `⌘[` / `⌘]` | Previous / next volume |
+| `⌘G` | Go to page… (modal prompt) |
+| `⌘D` | Add / remove page bookmark |
+| `⌘⇧D` | Add / remove current book from favorites |
+| `⌘⇧[` / `⌘⇧]` | Previous / next page bookmark within the current book |
 | `⌘1` / `⌘2` / `⌘3` | Fit to screen / fit to width / fit to height |
 | `⌘+` / `⌘-` | Zoom in / out (one step, viewport-centered) |
 | `⌘0` | Reset zoom to current fit mode |
@@ -145,6 +149,7 @@ Xcode resolves it automatically on first build.
 | `⌘L` | Lock / unlock view size (preserves zoom across resizes & layout flips) |
 | `⌃⌘S` | Pin / unpin library sidebar |
 | `⌃⌘T` | Pin / unpin toolbar (and bottom slider) |
+| `⌃⌘P` | Show / hide thumbnail sidebar |
 | Hover left edge | Reveal sidebar as overlay (auto-hide mode) |
 | `ESC` | Dismiss sidebar overlay (when unpinned) |
 | Double-click on image | Toggle 1× ↔ 2× zoom |
@@ -162,7 +167,7 @@ xcodebuild test \
   CODE_SIGN_IDENTITY="-"
 ```
 
-**126 tests across 25 suites** cover:
+**163 tests across 31 suites** cover:
 
 - Pure data types (`ComicPage`, `ComicSource`, `RecentItem`, enum raw values)
 - Natural-sort contract (Foundation behaviour Panely relies on)
@@ -201,6 +206,21 @@ xcodebuild test \
 - **`ScrollZoomCalculator`** — multiplicative zoom factor math from
   scroll-wheel delta with min/max clamp
 - **Toolbar pin state** — default unpinned, toggle flips persisted flag
+- **Thumbnail sidebar toggle** — default hidden, `toggleThumbnailSidebar`
+  flips persisted flag
+- **Quick-jump math** — `currentPageNumber` / `currentPageRangeEndNumber`
+  in single + double layouts, `jump(toPageNumber:)` clamps out-of-range
+  inputs and snaps to navigation step in double mode
+- **`BookmarksStore` page bookmarks** — toggle add/remove, keys isolated,
+  sort by page index, next/previous navigation, remove-by-id, persistence
+  round-trip through `UserDefaults`
+- **`BookmarksStore` favorites** — toggle add/remove against a real temp
+  file, security-scoped bookmark resolves back to the original URL
+- **`FavoriteBook` / `PageBookmark` Codable** — round-trip fidelity plus
+  forward-compat decode for legacy `FavoriteBook` JSON without `isDirectory`
+- **`ReaderViewModel` bookmark guards** — `toggle*`, `canGo*Bookmark`,
+  `currentPositionKey` behave as no-ops / false / nil when no source is
+  loaded
 
 Tests are organized to mirror the source tree under `PanelyTests/Core/`,
 `PanelyTests/Features/Library/`, and `PanelyTests/Features/Reader/`, with
@@ -416,7 +436,7 @@ git push origin v1.0.0
 ### CI / storage
 
 - **CI** runs on every push/PR (skips `**/*.md` and `docs/**`), builds
-  Debug with ad-hoc signing, runs all 126 tests, and uploads no artifacts —
+  Debug with ad-hoc signing, runs all 163 tests, and uploads no artifacts —
   storage footprint is essentially zero.
 - **Releases** attach a single zip (~5–10 MB) to GitHub Releases using
   `ditto` so resource forks are preserved.
@@ -434,26 +454,6 @@ scripts/generate-app-icon.sh
 This rasterises the SVG at all required sizes (16–1024), embeds sRGB
 profiles via ImageMagick, and produces `Panely/AppIcon.icns` via `iconutil`.
 Requires `librsvg` and `imagemagick` from Homebrew.
-
-## Roadmap
-
-- [x] AppKit-backed viewer with native magnification
-- [x] Nested-archive support (zip-in-zip)
-- [x] Position memory stable across temp extractions
-- [x] Library sidebar with folder access grant + pin mode
-- [x] Recent items with persistent bookmarks
-- [x] Loading overlay with stage messages
-- [x] **Vertical scroll mode** — webtoon-style continuous scroll with lazy
-      windowing (header-only dimension fetch + viewport-driven decode)
-- [x] **Three fit modes** — fit-screen / fit-width / fit-height with
-      `⌘1`/`⌘2`/`⌘3` and a cycling toolbar button
-- [x] **Zoom controls** — `⌘+`/`⌘-`/`⌘0` + `⌘ + scroll wheel` continuous zoom
-- [x] **View-size lock** — preserve magnification across resizes / mode flips
-- [x] **Toolbar pin** — keep toolbar + page slider visible (`⌃⌘T`)
-- [ ] **Thumbnail sidebar** — page-level preview panel
-- [ ] **Bookmarks / favorites** — pin specific pages or books
-- [ ] **Persistent library root** — set a home library folder once
-- [ ] **WebP / HEIC** — verify first-class support end-to-end
 
 ## Contributing
 

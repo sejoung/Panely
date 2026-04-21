@@ -25,6 +25,15 @@ struct PanelyToolbar: View {
     var onPreviousVolume: () -> Void = {}
     var onNextVolume: () -> Void = {}
 
+    var hasSource: Bool = false
+    var isBookFavorite: Bool = false
+    var isPageBookmarked: Bool = false
+    var onToggleFavorite: () -> Void = {}
+    var onTogglePageBookmark: () -> Void = {}
+
+    var thumbnailSidebarVisible: Bool = false
+    var onToggleThumbnailSidebar: () -> Void = {}
+
     var body: some View {
         HStack(spacing: PanelySpacing.xs) {
             PanelyIconButton(systemImage: "folder", action: onOpen)
@@ -88,6 +97,36 @@ struct PanelyToolbar: View {
             .help(autoFitOnResize
                   ? "Lock view size (don't auto-fit on resize) (⌘L)"
                   : "Unlock view size (auto-fit on resize) (⌘L)")
+
+            Divider()
+                .frame(height: 18)
+                .padding(.horizontal, PanelySpacing.xs)
+
+            PanelyIconButton(
+                systemImage: isBookFavorite ? "star.fill" : "star",
+                isActive: isBookFavorite,
+                action: onToggleFavorite
+            )
+            .disabled(!hasSource)
+            .help(isBookFavorite ? "Remove from Favorites (⌘⇧D)" : "Add to Favorites (⌘⇧D)")
+
+            PanelyIconButton(
+                systemImage: isPageBookmarked ? "bookmark.fill" : "bookmark",
+                isActive: isPageBookmarked,
+                action: onTogglePageBookmark
+            )
+            .disabled(!hasSource)
+            .help(isPageBookmarked ? "Remove Page Bookmark (⌘D)" : "Bookmark Current Page (⌘D)")
+
+            PanelyIconButton(
+                systemImage: "square.stack",
+                isActive: thumbnailSidebarVisible,
+                action: onToggleThumbnailSidebar
+            )
+            .disabled(!hasSource)
+            .help(thumbnailSidebarVisible
+                  ? "Hide Thumbnails (⌃⌘P)"
+                  : "Show Thumbnails (⌃⌘P)")
 
             Spacer()
 

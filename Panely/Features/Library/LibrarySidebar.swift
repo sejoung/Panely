@@ -5,7 +5,14 @@ struct LibrarySidebar: View {
     let activeURL: URL?
     let refreshToken: UUID
     let pinned: Bool
+    let favorites: [FavoriteBook]
+    let pageBookmarks: [PageBookmark]
+    let currentPageIndex: Int
     let onSelect: (URL) -> Void
+    let onSelectFavorite: (FavoriteBook) -> Void
+    let onRemoveFavorite: (FavoriteBook) -> Void
+    let onJumpToBookmark: (PageBookmark) -> Void
+    let onRemovePageBookmark: (PageBookmark) -> Void
     let onOpen: () -> Void
     let onTogglePin: () -> Void
     let onRequestFolderAccess: () -> Void
@@ -31,9 +38,9 @@ struct LibrarySidebar: View {
 
     @ViewBuilder
     private var content: some View {
-        if rootURL == nil {
+        if rootURL == nil && favorites.isEmpty && pageBookmarks.isEmpty {
             emptyState
-        } else if scanCompleted && nodes.isEmpty {
+        } else if rootURL != nil && scanCompleted && nodes.isEmpty && favorites.isEmpty && pageBookmarks.isEmpty {
             accessPrompt
         } else {
             tree
@@ -61,16 +68,60 @@ struct LibrarySidebar: View {
     }
 
     private var tree: some View {
-        List(nodes, children: \.children) { node in
-            FileNodeRow(
-                node: node,
-                isActive: activeURL?.standardizedFileURL == node.url.standardizedFileURL,
-                onTap: { onSelect(node.url) }
-            )
-            .listRowBackground(Color.clear)
+        List {
+            if !favorites.isEmpty {
+                Section(header: sectionHeader("Favorites", systemImage: "star.fill")) {
+                    ForEach(favorites) { fav in
+                        FavoriteRow(
+                            favorite: fav,
+                            isActive: activeURL?.path == fav.path,
+                            onTap: { onSelectFavorite(fav) },
+                            onRemove: { onRemoveFavorite(fav) }
+                        )
+                        .listRowBackground(Color.clear)
+                    }
+                }
+            }
+
+            if !pageBookmarks.isEmpty {
+                Section(header: sectionHeader("Bookmarks", systemImage: "bookmark.fill")) {
+                    ForEach(pageBookmarks) { bm in
+                        PageBookmarkRow(
+                            bookmark: bm,
+                            isCurrent: bm.pageIndex == currentPageIndex,
+                            onTap: { onJumpToBookmark(bm) },
+                            onRemove: { onRemovePageBookmark(bm) }
+                        )
+                        .listRowBackground(Color.clear)
+                    }
+                }
+            }
+
+            if !nodes.isEmpty {
+                Section(header: sectionHeader("Files", systemImage: "folder")) {
+                    OutlineGroup(nodes, children: \.children) { node in
+                        FileNodeRow(
+                            node: node,
+                            isActive: activeURL?.standardizedFileURL == node.url.standardizedFileURL,
+                            onTap: { onSelect(node.url) }
+                        )
+                        .listRowBackground(Color.clear)
+                    }
+                }
+            }
         }
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
+    }
+
+    private func sectionHeader(_ title: String, systemImage: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: systemImage)
+                .font(.system(size: 10, weight: .medium))
+            Text(title)
+                .font(PanelyTypography.caption)
+        }
+        .foregroundStyle(PanelyColor.textSecondary)
     }
 
     private var taskID: String {
@@ -180,13 +231,76 @@ private struct FileNodeRow: View {
     }
 }
 
+private struct FavoriteRow: View {
+    let favorite: FavoriteBook
+    let isActive: Bool
+    let onTap: () -> Void
+    let onRemove: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: PanelySpacing.sm) {
+                Image(systemName: favorite.iconName)
+                    .foregroundStyle(isActive ? PanelyColor.accentPrimary : PanelyColor.textSecondary)
+                    .frame(width: 16)
+                Text(favorite.title)
+                    .font(PanelyTypography.body)
+                    .foregroundStyle(isActive ? PanelyColor.accentPrimary : PanelyColor.textPrimary)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+            .padding(.vertical, 2)
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button("Remove from Favorites", role: .destructive, action: onRemove)
+        }
+    }
+}
+
+private struct PageBookmarkRow: View {
+    let bookmark: PageBookmark
+    let isCurrent: Bool
+    let onTap: () -> Void
+    let onRemove: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: PanelySpacing.sm) {
+                Image(systemName: "bookmark.fill")
+                    .foregroundStyle(isCurrent ? PanelyColor.accentPrimary : PanelyColor.textSecondary)
+                    .frame(width: 16)
+                Text("Page \(bookmark.pageIndex + 1)")
+                    .font(PanelyTypography.body)
+                    .foregroundStyle(isCurrent ? PanelyColor.accentPrimary : PanelyColor.textPrimary)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+            .padding(.vertical, 2)
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button("Remove Bookmark", role: .destructive, action: onRemove)
+        }
+    }
+}
+
 #Preview {
     LibrarySidebar(
         rootURL: URL(fileURLWithPath: "/Users/demo/Comics/OnePiece"),
         activeURL: nil,
         refreshToken: UUID(),
         pinned: false,
+        favorites: [],
+        pageBookmarks: [],
+        currentPageIndex: 0,
         onSelect: { _ in },
+        onSelectFavorite: { _ in },
+        onRemoveFavorite: { _ in },
+        onJumpToBookmark: { _ in },
+        onRemovePageBookmark: { _ in },
         onOpen: {},
         onTogglePin: {},
         onRequestFolderAccess: {}

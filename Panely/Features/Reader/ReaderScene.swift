@@ -19,6 +19,10 @@ struct ReaderScene: View {
                         .transition(.move(edge: .leading).combined(with: .opacity))
                 }
                 viewerArea
+                if viewModel.thumbnailSidebarVisible && viewModel.hasSource {
+                    thumbnailSidebar
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                }
             }
 
             if !viewModel.sidebarPinned {
@@ -44,6 +48,7 @@ struct ReaderScene: View {
         }
         .animation(PanelyMotion.uiReveal, value: viewModel.sidebarPinned)
         .animation(PanelyMotion.uiReveal, value: viewModel.sidebarOverlayVisible)
+        .animation(PanelyMotion.uiReveal, value: viewModel.thumbnailSidebarVisible)
         .overlay {
             if viewModel.isLoading {
                 LoadingOverlay(message: viewModel.loadingMessage)
@@ -59,10 +64,29 @@ struct ReaderScene: View {
             activeURL: viewModel.currentSourceURL,
             refreshToken: viewModel.libraryRefreshToken,
             pinned: viewModel.sidebarPinned,
+            favorites: viewModel.bookmarks.favorites,
+            pageBookmarks: viewModel.currentBookPageBookmarks,
+            currentPageIndex: viewModel.currentPageIndex,
             onSelect: { url in
                 viewModel.openURL(url)
                 viewModel.dismissSidebarOverlay()
                 isFocused = true
+            },
+            onSelectFavorite: { fav in
+                viewModel.openFavorite(fav)
+                viewModel.dismissSidebarOverlay()
+                isFocused = true
+            },
+            onRemoveFavorite: { fav in
+                viewModel.bookmarks.removeFavorite(fav)
+            },
+            onJumpToBookmark: { bm in
+                viewModel.jumpToBookmark(bm)
+                isFocused = true
+            },
+            onRemovePageBookmark: { bm in
+                guard let key = viewModel.currentPositionKey else { return }
+                viewModel.bookmarks.removePageBookmark(forKey: key, id: bm.id)
             },
             onOpen: {
                 viewModel.openSource()
@@ -70,6 +94,19 @@ struct ReaderScene: View {
             },
             onTogglePin: { viewModel.toggleSidebarPin() },
             onRequestFolderAccess: { viewModel.requestFolderAccess() }
+        )
+    }
+
+    private var thumbnailSidebar: some View {
+        ThumbnailSidebar(
+            pages: viewModel.source.pages,
+            pageDimensions: viewModel.pageDimensions,
+            currentPageIndex: viewModel.currentPageIndex,
+            onJump: { idx in
+                viewModel.jump(to: idx)
+                isFocused = true
+            },
+            onClose: { viewModel.toggleThumbnailSidebar() }
         )
     }
 
@@ -159,7 +196,14 @@ struct ReaderScene: View {
             canGoPreviousVolume: viewModel.canGoPreviousVolume,
             canGoNextVolume: viewModel.canGoNextVolume,
             onPreviousVolume: { viewModel.previousVolume() },
-            onNextVolume: { viewModel.nextVolume() }
+            onNextVolume: { viewModel.nextVolume() },
+            hasSource: viewModel.hasSource,
+            isBookFavorite: viewModel.isCurrentBookFavorite,
+            isPageBookmarked: viewModel.isCurrentPageBookmarked,
+            onToggleFavorite: { viewModel.toggleFavoriteForCurrentBook() },
+            onTogglePageBookmark: { viewModel.toggleCurrentPageBookmark() },
+            thumbnailSidebarVisible: viewModel.thumbnailSidebarVisible,
+            onToggleThumbnailSidebar: { viewModel.toggleThumbnailSidebar() }
         )
         .padding(PanelySpacing.md)
         .opacity(toolbarShown ? 1 : 0)
@@ -171,9 +215,19 @@ struct ReaderScene: View {
     private var sliderOverlay: some View {
         if viewModel.hasSource && viewModel.totalPages > 1 {
             VStack(spacing: PanelySpacing.xs) {
-                Text(viewModel.combinedCounterLabel)
-                    .font(PanelyTypography.caption)
-                    .foregroundStyle(PanelyColor.textSecondary)
+                HStack(spacing: 0) {
+                    if let vol = viewModel.volumeCounterLabel {
+                        Text("\(vol) · ")
+                            .font(PanelyTypography.caption)
+                            .foregroundStyle(PanelyColor.textSecondary)
+                    }
+                    QuickJumpField(
+                        currentPage: viewModel.currentPageNumber,
+                        rangeEndPage: viewModel.currentPageRangeEndNumber,
+                        totalPages: viewModel.totalPages,
+                        onJump: { viewModel.jump(toPageNumber: $0) }
+                    )
+                }
 
                 PanelySlider(
                     value: sliderBinding,
