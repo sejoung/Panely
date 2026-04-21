@@ -16,8 +16,11 @@ nonisolated enum ImageLoader {
 
     /// Reads only the image header to recover pixel dimensions — fast enough
     /// (microseconds for file URLs) to call for hundreds of pages on entry.
-    /// For archive entries the full entry data still has to be read because
-    /// ZIPFoundation doesn't expose partial reads, but no decode is performed.
+    /// For archive entries we now also short-circuit at ~64 KB via
+    /// `ArchiveReader.loadDataPrefix`; PNG dimensions live in the first ~33
+    /// bytes, JPEG SOF markers within the first few KB after EXIF. Falls
+    /// back to a full entry read only if the prefix can't yield dimensions
+    /// (e.g., unusually large EXIF blocks that push SOF past the prefix).
     static func dimensions(for page: ComicPage) async throws -> CGSize {
         switch page.source {
         case .file(let url):
@@ -26,9 +29,16 @@ nonisolated enum ImageLoader {
             }.value
 
         case .archiveEntry(let reader, let path):
-            let data = try await reader.loadData(at: path)
+            let prefix = try await reader.loadDataPrefix(at: path, maxBytes: 64 * 1024)
+            if let size = try? await Task.detached(priority: .userInitiated, operation: {
+                try Self.readDimensionsFromData(prefix)
+            }).value {
+                return size
+            }
+            // Fallback: prefix wasn't enough. Read the entire entry.
+            let full = try await reader.loadData(at: path)
             return try await Task.detached(priority: .userInitiated) {
-                try Self.readDimensionsFromData(data)
+                try Self.readDimensionsFromData(full)
             }.value
         }
     }

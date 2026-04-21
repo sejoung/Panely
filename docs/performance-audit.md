@@ -33,7 +33,7 @@ Items grouped by impact. Check off as completed.
   - (b) For non-nested archives, eagerly extract to a temp dir on vertical entry so subsequent dimension reads are file-URL header reads.
 - **Impact**: LARGE (eliminates seconds of lag on archive vertical entry)
 - **Risk**: MEDIUM (option a needs ZIPFoundation streaming; option b uses extra disk)
-- [ ] Done
+- [x] Done — option (a). `ArchiveReader.loadDataPrefix(at:maxBytes:)` uses ZIPFoundation's chunk consumer + `skipCRC32: true` and throws `ArchiveReaderError.prefixComplete` to bail at the requested byte count. `ImageLoader.dimensions` reads 64 KB prefix; falls back to full entry read only if `CGImageSource` can't extract dimensions from the prefix (rare — pathological EXIF blocks).
 
 ### 4. Unbounded `withTaskGroup` for dimension fetch
 - **File**: `Panely/Features/Reader/ReaderViewModel.swift` — `refreshVerticalLazily`
@@ -53,7 +53,9 @@ Items grouped by impact. Check off as completed.
 - **Fix**: Load only immediate children up front. Mark expandable folders with `hasChildren: Bool?` and load deeper on user expand. Cache results.
 - **Impact**: MEDIUM (large libraries open instantly)
 - **Risk**: LOW
-- [ ] Done
+- [x] Done — pragmatic two-part fix instead of full lazy (SwiftUI `List(_:children:)` doesn't expose expand callbacks):
+  1. **Two-phase reload in `LibrarySidebar.reload`** — load shallow tree (depth 1) and assign immediately, then load full tree (depth 3) in background and replace. User sees top-level folders/archives instantly.
+  2. **Parallel top-level scan in `FileNode.loadTree`** — chunked TaskGroup processes top-level entries' subtrees concurrently (chunk size = `min(8, cores)`). Each subtree's recursion stays serial via `buildTreeSerial` to avoid `N^depth` task explosion.
 
 ### 6. `layoutSubtreeIfNeeded()` runs every `updateNSView`
 - **File**: `Panely/Features/Reader/ViewerContainer.swift` — `updateNSView`

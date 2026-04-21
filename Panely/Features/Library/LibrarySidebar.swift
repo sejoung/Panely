@@ -84,8 +84,23 @@ struct LibrarySidebar: View {
             return
         }
         scanCompleted = false
-        nodes = await FileNode.loadTree(from: rootURL, maxDepth: 3)
+
+        // Two-phase load: ship the shallow (depth-1) tree immediately so the
+        // sidebar fills in fast on big libraries (was 1–2 s of blank for
+        // 10 k-file libraries when the depth-3 scan ran serially), then
+        // replace with the deeper tree once the background scan finishes.
+        let shallow = await FileNode.loadTree(from: rootURL, maxDepth: 1)
+        if Task.isCancelled { return }
+        nodes = shallow
         scanCompleted = true
+
+        let deep = await FileNode.loadTree(from: rootURL, maxDepth: 3)
+        if Task.isCancelled { return }
+        // Skip the swap if the deep tree didn't add anything (avoids a
+        // redundant SwiftUI render for shallow libraries).
+        if deep != shallow {
+            nodes = deep
+        }
     }
 
     private var emptyState: some View {
