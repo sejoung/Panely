@@ -3,6 +3,7 @@ import SwiftUI
 
 @main
 struct PanelyApp: App {
+    @NSApplicationDelegateAdaptor(PanelyAppDelegate.self) private var appDelegate
     @State private var viewModel = ReaderViewModel()
     @State private var viewerController = ViewerController()
 
@@ -157,6 +158,15 @@ struct PanelyApp: App {
                 .keyboardShortcut("]", modifiers: .command)
                 .disabled(!viewModel.canGoNextVolume)
             }
+    }
+}
+
+/// Quits the app when the last (and only) window is closed. Panely is a
+/// single-window viewer — keeping the process alive with no window visible
+/// would leave users wondering why the red close button "only minimizes".
+final class PanelyAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        true
     }
 }
 
