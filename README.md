@@ -222,9 +222,10 @@ Panely/
 │   └── Primitives/                     # Icon button, slider
 ├── Features/
 │   ├── Reader/
-│   │   ├── ReaderViewModel.swift       # @Observable @MainActor + lazy windowing
+│   │   ├── ReaderViewModel.swift       # @Observable @MainActor + lazy windowing + eviction
 │   │   ├── ReaderScene.swift           # ZStack layout + hot-edge reveal
 │   │   ├── ViewerContainer.swift       # SwiftUI shell + AppKitImageScroller
+│   │   │                               # (ImageStackView with view recycling)
 │   │   ├── ViewerController.swift      # Zoom remote control (⌘+/-/0, scroll-wheel)
 │   │   ├── PanelyToolbar.swift         # cycle layout / fit / zoom / pin buttons
 │   │   ├── LoadingOverlay.swift
@@ -234,17 +235,18 @@ Panely/
 │   │   ├── PositionKey.swift           # stable per-book position keys
 │   │   └── SidebarMode.swift           # pinned / overlay state value-type
 │   └── Library/
-│       ├── LibrarySidebar.swift        # pin button + extension badge row
-│       ├── FileNode.swift              # iconName + fileExtension
+│       ├── LibrarySidebar.swift        # pin button + extension badge + two-phase load
+│       ├── FileNode.swift              # iconName + fileExtension + parallel top-level scan
 │       ├── RecentItem.swift
-│       └── RecentItemsStore.swift
+│       └── RecentItemsStore.swift      # bookmark dedup on repeat opens
 └── Core/
     └── Comic/
         ├── ComicPage.swift / ComicSource.swift / ComicPageSource.swift
         ├── FolderLoader.swift
         ├── CBZLoader.swift             # flat + recursive-nested extraction
         ├── ArchiveReader.swift         # actor around ZIPFoundation.Archive
-        └── ImageLoader.swift           # async NSImage with Task.detached
+        │                               # (loadDataPrefix for header-only reads)
+        └── ImageLoader.swift           # async NSImage + dimensions(for:) header read
 
 PanelyTests/
 ├── TestFixtures.swift                  # shared temp-dir / zip / PNG helpers
@@ -309,20 +311,32 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   itself decomposes its `force` flag: identity (new book) or fit-mode
   change forces reset; layout-only change defers to lock + zoom state.
 - **Vertical (webtoon) lazy windowing** — entering vertical mode pre-fetches
-  every page's pixel dimensions concurrently (`CGImageSource` header read
-  on file URLs is microseconds). `currentImages` is filled with same-sized
-  gray placeholder `NSImage`s (lazy `drawingHandler` — no eager bitmap),
-  then a bounds observer drives `setVisibleRange(...)` which loads real
-  images for the visible page range plus a small buffer. Concurrent loads
-  fan out via `withTaskGroup` and **all results are committed to
-  `currentImages` in a single assignment** — one SwiftUI render per batch
-  instead of N. Previous in-flight tasks are cancelled when the visible
-  range changes again so fast scroll/zoom doesn't pile up work.
-- **`ImageStackView` incremental swap** — when count + axis match, real
-  images replace placeholders by mutating `imageView.image` directly (no
-  `removeFromSuperview` / re-layout), so per-page lazy loads cost a
-  pointer write each. Layout shifts are avoided because placeholder size
-  matches the header-reported size.
+  every page's pixel dimensions concurrently (header-only `CGImageSource`
+  read; for archive entries `ArchiveReader.loadDataPrefix(maxBytes: 64 KB)`
+  bails out of ZIPFoundation's extract early so we don't decompress the
+  whole entry just to read width/height). Dimension fetches and decodes
+  both run through chunked `withTaskGroup` capped at `min(8, cores)` to
+  avoid blowing through the cooperative pool on big folders.
+  `currentImages` is filled with same-sized gray placeholder `NSImage`s
+  (lazy `drawingHandler` — no eager bitmap), then a bounds observer drives
+  `setVisibleRange(...)` which loads real images for the visible range +
+  buffer. Results commit to `currentImages` in a **single batched
+  assignment** per task — one SwiftUI render per chunk instead of N.
+  In-flight tasks cancel when the visible range changes again, and
+  `ImageLoader.load` checks cancellation between fetch and decode so
+  abandoned work stops promptly.
+- **Window eviction** — when the visible range moves, pages outside
+  `[range ± 10]` are swapped back to placeholders so a 1000-page strip
+  doesn't pin every decoded image in memory. Recently-evicted pages
+  typically restore from `NSCache` instantly when scrolled back.
+- **`ImageStackView` view recycling** — the stack stores `pageFrames` for
+  every page (drives all geometry queries) but only materializes
+  `NSImageView` instances for pages whose frames intersect the visible
+  viewport ± 1 viewport buffer. A small `viewPool` (cap 24) caches recycled
+  views to avoid alloc/dealloc churn on scroll. A 1000-page strip lives in
+  a tree of ~10–15 NSImageViews instead of 1000. `setImages` fast path
+  (count + axis match) just mutates `imageView.image` for live views, so
+  per-page lazy loads cost a pointer write each.
 - **`ViewerController`** — `@Observable @MainActor` remote control owned by
   `PanelyApp` and shared via environment. Holds a weak `NSScrollView` ref
   + `baseMagnification` synced by `applyFit`, exposes `zoomIn`/`zoomOut`
@@ -340,8 +354,19 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   `/tmp`, the key is derived from the opened URL plus the relative path
   inside the temp root so reading progress survives re-extraction.
 - **`NSCache`-backed image cache** — per-page decoded `NSImage`s with
-  automatic memory-pressure eviction; preload runs a cancellable
-  `Task` around the current page ±2.
+  automatic memory-pressure eviction. Preload runs a cancellable `Task`
+  around the current page ±2 in paged modes. Cancellation propagates
+  into `ImageLoader.load` and `preloadIfNeeded` so abandoned work doesn't
+  pollute the cache during fast keyboard navigation.
+- **Sidebar two-phase load** — `LibrarySidebar.reload` ships a depth-1
+  scan to the UI immediately, then runs the deeper depth-3 scan in the
+  background and replaces the tree once ready. `FileNode.loadTree`
+  parallelizes top-level subtree scans via chunked `TaskGroup` so big
+  libraries open in ~100–200 ms instead of 1–2 s.
+- **Settings batch-read** — `ReaderViewModel.init` snapshots
+  `UserDefaults.standard.dictionaryRepresentation()` once and reads every
+  key from the in-memory dict, avoiding a dozen separate cross-process
+  `UserDefaults` calls on cold start.
 - **Security-scoped bookmarks** — Recent items persist across launches
   because we create `.withSecurityScope` bookmarks and resolve them on click.
   Scope lifecycle is tracked at the root URL so sibling navigation within a
@@ -428,11 +453,6 @@ Requires `librsvg` and `imagemagick` from Homebrew.
 - [ ] **Thumbnail sidebar** — page-level preview panel
 - [ ] **Bookmarks / favorites** — pin specific pages or books
 - [ ] **Persistent library root** — set a home library folder once
-- [ ] **Performance** — open items in
-      [`docs/performance-audit.md`](docs/performance-audit.md) (currentImages
-      window eviction, view-recycling for vertical strip, partial-read
-      dimensions for archive entries, capped TaskGroup fan-out, lazy
-      `FileNode.loadTree` expansion)
 - [ ] **WebP / HEIC** — verify first-class support end-to-end
 
 ## Contributing
