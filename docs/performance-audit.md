@@ -23,7 +23,13 @@ Items grouped by impact. Check off as completed.
 - **Fix**: Reusable view pool (NSCollectionView-style recycler). Keep ~15 NSImageViews, swap their frames + images as the visible window changes.
 - **Impact**: LARGE (>90% view-tree size reduction on big strips)
 - **Risk**: MEDIUM (sizable refactor of ImageStackView; needs careful frame tracking)
-- [ ] Done
+- [x] Done — `ImageStackView` rewritten:
+  - `pageFrames: [NSRect]` pre-computed for every page (drives `frame(forPageAt:)`, `pageIndex(forViewportY:)`, `pageIndexRange(visibleIn:)` — no live view required)
+  - `liveViews: [Int: NSImageView]` keyed by page index (only materialized pages)
+  - `viewPool: [NSImageView]` reuse pool (cap 24)
+  - `refreshVisibleViews(visibleRect:)` materializes pages whose frames intersect viewport ± 1 viewport buffer, recycles the rest
+  - Horizontal mode (1–2 images) keeps eager materialization
+  - `AppKitImageScroller` calls `refreshVisibleViews` from the bounds observer (every scroll/zoom) and at the end of `updateNSView` (initial render)
 
 ### 3. Archive entry dimension read pulls the entire entry data
 - **File**: `Panely/Core/Comic/ImageLoader.swift:18-30` + `ArchiveReader.loadData`
