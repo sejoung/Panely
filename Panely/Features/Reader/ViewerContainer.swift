@@ -200,7 +200,13 @@ struct AppKitImageScroller: NSViewRepresentable {
         // Apply fit synchronously so the user never sees a frame at the
         // previous magnification (which manifested as the image briefly
         // sliding/centering before snapping to fit-width on layout toggles).
-        scrollView.layoutSubtreeIfNeeded()
+        // Only force layout when something structural just changed —
+        // per-page navigation in paged mode and lazy-load image swaps in
+        // vertical mode keep frames stable, so layoutSubtreeIfNeeded would
+        // just walk the (potentially 1000-deep) view tree for nothing.
+        if resetNeeded {
+            scrollView.layoutSubtreeIfNeeded()
+        }
         Self.applyFit(
             scrollView: scrollView,
             coordinator: context.coordinator,

@@ -15,7 +15,7 @@ Items grouped by impact. Check off as completed.
 - **Fix**: When the visible window moves, evict pages outside `[range ± buffer]` back to placeholder NSImages. Real images stay only in `imageCache` for fast restore on scroll-back.
 - **Impact**: LARGE (50–80% memory reduction on big strips)
 - **Risk**: LOW
-- [ ] Done
+- [x] Done — `evictPagesOutsideKeepWindow(visibleRange:)` runs sync at start of `setVisibleRange`. `lazyKeepBuffer = 10` pages each side. `loadPagesBatched` now takes a fresh `currentImages` snapshot just before write to avoid clobbering the eviction.
 
 ### 2. One `NSImageView` per page (no view recycling)
 - **File**: `Panely/Features/Reader/ViewerContainer.swift` — `ImageStackView.layoutVertically`
@@ -41,7 +41,7 @@ Items grouped by impact. Check off as completed.
 - **Fix**: Bound concurrency to ~`min(4, activeProcessorCount)` via a small async semaphore.
 - **Impact**: MEDIUM (avoids spike, smoother launch)
 - **Risk**: LOW
-- [ ] Done
+- [x] Done — chunked TaskGroup iteration in both `refreshVerticalLazily` (dimension fetch) and `loadPagesBatched` (decode), capped at `Self.lazyConcurrencyLimit` (`max(2, min(8, activeProcessorCount))`). Cancellation check between chunks too.
 
 ---
 
@@ -61,7 +61,7 @@ Items grouped by impact. Check off as completed.
 - **Fix**: Only call when `resetNeeded || pageChanged || layoutChanged`. Otherwise rely on AppKit's lazy layout.
 - **Impact**: MEDIUM (50% layout CPU reduction during navigation)
 - **Risk**: LOW (add guard, watch for visual regressions)
-- [ ] Done
+- [x] Done — guarded by `if resetNeeded`. Per-page navigation in paged mode and lazy-load image swaps in vertical mode skip the forced layout entirely.
 
 ### 7. `schedulePreload` loop missing `Task.isCancelled` check inside
 - **File**: `Panely/Features/Reader/ReaderViewModel.swift` — `schedulePreload`
@@ -69,7 +69,7 @@ Items grouped by impact. Check off as completed.
 - **Fix**: Add `if Task.isCancelled { return }` at top of each loop iteration.
 - **Impact**: SMALL–MEDIUM (5–10% CPU during fast nav)
 - **Risk**: LOW (one-line addition)
-- [ ] Done
+- [x] Done — added `Task.checkCancellation()` between data fetch and decode in `ImageLoader.load`, and post-load cancellation guard in `preloadIfNeeded` so cancelled work doesn't pollute the cache. The outer loop already had the per-iteration check.
 
 ### 8. `ReaderViewModel.init` reads `UserDefaults` 12× synchronously
 - **File**: `Panely/Features/Reader/ReaderViewModel.swift` — init
@@ -77,7 +77,7 @@ Items grouped by impact. Check off as completed.
 - **Fix**: Single `dictionaryRepresentation()` read or a Codable settings struct.
 - **Impact**: SMALL (10–20 ms launch)
 - **Risk**: LOW
-- [ ] Done
+- [x] Done — single `UserDefaults.standard.dictionaryRepresentation()` snapshot, then in-memory dict casts for every key.
 
 ---
 

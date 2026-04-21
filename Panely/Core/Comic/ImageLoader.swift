@@ -8,6 +8,9 @@ enum ImageLoaderError: Error {
 nonisolated enum ImageLoader {
     static func load(_ page: ComicPage) async throws -> NSImage {
         let data = try await loadData(for: page.source)
+        // Skip decode if the caller bailed while the data was being read —
+        // saves a relatively expensive NSImage decode for stale work.
+        try Task.checkCancellation()
         return try await decode(data)
     }
 

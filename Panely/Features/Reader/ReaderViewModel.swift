@@ -53,6 +53,11 @@ final class ReaderViewModel {
     private(set) var pageDimensions: [CGSize] = []
     private var loadedPageIndices: Set<Int> = []
     private let lazyWindowRadius = 3
+    /// Pages outside `[visibleRange ± lazyKeepBuffer]` get evicted back to
+    /// placeholders so a long strip doesn't pin every loaded image in memory.
+    /// Wider than the load buffer so small back-scrolls don't immediately
+    /// re-decode. NSCache still holds recents for fast restore.
+    private let lazyKeepBuffer = 10
     private var lazyLoadTask: Task<Void, Never>?
 
     /// Set to true at the end of init. Gates `handleLayoutChange` so that
@@ -118,29 +123,36 @@ final class ReaderViewModel {
     init() {
         self.recentItems = RecentItemsStore()
 
-        if let raw = UserDefaults.standard.string(forKey: Self.layoutKey),
+        // Snapshot once. Each individual `UserDefaults.standard.string(...)`
+        // / `.bool(...)` / `.object(...)` call is a syscall + KVO check; on
+        // cold start the dozen lookups added up to ~10–50 ms. A single
+        // `dictionaryRepresentation()` is one cross-process trip and we
+        // type-cast from in-memory dict locally.
+        let defaults = UserDefaults.standard.dictionaryRepresentation()
+
+        if let raw = defaults[Self.layoutKey] as? String,
            let stored = PageLayout(rawValue: raw) {
             layout = stored
         }
-        if let raw = UserDefaults.standard.string(forKey: Self.directionKey),
+        if let raw = defaults[Self.directionKey] as? String,
            let stored = ReadingDirection(rawValue: raw) {
             direction = stored
         }
-        if UserDefaults.standard.object(forKey: Self.sidebarPinnedKey) != nil {
-            sidebarMode.pinned = UserDefaults.standard.bool(forKey: Self.sidebarPinnedKey)
-        } else if UserDefaults.standard.object(forKey: Self.legacySidebarVisibleKey) != nil {
+        if let pinned = defaults[Self.sidebarPinnedKey] as? Bool {
+            sidebarMode.pinned = pinned
+        } else if let legacy = defaults[Self.legacySidebarVisibleKey] as? Bool {
             // Migrate prior "always visible" preference to the new pinned mode.
-            sidebarMode.pinned = UserDefaults.standard.bool(forKey: Self.legacySidebarVisibleKey)
+            sidebarMode.pinned = legacy
         }
-        if let raw = UserDefaults.standard.string(forKey: Self.fitModeKey),
+        if let raw = defaults[Self.fitModeKey] as? String,
            let stored = FitMode(rawValue: raw) {
             fitMode = stored
         }
-        if UserDefaults.standard.object(forKey: Self.autoFitOnResizeKey) != nil {
-            autoFitOnResize = UserDefaults.standard.bool(forKey: Self.autoFitOnResizeKey)
+        if let value = defaults[Self.autoFitOnResizeKey] as? Bool {
+            autoFitOnResize = value
         }
-        if UserDefaults.standard.object(forKey: Self.toolbarPinnedKey) != nil {
-            toolbarPinned = UserDefaults.standard.bool(forKey: Self.toolbarPinnedKey)
+        if let value = defaults[Self.toolbarPinnedKey] as? Bool {
+            toolbarPinned = value
         }
 
         isFullyInitialized = true
@@ -275,10 +287,17 @@ final class ReaderViewModel {
     /// magnification). Loads every page in `range` plus a small buffer so
     /// pages just outside the viewport are ready when the user scrolls.
     /// Cancels any prior in-flight load so fast zoom/scroll doesn't pile
-    /// up tasks all racing to finish.
+    /// up tasks all racing to finish. Also evicts pages outside the keep
+    /// window so big strips don't pin every loaded image in memory.
     func setVisibleRange(_ range: Range<Int>) {
         guard layout.isContinuous else { return }
         guard !range.isEmpty else { return }
+
+        // Free pages outside the keep window first — runs sync so memory
+        // is released even if the load below gets cancelled by another
+        // setVisibleRange before completing.
+        evictPagesOutsideKeepWindow(visibleRange: range)
+
         let buffer = 2
         let lower = max(0, range.lowerBound - buffer)
         let upper = min(source.pageCount, range.upperBound + buffer)
@@ -291,6 +310,27 @@ final class ReaderViewModel {
         }
     }
 
+    /// Replace pages outside `[range ± lazyKeepBuffer]` with placeholder
+    /// NSImages so their decoded bitmaps can be released. NSCache still
+    /// holds the recently-decoded images, so scrolling back within a few
+    /// pages typically hits the cache and re-displays instantly.
+    private func evictPagesOutsideKeepWindow(visibleRange: Range<Int>) {
+        guard !pageDimensions.isEmpty, !loadedPageIndices.isEmpty else { return }
+        let lower = max(0, visibleRange.lowerBound - lazyKeepBuffer)
+        let upper = min(currentImages.count, visibleRange.upperBound + lazyKeepBuffer)
+
+        var newImages = currentImages
+        var evicted: [Int] = []
+        for i in loadedPageIndices where i < lower || i >= upper {
+            guard i < newImages.count, i < pageDimensions.count else { continue }
+            newImages[i] = Self.makePlaceholder(size: pageDimensions[i])
+            evicted.append(i)
+        }
+        guard !evicted.isEmpty else { return }
+        for i in evicted { loadedPageIndices.remove(i) }
+        currentImages = newImages
+    }
+
     /// Load `indices` concurrently and apply ALL results in a single
     /// `currentImages` assignment. Single SwiftUI render = single
     /// updateNSView = single setImages incremental swap, regardless of how
@@ -299,32 +339,53 @@ final class ReaderViewModel {
     /// own re-render and the main thread saturates.
     private func loadPagesBatched(_ indices: [Int]) async {
         guard !indices.isEmpty else { return }
-        let count = currentImages.count
         var loaded: [(Int, NSImage)] = []
+        let maxConcurrent = Self.lazyConcurrencyLimit
 
-        await withTaskGroup(of: (Int, NSImage?).self) { group in
-            for i in indices where !loadedPageIndices.contains(i) && source.pages.indices.contains(i) {
-                let page = source.pages[i]
-                group.addTask {
-                    let image = await self.loadVisibleImage(page)
-                    return (i, image)
+        // Decode in bounded chunks. Decoding is CPU-heavy so spawning every
+        // page at once would saturate the pool with no real benefit (cores
+        // are bounded anyway) while still costing per-task overhead.
+        for chunkStart in stride(from: 0, to: indices.count, by: maxConcurrent) {
+            if Task.isCancelled { return }
+            let chunkEnd = min(chunkStart + maxConcurrent, indices.count)
+            await withTaskGroup(of: (Int, NSImage?).self) { group in
+                for i in chunkStart..<chunkEnd {
+                    let pageIndex = indices[i]
+                    guard !loadedPageIndices.contains(pageIndex),
+                          source.pages.indices.contains(pageIndex) else { continue }
+                    let page = source.pages[pageIndex]
+                    group.addTask {
+                        let image = await self.loadVisibleImage(page)
+                        return (pageIndex, image)
+                    }
                 }
-            }
-            for await (i, image) in group {
-                guard !Task.isCancelled else { return }
-                if let image {
-                    loaded.append((i, image))
-                    loadedPageIndices.insert(i)
+                for await (pageIndex, image) in group {
+                    if Task.isCancelled { return }
+                    if let image {
+                        loaded.append((pageIndex, image))
+                        loadedPageIndices.insert(pageIndex)
+                    }
                 }
             }
         }
 
         guard !Task.isCancelled, !loaded.isEmpty else { return }
+        // Take a fresh snapshot — concurrent evictions or other lazy loads
+        // may have mutated currentImages during the awaits above. Merge our
+        // new pages into the latest state and write once.
         var newImages = currentImages
-        for (i, image) in loaded where i < count {
+        for (i, image) in loaded where i < newImages.count {
             newImages[i] = image
         }
         currentImages = newImages
+    }
+
+    /// Concurrency cap for header-fetch / decode TaskGroups. ~Core count
+    /// keeps the pool busy without overcommitting; clamped to [2, 8] so
+    /// neither single-core hosts nor monster CPUs spin up pathological
+    /// numbers of tasks.
+    private static var lazyConcurrencyLimit: Int {
+        max(2, min(8, ProcessInfo.processInfo.activeProcessorCount))
     }
 
     func toggleSidebarPin() {
@@ -649,24 +710,29 @@ final class ReaderViewModel {
             return
         }
 
-        // 1. Fetch dimensions concurrently. Falls back to a generic portrait
-        //    aspect for any page whose header read fails so layout still holds.
+        // 1. Fetch dimensions in bounded-concurrency chunks. Spawning one
+        //    task per page on big folders (500+) blew through the cooperative
+        //    pool and held a buffer per task; chunking caps concurrency at
+        //    ~core count without losing throughput. Falls back to a generic
+        //    portrait aspect for any page whose header read fails so layout
+        //    still holds.
         let fallbackSize = CGSize(width: 1000, height: 1500)
-        let dims: [CGSize] = await withTaskGroup(
-            of: (Int, CGSize).self,
-            returning: [CGSize].self
-        ) { group in
-            for (i, page) in pages.enumerated() {
-                group.addTask {
-                    let size = (try? await ImageLoader.dimensions(for: page)) ?? fallbackSize
-                    return (i, size)
+        let maxConcurrent = Self.lazyConcurrencyLimit
+        var dims = Array(repeating: fallbackSize, count: pages.count)
+        for chunkStart in stride(from: 0, to: pages.count, by: maxConcurrent) {
+            let chunkEnd = min(chunkStart + maxConcurrent, pages.count)
+            await withTaskGroup(of: (Int, CGSize).self) { group in
+                for i in chunkStart..<chunkEnd {
+                    let page = pages[i]
+                    group.addTask {
+                        let size = (try? await ImageLoader.dimensions(for: page)) ?? fallbackSize
+                        return (i, size)
+                    }
+                }
+                for await (i, size) in group {
+                    dims[i] = size
                 }
             }
-            var results = Array(repeating: fallbackSize, count: pages.count)
-            for await (i, size) in group {
-                results[i] = size
-            }
-            return results
         }
         pageDimensions = dims
 
@@ -727,7 +793,12 @@ final class ReaderViewModel {
 
     private func preloadIfNeeded(_ page: ComicPage) async {
         if cachedImage(for: page) != nil { return }
+        if Task.isCancelled { return }
         guard let image = try? await ImageLoader.load(page) else { return }
+        // Don't pollute the cache with work the caller no longer wants —
+        // important for rapid keyboard navigation where pages stream past
+        // faster than decode completes.
+        if Task.isCancelled { return }
         cacheImage(image, for: page)
     }
 
