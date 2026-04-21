@@ -10,6 +10,10 @@
 </p>
 
 <p align="center">
+  <strong>English</strong> · <a href="README.ko.md">한국어</a>
+</p>
+
+<p align="center">
   <img alt="platform" src="https://img.shields.io/badge/platform-macOS%2014%2B-blue">
   <img alt="swift" src="https://img.shields.io/badge/swift-5-orange">
   <img alt="license" src="https://img.shields.io/badge/license-Apache%202.0-green">
@@ -247,12 +251,19 @@ Panely/
 │   └── Primitives/                     # Icon button, slider
 ├── Features/
 │   ├── Reader/
-│   │   ├── ReaderViewModel.swift       # @Observable @MainActor + lazy windowing + eviction
+│   │   ├── ReaderViewModel.swift       # @Observable @MainActor — stored state + init
+│   │   ├── ReaderViewModel+Navigation.swift  # page nav, Quick jump, chrome toggles
+│   │   ├── ReaderViewModel+Source.swift      # source loading, volume nav, position memory
+│   │   ├── ReaderViewModel+ImageLoading.swift # preload, vertical lazy window, cache
+│   │   ├── ReaderViewModel+Bookmarks.swift   # favorites & page bookmarks integration
 │   │   ├── ReaderScene.swift           # ZStack layout + hot-edge reveal
 │   │   ├── ViewerContainer.swift       # SwiftUI shell + AppKitImageScroller
 │   │   │                               # (ImageStackView with view recycling)
 │   │   ├── ViewerController.swift      # Zoom remote control (⌘+/-/0, scroll-wheel)
-│   │   ├── PanelyToolbar.swift         # cycle layout / fit / zoom / pin buttons
+│   │   ├── PanelyToolbar.swift         # cycle layout / fit / zoom / pin / ★ / 🔖 buttons
+│   │   ├── QuickJumpField.swift        # inline-editable page counter
+│   │   ├── ThumbnailSidebar.swift      # right-side thumbnail panel (LazyVStack)
+│   │   ├── ThumbnailLoader.swift       # Image I/O thumbnails + NSCache
 │   │   ├── LoadingOverlay.swift
 │   │   ├── PageLayout.swift            # single/double/vertical + cycle + isContinuous
 │   │   ├── ReadingDirection.swift / FitMode.swift  # FitMode: 3 cases + cycle
@@ -262,8 +273,9 @@ Panely/
 │   └── Library/
 │       ├── LibrarySidebar.swift        # pin button + extension badge + two-phase load
 │       ├── FileNode.swift              # iconName + fileExtension + parallel top-level scan
-│       ├── RecentItem.swift
-│       └── RecentItemsStore.swift      # bookmark dedup on repeat opens
+│       ├── RecentItem.swift / RecentItemsStore.swift  # bookmark dedup on repeat opens
+│       ├── FavoriteBook.swift / PageBookmark.swift    # persistent bookmark data types
+│       └── BookmarksStore.swift        # favorites + page bookmarks persistent store
 └── Core/
     └── Comic/
         ├── ComicPage.swift / ComicSource.swift / ComicPageSource.swift
@@ -286,9 +298,7 @@ PanelyTests/
                                         # ReaderViewModelToolbarPin
 
 docs/
-├── panely_prd_product_requirements_document.md
 ├── panely_design_system_mac_os.md
-├── performance-audit.md                # prioritized perf TODO with checkboxes
 └── icon/panely-icon-stacked.svg
 
 scripts/
@@ -307,7 +317,9 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
 
 - **`@Observable` + `@MainActor`** — `ReaderViewModel` is main-actor isolated
   and orchestrates async loads via explicit stage messages to drive the
-  loading overlay.
+  loading overlay. The class file holds stored properties and `init` only;
+  logic is split across concern-focused extensions (`+Navigation`,
+  `+Source`, `+ImageLoading`, `+Bookmarks`).
 - **`nonisolated` core types** — `ComicPage`, `FolderLoader`, `CBZLoader`,
   `ImageLoader`, `FitCalculator`, `PositionKey` run off-main via
   `Task.detached`.
@@ -321,9 +333,10 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   document when the viewport is larger — keeps the image in the middle when
   the sidebar is toggled.
 - **`TitleBarPassthrough`** — a thin NSView overlaying the top 28 px of the
-  viewer. `mouseDownCanMoveWindow = true` gives native window drag, an
-  `NSTrackingArea` with `.cursorUpdate` shows the open-hand cursor, and a
-  `mouseDown` override handles double-click zoom via
+  viewer. `mouseDownCanMoveWindow = true` gives native window drag; two
+  `NSTrackingArea`s split the strip at the ~78 pt traffic-light inset so the
+  open-hand cursor never leaks onto the close / minimize / zoom buttons,
+  and a `mouseDown` override handles double-click zoom via
   `AppleActionOnDoubleClick`. The overlay uses `.ignoresSafeArea(edges: .top)`
   so it lines up with the actual window edge under `.hiddenTitleBar`.
 - **`FitCalculator`** — physical viewport (`scrollView.contentSize`) is
@@ -377,12 +390,20 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   pattern (`toolbarPinned`) and shares the auto-hide / pin overlay logic.
 - **`PositionKey.make(for:opened:tempRoot:)`** — for sources extracted to
   `/tmp`, the key is derived from the opened URL plus the relative path
-  inside the temp root so reading progress survives re-extraction.
+  inside the temp root so reading progress survives re-extraction. Page
+  bookmarks (`BookmarksStore`) reuse the same key so they also survive
+  temp-dir re-extraction.
 - **`NSCache`-backed image cache** — per-page decoded `NSImage`s with
   automatic memory-pressure eviction. Preload runs a cancellable `Task`
   around the current page ±2 in paged modes. Cancellation propagates
   into `ImageLoader.load` and `preloadIfNeeded` so abandoned work doesn't
   pollute the cache during fast keyboard navigation.
+- **Thumbnail cache** — `ThumbnailLoader` generates downscaled NSImages via
+  `CGImageSourceCreateThumbnailAtIndex` (skips full-resolution decode) and
+  stores them in an `NSCache` (`countLimit = 400`, `totalCostLimit ≈ 60 MB`).
+  The thumbnail sidebar's `LazyVStack` only materializes visible cells;
+  `.task` auto-cancels on scroll-out, so in-flight decodes naturally cap
+  at the viewport depth.
 - **Sidebar two-phase load** — `LibrarySidebar.reload` ships a depth-1
   scan to the UI immediately, then runs the deeper depth-3 scan in the
   background and replaces the tree once ready. `FileNode.loadTree`
@@ -392,10 +413,19 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   `UserDefaults.standard.dictionaryRepresentation()` once and reads every
   key from the in-memory dict, avoiding a dozen separate cross-process
   `UserDefaults` calls on cold start.
-- **Security-scoped bookmarks** — Recent items persist across launches
-  because we create `.withSecurityScope` bookmarks and resolve them on click.
-  Scope lifecycle is tracked at the root URL so sibling navigation within a
-  selected tree doesn't require re-prompting.
+- **Debounced position save** — `currentPageIndex`'s didSet schedules a
+  300 ms-debounced `savePosition`, so vertical-scroll-driven page changes
+  at ~60 Hz don't fan out to per-frame `UserDefaults` writes.
+  `NSApplication.willTerminateNotification` flushes
+  `flushPositionImmediately` before quit.
+- **Security-scoped bookmarks** — Recent items and favorites persist across
+  launches because we create `.withSecurityScope` bookmarks and resolve
+  them on click. Scope lifecycle is tracked at the root URL so sibling
+  navigation within a selected tree doesn't require re-prompting.
+- **Window close quits the app** — `PanelyAppDelegate` returns true from
+  `applicationShouldTerminateAfterLastWindowClosed` so the red close
+  button matches single-window-viewer expectations (vs. keeping a
+  headless process alive).
 - **Distraction-free chrome** — `.windowStyle(.hiddenTitleBar)` and
   `.preferredColorScheme(.dark)` make the whole window behave like the
   viewer itself; traffic-light buttons remain but the title text is gone.
