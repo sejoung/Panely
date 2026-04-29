@@ -140,11 +140,21 @@ extension ReaderViewModel {
     func load(url: URL, knownSiblings: [URL]? = nil) async {
         preloadTask?.cancel()
 
+        // Each load captures its own epoch and re-checks after every await.
+        // If a newer load has bumped the counter, this one bails out without
+        // overwriting the newer load's state. The defer is also epoch-aware
+        // so an interrupted earlier load doesn't clear `isLoading` while the
+        // later load is still in flight.
+        loadEpoch &+= 1
+        let myEpoch = loadEpoch
+
         isLoading = true
         loadingMessage = "Opening…"
         defer {
-            isLoading = false
-            loadingMessage = ""
+            if myEpoch == loadEpoch {
+                isLoading = false
+                loadingMessage = ""
+            }
         }
 
         if !isInsideCurrentTree(url) {
@@ -175,16 +185,26 @@ extension ReaderViewModel {
             let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
             if !isDir && CBZLoader.supportedExtensions.contains(ext) {
                 loadingMessage = "Analyzing archive…"
-                if let hasNested = try? await CBZLoader.hasNestedArchives(at: url), hasNested {
-                    loadingMessage = "Extracting archive…"
-                    let tempDir = Self.makeTempDir()
-                    do {
-                        try await CBZLoader.extractAll(from: url, to: tempDir)
-                        currentTempDir = tempDir
-                        targetURL = tempDir
-                    } catch {
-                        try? FileManager.default.removeItem(at: tempDir)
-                        errorMessage = "Failed to extract archive: \(error.localizedDescription)"
+                if let hasNested = try? await CBZLoader.hasNestedArchives(at: url) {
+                    guard myEpoch == loadEpoch else { return }
+                    if hasNested {
+                        loadingMessage = "Extracting archive…"
+                        let tempDir = Self.makeTempDir()
+                        do {
+                            try await CBZLoader.extractAll(from: url, to: tempDir)
+                            guard myEpoch == loadEpoch else {
+                                // Newer load is in flight; don't keep the
+                                // tempDir we just created — it would leak.
+                                try? FileManager.default.removeItem(at: tempDir)
+                                return
+                            }
+                            currentTempDir = tempDir
+                            targetURL = tempDir
+                        } catch {
+                            try? FileManager.default.removeItem(at: tempDir)
+                            guard myEpoch == loadEpoch else { return }
+                            errorMessage = "Failed to extract archive: \(error.localizedDescription)"
+                        }
                     }
                 }
             }
@@ -195,6 +215,7 @@ extension ReaderViewModel {
         if isDirectory {
             loadingMessage = "Scanning folder…"
             let (hasImages, volumes) = await Self.analyzeFolder(targetURL)
+            guard myEpoch == loadEpoch else { return }
 
             if !hasImages && !volumes.isEmpty {
                 guard let first = volumes.first else { return }
@@ -222,18 +243,28 @@ extension ReaderViewModel {
             } else {
                 loaded = try await CBZLoader.load(from: targetURL)
             }
+            guard myEpoch == loadEpoch else { return }
 
             source = loaded
             currentSourceURL = targetURL
             if let siblingsToUse {
                 siblings = siblingsToUse
+            } else if siblings.contains(where: {
+                $0.standardizedFileURL == targetURL.standardizedFileURL
+            }) {
+                // Already in the active siblings group (sidebar volume click,
+                // re-opening the same book, etc.). Keep them as-is and skip
+                // the disk enumeration — saves a directory scan per click in
+                // large series.
             } else {
                 siblings = await Self.scanSiblings(of: targetURL)
+                guard myEpoch == loadEpoch else { return }
             }
             currentPageIndex = clampedRestoredIndex(for: targetURL, pageCount: loaded.pageCount)
             errorMessage = loaded.isEmpty ? "No images found" : nil
             await refreshImages()
         } catch {
+            guard myEpoch == loadEpoch else { return }
             errorMessage = error.localizedDescription
             source = .empty
             currentImages = []

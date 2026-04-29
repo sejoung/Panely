@@ -40,6 +40,12 @@ extension ReaderViewModel {
         lazyLoadTask = nil
         loadedPageIndices.removeAll()
 
+        // Capture the load epoch so a refresh that finishes after a newer
+        // load() has started doesn't clear the loading indicator on the
+        // newer load's behalf. Layout-toggle refreshes don't bump the epoch,
+        // so they'll clear normally.
+        let epochAtStart = loadEpoch
+
         if layout.isContinuous {
             await refreshVerticalLazily()
         } else {
@@ -49,8 +55,10 @@ extension ReaderViewModel {
         // Always clear the loading flag when refresh completes — covers the
         // toggleLayout-driven path where handleLayoutChange set it to true.
         // load() also clears via its own defer; double-clear is harmless.
-        isLoading = false
-        loadingMessage = ""
+        if epochAtStart == loadEpoch {
+            isLoading = false
+            loadingMessage = ""
+        }
     }
 
     private func refreshPaged() async {

@@ -54,6 +54,15 @@ final class ReaderViewModel {
     var libraryRefreshToken: UUID = UUID()
     var explicitLibraryRootURL: URL?
 
+    /// Monotonic counter incremented at the start of every `load(url:)` call.
+    /// Each in-flight load captures the value, then re-checks it after every
+    /// `await`. If the counter has advanced, a newer load has started and
+    /// the older one bails out without writing stale state. Without this,
+    /// rapid book switches could leave the viewer showing the result of an
+    /// earlier-clicked book that happened to finish loading after the later
+    /// one (race in `currentImages` / `currentSourceURL` assignments).
+    var loadEpoch: Int = 0
+
     // MARK: - Image cache + paged preload
 
     let imageCache: NSCache<NSString, NSImage> = {
