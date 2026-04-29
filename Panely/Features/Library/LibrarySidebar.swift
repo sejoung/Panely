@@ -73,13 +73,17 @@ struct LibrarySidebar: View {
     }
 
     private var tree: some View {
-        List {
+        // Standardize the active URL once instead of per-row. `standardizedFileURL`
+        // resolves symlinks/relatives on every call, so hoisting it spares N
+        // redundant evaluations across Volumes + Files sections.
+        let activeStdURL = activeURL?.standardizedFileURL
+        return List {
             if volumes.count > 1 {
                 Section(header: sectionHeader("Volumes", systemImage: "books.vertical.fill")) {
                     ForEach(volumes, id: \.self) { url in
                         VolumeRow(
                             url: url,
-                            isActive: activeURL?.standardizedFileURL == url.standardizedFileURL,
+                            isActive: activeStdURL == url.standardizedFileURL,
                             onTap: { onSelectVolume(url) }
                         )
                         .listRowBackground(Color.clear)
@@ -120,7 +124,7 @@ struct LibrarySidebar: View {
                     OutlineGroup(nodes, children: \.children) { node in
                         FileNodeRow(
                             node: node,
-                            isActive: activeURL?.standardizedFileURL == node.url.standardizedFileURL,
+                            isActive: activeStdURL == node.url.standardizedFileURL,
                             onTap: { onSelect(node.url) }
                         )
                         .listRowBackground(Color.clear)
@@ -282,6 +286,21 @@ private struct VolumeRow: View {
     let isActive: Bool
     let onTap: () -> Void
 
+    private let iconName: String
+    private let displayName: String
+
+    init(url: URL, isActive: Bool, onTap: @escaping () -> Void) {
+        self.url = url
+        self.isActive = isActive
+        self.onTap = onTap
+        // Resolve `isDirectory` once at init instead of on every body
+        // evaluation (the previous shape called the resourceValues stat
+        // twice per render — once for icon, once for name).
+        let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
+        self.iconName = isDir ? "folder" : "doc.zipper"
+        self.displayName = isDir ? url.lastPathComponent : url.deletingPathExtension().lastPathComponent
+    }
+
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: PanelySpacing.sm) {
@@ -298,18 +317,6 @@ private struct VolumeRow: View {
             .padding(.vertical, 2)
         }
         .buttonStyle(.plain)
-    }
-
-    private var isDirectory: Bool {
-        (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
-    }
-
-    private var iconName: String {
-        isDirectory ? "folder" : "doc.zipper"
-    }
-
-    private var displayName: String {
-        isDirectory ? url.lastPathComponent : url.deletingPathExtension().lastPathComponent
     }
 }
 
