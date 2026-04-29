@@ -41,6 +41,16 @@ extension ReaderViewModel {
         explicitLibraryRootURL ?? currentSourceURL?.deletingLastPathComponent()
     }
 
+    /// Volumes to surface as a dedicated sidebar section. Only populated for
+    /// zip-in-zip (when the volumes live inside `currentTempDir` and are not
+    /// visible in the Files tree). For folder/cbz series the volumes already
+    /// appear in the tree under the parent folder, so a separate section
+    /// would just duplicate what's already on screen.
+    var sidebarVolumes: [URL] {
+        guard hasMultipleVolumes, currentTempDir != nil else { return [] }
+        return siblings
+    }
+
     func nextVolume() {
         guard canGoNextVolume, let idx = currentSiblingIndex else { return }
         let target = siblings[idx + 1]
@@ -136,6 +146,15 @@ extension ReaderViewModel {
             }
             explicitLibraryRootURL = nil
             openedSourceURL = url
+        } else if currentTempDir != nil && !isInsideTempDir(url) {
+            // Inside the library scope but outside the active temp dir —
+            // user is switching to a different book (or re-opening the
+            // same zip-in-zip after a library-root change). Drop the stale
+            // temp so the extraction block below re-runs against the new
+            // URL; without this, the original extraction is reused and we
+            // try to load the outer archive directly.
+            cleanupTempDir()
+            openedSourceURL = url
         }
 
         var targetURL = url
@@ -225,16 +244,15 @@ extension ReaderViewModel {
     }
 
     func isInsideCurrentTree(_ url: URL) -> Bool {
-        let target = url.standardizedFileURL.path
-
-        if let temp = currentTempDir {
-            let tempPath = temp.standardizedFileURL.path
-            if target == tempPath || target.hasPrefix(tempPath + "/") {
-                return true
-            }
-        }
-
+        if isInsideTempDir(url) { return true }
         return isInsideRootScope(url)
+    }
+
+    func isInsideTempDir(_ url: URL) -> Bool {
+        guard let temp = currentTempDir else { return false }
+        let tempPath = temp.standardizedFileURL.path
+        let target = url.standardizedFileURL.path
+        return target == tempPath || target.hasPrefix(tempPath + "/")
     }
 
     func cleanupTempDir() {

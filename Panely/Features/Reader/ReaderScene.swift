@@ -66,6 +66,7 @@ struct ReaderScene: View {
             pinned: viewModel.sidebarPinned,
             favorites: viewModel.bookmarks.favorites,
             pageBookmarks: viewModel.currentBookPageBookmarks,
+            volumes: viewModel.sidebarVolumes,
             currentPageIndex: viewModel.currentPageIndex,
             onSelect: { url in
                 viewModel.openURL(url)
@@ -87,6 +88,10 @@ struct ReaderScene: View {
             onRemovePageBookmark: { bm in
                 guard let key = viewModel.currentPositionKey else { return }
                 viewModel.bookmarks.removePageBookmark(forKey: key, id: bm.id)
+            },
+            onSelectVolume: { url in
+                viewModel.openURL(url)
+                isFocused = true
             },
             onOpen: {
                 viewModel.openSource()

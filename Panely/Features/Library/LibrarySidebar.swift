@@ -7,12 +7,14 @@ struct LibrarySidebar: View {
     let pinned: Bool
     let favorites: [FavoriteBook]
     let pageBookmarks: [PageBookmark]
+    let volumes: [URL]
     let currentPageIndex: Int
     let onSelect: (URL) -> Void
     let onSelectFavorite: (FavoriteBook) -> Void
     let onRemoveFavorite: (FavoriteBook) -> Void
     let onJumpToBookmark: (PageBookmark) -> Void
     let onRemovePageBookmark: (PageBookmark) -> Void
+    let onSelectVolume: (URL) -> Void
     let onOpen: () -> Void
     let onTogglePin: () -> Void
     let onRequestFolderAccess: () -> Void
@@ -38,9 +40,9 @@ struct LibrarySidebar: View {
 
     @ViewBuilder
     private var content: some View {
-        if rootURL == nil && favorites.isEmpty && pageBookmarks.isEmpty {
+        if rootURL == nil && favorites.isEmpty && pageBookmarks.isEmpty && volumes.isEmpty {
             emptyState
-        } else if rootURL != nil && scanCompleted && nodes.isEmpty && favorites.isEmpty && pageBookmarks.isEmpty {
+        } else if rootURL != nil && scanCompleted && nodes.isEmpty && favorites.isEmpty && pageBookmarks.isEmpty && volumes.isEmpty {
             accessPrompt
         } else {
             tree
@@ -49,8 +51,11 @@ struct LibrarySidebar: View {
 
     private var header: some View {
         HStack(spacing: PanelySpacing.sm) {
-            Image(systemName: "books.vertical")
-                .foregroundStyle(PanelyColor.textSecondary)
+            PanelyIconButton(
+                systemImage: "books.vertical",
+                action: onRequestFolderAccess
+            )
+            .help("Change Library Root…")
             Text(rootURL?.lastPathComponent ?? "Library")
                 .font(PanelyTypography.body)
                 .foregroundStyle(PanelyColor.textPrimary)
@@ -69,6 +74,19 @@ struct LibrarySidebar: View {
 
     private var tree: some View {
         List {
+            if volumes.count > 1 {
+                Section(header: sectionHeader("Volumes", systemImage: "books.vertical.fill")) {
+                    ForEach(volumes, id: \.self) { url in
+                        VolumeRow(
+                            url: url,
+                            isActive: activeURL?.standardizedFileURL == url.standardizedFileURL,
+                            onTap: { onSelectVolume(url) }
+                        )
+                        .listRowBackground(Color.clear)
+                    }
+                }
+            }
+
             if !favorites.isEmpty {
                 Section(header: sectionHeader("Favorites", systemImage: "star.fill")) {
                     ForEach(favorites) { fav in
@@ -259,6 +277,42 @@ private struct FavoriteRow: View {
     }
 }
 
+private struct VolumeRow: View {
+    let url: URL
+    let isActive: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: PanelySpacing.sm) {
+                Image(systemName: iconName)
+                    .foregroundStyle(isActive ? PanelyColor.accentPrimary : PanelyColor.textSecondary)
+                    .frame(width: 16)
+                Text(displayName)
+                    .font(PanelyTypography.body)
+                    .foregroundStyle(isActive ? PanelyColor.accentPrimary : PanelyColor.textPrimary)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+            .padding(.vertical, 2)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var isDirectory: Bool {
+        (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
+    }
+
+    private var iconName: String {
+        isDirectory ? "folder" : "doc.zipper"
+    }
+
+    private var displayName: String {
+        isDirectory ? url.lastPathComponent : url.deletingPathExtension().lastPathComponent
+    }
+}
+
 private struct PageBookmarkRow: View {
     let bookmark: PageBookmark
     let isCurrent: Bool
@@ -295,12 +349,14 @@ private struct PageBookmarkRow: View {
         pinned: false,
         favorites: [],
         pageBookmarks: [],
+        volumes: [],
         currentPageIndex: 0,
         onSelect: { _ in },
         onSelectFavorite: { _ in },
         onRemoveFavorite: { _ in },
         onJumpToBookmark: { _ in },
         onRemovePageBookmark: { _ in },
+        onSelectVolume: { _ in },
         onOpen: {},
         onTogglePin: {},
         onRequestFolderAccess: {}
