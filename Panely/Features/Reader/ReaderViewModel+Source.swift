@@ -38,7 +38,17 @@ extension ReaderViewModel {
     }
 
     var libraryRootURL: URL? {
-        explicitLibraryRootURL ?? currentSourceURL?.deletingLastPathComponent()
+        if let explicit = explicitLibraryRootURL { return explicit }
+        // Prefer the originally opened file's parent over `currentSourceURL`.
+        // For zip-in-zip, `currentSourceURL` points into the extracted temp
+        // dir, whose contents already appear in the Volumes section — using
+        // it as the library root would duplicate that listing in the Files
+        // tree. `openedSourceURL` keeps the user's actual library location
+        // visible while Volumes covers the in-archive volumes.
+        if let opened = openedSourceURL {
+            return opened.deletingLastPathComponent()
+        }
+        return currentSourceURL?.deletingLastPathComponent()
     }
 
     /// Volumes to surface as a dedicated sidebar section. Only populated for

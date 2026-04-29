@@ -134,14 +134,29 @@ struct ReaderViewModelLibraryTests {
     @Test func libraryRootURLFallsBackToCurrentSourceParent() {
         let vm = ReaderViewModel()
         vm.explicitLibraryRootURL = nil
+        vm.openedSourceURL = nil
         vm.currentSourceURL = URL(fileURLWithPath: "/Users/me/Comics/series/01")
 
         #expect(vm.libraryRootURL?.path == "/Users/me/Comics/series")
     }
 
+    @Test func libraryRootURLPrefersOpenedSourceParentOverCurrentSource() {
+        // zip-in-zip cold start: currentSourceURL points inside the extracted
+        // temp dir, but the user opened the outer archive from their library.
+        // The library tree must reflect the user's actual location, not the
+        // temp folder (whose contents are surfaced via the Volumes section).
+        let vm = ReaderViewModel()
+        vm.explicitLibraryRootURL = nil
+        vm.openedSourceURL = URL(fileURLWithPath: "/Users/me/Comics/zip-in-zip.cbz")
+        vm.currentSourceURL = URL(fileURLWithPath: "/var/folders/T/panely-X/Vol01.cbz")
+
+        #expect(vm.libraryRootURL?.path == "/Users/me/Comics")
+    }
+
     @Test func libraryRootURLIsNilWhenNoSourceAndNoExplicitRoot() {
         let vm = ReaderViewModel()
         vm.explicitLibraryRootURL = nil
+        vm.openedSourceURL = nil
         vm.currentSourceURL = nil
 
         #expect(vm.libraryRootURL == nil)
