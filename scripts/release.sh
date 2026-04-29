@@ -24,6 +24,7 @@ set -euo pipefail
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
 PBXPROJ="$REPO_ROOT/Panely.xcodeproj/project.pbxproj"
+CREDITS="$REPO_ROOT/Panely/Credits.rtf"
 MAIN_BRANCH="main"
 
 cd "$REPO_ROOT"
@@ -161,24 +162,55 @@ grep -q "MARKETING_VERSION = $new_version;" "$PBXPROJ" \
 
 echo "✓ bumped MARKETING_VERSION to $new_version"
 
-# Restore pbxproj if user aborts before committing — keeps the working tree
-# clean even on Ctrl-C between bump and commit.
-trap 'echo; echo "→ restoring $PBXPROJ"; git checkout -- "$PBXPROJ" 2>/dev/null || true' ERR INT
+# Build number = git commit count. Monotonically increasing, derivable from
+# git history alone (no separate counter file). The count reflects HEAD
+# *before* the release commit, so the released binary's CFBundleVersion
+# corresponds to the parent commit's SHA — which is the actual code being
+# released (the release commit itself only bumps version metadata).
+new_count=$(git rev-list HEAD --count)
+sed -i '' -E \
+    "s/(CURRENT_PROJECT_VERSION = )[^;]+;/\1$new_count;/g" \
+    "$PBXPROJ"
+
+grep -q "CURRENT_PROJECT_VERSION = $new_count;" "$PBXPROJ" \
+    || die "failed to update CURRENT_PROJECT_VERSION"
+
+echo "✓ bumped CURRENT_PROJECT_VERSION to $new_count"
+
+# Stamp the parent commit's short SHA into Credits.rtf so the About panel
+# shows what code corresponds to this binary. Pattern matches "Build <hex>"
+# regardless of whether the previous value was the placeholder or a prior
+# release's SHA.
+[[ -f "$CREDITS" ]] || die "Credits.rtf not found: $CREDITS"
+
+new_sha=$(git rev-parse --short HEAD)
+sed -i '' -E \
+    "s/(Build )[0-9a-f]+/\1$new_sha/g" \
+    "$CREDITS"
+
+grep -q "Build $new_sha" "$CREDITS" \
+    || die "failed to update SHA in Credits.rtf"
+
+echo "✓ stamped Credits.rtf with SHA $new_sha"
+
+# Restore tracked files if user aborts before committing — keeps the working
+# tree clean even on Ctrl-C between bump and commit.
+trap 'echo; echo "→ restoring tracked files"; git checkout -- "$PBXPROJ" "$CREDITS" 2>/dev/null || true' ERR INT
 
 # --- show diff + confirm ---
 echo
-echo "→ pending change:"
-git --no-pager diff --color=always -- "$PBXPROJ"
+echo "→ pending changes:"
+git --no-pager diff --color=always -- "$PBXPROJ" "$CREDITS"
 echo
 
 if ! confirm "commit + tag $tag?"; then
-    echo "aborted. reverting version bump..."
-    git checkout -- "$PBXPROJ"
+    echo "aborted. reverting changes..."
+    git checkout -- "$PBXPROJ" "$CREDITS"
     exit 0
 fi
 
 # --- commit + tag ---
-git add "$PBXPROJ"
+git add "$PBXPROJ" "$CREDITS"
 git commit -m "chore: release $tag"
 git tag -a "$tag" -m "Release $tag"
 trap - ERR INT
