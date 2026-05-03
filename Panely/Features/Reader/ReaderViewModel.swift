@@ -35,7 +35,13 @@ final class ReaderViewModel {
     // still treat this as read-only and mutate via load(url:) / next() etc.
     var source: ComicSource = .empty
     var currentPageIndex: Int = 0 {
-        didSet { savePosition() }
+        didSet {
+            savePosition()
+            // Any page-change clears the "show prev-volume card" cue. The
+            // backward path re-sets it immediately after the assignment when
+            // landing on page 0, so we don't lose intent there.
+            wantsPreviousVolumePrompt = false
+        }
     }
     var currentImages: [NSImage] = []
     var errorMessage: String?
@@ -44,6 +50,12 @@ final class ReaderViewModel {
 
     var currentSourceURL: URL?
     var siblings: [URL] = []
+
+    /// One-press cue for advancing to the previous volume from page 0.
+    /// Set by `goBackward()` (either when arriving at 0 from a higher page,
+    /// or on an explicit backward press at 0). Cleared by any page change
+    /// (`currentPageIndex` didSet) and by `load(url:)`.
+    var wantsPreviousVolumePrompt: Bool = false
 
     let recentItems: RecentItemsStore
     let bookmarks: BookmarksStore

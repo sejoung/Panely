@@ -137,6 +137,7 @@ struct ReaderScene: View {
             .overlay(alignment: .top) { toolbarOverlay }
             .overlay(alignment: .bottom) { sliderOverlay }
             .overlay(alignment: .bottom) { endOfVolumeOverlay }
+            .overlay(alignment: .top) { previousVolumeOverlay }
             .onContinuousHover { phase in
                 switch phase {
                 case .active(let location):
@@ -151,11 +152,11 @@ struct ReaderScene: View {
             .focused($isFocused)
             .focusEffectDisabled()
             .onKeyPress(.leftArrow) {
-                viewModel.effectiveDirection.isRTL ? viewModel.advanceForward() : viewModel.previous()
+                viewModel.effectiveDirection.isRTL ? viewModel.advanceForward() : viewModel.goBackward()
                 return .handled
             }
             .onKeyPress(.rightArrow) {
-                viewModel.effectiveDirection.isRTL ? viewModel.previous() : viewModel.advanceForward()
+                viewModel.effectiveDirection.isRTL ? viewModel.goBackward() : viewModel.advanceForward()
                 return .handled
             }
             .onKeyPress(.space) {
@@ -232,6 +233,20 @@ struct ReaderScene: View {
                 }
             )
             .animation(PanelyMotion.uiReveal, value: viewModel.showsEndOfVolumeCard)
+        }
+    }
+
+    @ViewBuilder
+    private var previousVolumeOverlay: some View {
+        if viewModel.showsPreviousVolumeCard, let name = viewModel.previousVolumeDisplayName {
+            PreviousVolumeCard(
+                previousVolumeName: name,
+                onPrevious: {
+                    viewModel.previousVolume()
+                    isFocused = true
+                }
+            )
+            .animation(PanelyMotion.uiReveal, value: viewModel.showsPreviousVolumeCard)
         }
     }
 

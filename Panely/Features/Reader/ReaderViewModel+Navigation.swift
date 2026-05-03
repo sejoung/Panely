@@ -59,6 +59,42 @@ extension ReaderViewModel {
         }
     }
 
+    /// Backward action for keyboard handlers. Asymmetric with
+    /// `advanceForward()` because the prev-volume card is gated behind an
+    /// explicit signal (this method) — without that, opening any volume on
+    /// page 0 would auto-prompt about the previous one.
+    ///
+    /// Behavior at page 0:
+    ///   - first press     → arms the cue (`wantsPreviousVolumePrompt = true`)
+    ///   - second press    → loads the previous sibling
+    ///
+    /// Behavior elsewhere:
+    ///   - pages backward via `previous()`. If that lands on page 0 with a
+    ///     previous sibling, the cue is armed automatically so the next
+    ///     press advances volumes — mirroring how the forward card auto-
+    ///     appears on reaching the last page.
+    func goBackward() {
+        if currentPageIndex == 0 {
+            guard canGoPreviousVolume else { return }
+            if wantsPreviousVolumePrompt {
+                previousVolume()
+            } else {
+                wantsPreviousVolumePrompt = true
+            }
+            return
+        }
+
+        let target = currentPageIndex - navigationStep
+        let willLandOnZero = target <= 0
+        previous()
+        // `previous()` triggers the didSet that resets the cue. If we just
+        // landed on page 0 with a prev sibling, re-arm so the user's next
+        // press advances volumes without a wasted no-op press first.
+        if willLandOnZero && canGoPreviousVolume {
+            wantsPreviousVolumePrompt = true
+        }
+    }
+
     func previous() {
         let target = currentPageIndex - navigationStep
         guard target >= 0 else {

@@ -173,6 +173,118 @@ struct ReaderViewModelEndOfVolumeTests {
         #expect(vm.currentPageIndex == 0)
     }
 
+    // MARK: showsPreviousVolumeCard / goBackward dispatch
+
+    @Test func prevCardHiddenOnFreshOpenAtPageZero() {
+        // Mimics the "loaded into Vol 02 at page 0" case — flag should not
+        // be set without explicit user intent, so the card must stay hidden.
+        let vm = makeViewModel(pageCount: 5)
+        vm.layout = .single
+        vm.currentPageIndex = 0
+        vm.siblings = [
+            URL(fileURLWithPath: "/series/Vol01.cbz"),
+            URL(fileURLWithPath: "/series/Vol02.cbz")
+        ]
+        vm.currentSourceURL = vm.siblings[1]
+
+        #expect(vm.showsPreviousVolumeCard == false)
+    }
+
+    @Test func goBackwardAtPageZeroFirstPressArmsCueAndDoesNotLoad() {
+        let vm = makeViewModel(pageCount: 5)
+        vm.layout = .single
+        vm.currentPageIndex = 0
+        vm.siblings = [
+            URL(fileURLWithPath: "/series/Vol01.cbz"),
+            URL(fileURLWithPath: "/series/Vol02.cbz")
+        ]
+        vm.currentSourceURL = vm.siblings[1]
+
+        vm.goBackward()
+        #expect(vm.showsPreviousVolumeCard == true)
+        #expect(vm.currentPageIndex == 0)
+    }
+
+    @Test func goBackwardAtPageZeroNoOpsWithoutPreviousSibling() {
+        let vm = makeViewModel(pageCount: 5)
+        vm.layout = .single
+        vm.currentPageIndex = 0
+        vm.siblings = [URL(fileURLWithPath: "/series/Vol01.cbz")]
+        vm.currentSourceURL = vm.siblings[0]
+
+        vm.goBackward()
+        #expect(vm.showsPreviousVolumeCard == false)
+    }
+
+    @Test func goBackwardLandingOnZeroAutoArmsCue() {
+        // User reading forward, scrolls back to page 0 — symmetry with the
+        // forward card auto-appearing on reaching the last page.
+        let vm = makeViewModel(pageCount: 5)
+        vm.layout = .single
+        vm.currentPageIndex = 1
+        vm.siblings = [
+            URL(fileURLWithPath: "/series/Vol01.cbz"),
+            URL(fileURLWithPath: "/series/Vol02.cbz")
+        ]
+        vm.currentSourceURL = vm.siblings[1]
+
+        vm.goBackward()
+        #expect(vm.currentPageIndex == 0)
+        #expect(vm.showsPreviousVolumeCard == true)
+    }
+
+    @Test func goBackwardPagesNormallyAboveZero() {
+        let vm = makeViewModel(pageCount: 10)
+        vm.layout = .single
+        vm.currentPageIndex = 5
+        vm.siblings = [
+            URL(fileURLWithPath: "/series/Vol01.cbz"),
+            URL(fileURLWithPath: "/series/Vol02.cbz")
+        ]
+        vm.currentSourceURL = vm.siblings[1]
+
+        vm.goBackward()
+        #expect(vm.currentPageIndex == 4)
+        #expect(vm.showsPreviousVolumeCard == false)
+    }
+
+    @Test func anyPageChangeClearsThePreviousVolumeCue() {
+        let vm = makeViewModel(pageCount: 10)
+        vm.layout = .single
+        vm.currentPageIndex = 0
+        vm.siblings = [
+            URL(fileURLWithPath: "/series/Vol01.cbz"),
+            URL(fileURLWithPath: "/series/Vol02.cbz")
+        ]
+        vm.currentSourceURL = vm.siblings[1]
+
+        vm.goBackward()
+        #expect(vm.showsPreviousVolumeCard == true)
+
+        vm.jump(to: 3)
+        #expect(vm.showsPreviousVolumeCard == false)
+    }
+
+    @Test func previousVolumeDisplayNameStripsExtension() {
+        let vm = makeViewModel(pageCount: 5)
+        vm.siblings = [
+            URL(fileURLWithPath: "/series/Vol01 - The Beginning.cbz"),
+            URL(fileURLWithPath: "/series/Vol02.cbz")
+        ]
+        vm.currentSourceURL = vm.siblings[1]
+        #expect(vm.previousVolumeDisplayName == "Vol01 - The Beginning")
+    }
+
+    @Test func previousVolumeDisplayNameNilOnFirstSibling() {
+        let vm = makeViewModel(pageCount: 5)
+        vm.siblings = [
+            URL(fileURLWithPath: "/series/Vol01.cbz"),
+            URL(fileURLWithPath: "/series/Vol02.cbz")
+        ]
+        vm.currentSourceURL = vm.siblings[0]
+        #expect(vm.previousVolumeDisplayName == nil)
+    }
+
     // MARK: helpers
 
     private func makeViewModel(pageCount: Int) -> ReaderViewModel {

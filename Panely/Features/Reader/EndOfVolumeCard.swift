@@ -13,15 +13,17 @@ struct EndOfVolumeCard: View {
         VStack(alignment: .leading, spacing: PanelySpacing.sm) {
             HStack(spacing: PanelySpacing.sm) {
                 Image(systemName: "books.vertical")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(PanelyColor.textSecondary)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(PanelyColor.textPrimary.opacity(0.85))
                 Text("Up next")
-                    .font(PanelyTypography.caption)
-                    .foregroundStyle(PanelyColor.textSecondary)
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(0.8)
+                    .textCase(.uppercase)
+                    .foregroundStyle(PanelyColor.textPrimary.opacity(0.85))
             }
 
             Text(nextVolumeName)
-                .font(PanelyTypography.body)
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(PanelyColor.textPrimary)
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -65,8 +67,16 @@ struct EndOfVolumeCard: View {
         .padding(PanelySpacing.lg)
         .frame(maxWidth: 360, alignment: .leading)
         .background(
+            // Regular material gives more opacity than ultra-thin, and the
+            // dark reservoir tint on top guarantees a consistent dark
+            // backdrop regardless of the comic page color underneath —
+            // textSecondary on white pages was washing out otherwise.
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(.ultraThinMaterial)
+                .fill(.regularMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(PanelyColor.bgSecondary.opacity(0.55))
+                )
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .stroke(PanelyColor.borderSubtle, lineWidth: 1)

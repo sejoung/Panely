@@ -114,6 +114,21 @@ extension ReaderViewModel {
         jump(toPageNumber: 1)
     }
 
+    /// Drives the previous-volume card. Asymmetric vs `showsEndOfVolumeCard`
+    /// on purpose: that card auto-appears whenever you're at the last page,
+    /// but this one only surfaces after the user has signaled intent (via
+    /// `goBackward()`). Otherwise opening Vol N (which lands on page 0 on
+    /// first read) would noisily prompt about Vol N-1 every time.
+    var showsPreviousVolumeCard: Bool {
+        wantsPreviousVolumePrompt && canGoPreviousVolume
+    }
+
+    /// Filename (no extension) of the previous sibling.
+    var previousVolumeDisplayName: String? {
+        guard canGoPreviousVolume, let idx = currentSiblingIndex else { return nil }
+        return siblings[idx - 1].deletingPathExtension().lastPathComponent
+    }
+
     // MARK: - Opening new sources
 
     func openSource() {
@@ -178,6 +193,13 @@ extension ReaderViewModel {
 
     func load(url: URL, knownSiblings: [URL]? = nil) async {
         preloadTask?.cancel()
+
+        // Any new book load — explicit, via prev/next volume, or via library
+        // — resets the prev-volume cue. Without this, opening Vol N+1 after
+        // dismissing Vol N's card by jumping pages could carry the stale flag
+        // when the new book's saved position lands at index 0 (didSet on
+        // currentPageIndex doesn't fire when oldValue == newValue == 0).
+        wantsPreviousVolumePrompt = false
 
         // Each load captures its own epoch and re-checks after every await.
         // If a newer load has bumped the counter, this one bails out without
