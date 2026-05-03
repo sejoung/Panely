@@ -81,10 +81,15 @@ struct ThumbnailLoaderTests {
         let imageB = await ThumbnailLoader.shared.thumbnail(for: pageB)
 
         guard let imageA, let imageB else {
-            Issue.record("expected both thumbnails to resolve")
+            Issue.record(
+                "expected both thumbnails to resolve. imageA=\(imageA == nil ? "nil" : "ok") imageB=\(imageB == nil ? "nil" : "ok") urlA=\(urlA.path) urlB=\(urlB.path)"
+            )
             return
         }
         // Different `ComicPage.id`s must yield distinct cache entries.
-        #expect(imageA !== imageB)
+        #expect(
+            imageA !== imageB,
+            "thumbnails collided: pageA.id=\(pageA.id) pageB.id=\(pageB.id) sizeA=\(imageA.size) sizeB=\(imageB.size) idA=\(ObjectIdentifier(imageA)) idB=\(ObjectIdentifier(imageB))"
+        )
     }
 }
