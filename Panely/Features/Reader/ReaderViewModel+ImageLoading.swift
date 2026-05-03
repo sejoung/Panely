@@ -69,11 +69,24 @@ extension ReaderViewModel {
             return
         }
 
-        var images: [NSImage] = []
-        for page in pages {
-            if let image = await loadVisibleImage(page) {
-                images.append(image)
+        // Parallel decode. In single-page layout this is a no-op (one task);
+        // in double-page mode the two pages decode concurrently instead of
+        // back-to-back, which is roughly a 2× speedup on the spread refresh.
+        // Index-tagged + sorted so spread order is preserved regardless of
+        // which decode finishes first.
+        let images = await withTaskGroup(of: (Int, NSImage?).self, returning: [NSImage].self) { group in
+            for (i, page) in pages.enumerated() {
+                group.addTask { [self] in
+                    let image = await self.loadVisibleImage(page)
+                    return (i, image)
+                }
             }
+            var slots: [(Int, NSImage?)] = []
+            for await result in group {
+                slots.append(result)
+            }
+            slots.sort { $0.0 < $1.0 }
+            return slots.compactMap { $0.1 }
         }
         currentImages = images
 
@@ -260,7 +273,11 @@ extension ReaderViewModel {
     }
 
     private func cacheImage(_ image: NSImage, for page: ComicPage) {
-        imageCache.setObject(image, forKey: page.id.uuidString as NSString)
+        // Decoded byte estimate (size in points × ~4 bytes/pixel) lets the
+        // cache's totalCostLimit kick in for big scans. NSCache treats it as
+        // a hint, not a strict budget — close enough for eviction decisions.
+        let cost = Int(image.size.width * image.size.height * 4)
+        imageCache.setObject(image, forKey: page.id.uuidString as NSString, cost: cost)
     }
 
     func loadVisibleImage(_ page: ComicPage) async -> NSImage? {

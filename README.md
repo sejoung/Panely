@@ -64,6 +64,13 @@ pages.
   preserved by default
 - **Auto-centering** — image stays centered when the viewport is larger
 - **Preload ±2 pages** in paged modes so the next flip is instant
+- **Series continuous reading** — when the last page of a volume is
+  reached and a next sibling exists, an "Up next" card surfaces over the
+  bottom of the viewer with the next volume's filename and a one-click
+  start. A symmetric "Previous" card appears at the top after an explicit
+  backward press at page 0 — opening Vol N at page 0 stays quiet until
+  the user signals intent to go further back. Forward / backward keys
+  also advance volumes when the matching card is showing
 - **Progress overlay** — stage-aware messages (Opening / Extracting /
   Loading / Building vertical strip) while big sources are processed,
   all on background threads
@@ -173,8 +180,8 @@ Terminal) and move the result straight to `/Applications`.
 | Input | Action |
 |:------|:-------|
 | `⌘O` | Open folder / CBZ / ZIP |
-| `←` / `→` | Previous / next page (direction-aware in paged modes; image-by-image in vertical) |
-| `Space` | Next page (or scroll to next image in vertical) |
+| `←` / `→` | Previous / next page (direction-aware; advances to the next/previous volume when the matching end-of-volume card is showing) |
+| `Space` | Next page (advances to the next volume when the end-of-volume card is showing) |
 | `⌘[` / `⌘]` | Previous / next volume |
 | `⌘G` | Go to page… (modal prompt) |
 | `⌘D` | Add / remove page bookmark |
@@ -205,7 +212,7 @@ xcodebuild test \
   CODE_SIGN_IDENTITY="-"
 ```
 
-**168 tests across 33 suites** cover:
+**223 tests across 38 suites** cover:
 
 - Pure data types (`ComicPage`, `ComicSource`, `RecentItem`, enum raw values)
 - Natural-sort contract (Foundation behaviour Panely relies on)
@@ -262,6 +269,19 @@ xcodebuild test \
 - **`ThumbnailLoader`** — nil for unreachable URLs, non-nil for a real PNG,
   same `ComicPage.id` returns the cached `NSImage` via `===`, distinct
   pages get distinct cache entries
+- **`ImageLoader.load`** — eager-decode pipeline (`CGImageSource` +
+  `kCGImageSourceShouldCacheImmediately`), throws on non-image / missing
+  files, returned NSImage's `cgImage(...)` resolves without an extra
+  decode pass
+- **End-of-volume / previous-volume cards** — visibility predicates,
+  filename labels, `advanceForward()` / `goBackward()` dispatch, and the
+  asymmetric prev-card trigger (cue stays armed only after explicit user
+  intent). Includes the symmetry test that the prev card is hidden on a
+  fresh open at page 0
+- **Position memory in-memory mirror** — first restore hydrates the
+  cache from `UserDefaults`, subsequent saves and reads hit the in-memory
+  dict; mirror correctly carries multiple books and reflects the latest
+  write without a re-read
 - **`PanelyAppDelegate`** — `applicationShouldTerminateAfterLastWindowClosed`
   returns true so the red close button quits the app
 
@@ -298,6 +318,8 @@ Panely/
 │   │   ├── QuickJumpField.swift        # inline-editable page counter
 │   │   ├── ThumbnailSidebar.swift      # right-side thumbnail panel (LazyVStack)
 │   │   ├── ThumbnailLoader.swift       # Image I/O thumbnails + NSCache
+│   │   ├── EndOfVolumeCard.swift       # bottom card: "Up next" + start/restart
+│   │   ├── PreviousVolumeCard.swift    # top card: "Previous" (intent-gated)
 │   │   ├── LoadingOverlay.swift
 │   │   ├── PageLayout.swift            # single/double/vertical + cycle + isContinuous
 │   │   ├── ReadingDirection.swift / FitMode.swift  # FitMode: 3 cases + cycle
@@ -428,10 +450,35 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   bookmarks (`BookmarksStore`) reuse the same key so they also survive
   temp-dir re-extraction.
 - **`NSCache`-backed image cache** — per-page decoded `NSImage`s with
-  automatic memory-pressure eviction. Preload runs a cancellable `Task`
-  around the current page ±2 in paged modes. Cancellation propagates
-  into `ImageLoader.load` and `preloadIfNeeded` so abandoned work doesn't
+  automatic memory-pressure eviction. `countLimit = 10` plus a
+  `totalCostLimit ≈ 150 MB` (per-entry cost = pixel area × 4 fed via
+  `setObject(_:forKey:cost:)`) keeps memory predictable when high-res
+  scans land in cache. Preload runs a cancellable `Task` around the
+  current page ±2 in paged modes. Cancellation propagates into
+  `ImageLoader.load` and `preloadIfNeeded` so abandoned work doesn't
   pollute the cache during fast keyboard navigation.
+- **Eager-decode image pipeline** — `ImageLoader.load` runs
+  `CGImageSourceCreateWithURL` (zero-copy mmap for file URLs) /
+  `CGImageSourceCreateWithData` (archive entries) inside a
+  `Task.detached`, with `kCGImageSourceShouldCacheImmediately: true`
+  so the returned NSImage backs onto a fully-realized CGImage. Avoids
+  the lazy decode that `NSImage(data:)` defers to first draw on the
+  main thread.
+- **Paged refresh parallelism** — `refreshPaged` decodes the visible
+  spread (2 pages in double-page mode) concurrently via `withTaskGroup`
+  and commits a single `currentImages` write in original order. Single
+  layout is unaffected; double layout finishes ~2× faster.
+- **Series continuous reading** — `ReaderViewModel.showsEndOfVolumeCard`
+  is the pure predicate `isAtLastPage && canGoNextVolume`; the prev
+  counterpart (`showsPreviousVolumeCard`) is gated behind a transient
+  `wantsPreviousVolumePrompt` cue that arms only on explicit user
+  intent (a backward press at page 0, or arriving at page 0 via
+  `goBackward()` from a higher page). Any subsequent `currentPageIndex`
+  change clears the cue, and `load(url:)` resets it on every new book
+  so opening a fresh volume doesn't surface the prompt prematurely.
+  Forward / backward keyboard handlers route through `advanceForward()`
+  / `goBackward()` so a single press of the matching key advances the
+  volume when the card is showing.
 - **Thumbnail cache** — `ThumbnailLoader` generates downscaled NSImages via
   `CGImageSourceCreateThumbnailAtIndex` (skips full-resolution decode) and
   stores them in an `NSCache` (`countLimit = 400`, `totalCostLimit ≈ 60 MB`).
@@ -447,9 +494,13 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   `UserDefaults.standard.dictionaryRepresentation()` once and reads every
   key from the in-memory dict, avoiding a dozen separate cross-process
   `UserDefaults` calls on cold start.
-- **Debounced position save** — `currentPageIndex`'s didSet schedules a
-  300 ms-debounced `savePosition`, so vertical-scroll-driven page changes
-  at ~60 Hz don't fan out to per-frame `UserDefaults` writes.
+- **Debounced position save with in-memory mirror** —
+  `currentPageIndex`'s didSet schedules a 300 ms-debounced
+  `savePosition`, so vertical-scroll-driven page changes at ~60 Hz don't
+  fan out to per-frame `UserDefaults` writes. Saves and reads also go
+  through a lazy in-memory mirror (`positionsCache`), so each save is a
+  small dict mutation + one `set(_:forKey:)` instead of a full
+  `dictionary(forKey:)` read-modify-write of every saved book's slot.
   `NSApplication.willTerminateNotification` flushes
   `flushPositionImmediately` before quit.
 - **Security-scoped bookmarks** — Recent items and favorites persist across
@@ -505,7 +556,7 @@ git push origin v1.0.0
 ### CI / storage
 
 - **CI** runs on every push/PR (skips `**/*.md` and `docs/**`), builds
-  Debug with ad-hoc signing, runs all 168 tests, and uploads no artifacts —
+  Debug with ad-hoc signing, runs all 223 tests, and uploads no artifacts —
   storage footprint is essentially zero.
 - **Releases** attach a single zip (~5–10 MB) to GitHub Releases using
   `ditto` so resource forks are preserved.

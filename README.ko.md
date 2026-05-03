@@ -59,6 +59,12 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   바뀌면 새 맞춤으로 스냅. 수동 줌은 기본으로 보존
 - **자동 센터링** — 뷰포트가 더 클 때 이미지를 중앙에 유지
 - **±2페이지 프리로드**(페이지 모드) — 다음 페이지 전환이 즉시 체감
+- **시리즈 연속 읽기** — 한 권의 마지막 페이지에 닿고 다음 시블링이 있으면
+  뷰어 하단에 다음 권 파일명 + "Next volume" 버튼이 뜬 카드(Up next)가
+  표시됨. 대칭으로 페이지 0에서 backward를 명시적으로 누르면 상단에
+  "Previous" 카드가 등장 — Vol N을 처음 페이지 0에서 열었을 땐 카드가
+  안 뜨고 사용자가 더 뒤로 가려는 의도를 표현해야만 노출. 카드가 떠 있는
+  동안 forward/backward 키 한 번이면 권을 이동
 - **진행 오버레이** — 큰 소스를 처리하는 동안 단계별 메시지
   (Opening / Extracting / Loading / Building vertical strip), 전부 백그라운드 스레드
 
@@ -163,8 +169,8 @@ LaunchServices 캐시에 남을 수 있으니, 우클릭 → "다음으로 압�
 | 입력 | 동작 |
 |:------|:-------|
 | `⌘O` | 폴더 / CBZ / ZIP 열기 |
-| `←` / `→` | 이전 / 다음 페이지 (페이지 모드는 방향 반영, 세로 모드는 이미지 단위) |
-| `Space` | 다음 페이지 (세로 모드에선 다음 이미지로 스크롤) |
+| `←` / `→` | 이전 / 다음 페이지 (방향 반영. 매칭되는 권 카드가 떠 있으면 다음/이전 권으로 이동) |
+| `Space` | 다음 페이지 (Up next 카드가 떠 있으면 다음 권으로 이동) |
 | `⌘[` / `⌘]` | 이전 / 다음 볼륨 |
 | `⌘G` | 페이지 번호로 이동… (모달 프롬프트) |
 | `⌘D` | 페이지 북마크 추가 / 제거 |
@@ -195,7 +201,7 @@ xcodebuild test \
   CODE_SIGN_IDENTITY="-"
 ```
 
-**33 스위트에 걸친 168개 테스트**가 다음을 커버:
+**38 스위트에 걸친 223개 테스트**가 다음을 커버:
 
 - 순수 데이터 타입 (`ComicPage`, `ComicSource`, `RecentItem`, enum raw 값)
 - 자연 정렬 규약 (Panely가 의존하는 Foundation 동작)
@@ -247,6 +253,16 @@ xcodebuild test \
   `canGo*Bookmark`, `currentPositionKey`가 no-op / false / nil
 - **`ThumbnailLoader`** — 접근 불가 URL은 nil, 실제 PNG는 non-nil, 동일
   `ComicPage.id`는 `===`로 캐시된 `NSImage` 반환, 서로 다른 페이지는 별개 캐시 엔트리
+- **`ImageLoader.load`** — eager-decode 파이프라인(`CGImageSource` +
+  `kCGImageSourceShouldCacheImmediately`), 비이미지/누락 파일에 throw,
+  반환된 NSImage의 `cgImage(...)`가 추가 디코드 패스 없이 즉시 resolve
+- **End-of-volume / previous-volume 카드** — 가시성 술어, 파일명 라벨,
+  `advanceForward()` / `goBackward()` 디스패치, prev 카드의 비대칭 트리거
+  (사용자 명시 의도가 있어야만 cue arm). 페이지 0의 첫 fresh open에선
+  카드가 안 뜨는 것까지 대칭 보장 테스트 포함
+- **위치 메모리 in-memory mirror** — 첫 restore에서 `UserDefaults`로부터
+  캐시 hydrate, 이후 save/read 모두 in-memory dict에 hit. 여러 책이
+  올바르게 공존하고, 같은 VM 내 최신 write가 재읽기 없이 반영됨
 - **`PanelyAppDelegate`** — `applicationShouldTerminateAfterLastWindowClosed`가
   true 반환해서 빨간 닫기 버튼이 앱 종료
 
@@ -283,6 +299,8 @@ Panely/
 │   │   ├── QuickJumpField.swift        # 페이지 카운터 인라인 편집
 │   │   ├── ThumbnailSidebar.swift      # 우측 썸네일 패널 (LazyVStack)
 │   │   ├── ThumbnailLoader.swift       # Image I/O 썸네일 + NSCache
+│   │   ├── EndOfVolumeCard.swift       # 하단 카드: "Up next" + start/restart
+│   │   ├── PreviousVolumeCard.swift    # 상단 카드: "Previous" (의도 게이트)
 │   │   ├── LoadingOverlay.swift
 │   │   ├── PageLayout.swift            # single/double/vertical + 순환 + isContinuous
 │   │   ├── ReadingDirection.swift / FitMode.swift  # FitMode: 3가지 + 순환
@@ -411,10 +429,32 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북�
   가로질러 읽기 진행 유지. 페이지 북마크(`BookmarksStore`)도 같은 키를
   써서 temp-dir 재추출에도 유지됨.
 - **`NSCache` 기반 이미지 캐시** — 페이지별 디코드된 `NSImage`를 메모리
-  압박 시 자동 eviction. 프리로드는 페이지 모드에서 현재 페이지 ±2
-  주변으로 취소 가능한 `Task` 실행. 취소는 `ImageLoader.load`와
-  `preloadIfNeeded`로 전파되어 빠른 키보드 네비게이션 중 버려진 작업이
-  캐시를 오염시키지 않음.
+  압박 시 자동 eviction. `countLimit = 10`에 더해 `totalCostLimit ≈ 150 MB`
+  (per-entry cost = pixel area × 4를 `setObject(_:forKey:cost:)`로 전달)
+  를 설정하여 큰 스캔본이 캐시에 들어와도 메모리가 예측 가능. 프리로드는
+  페이지 모드에서 현재 페이지 ±2 주변으로 취소 가능한 `Task` 실행. 취소는
+  `ImageLoader.load`와 `preloadIfNeeded`로 전파되어 빠른 키보드
+  네비게이션 중 버려진 작업이 캐시를 오염시키지 않음.
+- **Eager-decode 이미지 파이프라인** — `ImageLoader.load`는
+  `CGImageSourceCreateWithURL`(파일 URL은 zero-copy mmap) /
+  `CGImageSourceCreateWithData`(아카이브 엔트리)를 `Task.detached` 안에서
+  돌리고, `kCGImageSourceShouldCacheImmediately: true`로 반환되는
+  NSImage가 완전히 realize된 CGImage를 백킹하도록 함. `NSImage(data:)`가
+  첫 그리기까지 미루는 lazy decode를 회피.
+- **페이지 모드 새로고침 병렬화** — `refreshPaged`가 보이는 spread
+  (double-page 모드의 2페이지)를 `withTaskGroup`으로 동시 디코드하고
+  원래 순서로 `currentImages`를 한 번에 커밋. single 레이아웃은 영향
+  없음, double 레이아웃은 ~2배 빠름.
+- **시리즈 연속 읽기** — `ReaderViewModel.showsEndOfVolumeCard`는 순수
+  술어 `isAtLastPage && canGoNextVolume`. 대칭 prev 카드
+  (`showsPreviousVolumeCard`)는 transient cue
+  `wantsPreviousVolumePrompt`로 게이트되어 사용자 명시 의도(페이지 0에서
+  backward 누름, 또는 더 위에서 `goBackward()`로 0에 도달)가 있을 때만
+  arm. 이후 `currentPageIndex` 변경은 cue를 클리어하고, `load(url:)`은
+  새 책 로드 시 cue를 리셋해 새 권 첫 페이지에서 카드가 미리 뜨지
+  않도록 함. forward/backward 키보드 핸들러는 `advanceForward()` /
+  `goBackward()`로 라우팅되어, 매칭되는 카드가 떠 있을 때 한 번 누르면
+  권 이동.
 - **썸네일 캐시** — `ThumbnailLoader`가 `CGImageSourceCreateThumbnailAtIndex`로
   다운스케일된 NSImage 생성(풀 디코드 회피)하고 `NSCache`에 저장
   (`countLimit = 400`, `totalCostLimit ≈ 60 MB`). 썸네일 사이드바의
@@ -428,9 +468,12 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북�
   `UserDefaults.standard.dictionaryRepresentation()`을 한 번 스냅샷하고
   메모리 dict에서 모든 키를 읽어, 콜드 스타트 때 수십 개의 개별
   cross-process `UserDefaults` 호출 회피.
-- **디바운스된 위치 저장** — `currentPageIndex` didSet이 300 ms 디바운스된
-  `savePosition`을 예약해서 세로 스크롤의 ~60 Hz 페이지 변경이
-  `UserDefaults` 쓰기로 이어지지 않게 함. `NSApplication.willTerminateNotification`이
+- **디바운스된 위치 저장 + in-memory mirror** — `currentPageIndex`
+  didSet이 300 ms 디바운스된 `savePosition`을 예약해서 세로 스크롤의
+  ~60 Hz 페이지 변경이 `UserDefaults` 쓰기로 이어지지 않게 함. save와
+  read는 lazy in-memory mirror(`positionsCache`)를 거쳐서, 매 save가
+  저장된 모든 책의 dict를 read-modify-write하지 않고 작은 dict 변경 +
+  단일 `set(_:forKey:)`로 끝남. `NSApplication.willTerminateNotification`이
   종료 직전 `flushPositionImmediately`를 발화.
 - **Security-scoped 북마크** — 최근 항목과 즐겨찾기가 실행 간 유지되는 이유는
   `.withSecurityScope` 북마크를 생성하고 클릭 시 resolve하기 때문. 스코프
@@ -483,7 +526,7 @@ git push origin v1.0.0
 ### CI / 저장소
 
 - **CI**는 모든 push/PR에서 실행(`**/*.md`와 `docs/**` 제외), ad-hoc
-  서명으로 Debug 빌드, 168개 테스트 전부 실행, 아티팩트 업로드 없음 —
+  서명으로 Debug 빌드, 223개 테스트 전부 실행, 아티팩트 업로드 없음 —
   저장소 풋프린트는 사실상 0.
 - **릴리스**는 GitHub Releases에 `ditto`로 단일 zip(~5–10 MB)을 첨부하여
   리소스 포크 보존.

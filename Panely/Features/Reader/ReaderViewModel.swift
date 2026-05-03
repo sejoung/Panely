@@ -57,6 +57,14 @@ final class ReaderViewModel {
     /// (`currentPageIndex` didSet) and by `load(url:)`.
     var wantsPreviousVolumePrompt: Bool = false
 
+    /// In-memory mirror of the per-book positions dictionary. Lazy-loaded on
+    /// first access (single UserDefaults read), then mutated in place. Saves
+    /// were previously doing a read-modify-write of the entire dict on every
+    /// debounced fire — fine for one or two books, but linear in the number
+    /// of saved books. Mirror-and-write keeps each save O(1) memcpy plus one
+    /// `set(_:forKey:)` write.
+    var positionsCache: [String: Int]?
+
     let recentItems: RecentItemsStore
     let bookmarks: BookmarksStore
 
@@ -80,6 +88,12 @@ final class ReaderViewModel {
     let imageCache: NSCache<NSString, NSImage> = {
         let cache = NSCache<NSString, NSImage>()
         cache.countLimit = 10
+        // High-res scans (10000×14000 ≈ 600 MB decoded) could otherwise stack
+        // up to 6 GB RSS at the count limit. The byte cap means typical
+        // smaller pages stay cached up to the count limit, while a few huge
+        // pages get evicted before they pin too much memory. Per-entry cost
+        // is fed in by `cacheImage(_:for:)` based on pixel area × 4.
+        cache.totalCostLimit = 150 * 1024 * 1024
         return cache
     }()
     var preloadTask: Task<Void, Never>?

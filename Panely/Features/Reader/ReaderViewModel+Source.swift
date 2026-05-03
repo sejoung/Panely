@@ -414,15 +414,24 @@ extension ReaderViewModel {
     private func writePositionNow() {
         guard let url = currentSourceURL else { return }
         let key = positionKey(for: url)
-        var positions = UserDefaults.standard.dictionary(forKey: Self.positionsKey) as? [String: Int] ?? [:]
-        positions[key] = currentPageIndex
-        UserDefaults.standard.set(positions, forKey: Self.positionsKey)
+        var dict = loadedPositions()
+        dict[key] = currentPageIndex
+        positionsCache = dict
+        UserDefaults.standard.set(dict, forKey: Self.positionsKey)
     }
 
     func restoredIndex(for url: URL) -> Int {
         let key = positionKey(for: url)
-        let positions = UserDefaults.standard.dictionary(forKey: Self.positionsKey) as? [String: Int] ?? [:]
-        return positions[key] ?? 0
+        return loadedPositions()[key] ?? 0
+    }
+
+    /// Lazy hydration of the positions dict — first call pays the
+    /// UserDefaults syscall, subsequent calls hit the in-memory mirror.
+    private func loadedPositions() -> [String: Int] {
+        if let cached = positionsCache { return cached }
+        let loaded = UserDefaults.standard.dictionary(forKey: Self.positionsKey) as? [String: Int] ?? [:]
+        positionsCache = loaded
+        return loaded
     }
 
     func positionKey(for url: URL) -> String {

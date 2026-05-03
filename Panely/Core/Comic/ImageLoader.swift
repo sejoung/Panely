@@ -6,12 +6,51 @@ enum ImageLoaderError: Error {
 }
 
 nonisolated enum ImageLoader {
+    /// Loads and *eagerly* decodes the image on a background queue. The
+    /// previous `NSImage(data:)` path was lazy — decode happened on first
+    /// draw, typically on the main thread, causing visible hitches when
+    /// paging. `kCGImageSourceShouldCacheImmediately` forces ImageIO to
+    /// produce a fully-decoded `CGImage` here, off the main thread, so the
+    /// NSImage we return is render-ready.
+    ///
+    /// File URLs go straight through `CGImageSourceCreateWithURL` (zero-copy
+    /// mmap by ImageIO). Archive entries still need to materialize bytes via
+    /// the `ArchiveReader` actor before they can be decoded.
     static func load(_ page: ComicPage) async throws -> NSImage {
-        let data = try await loadData(for: page.source)
-        // Skip decode if the caller bailed while the data was being read —
-        // saves a relatively expensive NSImage decode for stale work.
-        try Task.checkCancellation()
-        return try await decode(data)
+        switch page.source {
+        case .file(let url):
+            return try await Task.detached(priority: .userInitiated) {
+                try Task.checkCancellation()
+                guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else {
+                    throw ImageLoaderError.decodingFailed
+                }
+                return try Self.decodeEagerly(from: src)
+            }.value
+
+        case .archiveEntry(let reader, let path):
+            let data = try await reader.loadData(at: path)
+            try Task.checkCancellation()
+            return try await Task.detached(priority: .userInitiated) {
+                guard let src = CGImageSourceCreateWithData(data as CFData, nil) else {
+                    throw ImageLoaderError.decodingFailed
+                }
+                return try Self.decodeEagerly(from: src)
+            }.value
+        }
+    }
+
+    /// Pulls a fully-decoded `CGImage` and wraps it in `NSImage`. The
+    /// `kCGImageSourceShouldCacheImmediately` option is the lever — without
+    /// it, the returned CGImage backs onto a deferred decoder and the work
+    /// gets paid by the main thread on first draw.
+    private static func decodeEagerly(from src: CGImageSource) throws -> NSImage {
+        let opts: [CFString: Any] = [
+            kCGImageSourceShouldCacheImmediately: true
+        ]
+        guard let cg = CGImageSourceCreateImageAtIndex(src, 0, opts as CFDictionary) else {
+            throw ImageLoaderError.decodingFailed
+        }
+        return NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
     }
 
     /// Reads only the image header to recover pixel dimensions — fast enough
@@ -41,27 +80,6 @@ nonisolated enum ImageLoader {
                 try Self.readDimensionsFromData(full)
             }.value
         }
-    }
-
-    private static func loadData(for source: ComicPageSource) async throws -> Data {
-        switch source {
-        case .file(let url):
-            return try await Task.detached(priority: .userInitiated) {
-                try Data(contentsOf: url, options: .mappedIfSafe)
-            }.value
-
-        case .archiveEntry(let reader, let path):
-            return try await reader.loadData(at: path)
-        }
-    }
-
-    private static func decode(_ data: Data) async throws -> NSImage {
-        try await Task.detached(priority: .userInitiated) {
-            guard let image = NSImage(data: data) else {
-                throw ImageLoaderError.decodingFailed
-            }
-            return image
-        }.value
     }
 
     private static func readDimensionsFromURL(_ url: URL) throws -> CGSize {
