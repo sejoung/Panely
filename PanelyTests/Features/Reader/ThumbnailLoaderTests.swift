@@ -1,6 +1,7 @@
 import Testing
 import AppKit
 import Foundation
+import ImageIO
 @testable import Panely
 
 @MainActor
@@ -77,12 +78,30 @@ struct ThumbnailLoaderTests {
         let pageA = ComicPage(source: .file(urlA), displayName: "a")
         let pageB = ComicPage(source: .file(urlB), displayName: "b")
 
+        let fm = FileManager.default
+        let pngABytes = pngA.count
+        let pngBBytes = pngB.count
+        let existsA = fm.fileExists(atPath: urlA.path)
+        let existsB = fm.fileExists(atPath: urlB.path)
+        let sizeA = (try? fm.attributesOfItem(atPath: urlA.path)[.size] as? Int) ?? -1
+        let sizeB = (try? fm.attributesOfItem(atPath: urlB.path)[.size] as? Int) ?? -1
+        let cgSrcA = CGImageSourceCreateWithURL(urlA as CFURL, nil) != nil
+        let cgSrcB = CGImageSourceCreateWithURL(urlB as CFURL, nil) != nil
+
         let imageA = await ThumbnailLoader.shared.thumbnail(for: pageA)
         let imageB = await ThumbnailLoader.shared.thumbnail(for: pageB)
 
         guard let imageA, let imageB else {
             Issue.record(
-                "expected both thumbnails to resolve. imageA=\(imageA == nil ? "nil" : "ok") imageB=\(imageB == nil ? "nil" : "ok") urlA=\(urlA.path) urlB=\(urlB.path)"
+                """
+                expected both thumbnails to resolve.
+                imageA=\(imageA == nil ? "nil" : "ok") imageB=\(imageB == nil ? "nil" : "ok")
+                pngABytes=\(pngABytes) pngBBytes=\(pngBBytes)
+                existsA=\(existsA) existsB=\(existsB) sizeOnDiskA=\(sizeA) sizeOnDiskB=\(sizeB)
+                cgSourceA=\(cgSrcA) cgSourceB=\(cgSrcB)
+                urlA=\(urlA.path)
+                urlB=\(urlB.path)
+                """
             )
             return
         }
