@@ -127,6 +127,42 @@ Panely는 Swift Package Manager를 사용합니다. 외부 의존성은 하나�
 
 Xcode가 첫 빌드에서 자동 해결합니다.
 
+## 파인더 연동
+
+Panely는 Finder에서 폴더 · `.cbz` · `.zip`을 바로 열 수 있도록 등록됩니다.
+
+- **파일** (`.cbz`, `.zip`) — 우클릭 → **다음으로 열기 → Panely**
+- **폴더** — macOS는 폴더에 "다음으로 열기"를 표시하지 않으므로
+  우클릭 → **서비스 → Open in Panely**, 또는 폴더를 Panely.app(또는 Dock
+  아이콘)에 드래그
+- **페이스트보드 URL** — Services 경로로 들어온 URL은 Powerbox로
+  샌드박스 권한이 부여되므로 추가 프롬프트 없이 바로 열림
+
+### 문제 해결
+
+설치 직후 우클릭 메뉴에 Panely가 안 보이거나, 옛 버전이 여러 개
+표시될 때:
+
+```bash
+# 1) 디스크에 등록된 모든 Panely.app 위치 확인
+mdfind "kMDItemCFBundleIdentifier == 'io.github.sejoung.Panely'"
+
+# 2) 안 쓰는 사본을 휴지통으로 보낸 뒤 휴지통도 비우기
+#    (DerivedData/Debug 빌드는 그대로 둬도 됨 — 다음 빌드 때 자동 재등록)
+
+# 3) Services 메뉴 캐시 갱신 + Finder 재시작
+/System/Library/CoreServices/pbs -update && killall -KILL Finder
+
+# 4) 그래도 여러 버전이 보이면 LaunchServices DB 초기화
+/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister -kill -r -domain local -domain system -domain user
+```
+
+Release 빌드를 `/Applications`에 두는 게 가장 안정적입니다 —
+DerivedData의 Debug 빌드는 LaunchServices가 보통 후순위로 노출합니다.
+다운받은 zip을 더블클릭하면 Archive Utility 임시 폴더에 풀어둔 사본이
+LaunchServices 캐시에 남을 수 있으니, 우클릭 → "다음으로 압축 해제"로
+풀어 바로 `/Applications`에 옮기는 걸 권장합니다.
+
 ## 단축키와 제스처
 
 | 입력 | 동작 |

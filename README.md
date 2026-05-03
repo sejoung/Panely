@@ -134,6 +134,45 @@ Panely uses Swift Package Manager. The only external dependency is:
 
 Xcode resolves it automatically on first build.
 
+## Finder integration
+
+Panely registers itself as a handler for folders, `.cbz`, and `.zip` so
+you can open them straight from Finder.
+
+- **Files** (`.cbz`, `.zip`) — right-click → **Open With → Panely**
+- **Folders** — macOS does not surface "Open With" for folders, so
+  right-click → **Services → Open in Panely**, or drag the folder onto
+  the Panely.app icon (or its Dock icon)
+- **Pasteboard URLs** — URLs delivered through the Services path are
+  granted sandbox access via Powerbox, so they open without an extra
+  permission prompt
+
+### Troubleshooting
+
+If Panely doesn't appear in the right-click menu, or you see several
+versions listed:
+
+```bash
+# 1) Find every Panely.app the system knows about
+mdfind "kMDItemCFBundleIdentifier == 'io.github.sejoung.Panely'"
+
+# 2) Move stale copies to the trash and empty it
+#    (DerivedData/Debug builds can stay — they re-register on next build)
+
+# 3) Refresh the Services menu cache and restart Finder
+/System/Library/CoreServices/pbs -update && killall -KILL Finder
+
+# 4) If duplicates persist, rebuild the LaunchServices database
+/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister -kill -r -domain local -domain system -domain user
+```
+
+Keeping a Release build in `/Applications` is the most stable setup —
+LaunchServices typically deprioritizes Debug builds in DerivedData.
+Double-clicking a downloaded zip can leave a stray copy in Archive
+Utility's temp folder that lingers in the LaunchServices cache, so
+prefer right-click → "Open With → Archive Utility" (or unzip in
+Terminal) and move the result straight to `/Applications`.
+
 ## Shortcuts &amp; Gestures
 
 | Input | Action |
