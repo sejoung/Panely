@@ -314,6 +314,25 @@ extension ReaderViewModel {
             .appendingPathComponent("panely-\(UUID().uuidString)", isDirectory: true)
     }
 
+    /// Sweep `panely-*` directories left behind by a prior session that
+    /// crashed or was force-quit before `cleanupTempDir()` could run. A
+    /// single zip-in-zip extraction can be hundreds of megabytes, and macOS
+    /// only sweeps the sandbox tmp opportunistically (not on every launch),
+    /// so leftovers can quietly accumulate. Safe to call only at startup —
+    /// it makes no attempt to spare an in-flight extraction.
+    nonisolated static func cleanupStaleTempDirs() {
+        let tmpRoot = FileManager.default.temporaryDirectory
+        guard let entries = try? FileManager.default.contentsOfDirectory(
+            at: tmpRoot,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else { return }
+
+        for entry in entries where entry.lastPathComponent.hasPrefix("panely-") {
+            try? FileManager.default.removeItem(at: entry)
+        }
+    }
+
     // MARK: - Per-book position memory
 
     /// Scheduled from the `currentPageIndex` didSet. Debounces the actual

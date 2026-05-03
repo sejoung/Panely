@@ -218,6 +218,13 @@ final class ReaderViewModel {
         isFullyInitialized = true
 
         observeAppTermination()
+
+        // Fire-and-forget: a previous session may have crashed mid-extraction
+        // and orphaned a `panely-*` temp dir. Do this off the main actor so
+        // a slow tmp scan doesn't delay first paint.
+        Task.detached(priority: .background) {
+            Self.cleanupStaleTempDirs()
+        }
     }
 
     /// Flush any pending debounced save when the process is about to exit.

@@ -162,6 +162,38 @@ struct ReaderViewModelLibraryTests {
         #expect(vm.libraryRootURL == nil)
     }
 
+    // MARK: - cleanupStaleTempDirs
+
+    @Test func cleanupStaleTempDirsRemovesPanelyPrefixedAndSparesOthers() throws {
+        // Mimics the on-launch sweep: a previous crash leaves a `panely-*`
+        // dir behind, while unrelated tmp entries (other apps, the user's
+        // own files) must survive. The prefix check is the only signal we
+        // have, so this is the contract.
+        let tmpRoot = FileManager.default.temporaryDirectory
+        let stale = tmpRoot.appendingPathComponent(
+            "panely-stale-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        let unrelated = tmpRoot.appendingPathComponent(
+            "notpanely-keep-\(UUID().uuidString)",
+            isDirectory: true
+        )
+
+        try FileManager.default.createDirectory(at: stale, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: unrelated, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: stale)
+            try? FileManager.default.removeItem(at: unrelated)
+        }
+
+        ReaderViewModel.cleanupStaleTempDirs()
+
+        #expect(!FileManager.default.fileExists(atPath: stale.path),
+                "Stale panely-* dir must be removed")
+        #expect(FileManager.default.fileExists(atPath: unrelated.path),
+                "Non-panely tmp entries must be left alone")
+    }
+
     @Test func libraryRootURLUsesOpenedFolderItselfWhenDirectory() throws {
         // Drag-drop / Open With on a folder: Powerbox grants the sandbox
         // scope on exactly that URL. Climbing to the parent would silently
