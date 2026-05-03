@@ -45,8 +45,15 @@ extension ReaderViewModel {
         // it as the library root would duplicate that listing in the Files
         // tree. `openedSourceURL` keeps the user's actual library location
         // visible while Volumes covers the in-archive volumes.
+        //
+        // For a directory entry (drag-drop, Open With on a folder, picking a
+        // folder via Open…) use the folder itself, not its parent. The
+        // sandbox grant from Powerbox is scoped to exactly that URL, so the
+        // parent is unreadable — `contentsOfDirectory` silently fails and
+        // the Files tree shows the misleading "No books to show" prompt.
         if let opened = openedSourceURL {
-            return opened.deletingLastPathComponent()
+            let isDir = (try? opened.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
+            return isDir ? opened : opened.deletingLastPathComponent()
         }
         return currentSourceURL?.deletingLastPathComponent()
     }

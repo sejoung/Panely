@@ -162,6 +162,23 @@ struct ReaderViewModelLibraryTests {
         #expect(vm.libraryRootURL == nil)
     }
 
+    @Test func libraryRootURLUsesOpenedFolderItselfWhenDirectory() throws {
+        // Drag-drop / Open With on a folder: Powerbox grants the sandbox
+        // scope on exactly that URL. Climbing to the parent would silently
+        // hit a permission wall (FileManager returns []) and the sidebar
+        // would render the misleading "No books to show" prompt. The opened
+        // folder itself must be the library root.
+        let vm = ReaderViewModel()
+        let droppedFolder = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: droppedFolder) }
+
+        vm.explicitLibraryRootURL = nil
+        vm.openedSourceURL = droppedFolder
+        vm.currentSourceURL = droppedFolder
+
+        #expect(vm.libraryRootURL?.standardizedFileURL == droppedFolder.standardizedFileURL)
+    }
+
     // MARK: - hasMultipleVolumes
 
     @Test func hasMultipleVolumesReflectsSiblingCount() {
