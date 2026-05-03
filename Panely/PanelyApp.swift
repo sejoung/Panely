@@ -13,6 +13,9 @@ struct PanelyApp: App {
                 .environment(viewModel)
                 .environment(viewerController)
                 .preferredColorScheme(.dark)
+                .onOpenURL { url in
+                    viewModel.openURL(url)
+                }
         }
         .windowStyle(.hiddenTitleBar)
         .commands { panelyCommands }
