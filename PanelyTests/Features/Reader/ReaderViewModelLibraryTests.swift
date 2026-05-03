@@ -194,6 +194,20 @@ struct ReaderViewModelLibraryTests {
                 "Non-panely tmp entries must be left alone")
     }
 
+    @Test func fixtureTempDirNamespaceDoesNotCollideWithCleanupSweep() throws {
+        // Regression guard for the race that hit CI: if `Fixture.makeTempDir`
+        // ever produces a name matching the `panely-*` sweep above, parallel
+        // tests lose their fixture files mid-await. Either side widening its
+        // namespace must trip this.
+        let dir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        #expect(
+            !dir.lastPathComponent.hasPrefix("panely-"),
+            "Fixture dir \(dir.lastPathComponent) collides with cleanupStaleTempDirs()'s panely-* prefix"
+        )
+    }
+
     @Test func libraryRootURLUsesOpenedFolderItselfWhenDirectory() throws {
         // Drag-drop / Open With on a folder: Powerbox grants the sandbox
         // scope on exactly that URL. Climbing to the parent would silently

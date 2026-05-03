@@ -1,7 +1,6 @@
 import Testing
 import AppKit
 import Foundation
-import ImageIO
 @testable import Panely
 
 @MainActor
@@ -64,12 +63,8 @@ struct ThumbnailLoaderTests {
         let dir = try Fixture.makeTempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
 
-        // Distinct dimensions so ImageIO can't return the same backing
-        // CGImage from a content-addressable cache — otherwise the two
-        // NSImages may share a rep and compare equal by identity under
-        // sandboxed CI.
         let pngA = try Fixture.makePNG(width: 100, height: 100)
-        let pngB = try Fixture.makePNG(width: 120, height: 80)
+        let pngB = try Fixture.makePNG(width: 100, height: 100)
         let urlA = dir.appendingPathComponent("a-\(UUID().uuidString).png")
         let urlB = dir.appendingPathComponent("b-\(UUID().uuidString).png")
         try pngA.write(to: urlA)
@@ -78,43 +73,15 @@ struct ThumbnailLoaderTests {
         let pageA = ComicPage(source: .file(urlA), displayName: "a")
         let pageB = ComicPage(source: .file(urlB), displayName: "b")
 
-        let opts: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceShouldCacheImmediately: true,
-            kCGImageSourceThumbnailMaxPixelSize: 480
-        ]
-        let manualThumbA = CGImageSourceCreateWithURL(urlA as CFURL, nil)
-            .flatMap { CGImageSourceCreateThumbnailAtIndex($0, 0, opts as CFDictionary) }
-        let manualThumbB = CGImageSourceCreateWithURL(urlB as CFURL, nil)
-            .flatMap { CGImageSourceCreateThumbnailAtIndex($0, 0, opts as CFDictionary) }
-
         let imageA = await ThumbnailLoader.shared.thumbnail(for: pageA)
         let imageB = await ThumbnailLoader.shared.thumbnail(for: pageB)
 
-        // Same options, called *after* the loader, on MainActor — confirms
-        // whether failure was specific to the detached-task path.
-        let manualThumbBPost = CGImageSourceCreateWithURL(urlB as CFURL, nil)
-            .flatMap { CGImageSourceCreateThumbnailAtIndex($0, 0, opts as CFDictionary) }
-
         guard let imageA, let imageB else {
-            Issue.record(
-                """
-                expected both thumbnails to resolve.
-                imageA=\(imageA == nil ? "nil" : "ok") imageB=\(imageB == nil ? "nil" : "ok")
-                manualThumbA=\(manualThumbA == nil ? "nil" : "ok")
-                manualThumbB=\(manualThumbB == nil ? "nil" : "ok")
-                manualThumbBPost=\(manualThumbBPost == nil ? "nil" : "ok")
-                urlA=\(urlA.path)
-                urlB=\(urlB.path)
-                """
-            )
+            Issue.record("expected both thumbnails to resolve")
             return
         }
-        // Different `ComicPage.id`s must yield distinct cache entries.
-        #expect(
-            imageA !== imageB,
-            "thumbnails collided: pageA.id=\(pageA.id) pageB.id=\(pageB.id) sizeA=\(imageA.size) sizeB=\(imageB.size) idA=\(ObjectIdentifier(imageA)) idB=\(ObjectIdentifier(imageB))"
-        )
+        // Different `ComicPage.id`s must yield distinct cache entries even
+        // when the underlying pixel data is identical.
+        #expect(imageA !== imageB)
     }
 }
