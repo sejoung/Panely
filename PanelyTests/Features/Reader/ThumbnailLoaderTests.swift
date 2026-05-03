@@ -78,27 +78,33 @@ struct ThumbnailLoaderTests {
         let pageA = ComicPage(source: .file(urlA), displayName: "a")
         let pageB = ComicPage(source: .file(urlB), displayName: "b")
 
-        let fm = FileManager.default
-        let pngABytes = pngA.count
-        let pngBBytes = pngB.count
-        let existsA = fm.fileExists(atPath: urlA.path)
-        let existsB = fm.fileExists(atPath: urlB.path)
-        let sizeA = (try? fm.attributesOfItem(atPath: urlA.path)[.size] as? Int) ?? -1
-        let sizeB = (try? fm.attributesOfItem(atPath: urlB.path)[.size] as? Int) ?? -1
-        let cgSrcA = CGImageSourceCreateWithURL(urlA as CFURL, nil) != nil
-        let cgSrcB = CGImageSourceCreateWithURL(urlB as CFURL, nil) != nil
+        let opts: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: 480
+        ]
+        let manualThumbA = CGImageSourceCreateWithURL(urlA as CFURL, nil)
+            .flatMap { CGImageSourceCreateThumbnailAtIndex($0, 0, opts as CFDictionary) }
+        let manualThumbB = CGImageSourceCreateWithURL(urlB as CFURL, nil)
+            .flatMap { CGImageSourceCreateThumbnailAtIndex($0, 0, opts as CFDictionary) }
 
         let imageA = await ThumbnailLoader.shared.thumbnail(for: pageA)
         let imageB = await ThumbnailLoader.shared.thumbnail(for: pageB)
+
+        // Same options, called *after* the loader, on MainActor — confirms
+        // whether failure was specific to the detached-task path.
+        let manualThumbBPost = CGImageSourceCreateWithURL(urlB as CFURL, nil)
+            .flatMap { CGImageSourceCreateThumbnailAtIndex($0, 0, opts as CFDictionary) }
 
         guard let imageA, let imageB else {
             Issue.record(
                 """
                 expected both thumbnails to resolve.
                 imageA=\(imageA == nil ? "nil" : "ok") imageB=\(imageB == nil ? "nil" : "ok")
-                pngABytes=\(pngABytes) pngBBytes=\(pngBBytes)
-                existsA=\(existsA) existsB=\(existsB) sizeOnDiskA=\(sizeA) sizeOnDiskB=\(sizeB)
-                cgSourceA=\(cgSrcA) cgSourceB=\(cgSrcB)
+                manualThumbA=\(manualThumbA == nil ? "nil" : "ok")
+                manualThumbB=\(manualThumbB == nil ? "nil" : "ok")
+                manualThumbBPost=\(manualThumbBPost == nil ? "nil" : "ok")
                 urlA=\(urlA.path)
                 urlB=\(urlB.path)
                 """
