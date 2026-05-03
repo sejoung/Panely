@@ -46,6 +46,19 @@ extension ReaderViewModel {
         scheduleRefreshIfPaged()
     }
 
+    /// Forward action for keyboard / space-bar handlers. When the
+    /// end-of-volume card is showing, the user has already seen the cue, so
+    /// pressing forward advances to the next sibling instead of no-oping.
+    /// Toolbar buttons keep `next()` / `nextVolume()` separate so users can
+    /// page within the final spread without auto-jumping books.
+    func advanceForward() {
+        if showsEndOfVolumeCard {
+            nextVolume()
+        } else {
+            next()
+        }
+    }
+
     func previous() {
         let target = currentPageIndex - navigationStep
         guard target >= 0 else {

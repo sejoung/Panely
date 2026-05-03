@@ -136,6 +136,7 @@ struct ReaderScene: View {
             }
             .overlay(alignment: .top) { toolbarOverlay }
             .overlay(alignment: .bottom) { sliderOverlay }
+            .overlay(alignment: .bottom) { endOfVolumeOverlay }
             .onContinuousHover { phase in
                 switch phase {
                 case .active(let location):
@@ -150,15 +151,15 @@ struct ReaderScene: View {
             .focused($isFocused)
             .focusEffectDisabled()
             .onKeyPress(.leftArrow) {
-                viewModel.effectiveDirection.isRTL ? viewModel.next() : viewModel.previous()
+                viewModel.effectiveDirection.isRTL ? viewModel.advanceForward() : viewModel.previous()
                 return .handled
             }
             .onKeyPress(.rightArrow) {
-                viewModel.effectiveDirection.isRTL ? viewModel.previous() : viewModel.next()
+                viewModel.effectiveDirection.isRTL ? viewModel.previous() : viewModel.advanceForward()
                 return .handled
             }
             .onKeyPress(.space) {
-                viewModel.next()
+                viewModel.advanceForward()
                 return .handled
             }
             .onKeyPress(.escape) {
@@ -214,6 +215,24 @@ struct ReaderScene: View {
         .opacity(toolbarShown ? 1 : 0)
         .allowsHitTesting(toolbarShown)
         .animation(PanelyMotion.uiReveal, value: toolbarShown)
+    }
+
+    @ViewBuilder
+    private var endOfVolumeOverlay: some View {
+        if viewModel.showsEndOfVolumeCard, let name = viewModel.nextVolumeDisplayName {
+            EndOfVolumeCard(
+                nextVolumeName: name,
+                onNext: {
+                    viewModel.nextVolume()
+                    isFocused = true
+                },
+                onRestart: {
+                    viewModel.restartCurrentVolume()
+                    isFocused = true
+                }
+            )
+            .animation(PanelyMotion.uiReveal, value: viewModel.showsEndOfVolumeCard)
+        }
     }
 
     @ViewBuilder

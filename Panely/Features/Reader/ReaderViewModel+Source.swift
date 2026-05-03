@@ -82,6 +82,38 @@ extension ReaderViewModel {
         Task { await load(url: target, knownSiblings: preservedSiblings) }
     }
 
+    // MARK: - End-of-volume card
+
+    /// True when the user is on the final page/spread — i.e., when `next()`
+    /// would no-op. Mirrors `next()`'s guard exactly so the card appears
+    /// precisely when forward navigation runs out, in both paged and vertical
+    /// layouts.
+    var isAtLastPage: Bool {
+        let count = source.pageCount
+        guard count > 0 else { return false }
+        return currentPageIndex + navigationStep >= count
+    }
+
+    /// Drives the end-of-volume card. Visible only when there's a next sibling
+    /// to advance to — last volume in a series shows nothing rather than a
+    /// "completion" toast (kept simple for v1).
+    var showsEndOfVolumeCard: Bool {
+        isAtLastPage && canGoNextVolume
+    }
+
+    /// Filename (no extension) of the next sibling. Used as the card's
+    /// preview label so users see *which* volume they'd advance to.
+    var nextVolumeDisplayName: String? {
+        guard canGoNextVolume, let idx = currentSiblingIndex else { return nil }
+        return siblings[idx + 1].deletingPathExtension().lastPathComponent
+    }
+
+    /// Restart the current volume from page 1. Used by the card's secondary
+    /// action so users can re-read without picking from the slider.
+    func restartCurrentVolume() {
+        jump(toPageNumber: 1)
+    }
+
     // MARK: - Opening new sources
 
     func openSource() {
