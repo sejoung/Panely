@@ -16,11 +16,6 @@ struct PanelyApp: App {
                 .onOpenURL { url in
                     viewModel.openURL(url)
                 }
-                .onReceive(NotificationCenter.default.publisher(for: .panelyOpenURLRequested)) { notification in
-                    if let url = notification.object as? URL {
-                        viewModel.openURL(url)
-                    }
-                }
         }
         .windowStyle(.hiddenTitleBar)
         .commands { panelyCommands }
@@ -172,18 +167,7 @@ struct PanelyApp: App {
 /// Quits the app when the last (and only) window is closed. Panely is a
 /// single-window viewer — keeping the process alive with no window visible
 /// would leave users wondering why the red close button "only minimizes".
-///
-/// Also owns the `NSServices` provider lifetime — the Finder right-click →
-/// Services → "Open in Panely" entry is wired here. Holding a strong
-/// reference keeps the provider alive for AppKit's services dispatcher
-/// (which only weakly references the registered object).
 final class PanelyAppDelegate: NSObject, NSApplicationDelegate {
-    private let serviceProvider = PanelyServiceProvider()
-
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.servicesProvider = serviceProvider
-    }
-
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
     }

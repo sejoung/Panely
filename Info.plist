@@ -63,24 +63,6 @@
 			</array>
 		</dict>
 	</array>
-	<key>NSServices</key>
-	<array>
-		<dict>
-			<key>NSMenuItem</key>
-			<dict>
-				<key>default</key>
-				<string>Open in Panely</string>
-			</dict>
-			<key>NSMessage</key>
-			<string>openInPanely</string>
-			<key>NSPortName</key>
-			<string>Panely</string>
-			<key>NSSendTypes</key>
-			<array>
-				<string>public.file-url</string>
-			</array>
-		</dict>
-	</array>
 	<key>UTImportedTypeDeclarations</key>
 	<array>
 		<dict>

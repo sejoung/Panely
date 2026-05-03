@@ -399,7 +399,7 @@
           <path d="M9 13l2 2 4-4"/>
         </svg>
         <h3>Open straight from Finder</h3>
-        <p>Right-click any <code>.cbz</code> or <code>.zip</code> &rarr; <strong>Open With &rarr; Panely</strong>. For folders, use <strong>Services &rarr; Open in Panely</strong> or drag onto the app icon.</p>
+        <p>Right-click any <code>.cbz</code> or <code>.zip</code> &rarr; <strong>Open With &rarr; Panely</strong>. Drop a folder onto the app icon to open it directly.</p>
       </div>
     </div>
   </div>
@@ -418,12 +418,12 @@
           <pre><code>mdfind "kMDItemCFBundleIdentifier == 'io.github.sejoung.Panely'"</code></pre>
         </li>
         <li>
-          <span class="step-label">Refresh the Services menu &amp; restart Finder</span>
-          <pre><code>/System/Library/CoreServices/pbs -update &amp;&amp; killall -KILL Finder</code></pre>
+          <span class="step-label">Trash any stale copies, then rebuild the LaunchServices database</span>
+          <pre><code>/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister -kill -r -domain local -domain system -domain user</code></pre>
         </li>
         <li>
-          <span class="step-label">If duplicates remain, rebuild the LaunchServices database</span>
-          <pre><code>/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister -kill -r -domain local -domain system -domain user</code></pre>
+          <span class="step-label">Restart Finder to pick up the refreshed registrations</span>
+          <pre><code>killall -KILL Finder</code></pre>
         </li>
       </ol>
       <p class="finder-help-note">Tip: keep a single Release build in <code>/Applications</code> — LaunchServices deprioritizes Debug builds in DerivedData.</p>

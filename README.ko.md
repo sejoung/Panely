@@ -133,15 +133,12 @@ Panely는 Finder에서 폴더 · `.cbz` · `.zip`을 바로 열 수 있도록 �
 
 - **파일** (`.cbz`, `.zip`) — 우클릭 → **다음으로 열기 → Panely**
 - **폴더** — macOS는 폴더에 "다음으로 열기"를 표시하지 않으므로
-  우클릭 → **서비스 → Open in Panely**, 또는 폴더를 Panely.app(또는 Dock
-  아이콘)에 드래그
-- **페이스트보드 URL** — Services 경로로 들어온 URL은 Powerbox로
-  샌드박스 권한이 부여되므로 추가 프롬프트 없이 바로 열림
+  폴더를 Panely.app(또는 Dock 아이콘)에 **드래그**, 혹은 메뉴바
+  **파일 → 다음으로 열기 → Panely**
 
 ### 문제 해결
 
-설치 직후 우클릭 메뉴에 Panely가 안 보이거나, 옛 버전이 여러 개
-표시될 때:
+우클릭 메뉴에 Panely가 안 보이거나 옛 버전이 여러 개 보일 때:
 
 ```bash
 # 1) 디스크에 등록된 모든 Panely.app 위치 확인
@@ -150,11 +147,9 @@ mdfind "kMDItemCFBundleIdentifier == 'io.github.sejoung.Panely'"
 # 2) 안 쓰는 사본을 휴지통으로 보낸 뒤 휴지통도 비우기
 #    (DerivedData/Debug 빌드는 그대로 둬도 됨 — 다음 빌드 때 자동 재등록)
 
-# 3) Services 메뉴 캐시 갱신 + Finder 재시작
-/System/Library/CoreServices/pbs -update && killall -KILL Finder
-
-# 4) 그래도 여러 버전이 보이면 LaunchServices DB 초기화
+# 3) LaunchServices DB 초기화 + Finder 재시작
 /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister -kill -r -domain local -domain system -domain user
+killall -KILL Finder
 ```
 
 Release 빌드를 `/Applications`에 두는 게 가장 안정적입니다 —

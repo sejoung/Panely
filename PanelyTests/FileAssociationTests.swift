@@ -53,30 +53,6 @@ struct FileAssociationTests {
 
     // MARK: - UTImportedTypeDeclarations
 
-    // MARK: - NSServices
-
-    @Test func registersOpenInPanelyService() {
-        // Folders don't surface in Finder's "Open With" submenu, so the
-        // Services menu is the right-click entry point we expose for them.
-        // A typo in NSMessage / NSPortName silently breaks the wire-up at
-        // runtime — these checks fail loudly at build time instead.
-        let services = info["NSServices"] as? [[String: Any]] ?? []
-        let openService = services.first { service in
-            let menu = service["NSMenuItem"] as? [String: String]
-            return menu?["default"] == "Open in Panely"
-        }
-
-        #expect(openService != nil, "Missing 'Open in Panely' service in NSServices")
-
-        // NSMessage must match the @objc selector on PanelyServiceProvider.
-        // If the strings drift apart, AppKit will silently no-op the menu pick.
-        #expect(openService?["NSMessage"] as? String == "openInPanely")
-        #expect(openService?["NSPortName"] as? String == "Panely")
-
-        let sendTypes = openService?["NSSendTypes"] as? [String] ?? []
-        #expect(sendTypes.contains("public.file-url"))
-    }
-
     @Test func declaresCBZUTIConformingToZip() {
         let imported = info["UTImportedTypeDeclarations"] as? [[String: Any]] ?? []
         let cbz = imported.first {
