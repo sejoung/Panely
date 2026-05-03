@@ -63,8 +63,12 @@ struct ThumbnailLoaderTests {
         let dir = try Fixture.makeTempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
 
+        // Distinct dimensions so ImageIO can't return the same backing
+        // CGImage from a content-addressable cache — otherwise the two
+        // NSImages may share a rep and compare equal by identity under
+        // sandboxed CI.
         let pngA = try Fixture.makePNG(width: 100, height: 100)
-        let pngB = try Fixture.makePNG(width: 100, height: 100)
+        let pngB = try Fixture.makePNG(width: 120, height: 80)
         let urlA = dir.appendingPathComponent("a-\(UUID().uuidString).png")
         let urlB = dir.appendingPathComponent("b-\(UUID().uuidString).png")
         try pngA.write(to: urlA)
@@ -80,8 +84,7 @@ struct ThumbnailLoaderTests {
             Issue.record("expected both thumbnails to resolve")
             return
         }
-        // Different `ComicPage.id`s must yield distinct cache entries even
-        // when the underlying pixel data is identical.
+        // Different `ComicPage.id`s must yield distinct cache entries.
         #expect(imageA !== imageB)
     }
 }
