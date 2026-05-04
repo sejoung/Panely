@@ -189,7 +189,7 @@ struct ReaderScene: View {
             onOpen: { viewModel.openSource() },
             onPrev: { viewModel.previous() },
             onNext: { viewModel.next() },
-            onToggleLayout: { viewModel.toggleLayout() },
+            onSetLayout: { viewModel.setLayout($0) },
             onToggleDirection: { viewModel.toggleDirection() },
             onToggleFitMode: { viewModel.toggleFitMode() },
             onToggleSidebarPin: { viewModel.toggleSidebarPin() },

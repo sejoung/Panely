@@ -41,7 +41,8 @@ pages.
 
 ### Reading
 - **Single page**, **double-page spread**, and **vertical scroll** (webtoon)
-  layouts — toolbar button cycles `single → double → vertical → single`
+  layouts — segmented toolbar control picks the mode directly (no cycle
+  round-trip through `vertical`); `⌘⇧1` / `⌘⇧2` / `⌘⇧3` for keyboard
 - **Left-to-right** or **right-to-left** reading (manga-friendly). RTL is
   ignored in vertical mode (webtoons are top-to-bottom) and the direction
   toggle disables itself there
@@ -187,6 +188,7 @@ Terminal) and move the result straight to `/Applications`.
 | `⌘D` | Add / remove page bookmark |
 | `⌘⇧D` | Add / remove current book from favorites |
 | `⌘⇧[` / `⌘⇧]` | Previous / next page bookmark within the current book |
+| `⌘⇧1` / `⌘⇧2` / `⌘⇧3` | Single page / double page / vertical scroll layout |
 | `⌘1` / `⌘2` / `⌘3` | Fit to screen / fit to width / fit to height |
 | `⌘+` / `⌘-` | Zoom in / out (one step, viewport-centered) |
 | `⌘0` | Reset zoom to current fit mode |

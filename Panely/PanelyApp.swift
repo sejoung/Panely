@@ -69,6 +69,26 @@ struct PanelyApp: App {
 
                 Divider()
 
+                Button("Single Page") {
+                    viewModel.setLayout(.single)
+                }
+                .keyboardShortcut("1", modifiers: [.command, .shift])
+                .disabled(viewModel.layout == .single)
+
+                Button("Double Page") {
+                    viewModel.setLayout(.double)
+                }
+                .keyboardShortcut("2", modifiers: [.command, .shift])
+                .disabled(viewModel.layout == .double)
+
+                Button("Vertical Scroll") {
+                    viewModel.setLayout(.vertical)
+                }
+                .keyboardShortcut("3", modifiers: [.command, .shift])
+                .disabled(viewModel.layout == .vertical)
+
+                Divider()
+
                 Button("Fit to Screen") {
                     viewModel.fitMode = .fitScreen
                 }

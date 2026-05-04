@@ -143,6 +143,16 @@ extension ReaderViewModel {
         layout = layout.next
     }
 
+    /// Direct layout selection — used by the segmented toolbar control and
+    /// the `⌘⇧1/2/3` menu shortcuts. Skips the cycle path so a user going
+    /// from `.vertical` to `.double` doesn't transit through `.single`,
+    /// which would otherwise re-run `handleLayoutChange` twice and reset
+    /// fit/zoom/scroll state along the way.
+    func setLayout(_ target: PageLayout) {
+        guard layout != target else { return }
+        layout = target
+    }
+
     func toggleDirection() {
         // Vertical strips have no left/right semantics — let the user keep
         // their preference for when they return to a paged layout.

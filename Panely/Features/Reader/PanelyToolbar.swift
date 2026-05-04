@@ -8,7 +8,7 @@ struct PanelyToolbar: View {
     let onOpen: () -> Void
     let onPrev: () -> Void
     let onNext: () -> Void
-    let onToggleLayout: () -> Void
+    let onSetLayout: (PageLayout) -> Void
     let onToggleDirection: () -> Void
     let onToggleFitMode: () -> Void
     let onToggleSidebarPin: () -> Void
@@ -57,12 +57,30 @@ struct PanelyToolbar: View {
                 .frame(height: 18)
                 .padding(.horizontal, PanelySpacing.xs)
 
+            // Segmented layout picker. One tap to switch directly to any
+            // mode — no cycle round-trip that would otherwise drag the user
+            // through `vertical` (the destructive transition) just to get
+            // from `single` to `double`.
             PanelyIconButton(
-                systemImage: layoutSymbol,
-                isActive: layout == .double,
-                action: onToggleLayout
+                systemImage: "rectangle.portrait",
+                isActive: layout == .single,
+                action: { onSetLayout(.single) }
             )
-            .help(layoutHelp)
+            .help("Single Page (⌘⇧1)")
+
+            PanelyIconButton(
+                systemImage: "rectangle.split.2x1",
+                isActive: layout == .double,
+                action: { onSetLayout(.double) }
+            )
+            .help("Double Page (⌘⇧2)")
+
+            PanelyIconButton(
+                systemImage: "arrow.up.and.down",
+                isActive: layout == .vertical,
+                action: { onSetLayout(.vertical) }
+            )
+            .help("Vertical Scroll (⌘⇧3)")
 
             PanelyIconButton(
                 systemImage: directionSymbol,
@@ -160,24 +178,8 @@ struct PanelyToolbar: View {
         )
     }
 
-    private var layoutSymbol: String {
-        switch layout {
-        case .single:   return "rectangle.portrait"
-        case .double:   return "rectangle.split.2x1"
-        case .vertical: return "arrow.up.and.down"
-        }
-    }
-
     private var directionSymbol: String {
         direction.isRTL ? "arrow.left" : "arrow.right"
-    }
-
-    private var layoutHelp: String {
-        switch layout {
-        case .single:   return "Switch to Double Page"
-        case .double:   return "Switch to Vertical Scroll"
-        case .vertical: return "Switch to Single Page"
-        }
     }
 
     private var directionHelp: String {
@@ -221,7 +223,7 @@ struct PanelyToolbar: View {
         onOpen: {},
         onPrev: {},
         onNext: {},
-        onToggleLayout: {},
+        onSetLayout: { _ in },
         onToggleDirection: {},
         onToggleFitMode: {},
         onToggleSidebarPin: {},
