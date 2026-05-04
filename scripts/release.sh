@@ -129,8 +129,14 @@ else
     # actual test failures stay visible. Don't grep for specific result
     # markers — that hides anything that doesn't match the assumed format
     # and was the cause of false-positive "tests failed" reports.
+    #
+    # `clean test` (not just `test`) — releases are infrequent and the
+    # extra ~30 s of from-scratch build is cheap insurance against stale
+    # DerivedData states that occasionally desync the codesign phase
+    # (e.g., "code object is not signed at all" on Panely.app because
+    # PanelyTests.xctest's own CodeSign step got skipped on incremental).
     set +e
-    xcodebuild test \
+    xcodebuild clean test \
         -project Panely.xcodeproj \
         -scheme Panely \
         -destination "$destination" \
