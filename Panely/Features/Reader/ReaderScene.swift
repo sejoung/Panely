@@ -191,7 +191,7 @@ struct ReaderScene: View {
             onNext: { viewModel.next() },
             onSetLayout: { viewModel.setLayout($0) },
             onToggleDirection: { viewModel.toggleDirection() },
-            onToggleFitMode: { viewModel.toggleFitMode() },
+            onSetFitMode: { viewModel.setFitMode($0) },
             onToggleSidebarPin: { viewModel.toggleSidebarPin() },
             onZoomIn: { viewerController.zoomIn() },
             onZoomOut: { viewerController.zoomOut() },

@@ -63,4 +63,43 @@ struct ReaderViewModelSetLayoutTests {
         vm.setLayout(.double)
         #expect(vm.fitMode == .fitWidth)
     }
+
+    // MARK: setFitMode
+
+    @Test func setFitModeSwitchesToTarget() {
+        let vm = ReaderViewModel()
+        vm.fitMode = .fitScreen
+
+        vm.setFitMode(.fitHeight)
+        #expect(vm.fitMode == .fitHeight)
+    }
+
+    @Test func setFitModeNoOpsWhenAlreadyAtTarget() {
+        let vm = ReaderViewModel()
+        vm.fitMode = .fitWidth
+
+        vm.setFitMode(.fitWidth)
+        #expect(vm.fitMode == .fitWidth)
+    }
+
+    @Test func setFitModeGoesDirectlyAcrossModesWithoutCycling() {
+        // Same selling point as setLayout: fitScreen → fitHeight skips the
+        // fitWidth detour that `toggleFitMode()` would take.
+        let vm = ReaderViewModel()
+        vm.fitMode = .fitScreen
+
+        vm.setFitMode(.fitHeight)
+        #expect(vm.fitMode == .fitHeight)
+    }
+
+    @Test func toggleFitModeStillCyclesThroughNext() {
+        let vm = ReaderViewModel()
+        vm.fitMode = .fitScreen
+        vm.toggleFitMode()
+        #expect(vm.fitMode == .fitWidth)
+        vm.toggleFitMode()
+        #expect(vm.fitMode == .fitHeight)
+        vm.toggleFitMode()
+        #expect(vm.fitMode == .fitScreen)
+    }
 }

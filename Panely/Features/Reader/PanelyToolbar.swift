@@ -10,7 +10,7 @@ struct PanelyToolbar: View {
     let onNext: () -> Void
     let onSetLayout: (PageLayout) -> Void
     let onToggleDirection: () -> Void
-    let onToggleFitMode: () -> Void
+    let onSetFitMode: (FitMode) -> Void
     let onToggleSidebarPin: () -> Void
     var onZoomIn: () -> Void = {}
     var onZoomOut: () -> Void = {}
@@ -76,7 +76,12 @@ struct PanelyToolbar: View {
             .help("Double Page (⌘⇧2)")
 
             PanelyIconButton(
-                systemImage: "arrow.up.and.down",
+                // `rectangle.stack` keeps the layout segments in the same
+                // "container shape" visual family as the single/double
+                // icons, and avoids colliding with the fit-height segment
+                // below (which legitimately owns `arrow.up.and.down` as
+                // part of the directional-resize triplet).
+                systemImage: "rectangle.stack",
                 isActive: layout == .vertical,
                 action: { onSetLayout(.vertical) }
             )
@@ -89,11 +94,30 @@ struct PanelyToolbar: View {
             .disabled(layout.isContinuous)
             .help(directionHelp)
 
+            // Segmented fit picker — same direct-selection pattern as the
+            // layout segments above. Mirrors the existing `⌘1/⌘2/⌘3`
+            // shortcuts so users see "the same three options" in toolbar
+            // and keyboard.
             PanelyIconButton(
-                systemImage: fitSymbol,
-                action: onToggleFitMode
+                systemImage: "arrow.up.left.and.arrow.down.right",
+                isActive: fitMode == .fitScreen,
+                action: { onSetFitMode(.fitScreen) }
             )
-            .help(fitHelp)
+            .help("Fit to Screen (⌘1)")
+
+            PanelyIconButton(
+                systemImage: "arrow.left.and.right",
+                isActive: fitMode == .fitWidth,
+                action: { onSetFitMode(.fitWidth) }
+            )
+            .help("Fit Width (⌘2)")
+
+            PanelyIconButton(
+                systemImage: "arrow.up.and.down",
+                isActive: fitMode == .fitHeight,
+                action: { onSetFitMode(.fitHeight) }
+            )
+            .help("Fit Height (⌘3)")
 
             PanelyIconButton(
                 systemImage: "minus.magnifyingglass",
@@ -189,22 +213,6 @@ struct PanelyToolbar: View {
         return direction.isRTL ? "Read Left to Right" : "Read Right to Left"
     }
 
-    private var fitSymbol: String {
-        switch fitMode {
-        case .fitScreen: return "arrow.up.left.and.arrow.down.right"
-        case .fitWidth:  return "arrow.left.and.right"
-        case .fitHeight: return "arrow.up.and.down"
-        }
-    }
-
-    private var fitHelp: String {
-        switch fitMode {
-        case .fitScreen: return "Fit to Screen — switch to Fit Width (⌘2)"
-        case .fitWidth:  return "Fit Width — switch to Fit Height (⌘3)"
-        case .fitHeight: return "Fit Height — switch to Fit Screen (⌘1)"
-        }
-    }
-
     private var previousKeyHint: String {
         direction.isRTL ? "→" : "←"
     }
@@ -225,7 +233,7 @@ struct PanelyToolbar: View {
         onNext: {},
         onSetLayout: { _ in },
         onToggleDirection: {},
-        onToggleFitMode: {},
+        onSetFitMode: { _ in },
         onToggleSidebarPin: {},
         showVolumeNav: true,
         canGoPreviousVolume: true,

@@ -46,7 +46,8 @@ pages.
 - **Left-to-right** or **right-to-left** reading (manga-friendly). RTL is
   ignored in vertical mode (webtoons are top-to-bottom) and the direction
   toggle disables itself there
-- **Three fit modes** with distinct arrow icons and `⌘1`/`⌘2`/`⌘3` shortcuts:
+- **Three fit modes** with distinct arrow icons in a segmented toolbar
+  picker (one tap = direct selection) plus `⌘1`/`⌘2`/`⌘3` shortcuts:
   - **Fit to screen** — entire page visible
   - **Fit to width** — fills viewport width
   - **Fit to height** — fills viewport height

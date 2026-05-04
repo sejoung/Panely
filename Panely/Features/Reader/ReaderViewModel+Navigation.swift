@@ -164,6 +164,16 @@ extension ReaderViewModel {
         fitMode = fitMode.next
     }
 
+    /// Direct fit-mode selection — used by the segmented toolbar control.
+    /// The View menu's `⌘1/⌘2/⌘3` shortcuts assign `fitMode` directly so
+    /// this isn't strictly required for keyboard, but routing through one
+    /// method keeps callsites consistent and makes redundant assignments
+    /// cheap (the didSet still fires only on actual changes).
+    func setFitMode(_ target: FitMode) {
+        guard fitMode != target else { return }
+        fitMode = target
+    }
+
     func toggleAutoFitOnResize() {
         autoFitOnResize.toggle()
     }

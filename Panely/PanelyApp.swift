@@ -90,19 +90,19 @@ struct PanelyApp: App {
                 Divider()
 
                 Button("Fit to Screen") {
-                    viewModel.fitMode = .fitScreen
+                    viewModel.setFitMode(.fitScreen)
                 }
                 .keyboardShortcut("1", modifiers: .command)
                 .disabled(viewModel.fitMode == .fitScreen)
 
                 Button("Fit to Width") {
-                    viewModel.fitMode = .fitWidth
+                    viewModel.setFitMode(.fitWidth)
                 }
                 .keyboardShortcut("2", modifiers: .command)
                 .disabled(viewModel.fitMode == .fitWidth)
 
                 Button("Fit to Height") {
-                    viewModel.fitMode = .fitHeight
+                    viewModel.setFitMode(.fitHeight)
                 }
                 .keyboardShortcut("3", modifiers: .command)
                 .disabled(viewModel.fitMode == .fitHeight)
