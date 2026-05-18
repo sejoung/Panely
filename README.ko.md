@@ -289,33 +289,53 @@ Panely/
 │   └── Primitives/                     # 아이콘 버튼, 슬라이더
 ├── Features/
 │   ├── Reader/
-│   │   ├── ReaderViewModel.swift       # @Observable @MainActor — 저장 프로퍼티 + init
-│   │   ├── ReaderViewModel+Navigation.swift  # 페이지 네비, Quick jump, chrome 토글
-│   │   ├── ReaderViewModel+Source.swift      # 소스 로딩, 볼륨 네비, 위치 기억
-│   │   ├── ReaderViewModel+ImageLoading.swift # 프리로드, 세로 지연 윈도우, 캐시
-│   │   ├── ReaderViewModel+Bookmarks.swift   # 즐겨찾기/페이지 북마크 연동
-│   │   ├── ReaderScene.swift           # ZStack 레이아웃 + 핫엣지 호버
-│   │   ├── ViewerContainer.swift       # SwiftUI 셸 + AppKitImageScroller
-│   │   │                               # (뷰 재사용하는 ImageStackView)
-│   │   ├── ViewerController.swift      # 줌 리모트 (⌘+/-/0, 스크롤 휠)
-│   │   ├── PanelyToolbar.swift         # 레이아웃 순환 / 맞춤 / 줌 / 고정 / ★ / 🔖 버튼
-│   │   ├── QuickJumpField.swift        # 페이지 카운터 인라인 편집
-│   │   ├── ThumbnailSidebar.swift      # 우측 썸네일 패널 (LazyVStack)
-│   │   ├── ThumbnailLoader.swift       # Image I/O 썸네일 + NSCache
-│   │   ├── EndOfVolumeCard.swift       # 하단 카드: "Up next" + start/restart
-│   │   ├── PreviousVolumeCard.swift    # 상단 카드: "Previous" (의도 게이트)
-│   │   ├── LoadingOverlay.swift
-│   │   ├── PageLayout.swift            # single/double/vertical + 순환 + isContinuous
-│   │   ├── ReadingDirection.swift / FitMode.swift  # FitMode: 3가지 + 순환
-│   │   ├── FitCalculator.swift         # 순수 배율 계산
-│   │   ├── PositionKey.swift           # 책별 안정적 위치 키
-│   │   └── SidebarMode.swift           # pinned / overlay 상태 값 타입
+│   │   ├── ReaderScene.swift           # ZStack 레이아웃 + 핫엣지 호버 (진입 뷰)
+│   │   ├── Model/                      # 값 타입 및 순수 헬퍼
+│   │   │   ├── PageLayout.swift        # single/double/vertical + 순환 + isContinuous
+│   │   │   ├── ReadingDirection.swift  # LTR / RTL
+│   │   │   ├── FitMode.swift           # 3가지 + 순환
+│   │   │   ├── FitCalculator.swift     # 순수 배율 계산
+│   │   │   ├── PositionKey.swift       # 책별 안정적 위치 키
+│   │   │   └── SidebarMode.swift       # pinned / overlay 상태 값 타입
+│   │   ├── ViewModel/                  # @Observable @MainActor 리더 상태
+│   │   │   ├── ReaderViewModel.swift           # 저장 프로퍼티 + init
+│   │   │   ├── ReaderViewModel+Navigation.swift # 페이지 네비, Quick jump, chrome 토글
+│   │   │   ├── ReaderViewModel+Source.swift     # 소스 로딩, 볼륨 네비, 위치 기억
+│   │   │   ├── ReaderViewModel+ImageLoading.swift # 프리로드, 세로 지연 윈도우, 캐시
+│   │   │   └── ReaderViewModel+Bookmarks.swift  # 즐겨찾기/페이지 북마크 연동
+│   │   ├── Viewer/                     # AppKit 기반 스크롤 가능 이미지 스테이지
+│   │   │   ├── ViewerContainer.swift   # SwiftUI 셸 (스크롤러 진입점)
+│   │   │   ├── AppKitImageScroller.swift # NSViewRepresentable + Coordinator + applyFit
+│   │   │   ├── PanelyScrollView.swift  # ⌘+휠 줌이 가능한 NSScrollView
+│   │   │   ├── TitleBarPassthrough.swift # 상단 28 px 드래그 + 커서 처리
+│   │   │   ├── CenteringClipView.swift # 작은 문서 중앙정렬 NSClipView
+│   │   │   ├── ImageStackView.swift    # 페이지 프레임 + 풀링된 NSImageView
+│   │   │   └── ViewerController.swift  # 줌 리모트 (⌘+/-/0, 스크롤 휠)
+│   │   ├── Toolbar/
+│   │   │   ├── PanelyToolbar.swift     # 레이아웃 / 맞춤 / 줌 / 고정 / ★ / 🔖 버튼
+│   │   │   └── QuickJumpField.swift    # 페이지 카운터 인라인 편집
+│   │   ├── Overlays/
+│   │   │   ├── LoadingOverlay.swift
+│   │   │   ├── EndOfVolumeCard.swift   # 하단 카드: "Up next" + start/restart
+│   │   │   └── PreviousVolumeCard.swift # 상단 카드: "Previous" (의도 게이트)
+│   │   └── Thumbnails/
+│   │       ├── ThumbnailSidebar.swift  # 우측 썸네일 패널 (LazyVStack)
+│   │       └── ThumbnailLoader.swift   # Image I/O 썸네일 + NSCache
 │   └── Library/
 │       ├── LibrarySidebar.swift        # 고정 버튼 + 확장자 배지 + 2단계 로드
-│       ├── FileNode.swift              # iconName + fileExtension + 최상위 병렬 스캔
-│       ├── RecentItem.swift / RecentItemsStore.swift  # 재열기 시 북마크 중복 제거
-│       ├── FavoriteBook.swift / PageBookmark.swift    # 영속 북마크 데이터 타입
-│       └── BookmarksStore.swift        # 즐겨찾기 + 페이지 북마크 영속 저장소
+│       ├── Model/
+│       │   ├── FileNode.swift          # iconName + fileExtension + 최상위 병렬 스캔
+│       │   ├── RecentItem.swift        # security-scoped 최근 항목
+│       │   ├── FavoriteBook.swift      # 영속 즐겨찾기 (security-scoped bookmark)
+│       │   └── PageBookmark.swift      # 영속 페이지 북마크
+│       ├── Store/
+│       │   ├── BookmarksStore.swift    # 즐겨찾기 + 페이지 북마크 영속 저장소
+│       │   └── RecentItemsStore.swift  # 재열기 시 북마크 중복 제거
+│       └── Rows/                       # 사이드바 row 뷰 (파일당 struct 하나)
+│           ├── FileNodeRow.swift
+│           ├── FavoriteRow.swift
+│           ├── VolumeRow.swift
+│           └── PageBookmarkRow.swift
 └── Core/
     └── Comic/
         ├── ComicPage.swift / ComicSource.swift / ComicPageSource.swift

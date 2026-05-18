@@ -308,33 +308,53 @@ Panely/
 │   └── Primitives/                     # Icon button, slider
 ├── Features/
 │   ├── Reader/
-│   │   ├── ReaderViewModel.swift       # @Observable @MainActor — stored state + init
-│   │   ├── ReaderViewModel+Navigation.swift  # page nav, Quick jump, chrome toggles
-│   │   ├── ReaderViewModel+Source.swift      # source loading, volume nav, position memory
-│   │   ├── ReaderViewModel+ImageLoading.swift # preload, vertical lazy window, cache
-│   │   ├── ReaderViewModel+Bookmarks.swift   # favorites & page bookmarks integration
-│   │   ├── ReaderScene.swift           # ZStack layout + hot-edge reveal
-│   │   ├── ViewerContainer.swift       # SwiftUI shell + AppKitImageScroller
-│   │   │                               # (ImageStackView with view recycling)
-│   │   ├── ViewerController.swift      # Zoom remote control (⌘+/-/0, scroll-wheel)
-│   │   ├── PanelyToolbar.swift         # cycle layout / fit / zoom / pin / ★ / 🔖 buttons
-│   │   ├── QuickJumpField.swift        # inline-editable page counter
-│   │   ├── ThumbnailSidebar.swift      # right-side thumbnail panel (LazyVStack)
-│   │   ├── ThumbnailLoader.swift       # Image I/O thumbnails + NSCache
-│   │   ├── EndOfVolumeCard.swift       # bottom card: "Up next" + start/restart
-│   │   ├── PreviousVolumeCard.swift    # top card: "Previous" (intent-gated)
-│   │   ├── LoadingOverlay.swift
-│   │   ├── PageLayout.swift            # single/double/vertical + cycle + isContinuous
-│   │   ├── ReadingDirection.swift / FitMode.swift  # FitMode: 3 cases + cycle
-│   │   ├── FitCalculator.swift         # pure magnification math
-│   │   ├── PositionKey.swift           # stable per-book position keys
-│   │   └── SidebarMode.swift           # pinned / overlay state value-type
+│   │   ├── ReaderScene.swift           # ZStack layout + hot-edge reveal (entry view)
+│   │   ├── Model/                      # value types & pure helpers
+│   │   │   ├── PageLayout.swift        # single/double/vertical + cycle + isContinuous
+│   │   │   ├── ReadingDirection.swift  # LTR / RTL
+│   │   │   ├── FitMode.swift           # 3 cases + cycle
+│   │   │   ├── FitCalculator.swift     # pure magnification math
+│   │   │   ├── PositionKey.swift       # stable per-book position keys
+│   │   │   └── SidebarMode.swift       # pinned / overlay state value-type
+│   │   ├── ViewModel/                  # @Observable @MainActor reader state
+│   │   │   ├── ReaderViewModel.swift           # stored state + init
+│   │   │   ├── ReaderViewModel+Navigation.swift # page nav, Quick jump, chrome toggles
+│   │   │   ├── ReaderViewModel+Source.swift     # source loading, volume nav, position memory
+│   │   │   ├── ReaderViewModel+ImageLoading.swift # preload, vertical lazy window, cache
+│   │   │   └── ReaderViewModel+Bookmarks.swift  # favorites & page bookmarks integration
+│   │   ├── Viewer/                     # AppKit-backed scrollable image stage
+│   │   │   ├── ViewerContainer.swift   # SwiftUI shell (entry into the scroller)
+│   │   │   ├── AppKitImageScroller.swift # NSViewRepresentable + Coordinator + applyFit
+│   │   │   ├── PanelyScrollView.swift  # NSScrollView with ⌘+scroll zoom
+│   │   │   ├── TitleBarPassthrough.swift # top 28 px drag + cursor handling
+│   │   │   ├── CenteringClipView.swift # small-document centering NSClipView
+│   │   │   ├── ImageStackView.swift    # page frames + pooled NSImageViews
+│   │   │   └── ViewerController.swift  # zoom remote (⌘+/-/0, scroll-wheel)
+│   │   ├── Toolbar/
+│   │   │   ├── PanelyToolbar.swift     # layout / fit / zoom / pin / ★ / 🔖 buttons
+│   │   │   └── QuickJumpField.swift    # inline-editable page counter
+│   │   ├── Overlays/
+│   │   │   ├── LoadingOverlay.swift
+│   │   │   ├── EndOfVolumeCard.swift   # bottom card: "Up next" + start/restart
+│   │   │   └── PreviousVolumeCard.swift # top card: "Previous" (intent-gated)
+│   │   └── Thumbnails/
+│   │       ├── ThumbnailSidebar.swift  # right-side thumbnail panel (LazyVStack)
+│   │       └── ThumbnailLoader.swift   # Image I/O thumbnails + NSCache
 │   └── Library/
 │       ├── LibrarySidebar.swift        # pin button + extension badge + two-phase load
-│       ├── FileNode.swift              # iconName + fileExtension + parallel top-level scan
-│       ├── RecentItem.swift / RecentItemsStore.swift  # bookmark dedup on repeat opens
-│       ├── FavoriteBook.swift / PageBookmark.swift    # persistent bookmark data types
-│       └── BookmarksStore.swift        # favorites + page bookmarks persistent store
+│       ├── Model/
+│       │   ├── FileNode.swift          # iconName + fileExtension + parallel top-level scan
+│       │   ├── RecentItem.swift        # security-scoped recent entry
+│       │   ├── FavoriteBook.swift      # persistent favorite (security-scoped bookmark)
+│       │   └── PageBookmark.swift      # persistent per-page bookmark
+│       ├── Store/
+│       │   ├── BookmarksStore.swift    # favorites + page bookmarks persistent store
+│       │   └── RecentItemsStore.swift  # bookmark dedup on repeat opens
+│       └── Rows/                       # sidebar row views (one struct per file)
+│           ├── FileNodeRow.swift
+│           ├── FavoriteRow.swift
+│           ├── VolumeRow.swift
+│           └── PageBookmarkRow.swift
 └── Core/
     └── Comic/
         ├── ComicPage.swift / ComicSource.swift / ComicPageSource.swift
