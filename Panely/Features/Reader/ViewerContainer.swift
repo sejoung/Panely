@@ -675,16 +675,27 @@ final class ImageStackView: NSView {
     }
 
     private func layoutFramesHorizontally() {
-        let totalWidth = currentImages.reduce(0) { $0 + $1.size.width }
-        let maxHeight = currentImages.map { $0.size.height }.max() ?? 0
-        setFrameSize(NSSize(width: totalWidth, height: maxHeight))
+        // Normalize pages to a shared display height (= tallest page's
+        // native height), scaling width proportionally. Without this, a
+        // spread that mixes pages of different native pixel sizes would
+        // render each at its raw size, and the uniform scrollView
+        // magnification can fit one page to the viewport but not the other.
+        let targetHeight = currentImages.map { $0.size.height }.max() ?? 0
+
+        let scaledSizes: [CGSize] = currentImages.map { image in
+            guard image.size.height > 0 else { return image.size }
+            let scale = targetHeight / image.size.height
+            return CGSize(width: image.size.width * scale, height: targetHeight)
+        }
+
+        let totalWidth = scaledSizes.reduce(0) { $0 + $1.width }
+        setFrameSize(NSSize(width: totalWidth, height: targetHeight))
 
         var frames: [NSRect] = []
         var x: CGFloat = 0
-        for image in currentImages {
-            let y = (maxHeight - image.size.height) / 2
-            frames.append(NSRect(x: x, y: y, width: image.size.width, height: image.size.height))
-            x += image.size.width
+        for size in scaledSizes {
+            frames.append(NSRect(x: x, y: 0, width: size.width, height: size.height))
+            x += size.width
         }
         pageFrames = frames
     }
