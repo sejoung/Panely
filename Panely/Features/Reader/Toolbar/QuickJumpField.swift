@@ -65,8 +65,12 @@ struct QuickJumpField: View {
     private func beginEditing() {
         draft = "\(currentPage)"
         editing = true
-        // Focus must be requested after the TextField is in the hierarchy.
-        DispatchQueue.main.async { focused = true }
+        // `@FocusState` requests applied in the same tick are honoured by
+        // SwiftUI even when the `TextField` is being added to the hierarchy
+        // on this very frame — no need for the prior `DispatchQueue` hop,
+        // which made the field briefly visible before becoming first
+        // responder.
+        focused = true
     }
 
     private func commit() {

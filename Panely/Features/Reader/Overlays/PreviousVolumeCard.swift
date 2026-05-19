@@ -44,21 +44,7 @@ struct PreviousVolumeCard: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(PanelySpacing.lg)
-        .frame(maxWidth: 360, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(.regularMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(PanelyColor.bgSecondary.opacity(0.55))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(PanelyColor.borderSubtle, lineWidth: 1)
-                )
-        )
-        .shadow(color: .black.opacity(0.35), radius: 18, y: 6)
+        .volumeCardChrome()
         .padding(.top, PanelySpacing.xl)
         .transition(.opacity.combined(with: .move(edge: .top)))
     }

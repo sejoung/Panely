@@ -29,7 +29,7 @@ final class ThumbnailLoader {
     private init() {}
 
     func thumbnail(for page: ComicPage, maxPixelSize: CGFloat = 240) async -> NSImage? {
-        let key = "\(page.id.uuidString)@\(Int(maxPixelSize))" as NSString
+        let key = "\(page.id)@\(Int(maxPixelSize))" as NSString
         if let cached = cache.object(forKey: key) {
             return cached
         }

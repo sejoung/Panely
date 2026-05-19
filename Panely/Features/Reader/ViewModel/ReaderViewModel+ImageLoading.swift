@@ -269,15 +269,36 @@ extension ReaderViewModel {
     // MARK: - Paged preload
 
     private func cachedImage(for page: ComicPage) -> NSImage? {
-        imageCache.object(forKey: page.id.uuidString as NSString)
+        imageCache.object(forKey: page.id as NSString)
     }
 
     private func cacheImage(_ image: NSImage, for page: ComicPage) {
-        // Decoded byte estimate (size in points × ~4 bytes/pixel) lets the
-        // cache's totalCostLimit kick in for big scans. NSCache treats it as
-        // a hint, not a strict budget — close enough for eviction decisions.
-        let cost = Int(image.size.width * image.size.height * 4)
-        imageCache.setObject(image, forKey: page.id.uuidString as NSString, cost: cost)
+        // Decoded byte estimate. Prefer the actual bitmap rep's pixel
+        // dimensions when available — `image.size` is in points, so Retina
+        // (2×) backing or 16-bit/HDR scans were systematically under-priced
+        // by the simple "points × 4" formula. Falls back to the point-based
+        // estimate when no rep advertises pixel dimensions.
+        let cost = Self.estimatedBitmapCost(of: image)
+        imageCache.setObject(image, forKey: page.id as NSString, cost: cost)
+    }
+
+    static func estimatedBitmapCost(of image: NSImage) -> Int {
+        if let rep = image.representations.first {
+            // pixelsWide/High return 0 for non-bitmap reps; guard against
+            // that by falling through to the size-based estimate.
+            let w = rep.pixelsWide
+            let h = rep.pixelsHigh
+            if w > 0 && h > 0 {
+                // bitsPerSample × samplesPerPixel ÷ 8 is the per-pixel byte
+                // cost; defaults of 8/4 cover the common 32-bit RGBA case
+                // and conservatively over-estimate sub-8-bit reps.
+                let bitsPerSample = (rep as? NSBitmapImageRep)?.bitsPerSample ?? 8
+                let samplesPerPixel = (rep as? NSBitmapImageRep)?.samplesPerPixel ?? 4
+                let bytesPerPixel = max(1, (bitsPerSample * samplesPerPixel) / 8)
+                return w * h * bytesPerPixel
+            }
+        }
+        return Int(image.size.width * image.size.height * 4)
     }
 
     func loadVisibleImage(_ page: ComicPage) async -> NSImage? {

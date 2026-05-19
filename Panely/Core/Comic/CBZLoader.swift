@@ -4,6 +4,25 @@ import ZIPFoundation
 nonisolated enum CBZLoader {
     static let supportedExtensions: Set<String> = ["cbz", "zip"]
 
+    /// Soft cap on cumulative bytes extracted by `extractAll`. Single
+    /// archives can legitimately be several GB (high-res scan series), so
+    /// we don't set this aggressively — the purpose is to abort obviously
+    /// pathological inputs (zip-bombs, infinitely-nested archives that
+    /// slipped past `maxNestingDepth`) before they fill the user's disk.
+    static let maxExtractedBytes: UInt64 = 5 * 1024 * 1024 * 1024  // 5 GB
+
+    enum LoadError: LocalizedError {
+        case extractedSizeExceeded(limit: UInt64)
+
+        var errorDescription: String? {
+            switch self {
+            case .extractedSizeExceeded(let limit):
+                let mb = limit / (1024 * 1024)
+                return "Archive expanded past the safety limit (\(mb) MB)."
+            }
+        }
+    }
+
     static func load(from url: URL) async throws -> ComicSource {
         try await Task.detached(priority: .userInitiated) {
             let reader = try ArchiveReader(url: url)
@@ -14,9 +33,7 @@ nonisolated enum CBZLoader {
                 return FolderLoader.supportedExtensions.contains(ext)
             }
 
-            let sorted = imagePaths.sorted { a, b in
-                a.localizedStandardCompare(b) == .orderedAscending
-            }
+            let sorted = imagePaths.sorted(by: NaturalSort.compare)
 
             let pages = sorted.map { path in
                 ComicPage(
@@ -48,6 +65,7 @@ nonisolated enum CBZLoader {
                 withIntermediateDirectories: true
             )
             try FileManager.default.unzipItem(at: url, to: destination)
+            try ensureSizeUnderLimit(at: destination)
             try extractNestedArchives(in: destination, depth: 0)
         }.value
     }
@@ -77,8 +95,39 @@ nonisolated enum CBZLoader {
             let destDir = entry.deletingPathExtension()
             try FileManager.default.createDirectory(at: destDir, withIntermediateDirectories: true)
             try FileManager.default.unzipItem(at: entry, to: destDir)
+            try ensureSizeUnderLimit(at: destDir)
             try FileManager.default.removeItem(at: entry)
             try extractNestedArchives(in: destDir, depth: depth + 1)
+        }
+    }
+
+    /// Walk the just-extracted tree once and abort if the cumulative file
+    /// size crosses `maxExtractedBytes`. ZIPFoundation has no streaming
+    /// callback for this in `unzipItem`, so we check post-hoc — fine for
+    /// the safety-net role (catches the pathological case; legitimate
+    /// large archives are still allowed up to the cap).
+    private static func ensureSizeUnderLimit(at directory: URL) throws {
+        let fm = FileManager.default
+        guard let enumerator = fm.enumerator(
+            at: directory,
+            includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .fileSizeKey],
+            options: [.skipsHiddenFiles]
+        ) else { return }
+
+        var total: UInt64 = 0
+        for case let url as URL in enumerator {
+            let values = try? url.resourceValues(forKeys: [
+                .totalFileAllocatedSizeKey,
+                .fileSizeKey,
+            ])
+            let size = UInt64(values?.totalFileAllocatedSize ?? values?.fileSize ?? 0)
+            total &+= size
+            if total > maxExtractedBytes {
+                // Clean up partial extraction so the caller's temp dir
+                // doesn't leak. extractAll/load already removes on error.
+                try? fm.removeItem(at: directory)
+                throw LoadError.extractedSizeExceeded(limit: maxExtractedBytes)
+            }
         }
     }
 }

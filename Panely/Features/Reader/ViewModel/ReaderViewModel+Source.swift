@@ -372,17 +372,30 @@ extension ReaderViewModel {
     /// crashed or was force-quit before `cleanupTempDir()` could run. A
     /// single zip-in-zip extraction can be hundreds of megabytes, and macOS
     /// only sweeps the sandbox tmp opportunistically (not on every launch),
-    /// so leftovers can quietly accumulate. Safe to call only at startup —
-    /// it makes no attempt to spare an in-flight extraction.
+    /// so leftovers can quietly accumulate.
+    ///
+    /// Called from `init` on a background queue, where it races with the
+    /// app's own first extraction. To avoid deleting that brand-new dir,
+    /// only sweep entries whose mtime is older than `staleAge` — anything
+    /// fresher belongs to a concurrent load or another running instance.
     nonisolated static func cleanupStaleTempDirs() {
         let tmpRoot = FileManager.default.temporaryDirectory
         guard let entries = try? FileManager.default.contentsOfDirectory(
             at: tmpRoot,
-            includingPropertiesForKeys: nil,
+            includingPropertiesForKeys: [.contentModificationDateKey],
             options: [.skipsHiddenFiles]
         ) else { return }
 
+        // 10 minutes is generous: even a multi-GB zip-in-zip extraction
+        // typically finishes well under that, and anything older is almost
+        // certainly orphaned from a prior session.
+        let staleAge: TimeInterval = 10 * 60
+        let cutoff = Date().addingTimeInterval(-staleAge)
+
         for entry in entries where entry.lastPathComponent.hasPrefix("panely-") {
+            let mtime = (try? entry.resourceValues(forKeys: [.contentModificationDateKey]))?
+                .contentModificationDate ?? .distantPast
+            guard mtime < cutoff else { continue }
             try? FileManager.default.removeItem(at: entry)
         }
     }
@@ -416,13 +429,30 @@ extension ReaderViewModel {
         let key = positionKey(for: url)
         var dict = loadedPositions()
         dict[key] = currentPageIndex
+        // Mirror under the volume/file-id key when available, so external
+        // drives whose mount path drifts ("/Volumes/X" → "/Volumes/X 1")
+        // can still recover the saved position. Older data without this
+        // mirror keeps working via the path-keyed entry above.
+        if let fidKey = PositionKey.fileIdentity(for: openedSourceURL ?? url) {
+            dict[fidKey] = currentPageIndex
+        }
         positionsCache = dict
         UserDefaults.standard.set(dict, forKey: Self.positionsKey)
     }
 
     func restoredIndex(for url: URL) -> Int {
         let key = positionKey(for: url)
-        return loadedPositions()[key] ?? 0
+        let dict = loadedPositions()
+        if let primary = dict[key] {
+            return primary
+        }
+        // Fallback: file-id key. Recovers position after a mount-path change
+        // or rename within the same volume.
+        if let fidKey = PositionKey.fileIdentity(for: openedSourceURL ?? url),
+           let secondary = dict[fidKey] {
+            return secondary
+        }
+        return 0
     }
 
     /// Lazy hydration of the positions dict — first call pays the
@@ -445,8 +475,16 @@ extension ReaderViewModel {
     func clampedRestoredIndex(for url: URL, pageCount: Int) -> Int {
         guard pageCount > 0 else { return 0 }
         let restored = restoredIndex(for: url)
-        let snapped = (restored / navigationStep) * navigationStep
-        return min(max(snapped, 0), pageCount - 1)
+        let step = navigationStep
+        let snapped = (restored / step) * step
+        // Highest valid step-aligned start: for 100-page double-page mode,
+        // that's index 98 (spread 99–100). The previous formula clamped to
+        // `pageCount - 1` (=99), which then rounded back down via the step
+        // snap and stranded the reader one spread short of where they left
+        // off. Use the last step-aligned index instead so the final spread
+        // is reachable.
+        let maxAligned = max(0, ((pageCount - 1) / step) * step)
+        return min(max(snapped, 0), maxAligned)
     }
 
     // MARK: - Off-main folder scanners
@@ -473,9 +511,7 @@ extension ReaderViewModel {
                 return CBZLoader.supportedExtensions.contains(ext)
             }
 
-            return volumes.sorted { a, b in
-                a.lastPathComponent.localizedStandardCompare(b.lastPathComponent) == .orderedAscending
-            }
+            return volumes.sorted(by: NaturalSort.byFilename)
         }.value
     }
 
@@ -505,9 +541,7 @@ extension ReaderViewModel {
                 }
             }
 
-            let sorted = volumes.sorted { a, b in
-                a.lastPathComponent.localizedStandardCompare(b.lastPathComponent) == .orderedAscending
-            }
+            let sorted = volumes.sorted(by: NaturalSort.byFilename)
 
             return (hasImages, sorted)
         }.value

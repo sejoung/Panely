@@ -16,9 +16,7 @@ nonisolated enum FolderLoader {
             supportedExtensions.contains(fileURL.pathExtension.lowercased())
         }
 
-        let sorted = images.sorted { a, b in
-            a.lastPathComponent.localizedStandardCompare(b.lastPathComponent) == .orderedAscending
-        }
+        let sorted = images.sorted(by: NaturalSort.byFilename)
 
         let pages = sorted.map { url in
             ComicPage(source: .file(url), displayName: url.lastPathComponent)

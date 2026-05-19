@@ -73,8 +73,10 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
 ### 파일 지원
 - **폴더**, **CBZ**, **ZIP** 열기
 - **시리즈 루트 자동 감지** — 볼륨들이 들어있는 폴더를 고르면 첫 번째가 열림
-- **중첩 아카이브 추출**(최대 3단계 재귀)
-- 자연 파일명 정렬(`1, 2, 10` — `1, 10, 2` 아님)
+- **중첩 아카이브 추출**(최대 3단계 재귀, 누적 추출 5 GB 안전 상한 —
+  zip-bomb 보호)
+- 자연 파일명 정렬(`1, 2, 10` — `1, 10, 2` 아님) — `NaturalSort` 헬퍼로
+  모든 로더/스캐너에서 일관 적용
 - 비이미지 파일과 숨김 항목 필터링
 
 ### 네비게이션
@@ -106,10 +108,15 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
 
 ### 상태 유지
 - **읽던 위치에서 이어보기** — 임시 디렉터리 추출을 버티는 안정적인 키로
-  책별 페이지 기억
+  책별 페이지 기억. 외장 디스크의 mount 경로가 바뀌어도 위치를 복구할 수
+  있도록 volume + file resource identifier 기반 보조 키를 함께 저장
 - **레이아웃 + 방향 + 맞춤 모드 + 사이드바 고정 + 툴바 고정 + 자동 맞춤
   잠금** 모두 유지(레거시 `panely.sidebarVisible` 키는 새 고정 플래그로
   자동 마이그레이션)
+- **북마크/즐겨찾기 안전 장치** — 책당 페이지 북마크 상한(500개) + 총 책
+  엔트리 상한(200개)으로 `UserDefaults` 4 MB 한계 도달로 인한 일괄
+  손실 방지. `bookmarkDataIsStale` 감지 시 자동 재생성으로 파일을
+  옮겨도 즐겨찾기/최근이 끊기지 않음
 - 완전 샌드박스 호환(사용자 선택 파일 + 앱 스코프 북마크)
 
 ## 요구 사항
@@ -204,7 +211,7 @@ xcodebuild test \
   CODE_SIGN_IDENTITY="-"
 ```
 
-**38 스위트에 걸친 223개 테스트**가 다음을 커버:
+**39 스위트에 걸친 234개 테스트**가 다음을 커버:
 
 - 순수 데이터 타입 (`ComicPage`, `ComicSource`, `RecentItem`, enum raw 값)
 - 자연 정렬 규약 (Panely가 의존하는 Foundation 동작)
@@ -316,6 +323,7 @@ Panely/
 │   │   │   └── QuickJumpField.swift    # 페이지 카운터 인라인 편집
 │   │   ├── Overlays/
 │   │   │   ├── LoadingOverlay.swift
+│   │   │   ├── VolumeCardChrome.swift  # 공유 머티리얼/섀도우/보더 ViewModifier
 │   │   │   ├── EndOfVolumeCard.swift   # 하단 카드: "Up next" + start/restart
 │   │   │   └── PreviousVolumeCard.swift # 상단 카드: "Previous" (의도 게이트)
 │   │   └── Thumbnails/
@@ -340,9 +348,10 @@ Panely/
     └── Comic/
         ├── ComicPage.swift / ComicSource.swift / ComicPageSource.swift
         ├── FolderLoader.swift
-        ├── CBZLoader.swift             # 평면 + 재귀 중첩 추출
+        ├── CBZLoader.swift             # 평면 + 재귀 중첩 추출 + 5 GB 안전 상한
         ├── ArchiveReader.swift         # ZIPFoundation.Archive 감싼 actor
         │                               # (헤더 전용 읽기용 loadDataPrefix)
+        ├── NaturalSort.swift           # 로케일 인식 자연 정렬 헬퍼
         └── ImageLoader.swift           # async NSImage + dimensions(for:) 헤더 읽기
 
 PanelyTests/
@@ -450,14 +459,51 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북�
 - **`PositionKey.make(for:opened:tempRoot:)`** — `/tmp`로 추출된 소스의
   경우, 키가 연 URL과 임시 루트 내 상대 경로로부터 파생되어 재추출을
   가로질러 읽기 진행 유지. 페이지 북마크(`BookmarksStore`)도 같은 키를
-  써서 temp-dir 재추출에도 유지됨.
+  써서 temp-dir 재추출에도 유지됨. 추가로 `PositionKey.fileIdentity(for:)`로
+  `(volumeIdentifier, fileResourceIdentifier)` 기반 보조 키를 생성해
+  외장 디스크 mount 경로가 변경돼도 위치 복구. 저장 시 두 키 모두에
+  현재 인덱스를 기록하고, 조회 시 path 키 → fileIdentity 키 순서로
+  fallback.
+- **결정적 `ComicPage.id`** — 페이지 식별자는 source에서 파생된 결정적
+  문자열(`file:<path>` 또는 `archive:<archiveURL>#<entryPath>`). 책을
+  다시 열어도 같은 `id`가 나오므로 이미지/썸네일 `NSCache`가 그대로
+  히트 — 기존 무작위 UUID 방식은 reopen마다 전량 재디코드 발생.
 - **`NSCache` 기반 이미지 캐시** — 페이지별 디코드된 `NSImage`를 메모리
-  압박 시 자동 eviction. `countLimit = 10`에 더해 `totalCostLimit ≈ 150 MB`
-  (per-entry cost = pixel area × 4를 `setObject(_:forKey:cost:)`로 전달)
-  를 설정하여 큰 스캔본이 캐시에 들어와도 메모리가 예측 가능. 프리로드는
-  페이지 모드에서 현재 페이지 ±2 주변으로 취소 가능한 `Task` 실행. 취소는
-  `ImageLoader.load`와 `preloadIfNeeded`로 전파되어 빠른 키보드
-  네비게이션 중 버려진 작업이 캐시를 오염시키지 않음.
+  압박 시 자동 eviction. `countLimit = 100`로 vertical lazy window의
+  `±lazyKeepBuffer` 페이지가 cost 여유에도 LRU eviction 당하는 문제를
+  해소. 실제 예산은 `totalCostLimit ≈ 150 MB`이며, bitmap rep의
+  `pixelsWide × pixelsHigh × (bitsPerSample × samplesPerPixel / 8)`로
+  per-entry cost를 계산해 Retina backing 이나 16-bit/HDR 스캔이
+  과소평가되지 않음. 프리로드는 페이지 모드에서 현재 페이지 ±2 주변으로
+  취소 가능한 `Task` 실행. 취소는 `ImageLoader.load`와 `preloadIfNeeded`로
+  전파되어 빠른 키보드 네비게이션 중 버려진 작업이 캐시를 오염시키지 않음.
+- **북마크/즐겨찾기 영속성 안전 장치** — `BookmarksStore`의 페이지 북마크는
+  `maxBookmarksPerBook = 500`(초과 시 오래된 항목부터 drop), 전체 책
+  엔트리는 `maxBookEntries = 200`(초과 시 가장 오래 손대지 않은 책의
+  엔트리 drop). `pruneOrphanedPageBookmarks(keeping:)`로 라이브 키 집합
+  바깥의 고아 엔트리를 일괄 GC 가능. `RecentItemsStore.resolve` /
+  `BookmarksStore.resolve`는 `bookmarkDataIsStale` 감지 시 즉시 새
+  bookmark를 만들어 store에 갱신해 외장 디스크 이름 변경/파일 이동을
+  실패 없이 흡수. `RecentItemsStore.record`의 빠른 reopen 경로도 같은
+  stale 체크를 수행.
+- **CBZ 추출 안전 상한** — `CBZLoader.maxExtractedBytes = 5 GB`. `extractAll`
+  완료 후(그리고 각 중첩 추출 후) 디렉터리 트리를 한 번 walk하여
+  누적 크기가 상한을 넘으면 `LoadError.extractedSizeExceeded`를 throw
+  하고 부분 추출물을 정리 — zip-bomb / 비정상 중첩 아카이브로부터
+  디스크 보호.
+- **앱 시작 시 임시 디렉터리 청소** — `cleanupStaleTempDirs`는 mtime이
+  10분 이상 지난 `panely-*` 디렉터리만 정리. 첫 실행 중 진행 중인
+  추출 디렉터리가 동시에 삭제되는 경쟁 방지.
+- **마지막 spread 도달 가능한 위치 복원** — `clampedRestoredIndex`가
+  `pageCount - 1`이 아니라 step 정렬된 마지막 인덱스
+  (`((pageCount - 1) / step) * step`)로 클램프. 더블 페이지 모드에서
+  마지막 spread로 종료한 책을 다시 열면 한 spread 뒤가 아니라 정확히
+  그 spread로 복원.
+- **AppKit 옵저버 방어** — `AppKitImageScroller`의
+  `frameDidChangeNotification` / `boundsDidChangeNotification` 옵저버는
+  `makeNSView`에서 등록 전 기존 옵저버를 명시 제거. Coordinator 재사용
+  또는 SwiftUI representable 재생성이 발생해도 auto-fit 핸들러가
+  중복 등록되지 않음.
 - **Eager-decode 이미지 파이프라인** — `ImageLoader.load`는
   `CGImageSourceCreateWithURL`(파일 URL은 zero-copy mmap) /
   `CGImageSourceCreateWithData`(아카이브 엔트리)를 `Task.detached` 안에서
@@ -549,7 +595,7 @@ git push origin v1.0.0
 ### CI / 저장소
 
 - **CI**는 모든 push/PR에서 실행(`**/*.md`와 `docs/**` 제외), ad-hoc
-  서명으로 Debug 빌드, 223개 테스트 전부 실행, 아티팩트 업로드 없음 —
+  서명으로 Debug 빌드, 234개 테스트 전부 실행, 아티팩트 업로드 없음 —
   저장소 풋프린트는 사실상 0.
 - **릴리스**는 GitHub Releases에 `ditto`로 단일 zip(~5–10 MB)을 첨부하여
   리소스 포크 보존.

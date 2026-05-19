@@ -58,9 +58,7 @@ nonisolated struct FileNode: Identifiable, Hashable, Sendable {
             nodes.append(contentsOf: chunkNodes)
         }
 
-        return nodes.sorted { a, b in
-            a.name.localizedStandardCompare(b.name) == .orderedAscending
-        }
+        return nodes.sorted { NaturalSort.compare($0.name, $1.name) }
     }
 
     private static func processEntry(_ entry: URL, depth: Int, maxDepth: Int) -> FileNode? {
@@ -110,8 +108,6 @@ nonisolated struct FileNode: Identifiable, Hashable, Sendable {
             }
         }
 
-        return nodes.sorted { a, b in
-            a.name.localizedStandardCompare(b.name) == .orderedAscending
-        }
+        return nodes.sorted { NaturalSort.compare($0.name, $1.name) }
     }
 }

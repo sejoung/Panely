@@ -15,11 +15,26 @@ final class RecentItemsStore {
     func record(_ url: URL, title: String) {
         // Re-opening a recently used item: skip the security-scoped bookmark
         // creation (the most expensive part of this method) and just bump
-        // the existing entry to the top. Bookmark data is unchanged.
+        // the existing entry to the top. If the existing bookmark is stale,
+        // refresh it now — that's the whole reason we kept the URL around.
         if let existingIndex = items.firstIndex(where: { $0.path == url.path }) {
             var existing = items.remove(at: existingIndex)
             existing.openedAt = Date()
             existing.title = title
+            var isStale = false
+            if (try? URL(
+                resolvingBookmarkData: existing.bookmarkData,
+                options: .withSecurityScope,
+                relativeTo: nil,
+                bookmarkDataIsStale: &isStale
+            )) != nil, isStale,
+               let refreshed = try? url.bookmarkData(
+                options: .withSecurityScope,
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+               ) {
+                existing.bookmarkData = refreshed
+            }
             items.insert(existing, at: 0)
             save()
             return
@@ -56,12 +71,27 @@ final class RecentItemsStore {
 
     func resolve(_ item: RecentItem) -> URL? {
         var isStale = false
-        return try? URL(
+        guard let url = try? URL(
             resolvingBookmarkData: item.bookmarkData,
             options: .withSecurityScope,
             relativeTo: nil,
             bookmarkDataIsStale: &isStale
-        )
+        ) else {
+            return nil
+        }
+        // If macOS marked the bookmark stale (file moved/renamed but still
+        // resolvable), regenerate it now so the next launch doesn't pay the
+        // resolution cost or risk failure as the staleness compounds.
+        if isStale, let refreshed = try? url.bookmarkData(
+            options: .withSecurityScope,
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+        ), let idx = items.firstIndex(where: { $0.id == item.id }) {
+            items[idx].bookmarkData = refreshed
+            items[idx].path = url.path
+            save()
+        }
+        return url
     }
 
     func remove(_ item: RecentItem) {

@@ -167,8 +167,7 @@ struct ReaderViewModelLibraryTests {
     @Test func cleanupStaleTempDirsRemovesPanelyPrefixedAndSparesOthers() throws {
         // Mimics the on-launch sweep: a previous crash leaves a `panely-*`
         // dir behind, while unrelated tmp entries (other apps, the user's
-        // own files) must survive. The prefix check is the only signal we
-        // have, so this is the contract.
+        // own files) must survive. The prefix + mtime check is the contract.
         let tmpRoot = FileManager.default.temporaryDirectory
         let stale = tmpRoot.appendingPathComponent(
             "panely-stale-\(UUID().uuidString)",
@@ -181,6 +180,13 @@ struct ReaderViewModelLibraryTests {
 
         try FileManager.default.createDirectory(at: stale, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: unrelated, withIntermediateDirectories: true)
+        // Backdate the stale dir past the sweep threshold (10 min). Without
+        // this, freshly-created `panely-*` dirs are left alone — that's by
+        // design so concurrent first-launch extractions aren't deleted.
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(-3600)],
+            ofItemAtPath: stale.path
+        )
         defer {
             try? FileManager.default.removeItem(at: stale)
             try? FileManager.default.removeItem(at: unrelated)
@@ -192,6 +198,24 @@ struct ReaderViewModelLibraryTests {
                 "Stale panely-* dir must be removed")
         #expect(FileManager.default.fileExists(atPath: unrelated.path),
                 "Non-panely tmp entries must be left alone")
+    }
+
+    @Test func cleanupStaleTempDirsSparesFreshlyCreatedPanelyDirs() throws {
+        // A first-launch extraction races the cleanup task. A freshly-made
+        // `panely-*` dir must survive the sweep so the in-flight load isn't
+        // deleted out from under itself.
+        let tmpRoot = FileManager.default.temporaryDirectory
+        let fresh = tmpRoot.appendingPathComponent(
+            "panely-fresh-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: fresh, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: fresh) }
+
+        ReaderViewModel.cleanupStaleTempDirs()
+
+        #expect(FileManager.default.fileExists(atPath: fresh.path),
+                "Freshly created panely-* dir must survive the sweep")
     }
 
     @Test func fixtureTempDirNamespaceDoesNotCollideWithCleanupSweep() throws {

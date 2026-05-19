@@ -96,7 +96,8 @@ struct LibrarySidebar: View {
                     ForEach(favorites) { fav in
                         FavoriteRow(
                             favorite: fav,
-                            isActive: activeURL?.path == fav.path,
+                            isActive: activeStdURL?.path
+                                == URL(fileURLWithPath: fav.path).standardizedFileURL.path,
                             onTap: { onSelectFavorite(fav) },
                             onRemove: { onRemoveFavorite(fav) }
                         )

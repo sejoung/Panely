@@ -12,6 +12,12 @@ struct PanelyApp: App {
             ContentView()
                 .environment(viewModel)
                 .environment(viewerController)
+                // Dark-only by design. `PanelyColor` tokens (`bgPrimary` #0F1115
+                // etc.) are tuned for a dark reading surface — comic pages have
+                // arbitrary content, and a near-black chrome stays out of the
+                // way regardless of the page's own palette. A light variant
+                // would require duplicating every token and is not on the
+                // roadmap; see README.
                 .preferredColorScheme(.dark)
                 .onOpenURL { url in
                     viewModel.openURL(url)
@@ -23,32 +29,7 @@ struct PanelyApp: App {
 
     @CommandsBuilder
     private var panelyCommands: some Commands {
-            CommandGroup(replacing: .newItem) {
-                Button("Open…") {
-                    viewModel.openSource()
-                }
-                .keyboardShortcut("o", modifiers: .command)
-
-                Menu("Open Recent") {
-                    if viewModel.recentItems.items.isEmpty {
-                        Text("No Recent Items")
-                    } else {
-                        ForEach(viewModel.recentItems.items) { item in
-                            Button {
-                                if let url = viewModel.recentItems.resolve(item) {
-                                    viewModel.openURL(url)
-                                }
-                            } label: {
-                                Label(item.title, systemImage: item.iconName)
-                            }
-                        }
-                        Divider()
-                        Button("Clear Menu") {
-                            viewModel.recentItems.clear()
-                        }
-                    }
-                }
-            }
+            fileCommands
 
             CommandMenu("View") {
                 Button(viewModel.sidebarPinned ? "Unpin Library" : "Pin Library") {
@@ -181,6 +162,39 @@ struct PanelyApp: App {
                 .keyboardShortcut("]", modifiers: .command)
                 .disabled(!viewModel.canGoNextVolume)
             }
+    }
+
+    /// File menu group. Pulled out of `panelyCommands` so the body of that
+    /// builder stays scannable — the original ~160-line builder made it
+    /// easy to miss shortcut collisions at review time.
+    @CommandsBuilder
+    private var fileCommands: some Commands {
+        CommandGroup(replacing: .newItem) {
+            Button("Open…") {
+                viewModel.openSource()
+            }
+            .keyboardShortcut("o", modifiers: .command)
+
+            Menu("Open Recent") {
+                if viewModel.recentItems.items.isEmpty {
+                    Text("No Recent Items")
+                } else {
+                    ForEach(viewModel.recentItems.items) { item in
+                        Button {
+                            if let url = viewModel.recentItems.resolve(item) {
+                                viewModel.openURL(url)
+                            }
+                        } label: {
+                            Label(item.title, systemImage: item.iconName)
+                        }
+                    }
+                    Divider()
+                    Button("Clear Menu") {
+                        viewModel.recentItems.clear()
+                    }
+                }
+            }
+        }
     }
 }
 

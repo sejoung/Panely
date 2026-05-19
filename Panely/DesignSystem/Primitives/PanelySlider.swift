@@ -3,6 +3,11 @@ import SwiftUI
 struct PanelySlider: View {
     @Binding var value: Double
     let range: ClosedRange<Double>
+    /// Step the slider snaps to on drag end. The default of 1 matches the
+    /// only current usage (page navigation), where the bound value is an
+    /// integer page number — without this the value carried a fractional
+    /// drift that wasn't visible but tripped equality checks in tests.
+    var snapStep: Double = 1
 
     private let trackHeight: CGFloat = 2
     private let thumbSize: CGFloat = 10
@@ -33,6 +38,9 @@ struct PanelySlider: View {
                     .onChanged { gesture in
                         update(from: gesture.location.x, width: geo.size.width)
                     }
+                    .onEnded { _ in
+                        snapToStep()
+                    }
             )
         }
         .frame(height: hitAreaHeight)
@@ -49,6 +57,13 @@ struct PanelySlider: View {
         guard width > 0 else { return }
         let pct = min(max(x / width, 0), 1)
         value = range.lowerBound + Double(pct) * (range.upperBound - range.lowerBound)
+    }
+
+    private func snapToStep() {
+        guard snapStep > 0 else { return }
+        let offset = value - range.lowerBound
+        let snapped = (offset / snapStep).rounded() * snapStep + range.lowerBound
+        value = min(max(snapped, range.lowerBound), range.upperBound)
     }
 }
 

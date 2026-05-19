@@ -87,12 +87,18 @@ final class ReaderViewModel {
 
     let imageCache: NSCache<NSString, NSImage> = {
         let cache = NSCache<NSString, NSImage>()
-        cache.countLimit = 10
+        // countLimit is intentionally loose — the real budget is `totalCostLimit`.
+        // Vertical lazy windows (`lazyWindowRadius` + `lazyKeepBuffer`) can pin
+        // ~25 pages around the visible band; setting the count cap close to that
+        // caused premature eviction of small pages even when far under the byte
+        // budget, hurting prefetch hit-rate on flips. Cost-driven eviction does
+        // the right thing for both huge and small pages.
+        cache.countLimit = 100
         // High-res scans (10000×14000 ≈ 600 MB decoded) could otherwise stack
-        // up to 6 GB RSS at the count limit. The byte cap means typical
-        // smaller pages stay cached up to the count limit, while a few huge
-        // pages get evicted before they pin too much memory. Per-entry cost
-        // is fed in by `cacheImage(_:for:)` based on pixel area × 4.
+        // up to many GB of RSS. The byte cap means typical smaller pages stay
+        // cached generously, while a few huge pages get evicted before they
+        // pin too much memory. Per-entry cost is fed in by `cacheImage(_:for:)`
+        // based on pixel area × 4.
         cache.totalCostLimit = 150 * 1024 * 1024
         return cache
     }()

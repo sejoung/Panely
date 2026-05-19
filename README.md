@@ -80,8 +80,10 @@ pages.
 ### File support
 - Open **folder**, **CBZ**, or **ZIP**
 - **Series-root auto-detection** — pick a folder of volumes and the first one opens
-- **Nested archive extraction** (up to 3 levels deep, recursive)
-- Natural filename sort (`1, 2, 10` — not `1, 10, 2`)
+- **Nested archive extraction** (up to 3 levels deep, recursive, with a
+  5 GB cumulative-size safety cap — guards against zip-bombs)
+- Natural filename sort (`1, 2, 10` — not `1, 10, 2`) — applied
+  consistently across loaders / scanners via the `NaturalSort` helper
 - Filters non-image files and hidden entries
 
 ### Navigation
@@ -114,10 +116,17 @@ pages.
 
 ### State persistence
 - **Resume where you left off** — per-book page memory with a stable key that
-  survives temp-directory extractions
+  survives temp-directory extractions. A secondary key derived from the
+  volume + file resource identifier recovers the saved position even
+  when an external drive's mount path changes
 - **Layout + direction + fit mode + sidebar pin + toolbar pin + auto-fit
   lock** all persisted (the legacy `panely.sidebarVisible` key auto-migrates
   to the new pin flag)
+- **Bookmark / favorite safety** — page-bookmark cap (500 per book) +
+  total-entry cap (200 books) keeps the store comfortably under the
+  `UserDefaults` ~4 MB practical limit, preventing wholesale loss on
+  decode failure. Stale security-scoped bookmarks are regenerated on
+  the fly so moving a favorited file doesn't break it
 - Entirely sandbox-compliant (user-selected files + app-scoped bookmarks)
 
 ## Requirements
@@ -215,7 +224,7 @@ xcodebuild test \
   CODE_SIGN_IDENTITY="-"
 ```
 
-**223 tests across 38 suites** cover:
+**234 tests across 39 suites** cover:
 
 - Pure data types (`ComicPage`, `ComicSource`, `RecentItem`, enum raw values)
 - Natural-sort contract (Foundation behaviour Panely relies on)
@@ -335,6 +344,7 @@ Panely/
 │   │   │   └── QuickJumpField.swift    # inline-editable page counter
 │   │   ├── Overlays/
 │   │   │   ├── LoadingOverlay.swift
+│   │   │   ├── VolumeCardChrome.swift  # shared material/shadow/border ViewModifier
 │   │   │   ├── EndOfVolumeCard.swift   # bottom card: "Up next" + start/restart
 │   │   │   └── PreviousVolumeCard.swift # top card: "Previous" (intent-gated)
 │   │   └── Thumbnails/
@@ -359,9 +369,10 @@ Panely/
     └── Comic/
         ├── ComicPage.swift / ComicSource.swift / ComicPageSource.swift
         ├── FolderLoader.swift
-        ├── CBZLoader.swift             # flat + recursive-nested extraction
+        ├── CBZLoader.swift             # flat + recursive-nested extraction + 5 GB safety cap
         ├── ArchiveReader.swift         # actor around ZIPFoundation.Archive
         │                               # (loadDataPrefix for header-only reads)
+        ├── NaturalSort.swift           # locale-aware natural ordering helper
         └── ImageLoader.swift           # async NSImage + dimensions(for:) header read
 
 PanelyTests/
@@ -471,15 +482,58 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   `/tmp`, the key is derived from the opened URL plus the relative path
   inside the temp root so reading progress survives re-extraction. Page
   bookmarks (`BookmarksStore`) reuse the same key so they also survive
-  temp-dir re-extraction.
+  temp-dir re-extraction. A `PositionKey.fileIdentity(for:)` helper
+  additionally produces a `(volumeIdentifier, fileResourceIdentifier)`
+  key so external drives whose mount path drifts (e.g. `/Volumes/X` →
+  `/Volumes/X 1`) still recover the saved position. Writes record under
+  both keys; reads try the path key first and fall back to file-identity.
+- **Deterministic `ComicPage.id`** — the page identifier is a deterministic
+  string derived from its source (`file:<path>` or
+  `archive:<archiveURL>#<entryPath>`). Re-opening the same book yields
+  the same `id`, so image and thumbnail `NSCache` entries stay warm —
+  the previous random-`UUID()` scheme caused a full thumbnail re-decode
+  on every reopen.
 - **`NSCache`-backed image cache** — per-page decoded `NSImage`s with
-  automatic memory-pressure eviction. `countLimit = 10` plus a
-  `totalCostLimit ≈ 150 MB` (per-entry cost = pixel area × 4 fed via
-  `setObject(_:forKey:cost:)`) keeps memory predictable when high-res
-  scans land in cache. Preload runs a cancellable `Task` around the
-  current page ±2 in paged modes. Cancellation propagates into
-  `ImageLoader.load` and `preloadIfNeeded` so abandoned work doesn't
-  pollute the cache during fast keyboard navigation.
+  automatic memory-pressure eviction. `countLimit = 100` is intentionally
+  loose so vertical lazy windows (`lazyWindowRadius + lazyKeepBuffer` ≈
+  25 pinned pages) aren't truncated by LRU eviction while still under
+  the real budget — `totalCostLimit ≈ 150 MB`. Per-entry cost uses the
+  bitmap rep's `pixelsWide × pixelsHigh × (bitsPerSample × samplesPerPixel / 8)`
+  so Retina backing and 16-bit/HDR scans aren't under-priced. Preload
+  runs a cancellable `Task` around the current page ±2 in paged modes;
+  cancellation propagates into `ImageLoader.load` and `preloadIfNeeded`
+  so abandoned work doesn't pollute the cache during fast keyboard navigation.
+- **Persistent store safety** — `BookmarksStore` caps per-book page
+  bookmarks at 500 (oldest dropped on overflow) and total book entries
+  at 200 (least-recently-touched dropped) so the JSON-encoded blob stays
+  comfortably under `UserDefaults`'s ~4 MB practical limit; a decode
+  failure there would otherwise lose every bookmark at once.
+  `pruneOrphanedPageBookmarks(keeping:)` lets the viewer GC entries
+  for books no longer in Recents/Favorites. Both
+  `RecentItemsStore.resolve` and `BookmarksStore.resolve` regenerate
+  stale security-scoped bookmarks in place, so moving a favorited file
+  doesn't break it — `RecentItemsStore.record`'s fast reopen path also
+  runs the same staleness check.
+- **CBZ extraction size cap** — `CBZLoader.maxExtractedBytes = 5 GB`.
+  After each `unzipItem` (top-level and nested), the destination is
+  walked once to sum file sizes; if the cumulative total crosses the
+  limit, `LoadError.extractedSizeExceeded` is thrown and partial
+  extraction is cleaned up. Protects against zip-bombs and pathological
+  nested archives that slip past `maxNestingDepth`.
+- **Startup temp-dir cleanup** — `cleanupStaleTempDirs` only removes
+  `panely-*` directories whose `contentModificationDate` is more than
+  10 minutes old, so a concurrent first-launch extraction can't be
+  deleted by the cleanup task racing it in the background.
+- **Last-spread-reachable position restore** — `clampedRestoredIndex`
+  clamps to the last step-aligned index (`((pageCount - 1) / step) * step`)
+  instead of `pageCount - 1`, so quitting on the final spread in
+  double-page mode and reopening lands exactly there rather than one
+  spread short.
+- **AppKit observer hardening** — the `frameDidChangeNotification` and
+  `boundsDidChangeNotification` observers in `AppKitImageScroller` are
+  defensively removed before being re-registered in `makeNSView`, so
+  any future Coordinator reuse (or SwiftUI representable recreation)
+  can't accumulate duplicate auto-fit handlers.
 - **Eager-decode image pipeline** — `ImageLoader.load` runs
   `CGImageSourceCreateWithURL` (zero-copy mmap for file URLs) /
   `CGImageSourceCreateWithData` (archive entries) inside a
@@ -579,7 +633,7 @@ git push origin v1.0.0
 ### CI / storage
 
 - **CI** runs on every push/PR (skips `**/*.md` and `docs/**`), builds
-  Debug with ad-hoc signing, runs all 223 tests, and uploads no artifacts —
+  Debug with ad-hoc signing, runs all 234 tests, and uploads no artifacts —
   storage footprint is essentially zero.
 - **Releases** attach a single zip (~5–10 MB) to GitHub Releases using
   `ditto` so resource forks are preserved.

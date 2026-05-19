@@ -45,6 +45,14 @@ struct AppKitImageScroller: NSViewRepresentable {
         context.coordinator.viewerController = viewerController
         viewerController?.attach(scrollView: scrollView)
 
+        // Defensive: makeNSView normally runs exactly once per Coordinator
+        // lifetime, but SwiftUI is free to recreate the representable. If a
+        // prior coordinator hand-off ever leaks an observer here it would
+        // double-fire the auto-fit on every resize. Cheap to guard.
+        if let existing = context.coordinator.frameObserver {
+            NotificationCenter.default.removeObserver(existing)
+            context.coordinator.frameObserver = nil
+        }
         context.coordinator.frameObserver = NotificationCenter.default.addObserver(
             forName: NSView.frameDidChangeNotification,
             object: scrollView,
@@ -69,6 +77,10 @@ struct AppKitImageScroller: NSViewRepresentable {
         coordinator.onVisibleRangeChanged = onVisibleRangeChanged
         // queue: nil → synchronous on the posting thread (always main here),
         // so currentPageIndex is always fresh when the user clicks a button.
+        if let existing = coordinator.boundsObserver {
+            NotificationCenter.default.removeObserver(existing)
+            coordinator.boundsObserver = nil
+        }
         coordinator.boundsObserver = NotificationCenter.default.addObserver(
             forName: NSView.boundsDidChangeNotification,
             object: scrollView.contentView,

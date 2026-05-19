@@ -13,6 +13,15 @@ final class BookmarksStore {
     private static let favoritesKey = "panely.favoriteBooks"
     private static let pageBookmarksKey = "panely.pageBookmarks"
 
+    /// Per-book bookmark cap. Picked so that even a maxed-out book stays
+    /// well under the UserDefaults practical limit when multiplied across
+    /// many books (500 entries × ~80 bytes ≈ 40 KB per book).
+    static let maxBookmarksPerBook = 500
+    /// Total book entries cap. Above this we drop the least-recently-touched
+    /// book's bookmarks on the next write. Prevents unbounded growth from a
+    /// long history of opened-then-deleted books.
+    static let maxBookEntries = 200
+
     private(set) var favorites: [FavoriteBook] = []
     /// Keyed by `PositionKey`. Values are kept sorted by `pageIndex` on write.
     private(set) var pageBookmarksByBook: [String: [PageBookmark]] = [:]
@@ -59,12 +68,26 @@ final class BookmarksStore {
 
     func resolve(_ favorite: FavoriteBook) -> URL? {
         var isStale = false
-        return try? URL(
+        guard let url = try? URL(
             resolvingBookmarkData: favorite.bookmarkData,
             options: .withSecurityScope,
             relativeTo: nil,
             bookmarkDataIsStale: &isStale
-        )
+        ) else {
+            return nil
+        }
+        // Refresh the bookmark in place when stale — keeps Favorites usable
+        // across file moves without forcing the user to re-add them.
+        if isStale, let refreshed = try? url.bookmarkData(
+            options: .withSecurityScope,
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+        ), let idx = favorites.firstIndex(where: { $0.id == favorite.id }) {
+            favorites[idx].bookmarkData = refreshed
+            favorites[idx].path = url.path
+            saveFavorites()
+        }
+        return url
     }
 
     func removeFavorite(_ favorite: FavoriteBook) {
@@ -91,6 +114,12 @@ final class BookmarksStore {
             list.remove(at: idx)
             commitPageBookmarks(list, forKey: key)
             return false
+        }
+        // Cap per-book bookmarks. Drop the oldest entry to make room — keeps
+        // recent intent intact while preventing pathological growth.
+        if list.count >= Self.maxBookmarksPerBook {
+            list.sort { $0.createdAt < $1.createdAt }
+            list.removeFirst()
         }
         list.append(PageBookmark(pageIndex: pageIndex))
         commitPageBookmarks(list, forKey: key)
@@ -120,7 +149,37 @@ final class BookmarksStore {
         } else {
             pageBookmarksByBook[key] = sorted
         }
+        // Cap total book entries. When over the limit, drop the entries with
+        // the oldest most-recent bookmark first — those are the "least
+        // recently touched" books in the store.
+        if pageBookmarksByBook.count > Self.maxBookEntries {
+            let recencyByKey: [(String, Date)] = pageBookmarksByBook.map { entry in
+                let mostRecent = entry.value.map(\.createdAt).max() ?? .distantPast
+                return (entry.key, mostRecent)
+            }
+            let overflow = pageBookmarksByBook.count - Self.maxBookEntries
+            let toDrop = recencyByKey
+                .sorted { $0.1 < $1.1 }
+                .prefix(overflow)
+            for (k, _) in toDrop {
+                pageBookmarksByBook.removeValue(forKey: k)
+            }
+        }
         savePageBookmarks()
+    }
+
+    /// Drop bookmark entries whose books are no longer reachable via
+    /// `liveKeys`. Call from the viewer after a successful load so that
+    /// long-deleted books don't accumulate forever. `liveKeys` should
+    /// include every `PositionKey` that's still resolvable (favorites,
+    /// recents, current book). Passing an empty set is a no-op for safety.
+    func pruneOrphanedPageBookmarks(keeping liveKeys: Set<String>) {
+        guard !liveKeys.isEmpty else { return }
+        let before = pageBookmarksByBook.count
+        pageBookmarksByBook = pageBookmarksByBook.filter { liveKeys.contains($0.key) }
+        if pageBookmarksByBook.count != before {
+            savePageBookmarks()
+        }
     }
 
     // MARK: Persistence

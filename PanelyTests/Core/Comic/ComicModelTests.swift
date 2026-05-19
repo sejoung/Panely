@@ -3,10 +3,19 @@ import Foundation
 @testable import Panely
 
 struct ComicPageTests {
-    @Test func createsUniqueIDPerInstance() {
+    @Test func idIsDeterministicForSameSource() {
+        // IDs are derived from the page source so image/thumbnail caches
+        // survive a `ComicSource` reload of the same book. Two pages built
+        // from the same URL must therefore share an id.
         let url = URL(fileURLWithPath: "/tmp/sample.cbz")
         let a = ComicPage(source: .file(url), displayName: "sample")
         let b = ComicPage(source: .file(url), displayName: "sample")
+        #expect(a.id == b.id)
+    }
+
+    @Test func idDiffersBetweenSources() {
+        let a = ComicPage(source: .file(URL(fileURLWithPath: "/tmp/a.jpg")), displayName: "a")
+        let b = ComicPage(source: .file(URL(fileURLWithPath: "/tmp/b.jpg")), displayName: "b")
         #expect(a.id != b.id)
     }
 
