@@ -2,40 +2,13 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Source loading (folder / archive), volume/sibling navigation, library
-/// root handling, and per-book position memory. Anything that touches disk
-/// or security-scoped URLs lives here.
+/// Source loading — Open dialogs, the main `load(url:)` pipeline, security
+/// scope acquisition, and the off-main folder/archive scanners. Volume
+/// navigation (counters, sibling stepping, end-of-volume cards) lives in
+/// `ReaderViewModel+Volumes.swift`.
 extension ReaderViewModel {
 
-    // MARK: - Volume / sibling navigation
-
-    var currentSiblingIndex: Int? {
-        guard let current = currentSourceURL else { return nil }
-        let target = current.standardizedFileURL
-        return siblings.firstIndex { $0.standardizedFileURL == target }
-    }
-
-    var hasMultipleVolumes: Bool { siblings.count > 1 }
-
-    var canGoPreviousVolume: Bool {
-        guard let idx = currentSiblingIndex else { return false }
-        return idx > 0
-    }
-
-    var canGoNextVolume: Bool {
-        guard let idx = currentSiblingIndex else { return false }
-        return idx + 1 < siblings.count
-    }
-
-    var volumeCounterLabel: String? {
-        guard hasMultipleVolumes, let idx = currentSiblingIndex else { return nil }
-        return "Vol \(idx + 1) / \(siblings.count)"
-    }
-
-    var combinedCounterLabel: String {
-        guard let vol = volumeCounterLabel else { return pageCounterLabel }
-        return "\(vol) · \(pageCounterLabel)"
-    }
+    // MARK: - Library root resolution
 
     var libraryRootURL: URL? {
         if let explicit = explicitLibraryRootURL { return explicit }
@@ -56,77 +29,6 @@ extension ReaderViewModel {
             return isDir ? opened : opened.deletingLastPathComponent()
         }
         return currentSourceURL?.deletingLastPathComponent()
-    }
-
-    /// Volumes to surface as a dedicated sidebar section. Only populated for
-    /// zip-in-zip (when the volumes live inside `currentTempDir` and are not
-    /// visible in the Files tree). For folder/cbz series the volumes already
-    /// appear in the tree under the parent folder, so a separate section
-    /// would just duplicate what's already on screen.
-    var sidebarVolumes: [URL] {
-        guard hasMultipleVolumes, currentTempDir != nil else { return [] }
-        return siblings
-    }
-
-    func nextVolume() {
-        guard canGoNextVolume, let idx = currentSiblingIndex else { return }
-        let target = siblings[idx + 1]
-        let preservedSiblings = siblings
-        Task { await load(url: target, knownSiblings: preservedSiblings) }
-    }
-
-    func previousVolume() {
-        guard canGoPreviousVolume, let idx = currentSiblingIndex else { return }
-        let target = siblings[idx - 1]
-        let preservedSiblings = siblings
-        Task { await load(url: target, knownSiblings: preservedSiblings) }
-    }
-
-    // MARK: - End-of-volume card
-
-    /// True when the user is on the final page/spread — i.e., when `next()`
-    /// would no-op. Mirrors `next()`'s guard exactly so the card appears
-    /// precisely when forward navigation runs out, in both paged and vertical
-    /// layouts.
-    var isAtLastPage: Bool {
-        let count = source.pageCount
-        guard count > 0 else { return false }
-        return currentPageIndex + navigationStep >= count
-    }
-
-    /// Drives the end-of-volume card. Visible only when there's a next sibling
-    /// to advance to — last volume in a series shows nothing rather than a
-    /// "completion" toast (kept simple for v1).
-    var showsEndOfVolumeCard: Bool {
-        isAtLastPage && canGoNextVolume
-    }
-
-    /// Filename (no extension) of the next sibling. Used as the card's
-    /// preview label so users see *which* volume they'd advance to.
-    var nextVolumeDisplayName: String? {
-        guard canGoNextVolume, let idx = currentSiblingIndex else { return nil }
-        return siblings[idx + 1].deletingPathExtension().lastPathComponent
-    }
-
-    /// Restart the current volume from page 1. Used by the card's secondary
-    /// action so users can re-read without picking from the slider.
-    func restartCurrentVolume() {
-        jump(toPageNumber: 1)
-    }
-
-    /// Drives the previous-volume card. Asymmetric vs `showsEndOfVolumeCard`
-    /// on purpose: that card auto-appears whenever you're at the last page,
-    /// but this one only surfaces after the user has signaled intent (via
-    /// `goBackward()`). Otherwise opening Vol N (which lands on page 0 on
-    /// first read) would noisily prompt about Vol N-1 every time.
-    var showsPreviousVolumeCard: Bool {
-        wantsPreviousVolumePrompt && canGoPreviousVolume
-    }
-
-    /// Filename (no extension) of the previous sibling.
-    var previousVolumeDisplayName: String? {
-        guard canGoPreviousVolume, let idx = currentSiblingIndex else { return nil }
-        return siblings[idx - 1].deletingPathExtension().lastPathComponent
     }
 
     // MARK: - Opening new sources
@@ -167,18 +69,14 @@ extension ReaderViewModel {
 
         guard panel.runModal() == .OK, let folderURL = panel.url else { return }
 
-        rootScopedURL?.stopAccessingSecurityScopedResource()
-        rootScopedURL = nil
-        if folderURL.startAccessingSecurityScopedResource() {
-            rootScopedURL = folderURL
-        }
+        libraryScope.acquire(folderURL)
 
         recentItems.record(folderURL, title: displayTitle(for: folderURL))
         explicitLibraryRootURL = folderURL
 
         Task {
             let volumes = await Self.enumerateVolumes(in: folderURL)
-            if let current = currentSourceURL, isInsideRootScope(current) {
+            if let current = currentSourceURL, libraryScope.contains(current) {
                 siblings = volumes.isEmpty ? [current] : volumes
             }
             libraryRefreshToken = UUID()
@@ -192,7 +90,7 @@ extension ReaderViewModel {
     // MARK: - Main load pipeline
 
     func load(url: URL, knownSiblings: [URL]? = nil) async {
-        preloadTask?.cancel()
+        imageLoader.cancelPreload()
 
         // Any new book load — explicit, via prev/next volume, or via library
         // — resets the prev-volume cue. Without this, opening Vol N+1 after
@@ -219,29 +117,25 @@ extension ReaderViewModel {
         }
 
         if !isInsideCurrentTree(url) {
-            cleanupTempDir()
-            rootScopedURL?.stopAccessingSecurityScopedResource()
-            rootScopedURL = nil
-            if url.startAccessingSecurityScopedResource() {
-                rootScopedURL = url
-            }
+            tempDir.cleanup()
+            libraryScope.acquire(url)
             explicitLibraryRootURL = nil
             openedSourceURL = url
-        } else if currentTempDir != nil && !isInsideTempDir(url) {
+        } else if tempDir.isActive && !tempDir.contains(url) {
             // Inside the library scope but outside the active temp dir —
             // user is switching to a different book (or re-opening the
             // same zip-in-zip after a library-root change). Drop the stale
             // temp so the extraction block below re-runs against the new
             // URL; without this, the original extraction is reused and we
             // try to load the outer archive directly.
-            cleanupTempDir()
+            tempDir.cleanup()
             openedSourceURL = url
         }
 
         var targetURL = url
         var siblingsToUse = knownSiblings
 
-        if currentTempDir == nil {
+        if !tempDir.isActive {
             let ext = url.pathExtension.lowercased()
             let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
             if !isDir && CBZLoader.supportedExtensions.contains(ext) {
@@ -250,19 +144,19 @@ extension ReaderViewModel {
                     guard myEpoch == loadEpoch else { return }
                     if hasNested {
                         loadingMessage = "Extracting archive…"
-                        let tempDir = Self.makeTempDir()
+                        let candidate = ReaderTempDirectory.makeCandidate()
                         do {
-                            try await CBZLoader.extractAll(from: url, to: tempDir)
+                            try await CBZLoader.extractAll(from: url, to: candidate)
                             guard myEpoch == loadEpoch else {
                                 // Newer load is in flight; don't keep the
-                                // tempDir we just created — it would leak.
-                                try? FileManager.default.removeItem(at: tempDir)
+                                // candidate we just extracted — it would leak.
+                                try? FileManager.default.removeItem(at: candidate)
                                 return
                             }
-                            currentTempDir = tempDir
-                            targetURL = tempDir
+                            tempDir.adopt(candidate)
+                            targetURL = candidate
                         } catch {
-                            try? FileManager.default.removeItem(at: tempDir)
+                            try? FileManager.default.removeItem(at: candidate)
                             guard myEpoch == loadEpoch else { return }
                             errorMessage = "Failed to extract archive: \(error.localizedDescription)"
                         }
@@ -284,7 +178,7 @@ extension ReaderViewModel {
                 siblingsToUse = volumes
             } else if !hasImages && volumes.isEmpty {
                 source = .empty
-                currentImages = []
+                imageLoader.reset()
                 currentSourceURL = nil
                 siblings = []
                 errorMessage = "Folder is empty or has no supported content"
@@ -328,76 +222,18 @@ extension ReaderViewModel {
             guard myEpoch == loadEpoch else { return }
             errorMessage = error.localizedDescription
             source = .empty
-            currentImages = []
+            imageLoader.reset()
             currentSourceURL = nil
             siblings = []
-            rootScopedURL?.stopAccessingSecurityScopedResource()
-            rootScopedURL = nil
+            libraryScope.release()
         }
     }
 
-    // MARK: - Scope / temp helpers
-
-    func isInsideRootScope(_ url: URL) -> Bool {
-        guard let root = rootScopedURL else { return false }
-        let rootPath = root.standardizedFileURL.path
-        let target = url.standardizedFileURL.path
-        return target == rootPath || target.hasPrefix(rootPath + "/")
-    }
+    // MARK: - Scope helpers
 
     func isInsideCurrentTree(_ url: URL) -> Bool {
-        if isInsideTempDir(url) { return true }
-        return isInsideRootScope(url)
-    }
-
-    func isInsideTempDir(_ url: URL) -> Bool {
-        guard let temp = currentTempDir else { return false }
-        let tempPath = temp.standardizedFileURL.path
-        let target = url.standardizedFileURL.path
-        return target == tempPath || target.hasPrefix(tempPath + "/")
-    }
-
-    func cleanupTempDir() {
-        guard let dir = currentTempDir else { return }
-        try? FileManager.default.removeItem(at: dir)
-        currentTempDir = nil
-    }
-
-    static func makeTempDir() -> URL {
-        FileManager.default.temporaryDirectory
-            .appendingPathComponent("panely-\(UUID().uuidString)", isDirectory: true)
-    }
-
-    /// Sweep `panely-*` directories left behind by a prior session that
-    /// crashed or was force-quit before `cleanupTempDir()` could run. A
-    /// single zip-in-zip extraction can be hundreds of megabytes, and macOS
-    /// only sweeps the sandbox tmp opportunistically (not on every launch),
-    /// so leftovers can quietly accumulate.
-    ///
-    /// Called from `init` on a background queue, where it races with the
-    /// app's own first extraction. To avoid deleting that brand-new dir,
-    /// only sweep entries whose mtime is older than `staleAge` — anything
-    /// fresher belongs to a concurrent load or another running instance.
-    nonisolated static func cleanupStaleTempDirs() {
-        let tmpRoot = FileManager.default.temporaryDirectory
-        guard let entries = try? FileManager.default.contentsOfDirectory(
-            at: tmpRoot,
-            includingPropertiesForKeys: [.contentModificationDateKey],
-            options: [.skipsHiddenFiles]
-        ) else { return }
-
-        // 10 minutes is generous: even a multi-GB zip-in-zip extraction
-        // typically finishes well under that, and anything older is almost
-        // certainly orphaned from a prior session.
-        let staleAge: TimeInterval = 10 * 60
-        let cutoff = Date().addingTimeInterval(-staleAge)
-
-        for entry in entries where entry.lastPathComponent.hasPrefix("panely-") {
-            let mtime = (try? entry.resourceValues(forKeys: [.contentModificationDateKey]))?
-                .contentModificationDate ?? .distantPast
-            guard mtime < cutoff else { continue }
-            try? FileManager.default.removeItem(at: entry)
-        }
+        if tempDir.contains(url) { return true }
+        return libraryScope.contains(url)
     }
 
     // MARK: - Per-book position memory
@@ -408,7 +244,7 @@ extension ReaderViewModel {
         PositionKey.make(
             for: url,
             opened: openedSourceURL,
-            tempRoot: currentTempDir
+            tempRoot: tempDir.url
         )
     }
 

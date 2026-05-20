@@ -19,7 +19,7 @@ struct ReaderViewModelLibraryTests {
             URL(fileURLWithPath: "/lib/series/02"),
             URL(fileURLWithPath: "/lib/series/03")
         ]
-        vm.currentTempDir = nil
+        vm.tempDir.url = nil
 
         #expect(vm.sidebarVolumes.isEmpty)
     }
@@ -27,7 +27,7 @@ struct ReaderViewModelLibraryTests {
     @Test func sidebarVolumesIsEmptyWhenOnlyOneSibling() {
         let vm = ReaderViewModel()
         vm.siblings = [URL(fileURLWithPath: "/var/folders/T/panely-X/Vol01.cbz")]
-        vm.currentTempDir = URL(fileURLWithPath: "/var/folders/T/panely-X")
+        vm.tempDir.url = URL(fileURLWithPath: "/var/folders/T/panely-X")
 
         #expect(vm.sidebarVolumes.isEmpty)
     }
@@ -35,7 +35,7 @@ struct ReaderViewModelLibraryTests {
     @Test func sidebarVolumesReturnsSiblingsForZipInZip() {
         let vm = ReaderViewModel()
         let temp = URL(fileURLWithPath: "/var/folders/T/panely-X")
-        vm.currentTempDir = temp
+        vm.tempDir.url = temp
         vm.siblings = [
             temp.appendingPathComponent("Vol01.cbz"),
             temp.appendingPathComponent("Vol02.cbz"),
@@ -46,65 +46,65 @@ struct ReaderViewModelLibraryTests {
         #expect(vm.sidebarVolumes.last?.lastPathComponent == "Vol03.cbz")
     }
 
-    // MARK: - isInsideTempDir
+    // MARK: - tempDir.contains
 
-    @Test func isInsideTempDirIsFalseWhenNoTempDir() {
+    @Test func tempDirContainsIsFalseWhenNoTempDir() {
         let vm = ReaderViewModel()
-        vm.currentTempDir = nil
+        vm.tempDir.url = nil
 
-        #expect(vm.isInsideTempDir(URL(fileURLWithPath: "/anywhere")) == false)
+        #expect(vm.tempDir.contains(URL(fileURLWithPath: "/anywhere")) == false)
     }
 
-    @Test func isInsideTempDirMatchesURLsInsideTheTempRoot() {
+    @Test func tempDirContainsMatchesURLsInsideTheTempRoot() {
         let vm = ReaderViewModel()
         let temp = URL(fileURLWithPath: "/var/folders/T/panely-X")
-        vm.currentTempDir = temp
+        vm.tempDir.url = temp
 
-        #expect(vm.isInsideTempDir(temp))
-        #expect(vm.isInsideTempDir(temp.appendingPathComponent("Vol01.cbz")))
-        #expect(vm.isInsideTempDir(temp.appendingPathComponent("nested/file.jpg")))
+        #expect(vm.tempDir.contains(temp))
+        #expect(vm.tempDir.contains(temp.appendingPathComponent("Vol01.cbz")))
+        #expect(vm.tempDir.contains(temp.appendingPathComponent("nested/file.jpg")))
     }
 
-    @Test func isInsideTempDirRejectsURLsOutsideTheTempRoot() {
+    @Test func tempDirContainsRejectsURLsOutsideTheTempRoot() {
         let vm = ReaderViewModel()
-        vm.currentTempDir = URL(fileURLWithPath: "/var/folders/T/panely-X")
+        vm.tempDir.url = URL(fileURLWithPath: "/var/folders/T/panely-X")
 
-        #expect(vm.isInsideTempDir(URL(fileURLWithPath: "/var/folders/T/panely-Y/file")) == false)
-        #expect(vm.isInsideTempDir(URL(fileURLWithPath: "/Users/me/Comics/book.cbz")) == false)
+        #expect(vm.tempDir.contains(URL(fileURLWithPath: "/var/folders/T/panely-Y/file")) == false)
+        #expect(vm.tempDir.contains(URL(fileURLWithPath: "/Users/me/Comics/book.cbz")) == false)
     }
 
-    @Test func isInsideTempDirRejectsSiblingDirectoryWithSamePrefix() {
+    @Test func tempDirContainsRejectsSiblingDirectoryWithSamePrefix() {
         // /a/panely-X must not be considered inside /a/panely — the prefix
         // check has to be path-component aware (uses "/" boundary).
         let vm = ReaderViewModel()
-        vm.currentTempDir = URL(fileURLWithPath: "/var/folders/T/panely")
+        vm.tempDir.url = URL(fileURLWithPath: "/var/folders/T/panely")
 
-        #expect(vm.isInsideTempDir(URL(fileURLWithPath: "/var/folders/T/panely-X/file")) == false)
+        #expect(vm.tempDir.contains(URL(fileURLWithPath: "/var/folders/T/panely-X/file")) == false)
     }
 
-    // MARK: - isInsideRootScope
+    // MARK: - libraryScope.contains
 
-    @Test func isInsideRootScopeIsFalseWhenNoRoot() {
+    @Test func libraryScopeContainsIsFalseWhenNoRoot() {
         let vm = ReaderViewModel()
-        vm.rootScopedURL = nil
+        vm.libraryScope.url = nil
 
-        #expect(vm.isInsideRootScope(URL(fileURLWithPath: "/Users/me/Comics/book.cbz")) == false)
+        #expect(vm.libraryScope.contains(URL(fileURLWithPath: "/Users/me/Comics/book.cbz")) == false)
     }
 
-    @Test func isInsideRootScopeMatchesURLsInsideTheRoot() {
+    @Test func libraryScopeContainsMatchesURLsInsideTheRoot() {
         let vm = ReaderViewModel()
         let root = URL(fileURLWithPath: "/Users/me/Comics")
-        vm.rootScopedURL = root
+        vm.libraryScope.url = root
 
-        #expect(vm.isInsideRootScope(root))
-        #expect(vm.isInsideRootScope(root.appendingPathComponent("series/01")))
+        #expect(vm.libraryScope.contains(root))
+        #expect(vm.libraryScope.contains(root.appendingPathComponent("series/01")))
     }
 
-    @Test func isInsideRootScopeRejectsURLsOutsideTheRoot() {
+    @Test func libraryScopeContainsRejectsURLsOutsideTheRoot() {
         let vm = ReaderViewModel()
-        vm.rootScopedURL = URL(fileURLWithPath: "/Users/me/Comics")
+        vm.libraryScope.url = URL(fileURLWithPath: "/Users/me/Comics")
 
-        #expect(vm.isInsideRootScope(URL(fileURLWithPath: "/Users/me/Downloads/x.cbz")) == false)
+        #expect(vm.libraryScope.contains(URL(fileURLWithPath: "/Users/me/Downloads/x.cbz")) == false)
     }
 
     // MARK: - isInsideCurrentTree
@@ -113,8 +113,8 @@ struct ReaderViewModelLibraryTests {
         let vm = ReaderViewModel()
         let root = URL(fileURLWithPath: "/Users/me/Comics")
         let temp = URL(fileURLWithPath: "/var/folders/T/panely-X")
-        vm.rootScopedURL = root
-        vm.currentTempDir = temp
+        vm.libraryScope.url = root
+        vm.tempDir.url = temp
 
         #expect(vm.isInsideCurrentTree(root.appendingPathComponent("a.cbz")))
         #expect(vm.isInsideCurrentTree(temp.appendingPathComponent("Vol01.cbz")))
@@ -162,7 +162,7 @@ struct ReaderViewModelLibraryTests {
         #expect(vm.libraryRootURL == nil)
     }
 
-    // MARK: - cleanupStaleTempDirs
+    // MARK: - ReaderTempDirectory.cleanupStaleEntries
 
     @Test func cleanupStaleTempDirsRemovesPanelyPrefixedAndSparesOthers() throws {
         // Mimics the on-launch sweep: a previous crash leaves a `panely-*`
@@ -192,7 +192,7 @@ struct ReaderViewModelLibraryTests {
             try? FileManager.default.removeItem(at: unrelated)
         }
 
-        ReaderViewModel.cleanupStaleTempDirs()
+        ReaderTempDirectory.cleanupStaleEntries()
 
         #expect(!FileManager.default.fileExists(atPath: stale.path),
                 "Stale panely-* dir must be removed")
@@ -212,7 +212,7 @@ struct ReaderViewModelLibraryTests {
         try FileManager.default.createDirectory(at: fresh, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: fresh) }
 
-        ReaderViewModel.cleanupStaleTempDirs()
+        ReaderTempDirectory.cleanupStaleEntries()
 
         #expect(FileManager.default.fileExists(atPath: fresh.path),
                 "Freshly created panely-* dir must survive the sweep")
@@ -228,7 +228,7 @@ struct ReaderViewModelLibraryTests {
 
         #expect(
             !dir.lastPathComponent.hasPrefix("panely-"),
-            "Fixture dir \(dir.lastPathComponent) collides with cleanupStaleTempDirs()'s panely-* prefix"
+            "Fixture dir \(dir.lastPathComponent) collides with ReaderTempDirectory.cleanupStaleEntries()'s panely-* prefix"
         )
     }
 

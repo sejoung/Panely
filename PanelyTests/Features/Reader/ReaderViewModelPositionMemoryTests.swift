@@ -14,22 +14,22 @@ struct ReaderViewModelPositionMemoryTests {
         let url = URL(fileURLWithPath: "/tmp/seed-test-\(UUID()).cbz")
         let key = url.standardizedFileURL.path
 
-        UserDefaults.standard.set([key: 42] as [String: Int], forKey: ReaderViewModel.positionsKey)
-        defer { UserDefaults.standard.removeObject(forKey: ReaderViewModel.positionsKey) }
+        UserDefaults.standard.set([key: 42] as [String: Int], forKey: ReaderPositionStore.positionsKey)
+        defer { UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey) }
 
         let vm = ReaderViewModel()
         // Cache is empty before any access.
-        #expect(vm.positionsCache == nil)
+        #expect(vm.positions.cache == nil)
 
         let restored = vm.restoredIndex(for: url)
         #expect(restored == 42)
         // First access hydrates the mirror.
-        #expect(vm.positionsCache?[key] == 42)
+        #expect(vm.positions.cache?[key] == 42)
     }
 
     @Test func writeRoundTripsThroughCacheAndUserDefaults() {
-        UserDefaults.standard.removeObject(forKey: ReaderViewModel.positionsKey)
-        defer { UserDefaults.standard.removeObject(forKey: ReaderViewModel.positionsKey) }
+        UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey)
+        defer { UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey) }
 
         let vm = ReaderViewModel()
         let url = URL(fileURLWithPath: "/tmp/positions-test-\(UUID()).cbz")
@@ -54,8 +54,8 @@ struct ReaderViewModelPositionMemoryTests {
     }
 
     @Test func mirrorReflectsLatestWriteWithoutReReadingDefaults() {
-        UserDefaults.standard.removeObject(forKey: ReaderViewModel.positionsKey)
-        defer { UserDefaults.standard.removeObject(forKey: ReaderViewModel.positionsKey) }
+        UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey)
+        defer { UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey) }
 
         let vm = ReaderViewModel()
         let url = URL(fileURLWithPath: "/tmp/mirror-test-\(UUID()).cbz")
@@ -78,8 +78,8 @@ struct ReaderViewModelPositionMemoryTests {
     }
 
     @Test func multipleBooksCoexistInTheSameMirror() {
-        UserDefaults.standard.removeObject(forKey: ReaderViewModel.positionsKey)
-        defer { UserDefaults.standard.removeObject(forKey: ReaderViewModel.positionsKey) }
+        UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey)
+        defer { UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey) }
 
         let vm = ReaderViewModel()
         let urlA = URL(fileURLWithPath: "/tmp/book-a-\(UUID()).cbz")

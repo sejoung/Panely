@@ -6,7 +6,7 @@ import ZIPFoundation
 
 enum Fixture {
     static func makeTempDir() throws -> URL {
-        // Must not start with `panely-` — `ReaderViewModel.cleanupStaleTempDirs()`
+        // Must not start with `panely-` — `ReaderTempDirectory.cleanupStaleEntries()`
         // sweeps that prefix at startup and can race with in-flight tests.
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("paneltest-\(UUID().uuidString)", isDirectory: true)

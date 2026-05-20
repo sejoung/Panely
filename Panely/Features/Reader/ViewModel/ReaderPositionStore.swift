@@ -9,7 +9,11 @@ import Foundation
 final class ReaderPositionStore {
     static let positionsKey = "panely.positions"
 
-    private var cache: [String: Int]?
+    /// In-memory mirror of the positions dict. Module-internal (not private)
+    /// so tests can assert the lazy-hydration invariant — production code
+    /// must go through `savePosition` / `restoredIndex` to keep the dict and
+    /// the UserDefaults write paired.
+    var cache: [String: Int]?
     private var pendingSaveTask: Task<Void, Never>?
 
     /// Schedule a debounced write. Rapid repeat calls coalesce into a single

@@ -6,19 +6,21 @@ import UniformTypeIdentifiers
 ///
 /// Composition over inheritance: state and persistence that don't depend on
 /// the open book live in dedicated collaborators, so this class only carries
-/// the source/image/navigation state that genuinely belongs together:
+/// the navigation/source plumbing that genuinely belongs together:
 ///
 /// - `ReaderPreferences` — layout / fit / sidebar / toolbar persistence
 /// - `ReaderPositionStore` — debounced per-book page memory
+/// - `ReaderImageLoader` — cache, lazy window, preload, paged refresh
+/// - `ReaderTempDirectory` — zip-in-zip extraction lifecycle
 /// - `ReaderViewModel+Navigation` — page stepping, chrome toggles, jumps
-/// - `ReaderViewModel+Source` — load pipeline, volume siblings, temp dirs
-/// - `ReaderViewModel+ImageLoading` — preload, vertical lazy window, cache
+/// - `ReaderViewModel+Source` — load pipeline, volume siblings, library scope
+/// - `ReaderViewModel+ImageLoading` — thin facade over `imageLoader`
 /// - `ReaderViewModel+Bookmarks` — favorites & per-page bookmarks integration
 ///
-/// The preferences fields (`layout`, `fitMode`, …) are exposed as forwarding
-/// computed properties on this class so existing view callsites
-/// (`viewModel.layout == .single`) keep working unchanged — `@Observable`
-/// tracks through the chain to `preferences.layout`.
+/// Preference/image fields are exposed as forwarding computed properties so
+/// existing view callsites (`viewModel.layout == .single`,
+/// `viewModel.currentImages`) keep working — `@Observable` tracks through
+/// the chain to the underlying collaborator.
 @Observable
 @MainActor
 final class ReaderViewModel {
@@ -26,6 +28,9 @@ final class ReaderViewModel {
 
     let preferences = ReaderPreferences()
     let positions = ReaderPositionStore()
+    let imageLoader = ReaderImageLoader()
+    let tempDir = ReaderTempDirectory()
+    let libraryScope = ReaderLibraryScope()
     let recentItems: RecentItemsStore
     let bookmarks: BookmarksStore
 
@@ -41,7 +46,6 @@ final class ReaderViewModel {
             wantsPreviousVolumePrompt = false
         }
     }
-    var currentImages: [NSImage] = []
     var errorMessage: String?
     var isLoading: Bool = false
     var loadingMessage: String = ""
@@ -55,8 +59,6 @@ final class ReaderViewModel {
     /// (`currentPageIndex` didSet) and by `load(url:)`.
     var wantsPreviousVolumePrompt: Bool = false
 
-    var rootScopedURL: URL?
-    var currentTempDir: URL?
     var openedSourceURL: URL?
     var libraryRefreshToken: UUID = UUID()
     var explicitLibraryRootURL: URL?
@@ -69,45 +71,6 @@ final class ReaderViewModel {
     /// earlier-clicked book that happened to finish loading after the later
     /// one (race in `currentImages` / `currentSourceURL` assignments).
     var loadEpoch: Int = 0
-
-    // MARK: - Image cache + paged preload
-
-    let imageCache: NSCache<NSString, NSImage> = {
-        let cache = NSCache<NSString, NSImage>()
-        // countLimit is intentionally loose — the real budget is `totalCostLimit`.
-        // Vertical lazy windows (`lazyWindowRadius` + `lazyKeepBuffer`) can pin
-        // ~25 pages around the visible band; setting the count cap close to that
-        // caused premature eviction of small pages even when far under the byte
-        // budget, hurting prefetch hit-rate on flips. Cost-driven eviction does
-        // the right thing for both huge and small pages.
-        cache.countLimit = 100
-        // High-res scans (10000×14000 ≈ 600 MB decoded) could otherwise stack
-        // up to many GB of RSS. The byte cap means typical smaller pages stay
-        // cached generously, while a few huge pages get evicted before they
-        // pin too much memory. Per-entry cost is fed in by `cacheImage(_:for:)`
-        // based on pixel area × 4.
-        cache.totalCostLimit = 150 * 1024 * 1024
-        return cache
-    }()
-    var preloadTask: Task<Void, Never>?
-    let preloadRadius = 2
-
-    // MARK: - Vertical lazy window
-
-    /// Vertical-mode lazy-load state. `pageDimensions` is populated up-front
-    /// (cheap header reads); `currentImages` starts as same-sized placeholder
-    /// `NSImage(size:)` instances and is replaced one-by-one as real images
-    /// are decoded inside the visible window. `loadedPageIndices` tracks
-    /// which slots already hold real (non-placeholder) images.
-    var pageDimensions: [CGSize] = []
-    var loadedPageIndices: Set<Int> = []
-    let lazyWindowRadius = 3
-    /// Pages outside `[visibleRange ± lazyKeepBuffer]` get evicted back to
-    /// placeholders so a long strip doesn't pin every loaded image in memory.
-    /// Wider than the load buffer so small back-scrolls don't immediately
-    /// re-decode. NSCache still holds recents for fast restore.
-    let lazyKeepBuffer = 10
-    var lazyLoadTask: Task<Void, Never>?
 
     // MARK: - Preference forwarding (preserves existing view API)
 
@@ -164,6 +127,18 @@ final class ReaderViewModel {
         layout.isContinuous ? .leftToRight : direction
     }
 
+    // MARK: - Image-loader forwarding (preserves existing view API)
+
+    var currentImages: [NSImage] {
+        get { imageLoader.currentImages }
+        set { imageLoader.currentImages = newValue }
+    }
+
+    var pageDimensions: [CGSize] {
+        get { imageLoader.pageDimensions }
+        set { imageLoader.pageDimensions = newValue }
+    }
+
     // MARK: - Trivial derived state
 
     var totalPages: Int { source.pageCount }
@@ -182,7 +157,7 @@ final class ReaderViewModel {
         // and orphaned a `panely-*` temp dir. Do this off the main actor so
         // a slow tmp scan doesn't delay first paint.
         Task.detached(priority: .background) {
-            Self.cleanupStaleTempDirs()
+            ReaderTempDirectory.cleanupStaleEntries()
         }
     }
 
