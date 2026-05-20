@@ -2,37 +2,35 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Main-actor-isolated, `@Observable` store for the reader feature. Stored
-/// state lives here; feature methods are split across focused extensions:
+/// Main-actor-isolated, `@Observable` store for the reader feature.
 ///
-/// - `ReaderViewModel+Navigation.swift` — page navigation, chrome toggles
-/// - `ReaderViewModel+Source.swift` — loading, volume/folder handling, position memory
-/// - `ReaderViewModel+ImageLoading.swift` — preload, vertical lazy window, cache
-/// - `ReaderViewModel+Bookmarks.swift` — favorites & page bookmarks integration
+/// Composition over inheritance: state and persistence that don't depend on
+/// the open book live in dedicated collaborators, so this class only carries
+/// the source/image/navigation state that genuinely belongs together:
 ///
-/// Stored properties had to drop `private` / `private(set)` so cross-file
-/// extensions can mutate them — in-module encapsulation only. The class is
-/// `final` and module-internal, so surface exposure is narrow.
+/// - `ReaderPreferences` — layout / fit / sidebar / toolbar persistence
+/// - `ReaderPositionStore` — debounced per-book page memory
+/// - `ReaderViewModel+Navigation` — page stepping, chrome toggles, jumps
+/// - `ReaderViewModel+Source` — load pipeline, volume siblings, temp dirs
+/// - `ReaderViewModel+ImageLoading` — preload, vertical lazy window, cache
+/// - `ReaderViewModel+Bookmarks` — favorites & per-page bookmarks integration
+///
+/// The preferences fields (`layout`, `fitMode`, …) are exposed as forwarding
+/// computed properties on this class so existing view callsites
+/// (`viewModel.layout == .single`) keep working unchanged — `@Observable`
+/// tracks through the chain to `preferences.layout`.
 @Observable
 @MainActor
 final class ReaderViewModel {
-    // MARK: - UserDefaults keys
+    // MARK: - Collaborators
 
-    static let layoutKey = "panely.layout"
-    static let directionKey = "panely.direction"
-    static let sidebarPinnedKey = "panely.sidebarPinned"
-    static let legacySidebarVisibleKey = "panely.sidebarVisible"
-    static let positionsKey = "panely.positions"
-    static let fitModeKey = "panely.fitMode"
-    static let autoFitOnResizeKey = "panely.autoFitOnResize"
-    static let toolbarPinnedKey = "panely.toolbarPinned"
-    static let thumbnailSidebarVisibleKey = "panely.thumbnailSidebarVisible"
+    let preferences = ReaderPreferences()
+    let positions = ReaderPositionStore()
+    let recentItems: RecentItemsStore
+    let bookmarks: BookmarksStore
 
     // MARK: - Source state
 
-    // setter is module-internal so tests can stage a source/page without
-    // going through the full file-load pipeline. Production callers should
-    // still treat this as read-only and mutate via load(url:) / next() etc.
     var source: ComicSource = .empty
     var currentPageIndex: Int = 0 {
         didSet {
@@ -56,17 +54,6 @@ final class ReaderViewModel {
     /// or on an explicit backward press at 0). Cleared by any page change
     /// (`currentPageIndex` didSet) and by `load(url:)`.
     var wantsPreviousVolumePrompt: Bool = false
-
-    /// In-memory mirror of the per-book positions dictionary. Lazy-loaded on
-    /// first access (single UserDefaults read), then mutated in place. Saves
-    /// were previously doing a read-modify-write of the entire dict on every
-    /// debounced fire — fine for one or two books, but linear in the number
-    /// of saved books. Mirror-and-write keeps each save O(1) memcpy plus one
-    /// `set(_:forKey:)` write.
-    var positionsCache: [String: Int]?
-
-    let recentItems: RecentItemsStore
-    let bookmarks: BookmarksStore
 
     var rootScopedURL: URL?
     var currentTempDir: URL?
@@ -105,13 +92,6 @@ final class ReaderViewModel {
     var preloadTask: Task<Void, Never>?
     let preloadRadius = 2
 
-    /// Coalesces rapid `currentPageIndex` changes (e.g., continuous vertical
-    /// scrolling fires `setCurrentPageFromScroll` at up to ~60 Hz) into a
-    /// single `UserDefaults` write. Without this, each scroll tick walks the
-    /// positions dictionary and rewrites it — measurable frame-time pressure
-    /// during long strips.
-    var pendingSaveTask: Task<Void, Never>?
-
     // MARK: - Vertical lazy window
 
     /// Vertical-mode lazy-load state. `pageDimensions` is populated up-front
@@ -129,23 +109,52 @@ final class ReaderViewModel {
     let lazyKeepBuffer = 10
     var lazyLoadTask: Task<Void, Never>?
 
-    /// Set to true at the end of init. Gates `handleLayoutChange` so that
-    /// reading layout back from UserDefaults during init doesn't fire a
-    /// premature handleLayoutChange (which would set isLoading=true with no
-    /// source loaded — visible to tests and producing a wasted Task).
-    var isFullyInitialized = false
+    // MARK: - Preference forwarding (preserves existing view API)
 
-    // MARK: - Preferences (persisted via didSet)
-
-    var layout: PageLayout = .single {
-        didSet { handleLayoutChange(from: oldValue) }
-    }
-
-    var direction: ReadingDirection = .leftToRight {
-        didSet {
-            UserDefaults.standard.set(direction.rawValue, forKey: Self.directionKey)
+    var layout: PageLayout {
+        get { preferences.layout }
+        set {
+            let oldValue = preferences.layout
+            preferences.layout = newValue
+            if oldValue != newValue {
+                handleLayoutChange(from: oldValue)
+            }
         }
     }
+
+    var direction: ReadingDirection {
+        get { preferences.direction }
+        set { preferences.direction = newValue }
+    }
+
+    var fitMode: FitMode {
+        get { preferences.fitMode }
+        set { preferences.fitMode = newValue }
+    }
+
+    var autoFitOnResize: Bool {
+        get { preferences.autoFitOnResize }
+        set { preferences.autoFitOnResize = newValue }
+    }
+
+    var toolbarPinned: Bool {
+        get { preferences.toolbarPinned }
+        set { preferences.toolbarPinned = newValue }
+    }
+
+    var thumbnailSidebarVisible: Bool {
+        get { preferences.thumbnailSidebarVisible }
+        set { preferences.thumbnailSidebarVisible = newValue }
+    }
+
+    var sidebarMode: SidebarMode {
+        get { preferences.sidebarMode }
+        set { preferences.sidebarMode = newValue }
+    }
+
+    var sidebarVisible: Bool { sidebarMode.visible }
+    var sidebarPinned: Bool { sidebarMode.pinned }
+    var sidebarOverlayVisible: Bool { sidebarMode.overlayVisible }
 
     /// Direction used for navigation/page-ordering decisions. In continuous
     /// (vertical) layouts the user's RTL preference doesn't apply — webtoons
@@ -153,51 +162,6 @@ final class ReaderViewModel {
     /// returns once paged mode resumes.
     var effectiveDirection: ReadingDirection {
         layout.isContinuous ? .leftToRight : direction
-    }
-
-    var sidebarMode = SidebarMode() {
-        didSet {
-            UserDefaults.standard.set(sidebarMode.pinned, forKey: Self.sidebarPinnedKey)
-        }
-    }
-
-    var sidebarVisible: Bool { sidebarMode.visible }
-    var sidebarPinned: Bool { sidebarMode.pinned }
-    var sidebarOverlayVisible: Bool { sidebarMode.overlayVisible }
-
-    var fitMode: FitMode = .fitScreen {
-        didSet {
-            UserDefaults.standard.set(fitMode.rawValue, forKey: Self.fitModeKey)
-        }
-    }
-
-    /// When true (default), the viewer re-applies the current fit mode on
-    /// window/sidebar resize. When false, the user's magnification is left
-    /// alone — useful when they've manually zoomed and want their view
-    /// preserved across layout shifts.
-    var autoFitOnResize: Bool = true {
-        didSet {
-            UserDefaults.standard.set(autoFitOnResize, forKey: Self.autoFitOnResizeKey)
-        }
-    }
-
-    /// When true, the floating toolbar (and bottom slider) stays visible
-    /// instead of auto-hiding. Default false matches the distraction-free
-    /// reading experience; opt-in for users who want quick access to
-    /// controls or progress info while reading.
-    var toolbarPinned: Bool = false {
-        didSet {
-            UserDefaults.standard.set(toolbarPinned, forKey: Self.toolbarPinnedKey)
-        }
-    }
-
-    /// Right-side thumbnail panel visibility. Off by default — users opt in
-    /// via the toolbar button or `⌃⌘P`. Persisted so the preference survives
-    /// app restarts.
-    var thumbnailSidebarVisible: Bool = false {
-        didSet {
-            UserDefaults.standard.set(thumbnailSidebarVisible, forKey: Self.thumbnailSidebarVisibleKey)
-        }
     }
 
     // MARK: - Trivial derived state
@@ -211,43 +175,6 @@ final class ReaderViewModel {
     init() {
         self.recentItems = RecentItemsStore()
         self.bookmarks = BookmarksStore()
-
-        // Snapshot once. Each individual `UserDefaults.standard.string(...)`
-        // / `.bool(...)` / `.object(...)` call is a syscall + KVO check; on
-        // cold start the dozen lookups added up to ~10–50 ms. A single
-        // `dictionaryRepresentation()` is one cross-process trip and we
-        // type-cast from in-memory dict locally.
-        let defaults = UserDefaults.standard.dictionaryRepresentation()
-
-        if let raw = defaults[Self.layoutKey] as? String,
-           let stored = PageLayout(rawValue: raw) {
-            layout = stored
-        }
-        if let raw = defaults[Self.directionKey] as? String,
-           let stored = ReadingDirection(rawValue: raw) {
-            direction = stored
-        }
-        if let pinned = defaults[Self.sidebarPinnedKey] as? Bool {
-            sidebarMode.pinned = pinned
-        } else if let legacy = defaults[Self.legacySidebarVisibleKey] as? Bool {
-            // Migrate prior "always visible" preference to the new pinned mode.
-            sidebarMode.pinned = legacy
-        }
-        if let raw = defaults[Self.fitModeKey] as? String,
-           let stored = FitMode(rawValue: raw) {
-            fitMode = stored
-        }
-        if let value = defaults[Self.autoFitOnResizeKey] as? Bool {
-            autoFitOnResize = value
-        }
-        if let value = defaults[Self.toolbarPinnedKey] as? Bool {
-            toolbarPinned = value
-        }
-        if let value = defaults[Self.thumbnailSidebarVisibleKey] as? Bool {
-            thumbnailSidebarVisible = value
-        }
-
-        isFullyInitialized = true
 
         observeAppTermination()
 

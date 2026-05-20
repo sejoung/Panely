@@ -10,11 +10,10 @@ extension ReaderViewModel {
     // MARK: - Layout change orchestration
 
     func handleLayoutChange(from oldLayout: PageLayout) {
-        // Skip when init is restoring from UserDefaults — there's no source
-        // to refresh and we don't want a phantom isLoading=true.
-        guard isFullyInitialized else { return }
-
-        UserDefaults.standard.set(layout.rawValue, forKey: Self.layoutKey)
+        // Only invoked from the `layout` forwarding setter on actual changes
+        // (the setter diffs old vs. new before calling here), so no init-time
+        // hydration guard is needed — preferences load through their own
+        // didSet without touching the viewmodel.
         let step = navigationStep
         currentPageIndex = (currentPageIndex / step) * step
 

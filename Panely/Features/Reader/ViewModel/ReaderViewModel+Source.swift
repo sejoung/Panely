@@ -402,73 +402,49 @@ extension ReaderViewModel {
 
     // MARK: - Per-book position memory
 
-    /// Scheduled from the `currentPageIndex` didSet. Debounces the actual
-    /// UserDefaults write so that dragging through a vertical strip at 60 Hz
-    /// doesn't thrash the positions dictionary. A quick quit-during-scroll
-    /// can lose ~300 ms of progress; flushPositionImmediately() is called on
-    /// app termination to cover that window.
-    func savePosition() {
-        pendingSaveTask?.cancel()
-        pendingSaveTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled else { return }
-            self?.writePositionNow()
-        }
-    }
-
-    /// Synchronous write used by the debounced path (after the sleep) and by
-    /// the app-terminate flush.
-    func flushPositionImmediately() {
-        pendingSaveTask?.cancel()
-        pendingSaveTask = nil
-        writePositionNow()
-    }
-
-    private func writePositionNow() {
-        guard let url = currentSourceURL else { return }
-        let key = positionKey(for: url)
-        var dict = loadedPositions()
-        dict[key] = currentPageIndex
-        // Mirror under the volume/file-id key when available, so external
-        // drives whose mount path drifts ("/Volumes/X" → "/Volumes/X 1")
-        // can still recover the saved position. Older data without this
-        // mirror keeps working via the path-keyed entry above.
-        if let fidKey = PositionKey.fileIdentity(for: openedSourceURL ?? url) {
-            dict[fidKey] = currentPageIndex
-        }
-        positionsCache = dict
-        UserDefaults.standard.set(dict, forKey: Self.positionsKey)
-    }
-
-    func restoredIndex(for url: URL) -> Int {
-        let key = positionKey(for: url)
-        let dict = loadedPositions()
-        if let primary = dict[key] {
-            return primary
-        }
-        // Fallback: file-id key. Recovers position after a mount-path change
-        // or rename within the same volume.
-        if let fidKey = PositionKey.fileIdentity(for: openedSourceURL ?? url),
-           let secondary = dict[fidKey] {
-            return secondary
-        }
-        return 0
-    }
-
-    /// Lazy hydration of the positions dict — first call pays the
-    /// UserDefaults syscall, subsequent calls hit the in-memory mirror.
-    private func loadedPositions() -> [String: Int] {
-        if let cached = positionsCache { return cached }
-        let loaded = UserDefaults.standard.dictionary(forKey: Self.positionsKey) as? [String: Int] ?? [:]
-        positionsCache = loaded
-        return loaded
-    }
-
+    /// Position key for `url`, derived from the URL + the active temp root
+    /// (so zip-in-zip volumes get a stable key that survives re-extractions).
     func positionKey(for url: URL) -> String {
         PositionKey.make(
             for: url,
             opened: openedSourceURL,
             tempRoot: currentTempDir
+        )
+    }
+
+    /// Mirror key used as a fallback when the path-keyed entry misses (e.g.,
+    /// after a mount-path drift). `nil` when `PositionKey.fileIdentity` can't
+    /// derive an identity (typically for inside-archive paths).
+    private func fileIdentityKey(for url: URL) -> String? {
+        PositionKey.fileIdentity(for: openedSourceURL ?? url)
+    }
+
+    /// Schedule a debounced save for the current page. Called from the
+    /// `currentPageIndex` didSet, so this fires once per page change — even
+    /// during 60 Hz vertical scroll the store coalesces into a single write.
+    func savePosition() {
+        guard let url = currentSourceURL else { return }
+        positions.savePosition(
+            forKey: positionKey(for: url),
+            fileIdentityKey: fileIdentityKey(for: url),
+            pageIndex: currentPageIndex
+        )
+    }
+
+    /// Synchronous flush used by the app-terminate observer.
+    func flushPositionImmediately() {
+        guard let url = currentSourceURL else { return }
+        positions.flushImmediately(
+            forKey: positionKey(for: url),
+            fileIdentityKey: fileIdentityKey(for: url),
+            pageIndex: currentPageIndex
+        )
+    }
+
+    func restoredIndex(for url: URL) -> Int {
+        positions.restoredIndex(
+            forKey: positionKey(for: url),
+            fileIdentityKey: fileIdentityKey(for: url)
         )
     }
 
