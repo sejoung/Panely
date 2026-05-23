@@ -65,6 +65,26 @@ struct FavoritesStoreTests {
         #expect(store.isFavorite(url: fileURL) == false)
     }
 
+    @Test func innerPathDistinguishesFavoritesInsideSameArchive() throws {
+        let store = freshStore()
+        let tempDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let fileURL = tempDir.appendingPathComponent("series.cbz")
+        _ = try Fixture.writeFile(fileURL)
+
+        store.toggleFavorite(url: fileURL, title: "Vol01", innerPath: "Vol01")
+        store.toggleFavorite(url: fileURL, title: "Vol02", innerPath: "Vol02")
+
+        #expect(store.favorites.count == 2)
+        #expect(store.isFavorite(url: fileURL, innerPath: "Vol01"))
+        #expect(store.isFavorite(url: fileURL, innerPath: "Vol02"))
+        #expect(store.isFavorite(url: fileURL, innerPath: nil) == false)
+
+        store.toggleFavorite(url: fileURL, title: "Vol01", innerPath: "Vol01")
+        #expect(store.isFavorite(url: fileURL, innerPath: "Vol01") == false)
+        #expect(store.isFavorite(url: fileURL, innerPath: "Vol02"))
+    }
+
     private func freshStore() -> FavoritesStore {
         UserDefaults.standard.removeObject(forKey: FavoritesStore.favoritesKey)
         return FavoritesStore()

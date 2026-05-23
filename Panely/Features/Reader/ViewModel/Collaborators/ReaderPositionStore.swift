@@ -7,7 +7,7 @@ import Foundation
 /// for app termination so quit-during-scroll doesn't lose progress.
 @MainActor
 final class ReaderPositionStore {
-    static let positionsKey = "panely.positions"
+    nonisolated static let positionsKey = "panely.positions"
 
     /// In-memory mirror of the positions dict. Module-internal (not private)
     /// so tests can assert the lazy-hydration invariant — production code
@@ -15,6 +15,13 @@ final class ReaderPositionStore {
     /// the UserDefaults write paired.
     var cache: [String: Int]?
     private var pendingSaveTask: Task<Void, Never>?
+    private let defaults: UserDefaults
+    private let positionsKey: String
+
+    init(defaults: UserDefaults = .standard, positionsKey: String = ReaderPositionStore.positionsKey) {
+        self.defaults = defaults
+        self.positionsKey = positionsKey
+    }
 
     /// Schedule a debounced write. Rapid repeat calls coalesce into a single
     /// `UserDefaults` round-trip after ~300 ms of quiet. `fileIdentityKey`
@@ -54,7 +61,7 @@ final class ReaderPositionStore {
             dict[fid] = pageIndex
         }
         cache = dict
-        UserDefaults.standard.set(dict, forKey: Self.positionsKey)
+        defaults.set(dict, forKey: positionsKey)
     }
 
     /// Lazy hydration. First call pays one UserDefaults syscall; subsequent
@@ -62,7 +69,7 @@ final class ReaderPositionStore {
     /// never do — the dict is mutated in place on every write).
     private func loaded() -> [String: Int] {
         if let cached = cache { return cached }
-        let loaded = UserDefaults.standard.dictionary(forKey: Self.positionsKey) as? [String: Int] ?? [:]
+        let loaded = defaults.dictionary(forKey: positionsKey) as? [String: Int] ?? [:]
         cache = loaded
         return loaded
     }

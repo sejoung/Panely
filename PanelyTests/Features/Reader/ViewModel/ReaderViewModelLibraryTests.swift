@@ -249,6 +249,69 @@ struct ReaderViewModelLibraryTests {
         #expect(vm.libraryRootURL?.standardizedFileURL == droppedFolder.standardizedFileURL)
     }
 
+    @Test func nestedArchiveExtractionFailureStopsLoadAndPreservesError() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+
+        let outerSrc = try Fixture.makeTempDir()
+        try Data("not a zip".utf8).write(to: outerSrc.appendingPathComponent("Vol01.cbz"))
+        let outerZip = workDir.appendingPathComponent("broken-series.cbz")
+        try Fixture.zipDirectory(outerSrc, to: outerZip)
+        try? FileManager.default.removeItem(at: outerSrc)
+
+        let vm = ReaderViewModel()
+        await vm.load(url: outerZip)
+
+        #expect(vm.source.isEmpty)
+        #expect(vm.currentSourceURL == nil)
+        #expect(vm.currentImages.isEmpty)
+        #expect(vm.errorMessage?.hasPrefix("Failed to extract archive:") == true)
+    }
+
+    @Test func preferredInnerPathCannotEscapeExtractionRoot() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+
+        let innerSrc = try Fixture.makeTempDir()
+        try Fixture.makePNG(width: 10, height: 10)
+            .write(to: innerSrc.appendingPathComponent("page.png"))
+        let innerZip = workDir.appendingPathComponent("Vol01.cbz")
+        try Fixture.zipDirectory(innerSrc, to: innerZip)
+        try? FileManager.default.removeItem(at: innerSrc)
+
+        let outerSrc = try Fixture.makeTempDir()
+        try FileManager.default.moveItem(at: innerZip, to: outerSrc.appendingPathComponent("Vol01.cbz"))
+        let outerZip = workDir.appendingPathComponent("series.cbz")
+        try Fixture.zipDirectory(outerSrc, to: outerZip)
+        try? FileManager.default.removeItem(at: outerSrc)
+
+        guard let cacheKey = ReaderTempDirectory.cacheKey(for: outerZip) else {
+            Issue.record("expected cache key for fixture archive")
+            return
+        }
+        let extractionRoot = ReaderTempDirectory.makeCachedCandidate(forKey: cacheKey)
+        let outside = extractionRoot
+            .deletingLastPathComponent()
+            .appendingPathComponent("outside", isDirectory: true)
+        try? FileManager.default.removeItem(at: extractionRoot)
+        try? FileManager.default.removeItem(at: outside)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        try Fixture.makePNG(width: 10, height: 10)
+            .write(to: outside.appendingPathComponent("outside.png"))
+        defer {
+            try? FileManager.default.removeItem(at: extractionRoot)
+            try? FileManager.default.removeItem(at: outside)
+        }
+
+        let vm = ReaderViewModel()
+        await vm.load(url: outerZip, preferredRelativePath: "../outside")
+
+        #expect(
+            vm.currentSourceURL?.standardizedFileURL
+                == extractionRoot.appendingPathComponent("Vol01", isDirectory: true).standardizedFileURL
+        )
+    }
+
     // MARK: - hasMultipleVolumes
 
     @Test func hasMultipleVolumesReflectsSiblingCount() {

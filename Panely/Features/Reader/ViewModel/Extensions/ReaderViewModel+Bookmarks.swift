@@ -17,13 +17,18 @@ extension ReaderViewModel {
     // MARK: - Favorite book toggle
 
     var isCurrentBookFavorite: Bool {
-        guard let url = currentSourceURL else { return false }
-        return favorites.isFavorite(url: url)
+        guard let target = currentFavoriteTarget else { return false }
+        return favorites.isFavorite(url: target.url, innerPath: target.innerPath)
     }
 
     func toggleFavoriteForCurrentBook() {
-        guard let url = currentSourceURL else { return }
-        favorites.toggleFavorite(url: url, title: displayTitle(for: url))
+        guard let target = currentFavoriteTarget else { return }
+        favorites.toggleFavorite(
+            url: target.url,
+            title: target.title,
+            innerPath: target.innerPath,
+            isDirectory: target.isDirectory
+        )
     }
 
     /// Open a favorite book, resolving its security-scoped bookmark the same
@@ -31,7 +36,7 @@ extension ReaderViewModel {
     func openFavorite(_ favorite: FavoriteBook) {
         guard let url = favorites.resolve(favorite) else { return }
         recentItems.record(url, title: displayTitle(for: url))
-        Task { await load(url: url) }
+        Task { await load(url: url, preferredRelativePath: favorite.innerPath) }
     }
 
     // MARK: - Page bookmark toggle + queries
@@ -81,5 +86,57 @@ extension ReaderViewModel {
 
     func jumpToBookmark(_ bookmark: PageBookmark) {
         jump(to: bookmark.pageIndex)
+    }
+
+    // MARK: - Favorite identity
+
+    private struct FavoriteTarget {
+        let url: URL
+        let title: String
+        let innerPath: String?
+        let isDirectory: Bool
+    }
+
+    /// For zip-in-zip volumes, `currentSourceURL` points into a temp/cache
+    /// extraction. Persist the user-granted outer archive bookmark plus the
+    /// inner relative path instead, so favorites survive cleanup and cache
+    /// eviction.
+    private var currentFavoriteTarget: FavoriteTarget? {
+        guard let current = currentSourceURL else { return nil }
+
+        if let innerPath = currentInnerArchiveRelativePath,
+           let opened = openedSourceURL {
+            return FavoriteTarget(
+                url: opened,
+                title: displayTitle(for: current),
+                innerPath: innerPath,
+                isDirectory: isDirectory(current)
+            )
+        }
+
+        return FavoriteTarget(
+            url: current,
+            title: displayTitle(for: current),
+            innerPath: nil,
+            isDirectory: isDirectory(current)
+        )
+    }
+
+    private var currentInnerArchiveRelativePath: String? {
+        guard tempDir.isActive,
+              let tempRoot = tempDir.url,
+              let current = currentSourceURL,
+              tempRoot.isAncestor(of: current),
+              openedSourceURL != nil else { return nil }
+
+        let rootPath = tempRoot.standardizedFileURL.path
+        let currentPath = current.standardizedFileURL.path
+        guard currentPath != rootPath,
+              currentPath.hasPrefix(rootPath + "/") else { return nil }
+        return String(currentPath.dropFirst(rootPath.count + 1))
+    }
+
+    private func isDirectory(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
     }
 }

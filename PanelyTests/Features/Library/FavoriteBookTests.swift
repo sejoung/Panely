@@ -10,7 +10,8 @@ struct FavoriteBookTests {
             title: "Vol01",
             addedAt: Date(timeIntervalSince1970: 1_700_000_000),
             bookmarkData: Data([0x01, 0x02, 0x03, 0x04]),
-            isDirectory: false
+            isDirectory: false,
+            innerPath: "Vol01"
         )
         let encoded = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(FavoriteBook.self, from: encoded)
@@ -21,6 +22,7 @@ struct FavoriteBookTests {
         #expect(decoded.addedAt == original.addedAt)
         #expect(decoded.bookmarkData == original.bookmarkData)
         #expect(decoded.isDirectory == original.isDirectory)
+        #expect(decoded.innerPath == original.innerPath)
     }
 
     @Test func legacyJSONWithoutIsDirectoryDecodesAsFile() throws {
@@ -37,6 +39,7 @@ struct FavoriteBookTests {
         """.data(using: .utf8)!
         let decoded = try JSONDecoder().decode(FavoriteBook.self, from: json)
         #expect(decoded.isDirectory == false)
+        #expect(decoded.innerPath == nil)
         #expect(decoded.path == "/legacy.cbz")
         #expect(decoded.bookmarkData == Data([0x01, 0x02, 0x03, 0x04]))
     }

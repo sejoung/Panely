@@ -89,7 +89,11 @@ extension ReaderViewModel {
 
     // MARK: - Main load pipeline
 
-    func load(url: URL, knownSiblings: [URL]? = nil) async {
+    func load(
+        url: URL,
+        knownSiblings: [URL]? = nil,
+        preferredRelativePath: String? = nil
+    ) async {
         imageLoader.cancelPreload()
 
         // Any new book load — explicit, via prev/next volume, or via library
@@ -183,10 +187,29 @@ extension ReaderViewModel {
                                 try? FileManager.default.removeItem(at: candidate)
                                 guard myEpoch == loadEpoch else { return }
                                 errorMessage = "Failed to extract archive: \(error.localizedDescription)"
+                                source = .empty
+                                imageLoader.reset()
+                                currentSourceURL = nil
+                                siblings = []
+                                libraryScope.release()
+                                return
                             }
                         }
                     }
                 }
+            }
+        }
+
+        if let preferredRelativePath,
+           !preferredRelativePath.isEmpty,
+           tempDir.isActive,
+           let root = tempDir.url {
+            let preferred = root
+                .appendingPathComponent(preferredRelativePath)
+                .standardizedFileURL
+            if root.isAncestor(of: preferred),
+               FileManager.default.fileExists(atPath: preferred.path) {
+                targetURL = preferred
             }
         }
 

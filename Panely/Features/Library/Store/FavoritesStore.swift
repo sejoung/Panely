@@ -20,13 +20,18 @@ final class FavoritesStore {
         load()
     }
 
-    func isFavorite(url: URL) -> Bool {
-        favorites.contains { $0.path == url.path }
+    func isFavorite(url: URL, innerPath: String? = nil) -> Bool {
+        favorites.contains { $0.path == url.path && $0.innerPath == innerPath }
     }
 
     /// Adds the book if not already favorited; otherwise removes it.
-    func toggleFavorite(url: URL, title: String) {
-        if let idx = favorites.firstIndex(where: { $0.path == url.path }) {
+    func toggleFavorite(
+        url: URL,
+        title: String,
+        innerPath: String? = nil,
+        isDirectory: Bool? = nil
+    ) {
+        if let idx = favorites.firstIndex(where: { $0.path == url.path && $0.innerPath == innerPath }) {
             favorites.remove(at: idx)
             save()
             return
@@ -37,14 +42,17 @@ final class FavoritesStore {
                 includingResourceValuesForKeys: nil,
                 relativeTo: nil
             )
-            let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
+            let isDir = isDirectory
+                ?? (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory
+                ?? false
             let fav = FavoriteBook(
                 id: UUID(),
                 path: url.path,
                 title: title,
                 addedAt: Date(),
                 bookmarkData: bookmark,
-                isDirectory: isDir
+                isDirectory: isDir,
+                innerPath: innerPath
             )
             favorites.insert(fav, at: 0)
             save()

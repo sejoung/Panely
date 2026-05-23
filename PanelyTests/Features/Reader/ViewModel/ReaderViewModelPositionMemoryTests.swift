@@ -6,6 +6,7 @@ import Foundation
 /// mirror is meant to keep saves O(1) memcpy + one write instead of an
 /// O(N) read-modify-write of the full positions dict every time.
 @MainActor
+@Suite(.serialized)
 struct ReaderViewModelPositionMemoryTests {
 
     @Test func cachePopulatesFromUserDefaultsOnFirstAccess() {

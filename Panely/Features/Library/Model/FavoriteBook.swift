@@ -9,6 +9,7 @@ nonisolated struct FavoriteBook: Identifiable, Sendable, Codable {
     var addedAt: Date
     var bookmarkData: Data
     var isDirectory: Bool
+    var innerPath: String?
 
     var iconName: String {
         isDirectory ? "folder" : "doc.zipper"
@@ -18,7 +19,7 @@ nonisolated struct FavoriteBook: Identifiable, Sendable, Codable {
     // review (renames/removals show up as diff hunks instead of silently
     // changing the serialised shape).
     private enum CodingKeys: String, CodingKey {
-        case id, path, title, addedAt, bookmarkData, isDirectory
+        case id, path, title, addedAt, bookmarkData, isDirectory, innerPath
     }
 
     init(
@@ -27,7 +28,8 @@ nonisolated struct FavoriteBook: Identifiable, Sendable, Codable {
         title: String,
         addedAt: Date,
         bookmarkData: Data,
-        isDirectory: Bool
+        isDirectory: Bool,
+        innerPath: String? = nil
     ) {
         self.id = id
         self.path = path
@@ -35,6 +37,7 @@ nonisolated struct FavoriteBook: Identifiable, Sendable, Codable {
         self.addedAt = addedAt
         self.bookmarkData = bookmarkData
         self.isDirectory = isDirectory
+        self.innerPath = innerPath
     }
 
     init(from decoder: Decoder) throws {
@@ -45,5 +48,6 @@ nonisolated struct FavoriteBook: Identifiable, Sendable, Codable {
         addedAt = try container.decode(Date.self, forKey: .addedAt)
         bookmarkData = try container.decode(Data.self, forKey: .bookmarkData)
         isDirectory = try container.decodeIfPresent(Bool.self, forKey: .isDirectory) ?? false
+        innerPath = try container.decodeIfPresent(String.self, forKey: .innerPath)
     }
 }

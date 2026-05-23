@@ -20,6 +20,14 @@ final class PanelyScrollView: NSScrollView {
         return min(max(currentMagnification * factor, minMag), maxMag)
     }
 
+    static func zoomCenter(
+        eventLocationInWindow: NSPoint,
+        documentView: NSView?
+    ) -> NSPoint {
+        guard let documentView else { return eventLocationInWindow }
+        return documentView.convert(eventLocationInWindow, from: nil)
+    }
+
     override func scrollWheel(with event: NSEvent) {
         if event.modifierFlags.contains(.command) && allowsMagnification {
             let delta = event.scrollingDeltaY
@@ -30,7 +38,10 @@ final class PanelyScrollView: NSScrollView {
                 minMag: minMagnification,
                 maxMag: maxMagnification
             )
-            let center = convert(event.locationInWindow, from: nil)
+            let center = Self.zoomCenter(
+                eventLocationInWindow: event.locationInWindow,
+                documentView: documentView
+            )
             setMagnification(target, centeredAt: center)
             return
         }

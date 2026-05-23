@@ -92,4 +92,38 @@ struct CBZLoaderIntegrationTests {
         let residualZip = dest.appendingPathComponent("vol01.cbz")
         #expect(!FileManager.default.fileExists(atPath: residualZip.path))
     }
+
+    @Test func extractAllCapsTotalNestedExtractionSize() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+
+        func makeInnerArchive(named name: String) throws -> URL {
+            let innerSrc = try Fixture.makeTempDir()
+            defer { try? FileManager.default.removeItem(at: innerSrc) }
+            try Data(repeating: 0, count: 700_000)
+                .write(to: innerSrc.appendingPathComponent("page.jpg"))
+            let innerZip = workDir.appendingPathComponent(name)
+            try Fixture.zipDirectory(innerSrc, to: innerZip)
+            return innerZip
+        }
+
+        let outerSrc = try Fixture.makeTempDir()
+        let innerA = try makeInnerArchive(named: "_inner_a.cbz")
+        let innerB = try makeInnerArchive(named: "_inner_b.cbz")
+        try FileManager.default.moveItem(at: innerA, to: outerSrc.appendingPathComponent("Vol01.cbz"))
+        try FileManager.default.moveItem(at: innerB, to: outerSrc.appendingPathComponent("Vol02.cbz"))
+        let outerZip = workDir.appendingPathComponent("series.cbz")
+        try Fixture.zipDirectory(outerSrc, to: outerZip)
+        try? FileManager.default.removeItem(at: outerSrc)
+
+        let dest = workDir.appendingPathComponent("extracted-limit", isDirectory: true)
+        await #expect(throws: CBZLoader.LoadError.self) {
+            try await CBZLoader.extractAll(
+                from: outerZip,
+                to: dest,
+                maxExtractedBytes: 1_000_000
+            )
+        }
+        #expect(!FileManager.default.fileExists(atPath: dest.path))
+    }
 }

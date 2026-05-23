@@ -27,6 +27,37 @@ struct ReaderViewModelBookmarksTests {
         #expect(vm.favorites.favorites.count == before)
     }
 
+    @Test func zipInZipFavoriteStoresOuterArchiveAndInnerPath() throws {
+        UserDefaults.standard.removeObject(forKey: FavoritesStore.favoritesKey)
+        defer { UserDefaults.standard.removeObject(forKey: FavoritesStore.favoritesKey) }
+
+        let outerDir = try Fixture.makeTempDir()
+        let tempRoot = try Fixture.makeTempDir()
+        defer {
+            try? FileManager.default.removeItem(at: outerDir)
+            try? FileManager.default.removeItem(at: tempRoot)
+        }
+        let outer = outerDir.appendingPathComponent("series.cbz")
+        _ = try Fixture.writeFile(outer)
+        let innerVolume = tempRoot.appendingPathComponent("Vol02", isDirectory: true)
+        try FileManager.default.createDirectory(at: innerVolume, withIntermediateDirectories: true)
+
+        let vm = ReaderViewModel()
+        vm.openedSourceURL = outer
+        vm.tempDir.url = tempRoot
+        vm.currentSourceURL = innerVolume
+
+        vm.toggleFavoriteForCurrentBook()
+
+        guard let favorite = vm.favorites.favorites.first else {
+            Issue.record("expected zip-in-zip favorite to be stored")
+            return
+        }
+        #expect(favorite.path == outer.path)
+        #expect(favorite.innerPath == "Vol02")
+        #expect(vm.isCurrentBookFavorite)
+    }
+
     @Test func isCurrentPageBookmarkedIsFalseWithoutSource() {
         let vm = ReaderViewModel()
         #expect(vm.isCurrentPageBookmarked == false)

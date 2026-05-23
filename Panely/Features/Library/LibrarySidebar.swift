@@ -110,8 +110,7 @@ struct LibrarySidebar: View {
                 ForEach(favorites) { fav in
                     FavoriteRow(
                         favorite: fav,
-                        isActive: activeStdURL?.path
-                            == URL(fileURLWithPath: fav.path).standardizedFileURL.path,
+                        isActive: isFavorite(fav, activeFor: activeStdURL),
                         onTap: { onSelectFavorite(fav) },
                         onRemove: { onRemoveFavorite(fav) }
                     )
@@ -166,6 +165,14 @@ struct LibrarySidebar: View {
 
     private var taskID: String {
         "\(rootURL?.path ?? "")#\(refreshToken.uuidString)"
+    }
+
+    private func isFavorite(_ favorite: FavoriteBook, activeFor activeStdURL: URL?) -> Bool {
+        guard let activePath = activeStdURL?.path else { return false }
+        if let innerPath = favorite.innerPath {
+            return activePath.hasSuffix("/" + innerPath)
+        }
+        return activePath == URL(fileURLWithPath: favorite.path).standardizedFileURL.path
     }
 
     private func reload() async {

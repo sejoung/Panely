@@ -58,21 +58,41 @@ nonisolated enum CBZLoader {
         }.value
     }
 
-    static func extractAll(from url: URL, to destination: URL) async throws {
+    static func extractAll(
+        from url: URL,
+        to destination: URL,
+        maxExtractedBytes limit: UInt64 = Self.maxExtractedBytes
+    ) async throws {
         try await Task.detached(priority: .userInitiated) {
-            try FileManager.default.createDirectory(
-                at: destination,
-                withIntermediateDirectories: true
-            )
-            try FileManager.default.unzipItem(at: url, to: destination)
-            try ensureSizeUnderLimit(at: destination)
-            try extractNestedArchives(in: destination, depth: 0)
+            let fm = FileManager.default
+            do {
+                try fm.createDirectory(
+                    at: destination,
+                    withIntermediateDirectories: true
+                )
+                try fm.unzipItem(at: url, to: destination)
+                try ensureSizeUnderLimit(at: destination, limit: limit)
+                try extractNestedArchives(
+                    in: destination,
+                    root: destination,
+                    depth: 0,
+                    maxExtractedBytes: limit
+                )
+            } catch {
+                try? fm.removeItem(at: destination)
+                throw error
+            }
         }.value
     }
 
     private static let maxNestingDepth = 3
 
-    private static func extractNestedArchives(in directory: URL, depth: Int) throws {
+    private static func extractNestedArchives(
+        in directory: URL,
+        root: URL,
+        depth: Int,
+        maxExtractedBytes limit: UInt64
+    ) throws {
         guard depth < maxNestingDepth else { return }
 
         let contents = try FileManager.default.contentsOfDirectory(
@@ -85,7 +105,12 @@ nonisolated enum CBZLoader {
             let isDir = (try? entry.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
 
             if isDir {
-                try extractNestedArchives(in: entry, depth: depth + 1)
+                try extractNestedArchives(
+                    in: entry,
+                    root: root,
+                    depth: depth + 1,
+                    maxExtractedBytes: limit
+                )
                 continue
             }
 
@@ -95,9 +120,14 @@ nonisolated enum CBZLoader {
             let destDir = entry.deletingPathExtension()
             try FileManager.default.createDirectory(at: destDir, withIntermediateDirectories: true)
             try FileManager.default.unzipItem(at: entry, to: destDir)
-            try ensureSizeUnderLimit(at: destDir)
             try FileManager.default.removeItem(at: entry)
-            try extractNestedArchives(in: destDir, depth: depth + 1)
+            try ensureSizeUnderLimit(at: root, limit: limit)
+            try extractNestedArchives(
+                in: destDir,
+                root: root,
+                depth: depth + 1,
+                maxExtractedBytes: limit
+            )
         }
     }
 
@@ -106,7 +136,7 @@ nonisolated enum CBZLoader {
     /// callback for this in `unzipItem`, so we check post-hoc — fine for
     /// the safety-net role (catches the pathological case; legitimate
     /// large archives are still allowed up to the cap).
-    private static func ensureSizeUnderLimit(at directory: URL) throws {
+    private static func ensureSizeUnderLimit(at directory: URL, limit: UInt64) throws {
         let fm = FileManager.default
         guard let enumerator = fm.enumerator(
             at: directory,
@@ -121,13 +151,13 @@ nonisolated enum CBZLoader {
                 .fileSizeKey,
             ])
             let size = UInt64(values?.totalFileAllocatedSize ?? values?.fileSize ?? 0)
-            total &+= size
-            if total > maxExtractedBytes {
+            if size > limit || total > limit - size {
                 // Clean up partial extraction so the caller's temp dir
                 // doesn't leak. extractAll/load already removes on error.
                 try? fm.removeItem(at: directory)
-                throw LoadError.extractedSizeExceeded(limit: maxExtractedBytes)
+                throw LoadError.extractedSizeExceeded(limit: limit)
             }
+            total += size
         }
     }
 }

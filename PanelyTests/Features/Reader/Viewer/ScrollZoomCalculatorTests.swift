@@ -68,4 +68,27 @@ struct ScrollZoomCalculatorTests {
         // from2 should be ≈ 2× from1 (same multiplicative factor applied)
         #expect(abs(from2 - from1 * 2) < 0.001)
     }
+
+    @Test func commandScrollZoomCenterUsesDocumentCoordinates() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 600, height: 500),
+            styleMask: [],
+            backing: .buffered,
+            defer: false
+        )
+        let scrollView = PanelyScrollView(frame: NSRect(x: 20, y: 30, width: 300, height: 240))
+        let document = NSView(frame: NSRect(x: 40, y: 60, width: 900, height: 720))
+        scrollView.documentView = document
+        window.contentView?.addSubview(scrollView)
+
+        let localInScrollView = NSPoint(x: 120, y: 90)
+        let windowPoint = scrollView.convert(localInScrollView, to: nil)
+        let center = PanelyScrollView.zoomCenter(
+            eventLocationInWindow: windowPoint,
+            documentView: document
+        )
+
+        #expect(center == document.convert(windowPoint, from: nil))
+        #expect(center != scrollView.convert(windowPoint, from: nil))
+    }
 }
