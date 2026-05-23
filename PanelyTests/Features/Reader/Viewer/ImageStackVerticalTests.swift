@@ -64,6 +64,22 @@ struct ImageStackVerticalTests {
         #expect(newFrames == originalFrames)
     }
 
+    @Test func horizontalUpdateWithSameCountButDifferentImageSizeRelayouts() {
+        let stack = ImageStackView(frame: .zero)
+        stack.setImages([NSImage(size: NSSize(width: 100, height: 150))], axis: .horizontal)
+
+        stack.setImages([NSImage(size: NSSize(width: 1000, height: 1500))], axis: .horizontal)
+
+        guard let pageFrame = stack.frame(forPageAt: 0) else {
+            Issue.record("expected a frame for the single horizontal page")
+            return
+        }
+        #expect(abs(pageFrame.width - 1000) < 0.001)
+        #expect(abs(pageFrame.height - 1500) < 0.001)
+        #expect(abs(stack.frame.width - 1000) < 0.001)
+        #expect(abs(stack.frame.height - 1500) < 0.001)
+    }
+
     @Test func pageIndexRangeCoversAllVisibleSlots() {
         let stack = ImageStackView(frame: .zero)
         let images = (0..<5).map { _ in NSImage(size: NSSize(width: 1000, height: 1500)) }

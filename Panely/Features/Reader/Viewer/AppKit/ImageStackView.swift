@@ -36,12 +36,15 @@ final class ImageStackView: NSView {
     func setImages(_ newImages: [NSImage], axis: Axis) {
         let sameCount = newImages.count == currentImages.count
         let sameAxis = self.axis == axis
+        let sameGeometry = sameCount && zip(newImages, currentImages).allSatisfy { newImage, currentImage in
+            newImage.size == currentImage.size
+        }
 
-        // Fast path: count + axis unchanged → swap NSImage refs in any
-        // live views (others pick up the new image when they come into
-        // view). No subview rebuild, no relayout. Per-page placeholder
-        // → real image swaps during lazy load take this path.
-        if sameCount && sameAxis {
+        // Fast path: count + axis + geometry unchanged → swap NSImage refs
+        // in any live views (others pick up the new image when they come
+        // into view). Per-page placeholder → real image swaps during lazy
+        // load take this path when the header-derived dimensions match.
+        if sameCount && sameAxis && sameGeometry {
             currentImages = newImages
             for (index, view) in liveViews where currentImages.indices.contains(index) {
                 view.image = currentImages[index]
