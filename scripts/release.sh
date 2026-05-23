@@ -136,10 +136,14 @@ else
     # (e.g., "code object is not signed at all" on Panely.app because
     # PanelyTests.xctest's own CodeSign step got skipped on incremental).
     set +e
+    # SnapshotGalleryTests is a docs/screenshots/ generator with no
+    # assertions — skip it here. Regenerate manually via
+    # `scripts/generate-snapshots.sh` when the manual needs updating.
     xcodebuild clean test \
         -project Panely.xcodeproj \
         -scheme Panely \
         -destination "$destination" \
+        -skip-testing:PanelyTests/SnapshotGalleryTests \
         CODE_SIGN_IDENTITY="-" \
         CODE_SIGNING_REQUIRED=NO \
         2>&1 | tee "$test_log" \

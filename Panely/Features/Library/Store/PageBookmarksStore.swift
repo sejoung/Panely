@@ -19,8 +19,12 @@ final class PageBookmarksStore {
     /// long history of opened-then-deleted books.
     static let maxBookEntries = 200
 
-    /// Keyed by `PositionKey`. Values are kept sorted by `pageIndex` on write.
-    private(set) var pageBookmarksByBook: [String: [PageBookmark]] = [:]
+    /// Keyed by `PositionKey`. Values are kept sorted by `pageIndex` on
+    /// write. Direct assignment is supported so tests and snapshot fixtures
+    /// can stage bookmark sets without driving the toggle path; production
+    /// code should go through `togglePageBookmark` / `removePageBookmark`
+    /// so persistence + caps stay in sync.
+    var pageBookmarksByBook: [String: [PageBookmark]] = [:]
 
     init() {
         load()

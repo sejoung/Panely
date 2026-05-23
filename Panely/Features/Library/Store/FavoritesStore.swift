@@ -10,7 +10,11 @@ import Foundation
 final class FavoritesStore {
     static let favoritesKey = "panely.favoriteBooks"
 
-    private(set) var favorites: [FavoriteBook] = []
+    /// In-memory favorites list. Direct assignment is supported so tests
+    /// and snapshot fixtures can stage favorites without creating real
+    /// security-scoped bookmarks; production code should go through
+    /// `toggleFavorite` / `removeFavorite` so persistence stays in sync.
+    var favorites: [FavoriteBook] = []
 
     init() {
         load()
