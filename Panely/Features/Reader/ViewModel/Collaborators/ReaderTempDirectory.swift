@@ -161,11 +161,68 @@ final class ReaderTempDirectory {
         // Oldest first → those get evicted first.
         let oldestFirst = measured.sorted { $0.mtime < $1.mtime }
         var remaining = total
+        var removedAny = false
         for entry in oldestFirst {
             if remaining <= cacheBudgetBytes { break }
-            try? FileManager.default.removeItem(at: entry.url)
+            if (try? FileManager.default.removeItem(at: entry.url)) != nil {
+                removedAny = true
+            }
             remaining = remaining > entry.size ? remaining - entry.size : 0
         }
+        if removedAny {
+            NotificationCenter.default.post(name: .panelyExtractionCacheDidChange, object: nil)
+        }
+    }
+
+    /// Total bytes currently stored in the extraction cache. When `activeURL`
+    /// points inside a cache entry, that entry can be excluded to report the
+    /// bytes that are safe to clear without disrupting the open book.
+    nonisolated static func cacheSizeBytes(
+        in root: URL = cacheRoot(),
+        excluding activeURL: URL? = nil
+    ) -> UInt64 {
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(
+            at: root,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else { return 0 }
+
+        let excluded = cacheEntryContaining(activeURL, in: root)?.standardizedFileURL
+        return entries.reduce(UInt64(0)) { total, entry in
+            if entry.standardizedFileURL == excluded { return total }
+            return saturatedAdd(total, directorySize(at: entry))
+        }
+    }
+
+    /// Clear cached extractions while preserving the cache entry backing the
+    /// currently open book, if any. Returns the approximate number of bytes
+    /// removed; individual deletion failures are skipped so one bad entry
+    /// doesn't block clearing the rest.
+    @discardableResult
+    nonisolated static func clearCache(
+        in root: URL = cacheRoot(),
+        excluding activeURL: URL? = nil
+    ) -> UInt64 {
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(
+            at: root,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else { return 0 }
+
+        let excluded = cacheEntryContaining(activeURL, in: root)?.standardizedFileURL
+        var removed: UInt64 = 0
+        for entry in entries where entry.standardizedFileURL != excluded {
+            let size = directorySize(at: entry)
+            if (try? fm.removeItem(at: entry)) != nil {
+                removed = saturatedAdd(removed, size)
+            }
+        }
+        if removed > 0 {
+            NotificationCenter.default.post(name: .panelyExtractionCacheDidChange, object: nil)
+        }
+        return removed
     }
 
     // MARK: - Orphan sweep (session dirs only)
@@ -231,6 +288,24 @@ final class ReaderTempDirectory {
             .hasPrefix(cacheRoot().standardizedFileURL.path + "/")
     }
 
+    private nonisolated static func cacheEntryContaining(_ activeURL: URL?, in root: URL) -> URL? {
+        guard let activeURL else { return nil }
+        let root = root.standardizedFileURL
+        let active = activeURL.standardizedFileURL
+        guard root.isAncestor(of: active) else { return nil }
+
+        let rootPath = root.path
+        let activePath = active.path
+        guard activePath != rootPath,
+              activePath.hasPrefix(rootPath + "/") else { return nil }
+
+        let relative = String(activePath.dropFirst(rootPath.count + 1))
+        guard let entryName = relative.split(separator: "/", maxSplits: 1).first else {
+            return nil
+        }
+        return root.appendingPathComponent(String(entryName), isDirectory: true)
+    }
+
     private nonisolated static func directorySize(at url: URL) -> UInt64 {
         let fm = FileManager.default
         guard let enumerator = fm.enumerator(
@@ -246,8 +321,17 @@ final class ReaderTempDirectory {
                 .fileSizeKey,
             ])
             let size = UInt64(values?.totalFileAllocatedSize ?? values?.fileSize ?? 0)
-            total &+= size
+            total = saturatedAdd(total, size)
         }
         return total
     }
+
+    private nonisolated static func saturatedAdd(_ lhs: UInt64, _ rhs: UInt64) -> UInt64 {
+        let (sum, overflow) = lhs.addingReportingOverflow(rhs)
+        return overflow ? UInt64.max : sum
+    }
+}
+
+extension Notification.Name {
+    nonisolated static let panelyExtractionCacheDidChange = Notification.Name("panelyExtractionCacheDidChange")
 }

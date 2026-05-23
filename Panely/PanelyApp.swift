@@ -29,6 +29,11 @@ struct PanelyApp: App {
             viewCommands
             goCommands
         }
+
+        Settings {
+            StorageSettingsView(viewModel: viewModel)
+                .preferredColorScheme(.dark)
+        }
     }
 }
 

@@ -10,8 +10,8 @@ import SwiftUI
 /// skips enough machinery that several reader chrome elements rendered as
 /// fallback glyphs.
 ///
-/// Output lives in the Debug host app's sandbox caches
-/// (`~/Library/Containers/io.github.sejoung.Panely.debug/Data/Library/Caches/panely-snapshots/`);
+/// Output lives in the Debug host app's sandbox caches, under
+/// `panely-snapshots/`;
 /// `scripts/generate-snapshots.sh` copies the PNGs into the repo's
 /// `docs/screenshots/` after the run. Keeping Debug on a separate bundle ID
 /// prevents snapshot tests from writing into the released app's container.
@@ -24,6 +24,7 @@ enum SnapshotRenderer {
     static let toolbarSize = CGSize(width: 920, height: 64)
     static let cardSize = CGSize(width: 520, height: 220)
     static let overlaySize = CGSize(width: 360, height: 140)
+    static let settingsSize = CGSize(width: 520, height: 320)
 
     /// Retina scale baked into the PNG so the asset looks crisp when shown
     /// at logical points (e.g., README on a Retina display).

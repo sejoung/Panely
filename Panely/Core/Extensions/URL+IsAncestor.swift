@@ -10,7 +10,7 @@ extension URL {
     /// Used by `ReaderLibraryScope` and `ReaderTempDirectory` to decide
     /// whether a clicked book lives inside the active library root / extraction
     /// dir respectively.
-    func isAncestor(of candidate: URL) -> Bool {
+    nonisolated func isAncestor(of candidate: URL) -> Bool {
         let rootPath = standardizedFileURL.path
         let target = candidate.standardizedFileURL.path
         return target == rootPath || target.hasPrefix(rootPath + "/")

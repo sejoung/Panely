@@ -61,7 +61,7 @@ final class LibraryFixture {
 enum SnapshotSampleContent {
     /// Default portrait page size. Mirrors a typical scanned manga page
     /// aspect (~2:3) so layout previews look natural.
-    static let pageSize = CGSize(width: 800, height: 1200)
+    nonisolated static let pageSize = CGSize(width: 800, height: 1200)
 
     // MARK: - Placeholder pages
 
@@ -134,9 +134,16 @@ enum SnapshotSampleContent {
 
     // MARK: - Pre-configured viewmodels
 
+    private static func snapshotViewModel() -> ReaderViewModel {
+        let vm = ReaderViewModel()
+        vm.favorites.favorites = []
+        vm.pageBookmarks.pageBookmarksByBook = [:]
+        return vm
+    }
+
     /// Empty state — nothing loaded, default chrome.
     static func emptyViewModel() -> ReaderViewModel {
-        ReaderViewModel()
+        snapshotViewModel()
     }
 
     /// Loaded book at the requested page index + layout. Drives the
@@ -154,7 +161,7 @@ enum SnapshotSampleContent {
         pageCount: Int = 24,
         library: LibraryFixture? = nil
     ) -> ReaderViewModel {
-        let vm = ReaderViewModel()
+        let vm = snapshotViewModel()
         vm.preferences.layout = layout
         vm.preferences.fitMode = fitMode
         vm.preferences.direction = direction
@@ -238,7 +245,7 @@ enum SnapshotSampleContent {
 
     /// Loading-overlay state — `isLoading=true` plus a stage-aware message.
     static func loadingViewModel(message: String = "Extracting archive…") -> ReaderViewModel {
-        let vm = ReaderViewModel()
+        let vm = snapshotViewModel()
         vm.isLoading = true
         vm.loadingMessage = message
         return vm

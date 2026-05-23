@@ -5,9 +5,8 @@ import Testing
 
 /// Generates `docs/screenshots/*.png` for the user manual.
 ///
-/// Gated behind the `PANELY_GENERATE_SNAPSHOTS=1` environment variable so a
-/// regular `xcodebuild test` doesn't write into the repo on every CI run.
-/// Regenerate via `scripts/generate-snapshots.sh`.
+/// The tests stage PNGs in the Debug app sandbox. Regenerate the checked-in
+/// manual screenshots via `scripts/generate-snapshots.sh`.
 @MainActor
 @Suite("Manual Snapshots")
 struct SnapshotGalleryTests {
@@ -163,11 +162,40 @@ struct SnapshotGalleryTests {
         )
     }
 
+    // MARK: - Settings
+
+    @Test func storageCacheSettings() async throws {
+        let cacheRoot = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: cacheRoot) }
+
+        let active = cacheRoot.appendingPathComponent("active-book", isDirectory: true)
+        let clearable = cacheRoot.appendingPathComponent("old-book", isDirectory: true)
+        try writeCacheEntry(active, byteCount: 1_400_000)
+        try writeCacheEntry(clearable, byteCount: 900_000)
+
+        let vm = SnapshotSampleContent.loadedViewModel()
+        vm.tempDir.url = active
+
+        try await render(
+            ZStack {
+                PanelyColor.bgPrimary
+                StorageSettingsView(viewModel: vm, cacheRoot: cacheRoot)
+            },
+            size: SnapshotRenderer.settingsSize,
+            named: "12-storage-cache.png"
+        )
+    }
+
     // MARK: - Helpers
 
     private func render<V: View>(_ view: V, size: CGSize, named name: String) async throws {
         let url = try await SnapshotRenderer.render(view, size: size, named: name)
         print("📸 wrote \(url.path)")
+    }
+
+    private func writeCacheEntry(_ dir: URL, byteCount: Int) throws {
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try Data(repeating: 0xAB, count: byteCount).write(to: dir.appendingPathComponent("pages.bin"))
     }
 }
 

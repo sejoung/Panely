@@ -173,6 +173,27 @@ so reopening the same archive is instant on subsequent launches.
 
 ---
 
+## Storage and cache
+
+![Storage settings with extraction cache controls](screenshots/12-storage-cache.png)
+
+Open **Panely → Settings… → Storage** to inspect and clear the
+zip-in-zip extraction cache.
+
+- **Extraction cache** — total disk space currently used by extracted
+  nested archives.
+- **Clearable cache** — bytes that can be removed immediately. If the
+  current book is open from a cached extraction, that active cache entry
+  is kept so reading is not interrupted.
+- **Cache limit** — the automatic LRU budget (10 GB).
+- **Clear Cache** — removes clearable extraction cache entries and
+  refreshes the totals.
+
+The same cleanup is available from **File → Clear Extraction Cache**.
+Cache clearing is disabled while a book is loading or extracting.
+
+---
+
 ## Bookmarks and favorites
 
 ### Favoriting a book

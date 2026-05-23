@@ -83,7 +83,9 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   키(SHA256 of 경로 + 크기 + mtime)로
   `~/Library/Caches/panely-extraction-cache/`에 보관됨. 10 GB LRU 예산
   안에서 관리되어 같은 아카이브를 다시 열 때 즉시 표시. 소스 파일 편집
-  시 mtime이 바뀌어 키도 바뀌므로 자동 재추출.
+  시 mtime이 바뀌어 키도 바뀌므로 자동 재추출. 캐시 용량 확인과 수동
+  정리는 **Panely → Settings… → Storage** 와
+  **File → Clear Extraction Cache** 에서 가능.
 - 자연 파일명 정렬(`1, 2, 10` — `1, 10, 2` 아님) — `NaturalSort` 헬퍼로
   모든 로더/스캐너에서 일관 적용
 - 비이미지 파일과 숨김 항목 필터링
@@ -220,7 +222,7 @@ xcodebuild test \
   CODE_SIGN_IDENTITY="-"
 ```
 
-**46 스위트에 걸친 289개 테스트**가 다음을 커버:
+**47 스위트에 걸친 310개 테스트**가 다음을 커버:
 
 - 순수 데이터 타입 (`ComicPage`, `ComicSource`, `RecentItem`, enum raw 값)
 - 자연 정렬 규약 (Panely가 의존하는 Foundation 동작)
@@ -280,7 +282,8 @@ xcodebuild test \
   mtime 게이트(stale 제거, fresh 유지, 비-panely 항목 무시), 그리고
   추출 캐시: 파일별 안정적 `cacheKey` (mtime 민감), `cachedEntry` 히트/
   미스 + 히트 시 mtime touch, `enforceCacheBudget()` 10 GB 초과 시 LRU
-  eviction, `cleanup()`이 session dir은 삭제하되 cache dir은 보존
+  eviction, `cacheSizeBytes()` / `clearCache(excluding:)` 수동 정리,
+  `cleanup()`이 session dir은 삭제하되 cache dir은 보존
 - **`ReaderImageLoader`** — reset / `prepareForVerticalRebuild` /
   `cancelPreload` 상태 전이, `estimatedBitmapCost`가 Retina 백킹에는 픽셀
   치수 사용 + 플레이스홀더에는 size fallback, `lazyConcurrencyLimit`이
@@ -423,7 +426,7 @@ PanelyTests/                            # 소스 트리를 미러링
 ├── Snapshots/                          # docs/screenshots/ 생성기 (CI에서 skip)
 │   ├── SnapshotRenderer.swift          # NSHostingView + offscreen window → PNG
 │   ├── SnapshotSampleContent.swift     # placeholder 페이지 + LibraryFixture
-│   └── SnapshotGalleryTests.swift      # 11개 매뉴얼 시나리오
+│   └── SnapshotGalleryTests.swift      # 12개 매뉴얼 시나리오
 ├── Core/Comic/                         # CBZLoader, FolderLoader, ImageLoader{Load,Dimensions},
 │                                       # ComicModel, LoaderExtension, NaturalSort
 ├── Features/Library/                   # FavoritesStore, PageBookmarksStore, RecentItem,
@@ -444,7 +447,7 @@ PanelyTests/                            # 소스 트리를 미러링
 docs/
 ├── manual.md                           # 영문 사용 설명서 (스크린샷 둘러보기)
 ├── manual.ko.md                        # 한글 사용 설명서
-├── screenshots/                        # SnapshotGalleryTests가 생성하는 11개 PNG
+├── screenshots/                        # SnapshotGalleryTests가 생성하는 12개 PNG
 ├── panely_design_system_mac_os.md
 └── icon/panely-icon-stacked.svg
 
@@ -696,9 +699,9 @@ git push origin v1.0.0
 ### CI / 저장소
 
 - **CI**는 모든 push/PR에서 실행(`**/*.md`와 `docs/**` 제외), ad-hoc
-  서명으로 Debug 빌드, 289개 테스트 전부 실행, 아티팩트 업로드 없음 —
-  저장소 풋프린트는 사실상 0. `SnapshotGalleryTests`는 어설션이 없는
-  매뉴얼 스크린샷 생성기라서 CI(+ release 스크립트)에서
+  서명으로 Debug 빌드, 스냅샷 제외 테스트 suite 실행, 아티팩트 업로드
+  없음 — 저장소 풋프린트는 사실상 0. `SnapshotGalleryTests`는 어설션이
+  없는 매뉴얼 스크린샷 생성기라서 CI(+ release 스크립트)에서
   `-skip-testing`으로 제외; 매뉴얼 PNG가 필요하면
   `scripts/generate-snapshots.sh`로 수동 재생성.
 - **릴리스**는 GitHub Releases에 `ditto`로 단일 zip(~5–10 MB)을 첨부하여

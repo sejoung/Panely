@@ -31,6 +31,16 @@ extension PanelyApp {
                     }
                 }
             }
+
+            Divider()
+
+            Button("Clear Extraction Cache") {
+                let activeURL = viewModel.tempDir.url
+                Task.detached(priority: .utility) {
+                    ReaderTempDirectory.clearCache(excluding: activeURL)
+                }
+            }
+            .disabled(viewModel.isLoading)
         }
     }
 }

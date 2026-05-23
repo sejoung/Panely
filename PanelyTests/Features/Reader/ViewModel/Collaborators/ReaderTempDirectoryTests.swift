@@ -234,6 +234,41 @@ struct ReaderTempDirectoryTests {
         #expect(FileManager.default.fileExists(atPath: entries[2].0.path))
     }
 
+    // MARK: - cache size / clear
+
+    @Test func cacheSizeBytesSumsCacheEntries() throws {
+        let root = try makeIsolatedCacheRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let first = root.appendingPathComponent("first", isDirectory: true)
+        let second = root.appendingPathComponent("second", isDirectory: true)
+        try writeCacheEntry(first, byteCount: 128)
+        try writeCacheEntry(second, byteCount: 256)
+
+        #expect(ReaderTempDirectory.cacheSizeBytes(in: root) >= 384)
+    }
+
+    @Test func clearCachePreservesActiveCacheEntry() throws {
+        let root = try makeIsolatedCacheRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let active = root.appendingPathComponent("active", isDirectory: true)
+        let inactive = root.appendingPathComponent("inactive", isDirectory: true)
+        try writeCacheEntry(active, byteCount: 128)
+        try writeCacheEntry(inactive, byteCount: 256)
+
+        let activeFile = active.appendingPathComponent("blob")
+        let clearableBefore = ReaderTempDirectory.cacheSizeBytes(in: root, excluding: activeFile)
+        #expect(clearableBefore > 0)
+
+        let removed = ReaderTempDirectory.clearCache(in: root, excluding: activeFile)
+
+        #expect(removed > 0)
+        #expect(FileManager.default.fileExists(atPath: active.path))
+        #expect(FileManager.default.fileExists(atPath: inactive.path) == false)
+        #expect(ReaderTempDirectory.cacheSizeBytes(in: root, excluding: activeFile) == 0)
+    }
+
     // MARK: - cleanupStaleEntries (session dirs only)
 
     @Test func cleanupStaleEntriesRemovesOldSessionDirsAndKeepsFresh() throws {
@@ -274,6 +309,18 @@ struct ReaderTempDirectoryTests {
     }
 
     // MARK: - Helpers
+
+    private func makeIsolatedCacheRoot() throws -> URL {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("paneltest-cache-root-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        return root
+    }
+
+    private func writeCacheEntry(_ dir: URL, byteCount: Int) throws {
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try Data(repeating: 0xAB, count: byteCount).write(to: dir.appendingPathComponent("blob"))
+    }
 
     /// Mirror of `ReaderTempDirectory.directorySize(at:)` for the budget
     /// test (the production one is `private`). Sums file sizes recursively.

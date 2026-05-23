@@ -171,6 +171,26 @@ LRU 정리). 따라서 같은 아카이브를 다시 열 때는 즉시 표시됩
 
 ---
 
+## 저장 공간과 캐시
+
+![추출 캐시 컨트롤이 있는 Storage 설정](screenshots/12-storage-cache.png)
+
+**Panely → Settings… → Storage** 에서 zip-in-zip 추출 캐시 용량을
+확인하고 비울 수 있습니다.
+
+- **Extraction cache** — 추출된 중첩 아카이브가 현재 디스크에서
+  사용하는 전체 용량.
+- **Clearable cache** — 즉시 삭제 가능한 용량. 현재 책이 캐시된 추출
+  디렉터리에서 열려 있으면 해당 활성 캐시 entry는 읽기를 끊지 않도록
+  보존됩니다.
+- **Cache limit** — 자동 LRU 예산(10 GB).
+- **Clear Cache** — 삭제 가능한 추출 캐시를 제거하고 용량을 다시 계산.
+
+같은 정리는 **File → Clear Extraction Cache** 에서도 실행할 수 있습니다.
+책을 로딩하거나 압축 해제 중일 때는 캐시 삭제가 비활성화됩니다.
+
+---
+
 ## 북마크와 즐겨찾기
 
 ### 책 즐겨찾기
