@@ -93,11 +93,12 @@ struct StorageSettingsView: View {
         isClearing = true
         let activeURL = viewModel.tempDir.url
         Task {
-            _ = await Task.detached(priority: .utility) {
+            let removedBytes = await Task.detached(priority: .utility) {
                 ReaderTempDirectory.clearCache(in: cacheRoot, excluding: activeURL)
             }.value
             isClearing = false
             await refreshCacheSize()
+            presentCacheClearResult(removedBytes: removedBytes)
         }
     }
 
