@@ -78,63 +78,80 @@ struct LibrarySidebar: View {
         // redundant evaluations across Volumes + Files sections.
         let activeStdURL = activeURL?.standardizedFileURL
         return List {
-            if volumes.count > 1 {
-                Section(header: sectionHeader("Volumes", systemImage: "books.vertical.fill")) {
-                    ForEach(volumes, id: \.self) { url in
-                        VolumeRow(
-                            url: url,
-                            isActive: activeStdURL == url.standardizedFileURL,
-                            onTap: { onSelectVolume(url) }
-                        )
-                        .listRowBackground(Color.clear)
-                    }
-                }
-            }
-
-            if !favorites.isEmpty {
-                Section(header: sectionHeader("Favorites", systemImage: "star.fill")) {
-                    ForEach(favorites) { fav in
-                        FavoriteRow(
-                            favorite: fav,
-                            isActive: activeStdURL?.path
-                                == URL(fileURLWithPath: fav.path).standardizedFileURL.path,
-                            onTap: { onSelectFavorite(fav) },
-                            onRemove: { onRemoveFavorite(fav) }
-                        )
-                        .listRowBackground(Color.clear)
-                    }
-                }
-            }
-
-            if !pageBookmarks.isEmpty {
-                Section(header: sectionHeader("Bookmarks", systemImage: "bookmark.fill")) {
-                    ForEach(pageBookmarks) { bm in
-                        PageBookmarkRow(
-                            bookmark: bm,
-                            isCurrent: bm.pageIndex == currentPageIndex,
-                            onTap: { onJumpToBookmark(bm) },
-                            onRemove: { onRemovePageBookmark(bm) }
-                        )
-                        .listRowBackground(Color.clear)
-                    }
-                }
-            }
-
-            if !nodes.isEmpty {
-                Section(header: sectionHeader("Files", systemImage: "folder")) {
-                    OutlineGroup(nodes, children: \.children) { node in
-                        FileNodeRow(
-                            node: node,
-                            isActive: activeStdURL == node.url.standardizedFileURL,
-                            onTap: { onSelect(node.url) }
-                        )
-                        .listRowBackground(Color.clear)
-                    }
-                }
-            }
+            volumesSection(activeStdURL: activeStdURL)
+            favoritesSection(activeStdURL: activeStdURL)
+            bookmarksSection
+            filesSection(activeStdURL: activeStdURL)
         }
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
+    }
+
+    @ViewBuilder
+    private func volumesSection(activeStdURL: URL?) -> some View {
+        if volumes.count > 1 {
+            Section(header: sectionHeader("Volumes", systemImage: "books.vertical.fill")) {
+                ForEach(volumes, id: \.self) { url in
+                    VolumeRow(
+                        url: url,
+                        isActive: activeStdURL == url.standardizedFileURL,
+                        onTap: { onSelectVolume(url) }
+                    )
+                    .listRowBackground(Color.clear)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func favoritesSection(activeStdURL: URL?) -> some View {
+        if !favorites.isEmpty {
+            Section(header: sectionHeader("Favorites", systemImage: "star.fill")) {
+                ForEach(favorites) { fav in
+                    FavoriteRow(
+                        favorite: fav,
+                        isActive: activeStdURL?.path
+                            == URL(fileURLWithPath: fav.path).standardizedFileURL.path,
+                        onTap: { onSelectFavorite(fav) },
+                        onRemove: { onRemoveFavorite(fav) }
+                    )
+                    .listRowBackground(Color.clear)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var bookmarksSection: some View {
+        if !pageBookmarks.isEmpty {
+            Section(header: sectionHeader("Bookmarks", systemImage: "bookmark.fill")) {
+                ForEach(pageBookmarks) { bm in
+                    PageBookmarkRow(
+                        bookmark: bm,
+                        isCurrent: bm.pageIndex == currentPageIndex,
+                        onTap: { onJumpToBookmark(bm) },
+                        onRemove: { onRemovePageBookmark(bm) }
+                    )
+                    .listRowBackground(Color.clear)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func filesSection(activeStdURL: URL?) -> some View {
+        if !nodes.isEmpty {
+            Section(header: sectionHeader("Files", systemImage: "folder")) {
+                OutlineGroup(nodes, children: \.children) { node in
+                    FileNodeRow(
+                        node: node,
+                        isActive: activeStdURL == node.url.standardizedFileURL,
+                        onTap: { onSelect(node.url) }
+                    )
+                    .listRowBackground(Color.clear)
+                }
+            }
+        }
     }
 
     private func sectionHeader(_ title: String, systemImage: String) -> some View {

@@ -1,0 +1,54 @@
+import SwiftUI
+
+/// Wires the project-wide `LibrarySidebar` to `ReaderViewModel` actions. The
+/// sidebar itself stays presentation-only — opening a book, dismissing the
+/// overlay, and re-focusing the viewer all funnel through here so the
+/// sidebar component doesn't need to know about the viewmodel.
+struct SidebarHost: View {
+    @Environment(ReaderViewModel.self) private var viewModel
+    let requestFocus: () -> Void
+
+    var body: some View {
+        LibrarySidebar(
+            rootURL: viewModel.libraryRootURL,
+            activeURL: viewModel.currentSourceURL,
+            refreshToken: viewModel.libraryRefreshToken,
+            pinned: viewModel.sidebarPinned,
+            favorites: viewModel.bookmarks.favorites,
+            pageBookmarks: viewModel.currentBookPageBookmarks,
+            volumes: viewModel.sidebarVolumes,
+            currentPageIndex: viewModel.currentPageIndex,
+            onSelect: { url in
+                viewModel.openURL(url)
+                viewModel.dismissSidebarOverlay()
+                requestFocus()
+            },
+            onSelectFavorite: { fav in
+                viewModel.openFavorite(fav)
+                viewModel.dismissSidebarOverlay()
+                requestFocus()
+            },
+            onRemoveFavorite: { fav in
+                viewModel.bookmarks.removeFavorite(fav)
+            },
+            onJumpToBookmark: { bm in
+                viewModel.jumpToBookmark(bm)
+                requestFocus()
+            },
+            onRemovePageBookmark: { bm in
+                guard let key = viewModel.currentPositionKey else { return }
+                viewModel.bookmarks.removePageBookmark(forKey: key, id: bm.id)
+            },
+            onSelectVolume: { url in
+                viewModel.openURL(url)
+                requestFocus()
+            },
+            onOpen: {
+                viewModel.openSource()
+                viewModel.dismissSidebarOverlay()
+            },
+            onTogglePin: { viewModel.toggleSidebarPin() },
+            onRequestFolderAccess: { viewModel.requestFolderAccess() }
+        )
+    }
+}

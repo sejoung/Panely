@@ -1,5 +1,10 @@
 import SwiftUI
 
+/// The floating reader toolbar. Presentation-only — every action is a
+/// closure injected by the parent, so the toolbar has no opinion about
+/// view models or controllers. The body composes five logical groups in
+/// fixed left-to-right order: chrome → layout → fit/zoom → bookmarks →
+/// navigation, separated by dividers.
 struct PanelyToolbar: View {
     let layout: PageLayout
     let direction: ReadingDirection
@@ -36,6 +41,24 @@ struct PanelyToolbar: View {
 
     var body: some View {
         HStack(spacing: PanelySpacing.xs) {
+            chromeGroup
+            sectionDivider
+            layoutGroup
+            fitAndZoomGroup
+            sectionDivider
+            bookmarkGroup
+            Spacer()
+            navigationGroup
+        }
+        .padding(.horizontal, PanelySpacing.sm)
+        .padding(.vertical, PanelySpacing.xs)
+        .background(toolbarBackground)
+    }
+
+    // MARK: - Groups
+
+    private var chromeGroup: some View {
+        Group {
             PanelyIconButton(systemImage: "folder", action: onOpen)
                 .help("Open Folder, CBZ, or ZIP… (⌘O)")
 
@@ -52,15 +75,14 @@ struct PanelyToolbar: View {
                 action: onToggleToolbarPin
             )
             .help(toolbarPinned ? "Unpin Toolbar (⌃⌘T)" : "Pin Toolbar (⌃⌘T)")
+        }
+    }
 
-            Divider()
-                .frame(height: 18)
-                .padding(.horizontal, PanelySpacing.xs)
-
-            // Segmented layout picker. One tap to switch directly to any
-            // mode — no cycle round-trip that would otherwise drag the user
-            // through `vertical` (the destructive transition) just to get
-            // from `single` to `double`.
+    // Segmented layout picker. One tap to switch directly to any mode — no
+    // cycle round-trip that would otherwise drag the user through `vertical`
+    // (the destructive transition) just to get from `single` to `double`.
+    private var layoutGroup: some View {
+        Group {
             PanelyIconButton(
                 systemImage: "rectangle.portrait",
                 isActive: layout == .single,
@@ -77,10 +99,10 @@ struct PanelyToolbar: View {
 
             PanelyIconButton(
                 // `rectangle.stack` keeps the layout segments in the same
-                // "container shape" visual family as the single/double
-                // icons, and avoids colliding with the fit-height segment
-                // below (which legitimately owns `arrow.up.and.down` as
-                // part of the directional-resize triplet).
+                // "container shape" visual family as the single/double icons,
+                // and avoids colliding with the fit-height segment below
+                // (which legitimately owns `arrow.up.and.down` as part of the
+                // directional-resize triplet).
                 systemImage: "rectangle.stack",
                 isActive: layout == .vertical,
                 action: { onSetLayout(.vertical) }
@@ -93,11 +115,14 @@ struct PanelyToolbar: View {
             )
             .disabled(layout.isContinuous)
             .help(directionHelp)
+        }
+    }
 
-            // Segmented fit picker — same direct-selection pattern as the
-            // layout segments above. Mirrors the existing `⌘1/⌘2/⌘3`
-            // shortcuts so users see "the same three options" in toolbar
-            // and keyboard.
+    // Segmented fit picker — same direct-selection pattern as the layout
+    // segments above. Mirrors the existing `⌘1/⌘2/⌘3` shortcuts so users
+    // see "the same three options" in toolbar and keyboard.
+    private var fitAndZoomGroup: some View {
+        Group {
             PanelyIconButton(
                 systemImage: "arrow.up.left.and.arrow.down.right",
                 isActive: fitMode == .fitScreen,
@@ -139,11 +164,11 @@ struct PanelyToolbar: View {
             .help(autoFitOnResize
                   ? "Lock view size (don't auto-fit on resize) (⌘L)"
                   : "Unlock view size (auto-fit on resize) (⌘L)")
+        }
+    }
 
-            Divider()
-                .frame(height: 18)
-                .padding(.horizontal, PanelySpacing.xs)
-
+    private var bookmarkGroup: some View {
+        Group {
             PanelyIconButton(
                 systemImage: isBookFavorite ? "star.fill" : "star",
                 isActive: isBookFavorite,
@@ -169,38 +194,48 @@ struct PanelyToolbar: View {
             .help(thumbnailSidebarVisible
                   ? "Hide Thumbnails (⌃⌘P)"
                   : "Show Thumbnails (⌃⌘P)")
-
-            Spacer()
-
-            if showVolumeNav {
-                PanelyIconButton(systemImage: "chevron.backward.2", action: onPreviousVolume)
-                    .disabled(!canGoPreviousVolume)
-                    .help("Previous Volume (⌘[)")
-            }
-
-            PanelyIconButton(systemImage: "chevron.left", action: onPrev)
-                .help("Previous Page (\(previousKeyHint))")
-
-            PanelyIconButton(systemImage: "chevron.right", action: onNext)
-                .help("Next Page (\(nextKeyHint) or Space)")
-
-            if showVolumeNav {
-                PanelyIconButton(systemImage: "chevron.forward.2", action: onNextVolume)
-                    .disabled(!canGoNextVolume)
-                    .help("Next Volume (⌘])")
-            }
         }
-        .padding(.horizontal, PanelySpacing.sm)
-        .padding(.vertical, PanelySpacing.xs)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(PanelyColor.borderSubtle, lineWidth: 1)
-                )
-        )
     }
+
+    @ViewBuilder
+    private var navigationGroup: some View {
+        if showVolumeNav {
+            PanelyIconButton(systemImage: "chevron.backward.2", action: onPreviousVolume)
+                .disabled(!canGoPreviousVolume)
+                .help("Previous Volume (⌘[)")
+        }
+
+        PanelyIconButton(systemImage: "chevron.left", action: onPrev)
+            .help("Previous Page (\(previousKeyHint))")
+
+        PanelyIconButton(systemImage: "chevron.right", action: onNext)
+            .help("Next Page (\(nextKeyHint) or Space)")
+
+        if showVolumeNav {
+            PanelyIconButton(systemImage: "chevron.forward.2", action: onNextVolume)
+                .disabled(!canGoNextVolume)
+                .help("Next Volume (⌘])")
+        }
+    }
+
+    // MARK: - Chrome
+
+    private var sectionDivider: some View {
+        Divider()
+            .frame(height: 18)
+            .padding(.horizontal, PanelySpacing.xs)
+    }
+
+    private var toolbarBackground: some View {
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(.ultraThinMaterial)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(PanelyColor.borderSubtle, lineWidth: 1)
+            )
+    }
+
+    // MARK: - Direction-aware labels
 
     private var directionSymbol: String {
         direction.isRTL ? "arrow.left" : "arrow.right"
