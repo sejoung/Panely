@@ -116,14 +116,12 @@ final class PageBookmarksStore {
     // MARK: - Persistence
 
     private func load() {
-        guard let data = UserDefaults.standard.data(forKey: Self.pageBookmarksKey),
-              let decoded = try? JSONDecoder().decode([String: [PageBookmark]].self, from: data)
-        else { return }
-        pageBookmarksByBook = decoded
+        if let decoded = UserDefaults.standard.loadCodable([String: [PageBookmark]].self, forKey: Self.pageBookmarksKey) {
+            pageBookmarksByBook = decoded
+        }
     }
 
     private func save() {
-        guard let data = try? JSONEncoder().encode(pageBookmarksByBook) else { return }
-        UserDefaults.standard.set(data, forKey: Self.pageBookmarksKey)
+        UserDefaults.standard.saveCodable(pageBookmarksByBook, forKey: Self.pageBookmarksKey)
     }
 }

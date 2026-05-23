@@ -224,7 +224,7 @@ xcodebuild test \
   CODE_SIGN_IDENTITY="-"
 ```
 
-**234 tests across 39 suites** cover:
+**281 tests across 46 suites** cover:
 
 - Pure data types (`ComicPage`, `ComicSource`, `RecentItem`, enum raw values)
 - Natural-sort contract (Foundation behaviour Panely relies on)
@@ -268,11 +268,33 @@ xcodebuild test \
 - **Quick-jump math** — `currentPageNumber` / `currentPageRangeEndNumber`
   in single + double layouts, `jump(toPageNumber:)` clamps out-of-range
   inputs and snaps to navigation step in double mode
-- **`BookmarksStore` page bookmarks** — toggle add/remove, keys isolated,
-  sort by page index, next/previous navigation, remove-by-id, persistence
-  round-trip through `UserDefaults`
-- **`BookmarksStore` favorites** — toggle add/remove against a real temp
-  file, security-scoped bookmark resolves back to the original URL
+- **`PageBookmarksStore`** — toggle add/remove, keys isolated, sort by page
+  index, next/previous navigation, remove-by-id, persistence round-trip
+  through `UserDefaults`
+- **`FavoritesStore`** — toggle add/remove against a real temp file,
+  security-scoped bookmark resolves back to the original URL
+- **`ReaderPreferences`** — UserDefaults round-trip for every persisted
+  setting (layout / direction / fit / sidebar pin / etc.), invalid raw
+  values fall back to defaults, legacy `panely.sidebarVisible` migrates to
+  the new pin flag
+- **`ReaderPositionStore`** — empty-store zero return, lazy cache hydration,
+  300 ms debounce coalesces rapid `savePosition` calls, primary key beats
+  file-identity fallback, mirrored writes under both keys
+- **`ReaderLibraryScope`** — `contains()` accepts at-or-below paths and
+  rejects sibling-prefix collisions, acquire/release lifecycle (including
+  prev-URL released even when new acquire fails on a non-Powerbox URL)
+- **`ReaderTempDirectory`** — adopt/cleanup against real temp dirs,
+  contains() boundary correctness, `makeCandidate()` uniqueness,
+  `cleanupStaleEntries()` mtime gating (stale removed, fresh kept,
+  non-panely entries ignored)
+- **`ReaderImageLoader`** — reset / `prepareForVerticalRebuild` /
+  `cancelPreload` state transitions, `estimatedBitmapCost` uses pixel
+  dimensions for Retina backing and falls back to size for placeholders,
+  `lazyConcurrencyLimit` clamps to [2, 8]
+- **`AppKitScrollerCoordinator`** — bounds observer fires page-index +
+  range callbacks in continuous layout but no-ops in paged, programmatic
+  scroll suppresses the page callback (lazy-load still proceeds), same-page
+  notifications dedupe, re-attaching either observer doesn't double-fire
 - **`FavoriteBook` / `PageBookmark` Codable** — round-trip fidelity plus
   forward-compat decode for legacy `FavoriteBook` JSON without `isDirectory`
 - **`ReaderViewModel` bookmark guards** — `toggle*`, `canGo*Bookmark`,
@@ -297,27 +319,44 @@ xcodebuild test \
 - **`PanelyAppDelegate`** — `applicationShouldTerminateAfterLastWindowClosed`
   returns true so the red close button quits the app
 
-Tests are organized to mirror the source tree under `PanelyTests/Core/`,
-`PanelyTests/Features/Library/`, and `PanelyTests/Features/Reader/`, with
-shared fixtures (including a real PNG generator) in
-`PanelyTests/TestFixtures.swift`.
+Tests mirror the source tree: `PanelyTests/Core/Comic/`,
+`PanelyTests/Features/Library/`, and `PanelyTests/Features/Reader/{Model,
+Viewer, Thumbnails, ViewModel, ViewModel/Collaborators}`. Shared fixtures
+(including a real PNG generator) live in `PanelyTests/TestFixtures.swift`.
 
 `RecentItem.Codable` includes a `decodeIfPresent` path for `isDirectory` so
 old stored entries survive a schema bump.
 
 ## Project Structure
 
+Each folder's top level holds only types referenced by code outside that
+folder. Internals (extensions, sub-views, AppKit bridge, collaborators)
+sit in subfolders so the top of any directory shows its public surface
+at a glance.
+
 ```
 Panely/
-├── PanelyApp.swift                     # @main, commands, window style
+├── PanelyApp.swift                     # @main, window style, .commands { fileCommands + viewCommands + goCommands }
 ├── ContentView.swift
 ├── AppIcon.icns                        # generated from docs/icon/*.svg
+├── Commands/                           # @CommandsBuilder extensions on PanelyApp
+│   ├── PanelyApp+FileCommands.swift    # Open / Open Recent
+│   ├── PanelyApp+ViewCommands.swift    # chrome / layout / fit / zoom / autofit
+│   └── PanelyApp+GoCommands.swift      # page jump / bookmarks / favorites / volumes
 ├── DesignSystem/
 │   ├── Tokens/                         # Color / Spacing / Typography / Motion
 │   └── Primitives/                     # Icon button, slider
 ├── Features/
 │   ├── Reader/
-│   │   ├── ReaderScene.swift           # ZStack layout + hot-edge reveal (entry view)
+│   │   ├── ReaderScene.swift           # ZStack: SidebarHost + ViewerArea + ThumbnailSidebarHost (~100 lines, entry view)
+│   │   ├── Scene/                      # ReaderScene sub-views (one struct per file)
+│   │   │   ├── HotEdgeReveal.swift
+│   │   │   ├── SidebarHost.swift               # LibrarySidebar wired to viewmodel actions
+│   │   │   ├── ThumbnailSidebarHost.swift      # ThumbnailSidebar wired to viewmodel actions
+│   │   │   ├── ViewerArea.swift                # viewer + key handlers + overlays
+│   │   │   ├── ReaderToolbarOverlay.swift
+│   │   │   ├── ReaderSliderOverlay.swift
+│   │   │   └── VolumeCardOverlays.swift        # end-of- + previous-volume cards
 │   │   ├── Model/                      # value types & pure helpers
 │   │   │   ├── PageLayout.swift        # single/double/vertical + cycle + isContinuous
 │   │   │   ├── ReadingDirection.swift  # LTR / RTL
@@ -326,21 +365,31 @@ Panely/
 │   │   │   ├── PositionKey.swift       # stable per-book position keys
 │   │   │   └── SidebarMode.swift       # pinned / overlay state value-type
 │   │   ├── ViewModel/                  # @Observable @MainActor reader state
-│   │   │   ├── ReaderViewModel.swift           # stored state + init
-│   │   │   ├── ReaderViewModel+Navigation.swift # page nav, Quick jump, chrome toggles
-│   │   │   ├── ReaderViewModel+Source.swift     # source loading, volume nav, position memory
-│   │   │   ├── ReaderViewModel+ImageLoading.swift # preload, vertical lazy window, cache
-│   │   │   └── ReaderViewModel+Bookmarks.swift  # favorites & page bookmarks integration
+│   │   │   ├── ReaderViewModel.swift           # session state + composition (~180 lines)
+│   │   │   ├── Extensions/                     # logic split by concern
+│   │   │   │   ├── ReaderViewModel+Navigation.swift   # page nav, Quick jump, chrome toggles
+│   │   │   │   ├── ReaderViewModel+Source.swift       # load pipeline + folder/archive scanners
+│   │   │   │   ├── ReaderViewModel+Volumes.swift      # sibling counters + volume cards
+│   │   │   │   ├── ReaderViewModel+ImageLoading.swift # facade over ReaderImageLoader
+│   │   │   │   └── ReaderViewModel+Bookmarks.swift    # favorites + page bookmarks integration
+│   │   │   └── Collaborators/                  # composed by ReaderViewModel; each single-responsibility
+│   │   │       ├── ReaderPreferences.swift     # UserDefaults-backed layout / fit / pins
+│   │   │       ├── ReaderPositionStore.swift   # debounced per-book page memory
+│   │   │       ├── ReaderImageLoader.swift     # cache + paged refresh + vertical lazy window + preload
+│   │   │       ├── ReaderTempDirectory.swift   # zip-in-zip extraction lifecycle + stale sweep
+│   │   │       └── ReaderLibraryScope.swift    # security-scope grant ownership
 │   │   ├── Viewer/                     # AppKit-backed scrollable image stage
-│   │   │   ├── ViewerContainer.swift   # SwiftUI shell (entry into the scroller)
-│   │   │   ├── AppKitImageScroller.swift # NSViewRepresentable + Coordinator + applyFit
-│   │   │   ├── PanelyScrollView.swift  # NSScrollView with ⌘+scroll zoom
-│   │   │   ├── TitleBarPassthrough.swift # top 28 px drag + cursor handling
-│   │   │   ├── CenteringClipView.swift # small-document centering NSClipView
-│   │   │   ├── ImageStackView.swift    # page frames + pooled NSImageViews
-│   │   │   └── ViewerController.swift  # zoom remote (⌘+/-/0, scroll-wheel)
+│   │   │   ├── ViewerContainer.swift           # SwiftUI shell (entry into the scroller)
+│   │   │   ├── ViewerController.swift          # zoom remote (⌘+/-/0, scroll-wheel)
+│   │   │   └── AppKit/                         # internal AppKit bridge
+│   │   │       ├── AppKitImageScroller.swift       # NSViewRepresentable + applyFit
+│   │   │       ├── AppKitScrollerCoordinator.swift # observers + state diffing
+│   │   │       ├── PanelyScrollView.swift          # NSScrollView with ⌘+scroll zoom
+│   │   │       ├── TitleBarPassthrough.swift       # top 28 px drag + cursor handling
+│   │   │       ├── CenteringClipView.swift         # small-document centering NSClipView
+│   │   │       └── ImageStackView.swift            # page frames + pooled NSImageViews
 │   │   ├── Toolbar/
-│   │   │   ├── PanelyToolbar.swift     # layout / fit / zoom / pin / ★ / 🔖 buttons
+│   │   │   ├── PanelyToolbar.swift     # 5 button groups: chrome / layout / fit&zoom / bookmarks / nav
 │   │   │   └── QuickJumpField.swift    # inline-editable page counter
 │   │   ├── Overlays/
 │   │   │   ├── LoadingOverlay.swift
@@ -358,14 +407,18 @@ Panely/
 │       │   ├── FavoriteBook.swift      # persistent favorite (security-scoped bookmark)
 │       │   └── PageBookmark.swift      # persistent per-page bookmark
 │       ├── Store/
-│       │   ├── BookmarksStore.swift    # favorites + page bookmarks persistent store
-│       │   └── RecentItemsStore.swift  # bookmark dedup on repeat opens
+│       │   ├── FavoritesStore.swift            # starred books (security-scoped, stale auto-refresh)
+│       │   ├── PageBookmarksStore.swift        # per-book pages with per-book + total caps
+│       │   └── RecentItemsStore.swift          # bookmark dedup on repeat opens
 │       └── Rows/                       # sidebar row views (one struct per file)
 │           ├── FileNodeRow.swift
 │           ├── FavoriteRow.swift
 │           ├── VolumeRow.swift
 │           └── PageBookmarkRow.swift
 └── Core/
+    ├── Extensions/                     # shared Foundation utility extensions (DRY)
+    │   ├── URL+IsAncestor.swift        # path-component-aware prefix containment
+    │   └── UserDefaults+Codable.swift  # JSON encode/decode helpers for the stores
     └── Comic/
         ├── ComicPage.swift / ComicSource.swift / ComicPageSource.swift
         ├── FolderLoader.swift
@@ -375,17 +428,26 @@ Panely/
         ├── NaturalSort.swift           # locale-aware natural ordering helper
         └── ImageLoader.swift           # async NSImage + dimensions(for:) header read
 
-PanelyTests/
+PanelyTests/                            # mirrors the source tree
 ├── TestFixtures.swift                  # shared temp-dir / zip / PNG helpers
-├── Core/Comic/                         # ComicModel, Loader extension, FolderLoader,
-│                                       # CBZLoader, ImageLoaderDimensions
-├── Features/Library/                   # RecentItem, FileNode
-└── Features/Reader/                    # enums, NaturalSort, PositionKey, FitCalculator,
-                                        # FitMagnificationStability, CenteringClipView,
-                                        # ViewerResizeFit, SidebarMode, ViewerController,
-                                        # ScrollZoomCalculator, ImageStackVertical,
-                                        # ReaderViewModelPagedMode / VerticalMode,
-                                        # ReaderViewModelToolbarPin
+├── PanelyAppDelegateTests.swift
+├── FileAssociationTests.swift
+├── Core/Comic/                         # CBZLoader, FolderLoader, ImageLoader{Load,Dimensions},
+│                                       # ComicModel, LoaderExtension, NaturalSort
+├── Features/Library/                   # FavoritesStore, PageBookmarksStore, RecentItem,
+│                                       # FileNode, FavoriteBook, PageBookmark
+└── Features/Reader/
+    ├── Model/                          # FitCalculator, PositionKey, ReaderEnum, SidebarMode
+    ├── Viewer/                         # CenteringClipView, FitMagnificationStability,
+    │                                   # ImageStackVertical, ScrollZoomCalculator,
+    │                                   # ViewerController, ViewerResizeFit,
+    │                                   # AppKitScrollerCoordinator
+    ├── Thumbnails/                     # ThumbnailLoader
+    └── ViewModel/                      # 10 integration files (Bookmarks, EndOfVolume,
+        │                               # Library, PagedMode, PositionMemory, QuickJump,
+        │                               # SetLayout, ThumbnailSidebar, ToolbarPin,
+        │                               # VerticalMode)
+        └── Collaborators/              # focused unit tests for the 5 collaborators
 
 docs/
 ├── panely_design_system_mac_os.md
@@ -407,18 +469,28 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
 
 - **`@Observable` + `@MainActor`** — `ReaderViewModel` is main-actor isolated
   and orchestrates async loads via explicit stage messages to drive the
-  loading overlay. The class file holds stored properties and `init` only;
-  logic is split across concern-focused extensions (`+Navigation`,
-  `+Source`, `+ImageLoading`, `+Bookmarks`).
+  loading overlay. The class file holds session state + composition of five
+  single-responsibility **collaborators** (`ReaderPreferences`,
+  `ReaderPositionStore`, `ReaderImageLoader`, `ReaderTempDirectory`,
+  `ReaderLibraryScope`) and forwards their observable properties so view
+  callsites (`viewModel.layout`, `viewModel.currentImages`) stay unchanged
+  while the underlying types own their state independently. Per-concern
+  logic is split across five extensions (`+Navigation`, `+Source`,
+  `+Volumes`, `+ImageLoading`, `+Bookmarks`).
 - **`nonisolated` core types** — `ComicPage`, `FolderLoader`, `CBZLoader`,
   `ImageLoader`, `FitCalculator`, `PositionKey` run off-main via
   `Task.detached`.
 - **`actor ArchiveReader`** — wraps ZIPFoundation's `Archive` for
   serialised, thread-safe entry reads.
 - **AppKit viewer core** — `ViewerContainer` is SwiftUI, but the scrollable
-  zoomable stage is an `NSViewRepresentable` wrapping `NSScrollView` +
-  `CenteringClipView` + a custom `ImageStackView`. `acceptsFirstResponder`
-  is disabled so keyboard events still flow to SwiftUI's `.onKeyPress`.
+  zoomable stage is `AppKitImageScroller` (`NSViewRepresentable`) wrapping
+  `NSScrollView` + `CenteringClipView` + a custom `ImageStackView`.
+  `acceptsFirstResponder` is disabled so keyboard events still flow to
+  SwiftUI's `.onKeyPress`. `AppKitScrollerCoordinator` owns the bridge's
+  AppKit-side state: last-seen SwiftUI props (for change detection), the
+  two NotificationCenter observer tokens, and the `applyFit` invocation —
+  so the representable itself stays focused on the SwiftUI ↔ AppKit
+  handshake.
 - **`CenteringClipView`** overrides `constrainBoundsRect(_:)` to center the
   document when the viewport is larger — keeps the image in the middle when
   the sidebar is toggled.
@@ -472,16 +544,17 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   buttons + menu shortcuts (`⌘+`/`⌘-`/`⌘0`) and `⌘ + scroll wheel` all hit
   the same code path.
 - **`SidebarMode`** — a tiny pure value-type owning `pinned` and
-  `overlayVisible`; `ReaderViewModel` holds an instance and persists only
-  `pinned`. UI composes it via `sidebarVisible` (computed). Hot-edge hover
-  reveal lives in `ReaderScene` as a small `HotEdgeReveal` SwiftUI view that
-  fires `revealSidebarOverlay()` after a 200 ms delay; mouse-out from the
-  overlay schedules a 300 ms dismiss. The toolbar follows the same pin
+  `overlayVisible`. `ReaderPreferences` holds the instance and persists only
+  `pinned`; `ReaderViewModel` forwards `sidebarPinned` / `sidebarOverlayVisible`
+  / `sidebarVisible` (computed) so view callsites are unchanged. Hot-edge
+  hover reveal lives in `ReaderScene` as a small `HotEdgeReveal` SwiftUI view
+  that fires `revealSidebarOverlay()` after a 200 ms delay; mouse-out from
+  the overlay schedules a 300 ms dismiss. The toolbar follows the same pin
   pattern (`toolbarPinned`) and shares the auto-hide / pin overlay logic.
 - **`PositionKey.make(for:opened:tempRoot:)`** — for sources extracted to
   `/tmp`, the key is derived from the opened URL plus the relative path
   inside the temp root so reading progress survives re-extraction. Page
-  bookmarks (`BookmarksStore`) reuse the same key so they also survive
+  bookmarks (`PageBookmarksStore`) reuse the same key so they also survive
   temp-dir re-extraction. A `PositionKey.fileIdentity(for:)` helper
   additionally produces a `(volumeIdentifier, fileResourceIdentifier)`
   key so external drives whose mount path drifts (e.g. `/Volumes/X` →
@@ -503,37 +576,41 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   runs a cancellable `Task` around the current page ±2 in paged modes;
   cancellation propagates into `ImageLoader.load` and `preloadIfNeeded`
   so abandoned work doesn't pollute the cache during fast keyboard navigation.
-- **Persistent store safety** — `BookmarksStore` caps per-book page
+- **Persistent store safety** — `PageBookmarksStore` caps per-book page
   bookmarks at 500 (oldest dropped on overflow) and total book entries
   at 200 (least-recently-touched dropped) so the JSON-encoded blob stays
   comfortably under `UserDefaults`'s ~4 MB practical limit; a decode
   failure there would otherwise lose every bookmark at once.
-  `pruneOrphanedPageBookmarks(keeping:)` lets the viewer GC entries
-  for books no longer in Recents/Favorites. Both
-  `RecentItemsStore.resolve` and `BookmarksStore.resolve` regenerate
-  stale security-scoped bookmarks in place, so moving a favorited file
-  doesn't break it — `RecentItemsStore.record`'s fast reopen path also
-  runs the same staleness check.
+  `pruneOrphaned(keeping:)` lets the viewer GC entries for books no
+  longer in Recents/Favorites. Both `RecentItemsStore.resolve` and
+  `FavoritesStore.resolve` regenerate stale security-scoped bookmarks
+  in place, so moving a favorited file doesn't break it —
+  `RecentItemsStore.record`'s fast reopen path also runs the same
+  staleness check. All three stores share JSON encode/decode through
+  `UserDefaults.loadCodable(_:forKey:)` / `saveCodable(_:forKey:)` in
+  `Core/Extensions/`.
 - **CBZ extraction size cap** — `CBZLoader.maxExtractedBytes = 5 GB`.
   After each `unzipItem` (top-level and nested), the destination is
   walked once to sum file sizes; if the cumulative total crosses the
   limit, `LoadError.extractedSizeExceeded` is thrown and partial
   extraction is cleaned up. Protects against zip-bombs and pathological
   nested archives that slip past `maxNestingDepth`.
-- **Startup temp-dir cleanup** — `cleanupStaleTempDirs` only removes
-  `panely-*` directories whose `contentModificationDate` is more than
-  10 minutes old, so a concurrent first-launch extraction can't be
-  deleted by the cleanup task racing it in the background.
+- **Startup temp-dir cleanup** — `ReaderTempDirectory.cleanupStaleEntries`
+  only removes `panely-*` directories whose `contentModificationDate` is
+  more than 10 minutes old, so a concurrent first-launch extraction can't
+  be deleted by the cleanup task racing it in the background.
 - **Last-spread-reachable position restore** — `clampedRestoredIndex`
   clamps to the last step-aligned index (`((pageCount - 1) / step) * step`)
   instead of `pageCount - 1`, so quitting on the final spread in
   double-page mode and reopening lands exactly there rather than one
   spread short.
-- **AppKit observer hardening** — the `frameDidChangeNotification` and
-  `boundsDidChangeNotification` observers in `AppKitImageScroller` are
-  defensively removed before being re-registered in `makeNSView`, so
-  any future Coordinator reuse (or SwiftUI representable recreation)
-  can't accumulate duplicate auto-fit handlers.
+- **AppKit observer hardening** — `AppKitScrollerCoordinator.attachFrameObserver(to:)`
+  and `attachBoundsObserver(to:)` defensively remove any prior token
+  before registering, so even if SwiftUI recreates the representable
+  the coordinator can't accumulate duplicate auto-fit / scroll handlers.
+  Both tokens are released in the coordinator's `deinit`. Covered by
+  `AppKitScrollerCoordinatorTests` (no-double-fire on re-attach, deinit
+  no-leak).
 - **Eager-decode image pipeline** — `ImageLoader.load` runs
   `CGImageSourceCreateWithURL` (zero-copy mmap for file URLs) /
   `CGImageSourceCreateWithData` (archive entries) inside a
@@ -571,19 +648,20 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   `UserDefaults.standard.dictionaryRepresentation()` once and reads every
   key from the in-memory dict, avoiding a dozen separate cross-process
   `UserDefaults` calls on cold start.
-- **Debounced position save with in-memory mirror** —
-  `currentPageIndex`'s didSet schedules a 300 ms-debounced
-  `savePosition`, so vertical-scroll-driven page changes at ~60 Hz don't
-  fan out to per-frame `UserDefaults` writes. Saves and reads also go
-  through a lazy in-memory mirror (`positionsCache`), so each save is a
-  small dict mutation + one `set(_:forKey:)` instead of a full
-  `dictionary(forKey:)` read-modify-write of every saved book's slot.
-  `NSApplication.willTerminateNotification` flushes
-  `flushPositionImmediately` before quit.
+- **Debounced position save with in-memory mirror** — `currentPageIndex`'s
+  didSet routes to `ReaderPositionStore.savePosition(...)`, which schedules
+  a 300 ms-debounced write so vertical-scroll-driven page changes at
+  ~60 Hz don't fan out to per-frame `UserDefaults` writes. Saves and reads
+  go through a lazy in-memory mirror so each save is a small dict mutation
+  + one `set(_:forKey:)` instead of a full read-modify-write of every
+  saved book's slot. `NSApplication.willTerminateNotification` flushes
+  the pending write before quit.
 - **Security-scoped bookmarks** — Recent items and favorites persist across
   launches because we create `.withSecurityScope` bookmarks and resolve
-  them on click. Scope lifecycle is tracked at the root URL so sibling
-  navigation within a selected tree doesn't require re-prompting.
+  them on click. The active library-root grant lives on
+  `ReaderLibraryScope` (one URL at a time, `acquire`/`release` paired),
+  so sibling navigation within a selected tree doesn't require re-prompting
+  and the prior grant is always released before a new one is acquired.
 - **Window close quits the app** — `PanelyAppDelegate` returns true from
   `applicationShouldTerminateAfterLastWindowClosed` so the red close
   button matches single-window-viewer expectations (vs. keeping a
@@ -633,7 +711,7 @@ git push origin v1.0.0
 ### CI / storage
 
 - **CI** runs on every push/PR (skips `**/*.md` and `docs/**`), builds
-  Debug with ad-hoc signing, runs all 234 tests, and uploads no artifacts —
+  Debug with ad-hoc signing, runs all 281 tests, and uploads no artifacts —
   storage footprint is essentially zero.
 - **Releases** attach a single zip (~5–10 MB) to GitHub Releases using
   `ditto` so resource forks are preserved.

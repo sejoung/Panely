@@ -82,14 +82,12 @@ final class FavoritesStore {
     // MARK: - Persistence
 
     private func load() {
-        guard let data = UserDefaults.standard.data(forKey: Self.favoritesKey),
-              let decoded = try? JSONDecoder().decode([FavoriteBook].self, from: data)
-        else { return }
-        favorites = decoded
+        if let decoded = UserDefaults.standard.loadCodable([FavoriteBook].self, forKey: Self.favoritesKey) {
+            favorites = decoded
+        }
     }
 
     private func save() {
-        guard let data = try? JSONEncoder().encode(favorites) else { return }
-        UserDefaults.standard.set(data, forKey: Self.favoritesKey)
+        UserDefaults.standard.saveCodable(favorites, forKey: Self.favoritesKey)
     }
 }

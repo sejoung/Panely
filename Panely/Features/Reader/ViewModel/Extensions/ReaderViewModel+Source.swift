@@ -143,22 +143,47 @@ extension ReaderViewModel {
                 if let hasNested = try? await CBZLoader.hasNestedArchives(at: url) {
                     guard myEpoch == loadEpoch else { return }
                     if hasNested {
-                        loadingMessage = "Extracting archive…"
-                        let candidate = ReaderTempDirectory.makeCandidate()
-                        do {
-                            try await CBZLoader.extractAll(from: url, to: candidate)
-                            guard myEpoch == loadEpoch else {
-                                // Newer load is in flight; don't keep the
-                                // candidate we just extracted — it would leak.
+                        // Cache hit fast path — same archive (same path +
+                        // size + mtime) reuses the previous extraction so
+                        // reopen is instant. Edits to the source bump
+                        // mtime → new key → automatic re-extraction.
+                        let key = ReaderTempDirectory.cacheKey(for: url)
+                        if let key,
+                           let cached = ReaderTempDirectory.cachedEntry(forKey: key) {
+                            tempDir.adopt(cached)
+                            targetURL = cached
+                        } else {
+                            loadingMessage = "Extracting archive…"
+                            // Use the cached destination when we have a
+                            // key; fall back to a UUID session dir when
+                            // the source can't be stat'd.
+                            let candidate = key.map(ReaderTempDirectory.makeCachedCandidate(forKey:))
+                                ?? ReaderTempDirectory.makeSessionCandidate()
+                            do {
+                                try await CBZLoader.extractAll(from: url, to: candidate)
+                                guard myEpoch == loadEpoch else {
+                                    // Newer load is in flight; don't keep
+                                    // the candidate we just extracted —
+                                    // partial state isn't safe to serve
+                                    // and would otherwise leak.
+                                    try? FileManager.default.removeItem(at: candidate)
+                                    return
+                                }
+                                tempDir.adopt(candidate)
+                                targetURL = candidate
+                                // New cache entry might push us over budget.
+                                // Sweep async on a background queue so the
+                                // size walk doesn't block first-paint.
+                                if key != nil {
+                                    Task.detached(priority: .background) {
+                                        ReaderTempDirectory.enforceCacheBudget()
+                                    }
+                                }
+                            } catch {
                                 try? FileManager.default.removeItem(at: candidate)
-                                return
+                                guard myEpoch == loadEpoch else { return }
+                                errorMessage = "Failed to extract archive: \(error.localizedDescription)"
                             }
-                            tempDir.adopt(candidate)
-                            targetURL = candidate
-                        } catch {
-                            try? FileManager.default.removeItem(at: candidate)
-                            guard myEpoch == loadEpoch else { return }
-                            errorMessage = "Failed to extract archive: \(error.localizedDescription)"
                         }
                     }
                 }

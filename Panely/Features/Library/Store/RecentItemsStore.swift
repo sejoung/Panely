@@ -105,12 +105,10 @@ final class RecentItemsStore {
     }
 
     private func load() {
-        guard let data = UserDefaults.standard.data(forKey: Self.defaultsKey) else { return }
-        items = (try? JSONDecoder().decode([RecentItem].self, from: data)) ?? []
+        items = UserDefaults.standard.loadCodable([RecentItem].self, forKey: Self.defaultsKey) ?? []
     }
 
     private func save() {
-        guard let data = try? JSONEncoder().encode(items) else { return }
-        UserDefaults.standard.set(data, forKey: Self.defaultsKey)
+        UserDefaults.standard.saveCodable(items, forKey: Self.defaultsKey)
     }
 }
