@@ -14,7 +14,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-BUNDLE_ID="io.github.sejoung.Panely"
+BUNDLE_ID="io.github.sejoung.Panely.debug"
 SANDBOX_CACHE="$HOME/Library/Containers/$BUNDLE_ID/Data/Library/Caches/panely-snapshots"
 DEST="$PROJECT_ROOT/docs/screenshots"
 

@@ -10,10 +10,11 @@ import SwiftUI
 /// skips enough machinery that several reader chrome elements rendered as
 /// fallback glyphs.
 ///
-/// Output lives in `~/Library/Containers/<bundle>/Data/Library/Caches/panely-snapshots/`
-/// because the test bundle inherits the host app's sandbox; the
-/// `scripts/generate-snapshots.sh` script copies the PNGs into the repo's
-/// `docs/screenshots/` after the run.
+/// Output lives in the Debug host app's sandbox caches
+/// (`~/Library/Containers/io.github.sejoung.Panely.debug/Data/Library/Caches/panely-snapshots/`);
+/// `scripts/generate-snapshots.sh` copies the PNGs into the repo's
+/// `docs/screenshots/` after the run. Keeping Debug on a separate bundle ID
+/// prevents snapshot tests from writing into the released app's container.
 @MainActor
 enum SnapshotRenderer {
     /// Standard hero-shot canvas. Matches typical macOS app-store screenshot
@@ -129,11 +130,9 @@ enum SnapshotRenderer {
     }
 
     /// Output dir for the generated PNGs. The test bundle inherits the
-    /// host app's sandbox, which blocks writes to the repo's `docs/`. We
-    /// therefore stage PNGs under the sandbox's own Caches dir
-    /// (`~/Library/Containers/<bundle>/Data/Library/Caches/panely-snapshots/`)
-    /// and let `scripts/generate-snapshots.sh` copy them into the repo
-    /// after the test run.
+    /// Debug host app's sandbox, which blocks writes to the repo's `docs/`.
+    /// We therefore stage PNGs under that sandbox's own Caches dir and let
+    /// `scripts/generate-snapshots.sh` copy them into the repo after the run.
     static func outputDirectory() throws -> URL {
         let caches = FileManager.default
             .urls(for: .cachesDirectory, in: .userDomainMask)
