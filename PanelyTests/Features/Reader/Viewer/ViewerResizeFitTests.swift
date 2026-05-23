@@ -14,7 +14,7 @@ struct ViewerResizeFitTests {
         scrollView.documentView = doc
         scrollView.layoutSubtreeIfNeeded()
 
-        let coordinator = AppKitImageScroller.Coordinator()
+        let coordinator = AppKitScrollerCoordinator()
         AppKitImageScroller.applyFit(
             scrollView: scrollView,
             coordinator: coordinator,
@@ -51,7 +51,7 @@ struct ViewerResizeFitTests {
         scrollView.documentView = doc
         scrollView.layoutSubtreeIfNeeded()
 
-        let coordinator = AppKitImageScroller.Coordinator()
+        let coordinator = AppKitScrollerCoordinator()
         AppKitImageScroller.applyFit(
             scrollView: scrollView,
             coordinator: coordinator,
@@ -90,7 +90,7 @@ struct ViewerResizeFitTests {
         scrollView.documentView = doc
         scrollView.layoutSubtreeIfNeeded()
 
-        let coordinator = AppKitImageScroller.Coordinator()
+        let coordinator = AppKitScrollerCoordinator()
         AppKitImageScroller.applyFit(
             scrollView: scrollView,
             coordinator: coordinator,
@@ -125,7 +125,7 @@ struct ViewerResizeFitTests {
         scrollView.documentView = doc
         scrollView.layoutSubtreeIfNeeded()
 
-        let coordinator = AppKitImageScroller.Coordinator()
+        let coordinator = AppKitScrollerCoordinator()
         // Initial fit-screen → mag ≈ 0.4
         AppKitImageScroller.applyFit(
             scrollView: scrollView,
@@ -160,7 +160,7 @@ struct ViewerResizeFitTests {
         scrollView.documentView = doc
         scrollView.layoutSubtreeIfNeeded()
 
-        let coordinator = AppKitImageScroller.Coordinator()
+        let coordinator = AppKitScrollerCoordinator()
         coordinator.autoFitOnResize = true // default
         AppKitImageScroller.applyFit(
             scrollView: scrollView,
@@ -192,7 +192,7 @@ struct ViewerResizeFitTests {
         scrollView.documentView = doc
         scrollView.layoutSubtreeIfNeeded()
 
-        let coordinator = AppKitImageScroller.Coordinator()
+        let coordinator = AppKitScrollerCoordinator()
         coordinator.autoFitOnResize = false // locked
         scrollView.magnification = 2.0
 
@@ -209,19 +209,16 @@ struct ViewerResizeFitTests {
 
     /// Coordinator must remove its NotificationCenter observer on deinit, or
     /// posting frame-change notifications after the view tree is torn down
-    /// will dispatch into a dead reference.
+    /// will dispatch into a dead reference. We attach via the public API
+    /// (same path production uses) so the test guards the real cleanup.
     @Test func coordinatorRemovesFrameObserverOnDeinit() {
-        weak var weakCoordinator: AppKitImageScroller.Coordinator?
+        weak var weakCoordinator: AppKitScrollerCoordinator?
         do {
             let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
             scrollView.postsFrameChangedNotifications = true
-            let coordinator = AppKitImageScroller.Coordinator()
+            let coordinator = AppKitScrollerCoordinator()
             coordinator.scrollView = scrollView
-            coordinator.frameObserver = NotificationCenter.default.addObserver(
-                forName: NSView.frameDidChangeNotification,
-                object: scrollView,
-                queue: .main
-            ) { _ in }
+            coordinator.attachFrameObserver(to: scrollView)
             weakCoordinator = coordinator
             #expect(weakCoordinator != nil)
         }

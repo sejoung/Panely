@@ -2,14 +2,12 @@ import Testing
 import Foundation
 @testable import Panely
 
-/// `BookmarksStore` reads/writes `UserDefaults.standard`, so the suite is
-/// serialised to avoid tests clobbering each other's state through the
+/// `PageBookmarksStore` reads/writes `UserDefaults.standard`, so the suite
+/// is serialised to avoid tests clobbering each other's state through the
 /// shared defaults.
 @MainActor
 @Suite(.serialized)
-struct BookmarksStoreTests {
-
-    // MARK: Page bookmarks — pure logic
+struct PageBookmarksStoreTests {
 
     @Test func togglingPageBookmarkAddsThenRemovesIt() {
         let store = freshStore()
@@ -108,8 +106,6 @@ struct BookmarksStoreTests {
         #expect(store.pageBookmarksByBook[key] == nil)
     }
 
-    // MARK: Page bookmarks — persistence
-
     @Test func pageBookmarksPersistAcrossStoreInstances() {
         let key = "book-\(UUID().uuidString)"
         let writer = freshStore()
@@ -117,76 +113,12 @@ struct BookmarksStoreTests {
 
         // A brand-new store must read what the previous one wrote through
         // UserDefaults — proves the load/save symmetry.
-        let reader = BookmarksStore()
+        let reader = PageBookmarksStore()
         #expect(reader.isPageBookmarked(key: key, pageIndex: 42) == true)
     }
 
-    // MARK: Favorites — round-trip on real file
-
-    @Test func toggleFavoriteAddsRealFileThenRemoves() throws {
-        let store = freshStore()
-        let tempDir = try Fixture.makeTempDir()
-        defer { try? FileManager.default.removeItem(at: tempDir) }
-        let fileURL = tempDir.appendingPathComponent("book.cbz")
-        _ = try Fixture.writeFile(fileURL)
-
-        #expect(store.isFavorite(url: fileURL) == false)
-
-        store.toggleFavorite(url: fileURL, title: "book")
-        #expect(store.isFavorite(url: fileURL) == true)
-        #expect(store.favorites.contains { $0.path == fileURL.path })
-
-        store.toggleFavorite(url: fileURL, title: "book")
-        #expect(store.isFavorite(url: fileURL) == false)
-    }
-
-    @Test func resolveReturnsEquivalentURL() throws {
-        let store = freshStore()
-        let tempDir = try Fixture.makeTempDir()
-        defer { try? FileManager.default.removeItem(at: tempDir) }
-        let fileURL = tempDir.appendingPathComponent("book.cbz")
-        _ = try Fixture.writeFile(fileURL)
-
-        store.toggleFavorite(url: fileURL, title: "book")
-        guard let fav = store.favorites.first(where: { $0.path == fileURL.path }) else {
-            Issue.record("expected favorite for just-added URL")
-            return
-        }
-
-        let resolved = store.resolve(fav)
-        // Compare after resolving symlinks because bookmark resolution may
-        // canonicalise `/var/...` to `/private/var/...` on macOS.
-        #expect(
-            resolved?.resolvingSymlinksInPath().path
-                == fileURL.resolvingSymlinksInPath().path
-        )
-    }
-
-    @Test func removeFavoriteDropsTheEntry() throws {
-        let store = freshStore()
-        let tempDir = try Fixture.makeTempDir()
-        defer { try? FileManager.default.removeItem(at: tempDir) }
-        let fileURL = tempDir.appendingPathComponent("book.cbz")
-        _ = try Fixture.writeFile(fileURL)
-
-        store.toggleFavorite(url: fileURL, title: "book")
-        guard let fav = store.favorites.first(where: { $0.path == fileURL.path }) else {
-            Issue.record("expected favorite entry")
-            return
-        }
-
-        store.removeFavorite(fav)
-        #expect(store.isFavorite(url: fileURL) == false)
-    }
-
-    // MARK: helpers
-
-    private func freshStore() -> BookmarksStore {
-        // Clear both persisted slots so each test starts from a known empty
-        // state. Suite-level serialisation prevents a concurrent sibling
-        // from reading an empty store mid-write.
-        UserDefaults.standard.removeObject(forKey: "panely.favoriteBooks")
-        UserDefaults.standard.removeObject(forKey: "panely.pageBookmarks")
-        return BookmarksStore()
+    private func freshStore() -> PageBookmarksStore {
+        UserDefaults.standard.removeObject(forKey: PageBookmarksStore.pageBookmarksKey)
+        return PageBookmarksStore()
     }
 }

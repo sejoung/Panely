@@ -14,7 +14,7 @@ struct SidebarHost: View {
             activeURL: viewModel.currentSourceURL,
             refreshToken: viewModel.libraryRefreshToken,
             pinned: viewModel.sidebarPinned,
-            favorites: viewModel.bookmarks.favorites,
+            favorites: viewModel.favorites.favorites,
             pageBookmarks: viewModel.currentBookPageBookmarks,
             volumes: viewModel.sidebarVolumes,
             currentPageIndex: viewModel.currentPageIndex,
@@ -29,7 +29,7 @@ struct SidebarHost: View {
                 requestFocus()
             },
             onRemoveFavorite: { fav in
-                viewModel.bookmarks.removeFavorite(fav)
+                viewModel.favorites.removeFavorite(fav)
             },
             onJumpToBookmark: { bm in
                 viewModel.jumpToBookmark(bm)
@@ -37,7 +37,7 @@ struct SidebarHost: View {
             },
             onRemovePageBookmark: { bm in
                 guard let key = viewModel.currentPositionKey else { return }
-                viewModel.bookmarks.removePageBookmark(forKey: key, id: bm.id)
+                viewModel.pageBookmarks.removePageBookmark(forKey: key, id: bm.id)
             },
             onSelectVolume: { url in
                 viewModel.openURL(url)

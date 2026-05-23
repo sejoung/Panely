@@ -2,10 +2,11 @@ import Testing
 import Foundation
 @testable import Panely
 
-/// Integration-level behaviour of the `ReaderViewModel` ↔ `BookmarksStore`
-/// wiring. `currentSourceURL` is `private(set)`, so without going through
-/// the full `load(url:)` pipeline we can only exercise the "no source" guard
-/// paths — which is what users would hit when the app is opened with no book.
+/// Integration-level behaviour of the `ReaderViewModel` ↔ `FavoritesStore`
+/// / `PageBookmarksStore` wiring. `currentSourceURL` is `private(set)`, so
+/// without going through the full `load(url:)` pipeline we can only exercise
+/// the "no source" guard paths — which is what users would hit when the app
+/// is opened with no book.
 @MainActor
 struct ReaderViewModelBookmarksTests {
 
@@ -21,9 +22,9 @@ struct ReaderViewModelBookmarksTests {
 
     @Test func toggleFavoriteIsNoOpWithoutSource() {
         let vm = ReaderViewModel()
-        let before = vm.bookmarks.favorites.count
+        let before = vm.favorites.favorites.count
         vm.toggleFavoriteForCurrentBook()
-        #expect(vm.bookmarks.favorites.count == before)
+        #expect(vm.favorites.favorites.count == before)
     }
 
     @Test func isCurrentPageBookmarkedIsFalseWithoutSource() {
@@ -33,9 +34,9 @@ struct ReaderViewModelBookmarksTests {
 
     @Test func toggleCurrentPageBookmarkIsNoOpWithoutSource() {
         let vm = ReaderViewModel()
-        let beforeKeys = vm.bookmarks.pageBookmarksByBook.keys.count
+        let beforeKeys = vm.pageBookmarks.pageBookmarksByBook.keys.count
         vm.toggleCurrentPageBookmark()
-        #expect(vm.bookmarks.pageBookmarksByBook.keys.count == beforeKeys)
+        #expect(vm.pageBookmarks.pageBookmarksByBook.keys.count == beforeKeys)
     }
 
     @Test func currentBookPageBookmarksIsEmptyWithoutSource() {

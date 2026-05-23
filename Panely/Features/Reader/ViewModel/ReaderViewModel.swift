@@ -32,7 +32,8 @@ final class ReaderViewModel {
     let tempDir = ReaderTempDirectory()
     let libraryScope = ReaderLibraryScope()
     let recentItems: RecentItemsStore
-    let bookmarks: BookmarksStore
+    let favorites: FavoritesStore
+    let pageBookmarks: PageBookmarksStore
 
     // MARK: - Source state
 
@@ -149,7 +150,8 @@ final class ReaderViewModel {
 
     init() {
         self.recentItems = RecentItemsStore()
-        self.bookmarks = BookmarksStore()
+        self.favorites = FavoritesStore()
+        self.pageBookmarks = PageBookmarksStore()
 
         observeAppTermination()
 
