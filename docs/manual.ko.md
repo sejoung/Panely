@@ -175,8 +175,8 @@ LRU 정리). 따라서 같은 아카이브를 다시 열 때는 즉시 표시됩
 
 ![추출 캐시 컨트롤이 있는 Storage 설정](screenshots/12-storage-cache.png)
 
-**Panely → Settings… → Storage** 에서 zip-in-zip 추출 캐시 용량을
-확인하고 비울 수 있습니다.
+**File → Storage Settings…**(또는 **Panely → Settings…**)에서 zip-in-zip
+추출 캐시 용량을 확인하고 비울 수 있습니다.
 
 - **Extraction cache** — 추출된 중첩 아카이브가 현재 디스크에서
   사용하는 전체 용량.

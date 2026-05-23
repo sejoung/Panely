@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 extension PanelyApp {
@@ -33,6 +34,10 @@ extension PanelyApp {
             }
 
             Divider()
+
+            Button("Storage Settings…") {
+                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+            }
 
             Button("Clear Extraction Cache") {
                 let activeURL = viewModel.tempDir.url

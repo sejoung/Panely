@@ -43,16 +43,12 @@ jobs:
       - name: Build & Test
         run: |
           set -o pipefail
-          # SnapshotGalleryTests is a docs/screenshots/ generator that lives in
-          # the test target for convenience (NSHostingView + sandbox cache
-          # output). It has no assertions and its PNGs go nowhere useful in
-          # CI, so we skip it here — regenerate manually via
-          # `scripts/generate-snapshots.sh` when the manual needs updating.
+          # SnapshotGalleryTests is gated off by default and is enabled only
+          # by `scripts/generate-snapshots.sh` when the manual needs updating.
           xcodebuild test \
             -project Panely.xcodeproj \
             -scheme Panely \
             -configuration Debug \
             -destination 'platform=macOS' \
-            -skip-testing:PanelyTests/SnapshotGalleryTests \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=YES

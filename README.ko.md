@@ -84,7 +84,7 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   `~/Library/Caches/panely-extraction-cache/`에 보관됨. 10 GB LRU 예산
   안에서 관리되어 같은 아카이브를 다시 열 때 즉시 표시. 소스 파일 편집
   시 mtime이 바뀌어 키도 바뀌므로 자동 재추출. 캐시 용량 확인과 수동
-  정리는 **Panely → Settings… → Storage** 와
+  정리는 **File → Storage Settings…**(또는 **Panely → Settings…**)와
   **File → Clear Extraction Cache** 에서 가능.
 - 자연 파일명 정렬(`1, 2, 10` — `1, 10, 2` 아님) — `NaturalSort` 헬퍼로
   모든 로더/스캐너에서 일관 적용
@@ -223,6 +223,10 @@ xcodebuild test \
 ```
 
 **47 스위트에 걸친 310개 테스트**가 다음을 커버:
+
+`SnapshotGalleryTests`는 기본 테스트에서 발견은 되지만
+`scripts/generate-snapshots.sh`가 스냅샷 생성 flag를 만들 때만 활성화됩니다.
+따라서 기본 `xcodebuild test` 경로는 매뉴얼 PNG를 렌더링하거나 복사하지 않습니다.
 
 - 순수 데이터 타입 (`ComicPage`, `ComicSource`, `RecentItem`, enum raw 값)
 - 자연 정렬 규약 (Panely가 의존하는 Foundation 동작)
@@ -701,8 +705,7 @@ git push origin v1.0.0
 - **CI**는 모든 push/PR에서 실행(`**/*.md`와 `docs/**` 제외), ad-hoc
   서명으로 Debug 빌드, 스냅샷 제외 테스트 suite 실행, 아티팩트 업로드
   없음 — 저장소 풋프린트는 사실상 0. `SnapshotGalleryTests`는 어설션이
-  없는 매뉴얼 스크린샷 생성기라서 CI(+ release 스크립트)에서
-  `-skip-testing`으로 제외; 매뉴얼 PNG가 필요하면
+  없는 매뉴얼 스크린샷 생성기라서 기본으로 gate off; 매뉴얼 PNG가 필요하면
   `scripts/generate-snapshots.sh`로 수동 재생성.
 - **릴리스**는 GitHub Releases에 `ditto`로 단일 zip(~5–10 MB)을 첨부하여
   리소스 포크 보존.

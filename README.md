@@ -91,8 +91,8 @@ pages.
   `~/Library/Caches/panely-extraction-cache/` with a 10 GB LRU budget, so
   reopening the same archive is instant on subsequent launches. Source
   edits bump mtime → new key → automatic re-extraction. Cache size and
-  manual cleanup live in **Panely → Settings… → Storage** and
-  **File → Clear Extraction Cache**.
+  manual cleanup live in **File → Storage Settings…** (or
+  **Panely → Settings…**) and **File → Clear Extraction Cache**.
 - Natural filename sort (`1, 2, 10` — not `1, 10, 2`) — applied
   consistently across loaders / scanners via the `NaturalSort` helper
 - Filters non-image files and hidden entries
@@ -236,6 +236,10 @@ xcodebuild test \
 ```
 
 **310 tests across 47 suites** cover:
+
+`SnapshotGalleryTests` is discovered in normal runs but gated off unless
+`scripts/generate-snapshots.sh` creates the snapshot-generation flag, so the
+default `xcodebuild test` path does not render or copy manual PNGs.
 
 - Pure data types (`ComicPage`, `ComicSource`, `RecentItem`, enum raw values)
 - Natural-sort contract (Foundation behaviour Panely relies on)
@@ -749,9 +753,9 @@ git push origin v1.0.0
 - **CI** runs on every push/PR (skips `**/*.md` and `docs/**`), builds
   Debug with ad-hoc signing, runs the non-snapshot test suite, and uploads
   no artifacts — storage footprint is essentially zero.
-  `SnapshotGalleryTests` is explicitly `-skip-testing`'d in CI (and the
-  release script) because it has no assertions; regenerate the manual's PNGs with
-  `scripts/generate-snapshots.sh` when needed.
+  `SnapshotGalleryTests` is gated off by default because it is a PNG
+  generator; regenerate the manual's PNGs with `scripts/generate-snapshots.sh`
+  when needed.
 - **Releases** attach a single zip (~5–10 MB) to GitHub Releases using
   `ditto` so resource forks are preserved.
 - **SPM cache** speeds up subsequent runs; invalidates on `Package.resolved`

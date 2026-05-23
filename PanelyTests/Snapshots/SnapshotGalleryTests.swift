@@ -8,7 +8,10 @@ import Testing
 /// The tests stage PNGs in the Debug app sandbox. Regenerate the checked-in
 /// manual screenshots via `scripts/generate-snapshots.sh`.
 @MainActor
-@Suite("Manual Snapshots")
+@Suite(
+    "Manual Snapshots",
+    .enabled(if: SnapshotGenerationGate.isEnabled)
+)
 struct SnapshotGalleryTests {
 
     // MARK: - Hero (full reader composition)
@@ -196,6 +199,17 @@ struct SnapshotGalleryTests {
     private func writeCacheEntry(_ dir: URL, byteCount: Int) throws {
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         try Data(repeating: 0xAB, count: byteCount).write(to: dir.appendingPathComponent("pages.bin"))
+    }
+}
+
+private enum SnapshotGenerationGate {
+    static var isEnabled: Bool {
+        FileManager.default.fileExists(atPath: flagURL.path)
+    }
+
+    private static var flagURL: URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("panely-generate-snapshots.flag")
     }
 }
 

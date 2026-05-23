@@ -16,6 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 BUNDLE_ID="io.github.sejoung.Panely.debug"
 SANDBOX_CACHE="$HOME/Library/Containers/$BUNDLE_ID/Data/Library/Caches/panely-snapshots"
+SNAPSHOT_FLAG="$HOME/Library/Containers/$BUNDLE_ID/Data/tmp/panely-generate-snapshots.flag"
 DEST="$PROJECT_ROOT/docs/screenshots"
 DERIVED_DATA_PATH="/private/tmp/PanelyDerivedData"
 
@@ -37,7 +38,9 @@ EXPECTED_SNAPSHOTS=(
 cd "$PROJECT_ROOT"
 
 RUN_STAMP="$(mktemp -t panely-snapshots.XXXXXX)"
-trap 'rm -f "$RUN_STAMP"' EXIT
+mkdir -p "$(dirname "$SNAPSHOT_FLAG")"
+: > "$SNAPSHOT_FLAG"
+trap 'rm -f "$RUN_STAMP" "$SNAPSHOT_FLAG"' EXIT
 
 echo "▶︎ Running snapshot test pass…"
 xcodebuild test \

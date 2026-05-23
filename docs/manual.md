@@ -177,8 +177,8 @@ so reopening the same archive is instant on subsequent launches.
 
 ![Storage settings with extraction cache controls](screenshots/12-storage-cache.png)
 
-Open **Panely → Settings… → Storage** to inspect and clear the
-zip-in-zip extraction cache.
+Open **File → Storage Settings…** (or **Panely → Settings…**) to inspect
+and clear the zip-in-zip extraction cache.
 
 - **Extraction cache** — total disk space currently used by extracted
   nested archives.
