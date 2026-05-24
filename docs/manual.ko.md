@@ -193,16 +193,26 @@ zip-in-zip 추출 캐시 용량을 확인하고 비울 수 있습니다.
 
 ![진단 리포트 export 컨트롤이 있는 Diagnostics 설정](screenshots/13-diagnostics-settings.png)
 
-**Settings → Diagnostics** 에서 **Export Diagnostic Report…** 를 누르면
-버그 리포트에 첨부할 수 있는 zip을 생성합니다. 포함 내용:
+### Export Diagnostic Report
+
+**File → Export Diagnostic Report…** 를 누르면 버그 리포트에 첨부할 수
+있는 zip을 생성합니다. 같은 기능은 **Settings → Diagnostics** 에도
+있습니다. 포함 내용:
 
 - 앱 버전/build와 macOS 버전.
 - 최근 Panely 로그.
 - 파일 경로가 filename, extension, type 수준으로 redacted 된 최근 열기/로드 이벤트.
 - 추출 캐시 용량, 현재 reader 설정, 마지막 reader 에러.
 
-**Clear Diagnostic Logs** 는 최근 파일 로그를 비웁니다. OSLog의 시스템
-로그는 지우지 않고, 다음 진단 리포트부터 새 로그만 포함됩니다.
+### Clear Diagnostic Logs
+
+**File → Clear Diagnostic Logs** 는 Panely의 최근 파일 로그를 비웁니다.
+같은 버튼은 **Settings → Diagnostics** 에도 있습니다.
+
+이 동작은 diagnostics cache 안의 `recent-log.txt` 파일만 삭제합니다.
+그래서 다음 진단 리포트부터는 새로 쌓인 파일 로그만 포함됩니다. macOS
+시스템 OSLog, 추출 캐시, 최근 열기 목록, 북마크, 즐겨찾기, 읽던 위치는
+삭제하지 않습니다.
 
 ---
 

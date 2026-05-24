@@ -86,9 +86,10 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   시 mtime이 바뀌어 키도 바뀌므로 자동 재추출. 캐시 용량 확인과 수동
   정리는 **File → Settings…**(또는 **Panely → Settings…**)와
   **File → Clear Extraction Cache** 에서 가능.
-- **진단 리포트 내보내기** — **Settings → Diagnostics** 에서 앱 버전/build,
-  macOS 버전, 최근 Panely 로그, redacted 열기/로드 이벤트, 캐시 용량,
-  현재 설정, 마지막 reader 에러를 담은 zip을 생성해 버그 리포트에 첨부할 수 있음.
+- **진단 리포트 내보내기** — **File → Export Diagnostic Report…** 에서
+  앱 버전/build, macOS 버전, 최근 Panely 로그, redacted 열기/로드 이벤트,
+  캐시 용량, 현재 설정, 마지막 reader 에러를 담은 zip을 생성해 버그
+  리포트에 첨부할 수 있음. 같은 기능은 **Settings → Diagnostics** 에도 있음.
 - 자연 파일명 정렬(`1, 2, 10` — `1, 10, 2` 아님) — `NaturalSort` 헬퍼로
   모든 로더/스캐너에서 일관 적용
 - 비이미지 파일과 숨김 항목 필터링

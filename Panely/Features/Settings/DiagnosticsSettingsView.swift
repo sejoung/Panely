@@ -1,6 +1,5 @@
 import AppKit
 import SwiftUI
-import UniformTypeIdentifiers
 
 @MainActor
 struct DiagnosticsSettingsView: View {
@@ -66,13 +65,7 @@ struct DiagnosticsSettingsView: View {
     }
 
     private func exportDiagnosticReport() {
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.zip]
-        panel.canCreateDirectories = true
-        panel.isExtensionHidden = false
-        panel.nameFieldStringValue = exporter.defaultFileName()
-
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let url = exporter.selectDestination() else { return }
 
         isExporting = true
         exportMessage = nil
@@ -99,7 +92,6 @@ struct DiagnosticsSettingsView: View {
     private func clearDiagnosticLogs() {
         Task {
             await DiagnosticLogStore.shared.clear()
-            AppLog.info(.diagnostics, "Diagnostic logs cleared")
             exportMessage = "Diagnostic logs cleared."
         }
     }

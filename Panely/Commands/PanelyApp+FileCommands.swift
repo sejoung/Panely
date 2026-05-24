@@ -38,6 +38,28 @@ extension PanelyApp {
                 Text("Settings…")
             }
 
+            Divider()
+
+            Button("Export Diagnostic Report…") {
+                let exporter = DiagnosticReportExporter(viewModel: viewModel)
+                guard let destination = exporter.selectDestination() else { return }
+                Task {
+                    do {
+                        try await exporter.exportReport(to: destination)
+                        exporter.presentExportResult(destination: destination)
+                    } catch {
+                        exporter.presentExportFailure(error, destination: destination)
+                    }
+                }
+            }
+
+            Button("Clear Diagnostic Logs") {
+                Task {
+                    await DiagnosticLogStore.shared.clear()
+                    DiagnosticReportExporter.presentClearLogsResult()
+                }
+            }
+
             Button("Clear Extraction Cache") {
                 let activeURL = viewModel.tempDir.url
                 let cacheMaintenance = CacheMaintenance(extractionCache: viewModel.dependencies.extractionCache)

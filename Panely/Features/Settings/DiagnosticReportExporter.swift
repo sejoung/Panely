@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import UniformTypeIdentifiers
 import ZIPFoundation
 
 @MainActor
@@ -21,6 +22,15 @@ struct DiagnosticReportExporter {
         return "Panely-Diagnostic-Report-\(date).zip"
     }
 
+    func selectDestination() -> URL? {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.zip]
+        panel.canCreateDirectories = true
+        panel.isExtensionHidden = false
+        panel.nameFieldStringValue = defaultFileName()
+        return panel.runModal() == .OK ? panel.url : nil
+    }
+
     func exportReport(to destination: URL) async throws {
         AppLog.info(
             .diagnostics,
@@ -36,6 +46,43 @@ struct DiagnosticReportExporter {
             "Diagnostic report exported",
             metadata: ["destination": "\(DiagnosticRedactor.describe(destination))"]
         )
+    }
+
+    func presentExportResult(destination: URL) {
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "Diagnostic Report Exported"
+        alert.informativeText = "\(destination.lastPathComponent) was created."
+        alert.addButton(withTitle: "OK")
+        Self.present(alert)
+    }
+
+    func presentExportFailure(_ error: Error, destination: URL) {
+        let message = DiagnosticRedactor.redactKnownPaths(
+            in: error.localizedDescription,
+            urls: [destination]
+        )
+        AppLog.error(
+            .diagnostics,
+            "Diagnostic report export failed",
+            metadata: ["error": "\(message)"]
+        )
+
+        let alert = NSAlert()
+        alert.alertStyle = .critical
+        alert.messageText = "Diagnostic Report Export Failed"
+        alert.informativeText = error.localizedDescription
+        alert.addButton(withTitle: "OK")
+        Self.present(alert)
+    }
+
+    static func presentClearLogsResult() {
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "Diagnostic Logs Cleared"
+        alert.informativeText = "Recent file logs were removed."
+        alert.addButton(withTitle: "OK")
+        present(alert)
     }
 
     private func makeSnapshot() async -> DiagnosticReportSnapshot {
@@ -110,6 +157,14 @@ struct DiagnosticReportExporter {
             viewModel.tempDir.url,
             cacheMaintenance.cacheRoot(),
         ])
+    }
+
+    private static func present(_ alert: NSAlert) {
+        if let window = NSApp.keyWindow ?? NSApp.mainWindow {
+            alert.beginSheetModal(for: window)
+        } else {
+            alert.runModal()
+        }
     }
 
     private static let fileDateFormatter: DateFormatter = {

@@ -93,10 +93,11 @@ pages.
   edits bump mtime → new key → automatic re-extraction. Cache size and
   manual cleanup live in **File → Settings…** (or **Panely → Settings…**)
   and **File → Clear Extraction Cache**.
-- **Diagnostic report export** — **Settings → Diagnostics** writes a zip
-  with app/build and macOS versions, recent Panely logs, redacted open/load
-  events, cache size, current settings, and the last reader error for bug
-  reports.
+- **Diagnostic report export** — **File → Export Diagnostic Report…** writes
+  a zip with app/build and macOS versions, recent Panely logs, redacted
+  open/load events, cache size, current settings, and the last reader error
+  for bug reports. The same action is also available in **Settings →
+  Diagnostics**.
 - Natural filename sort (`1, 2, 10` — not `1, 10, 2`) — applied
   consistently across loaders / scanners via the `NaturalSort` helper
 - Filters non-image files and hidden entries

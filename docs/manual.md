@@ -196,8 +196,11 @@ Cache clearing is disabled while a book is loading or extracting.
 
 ![Diagnostics settings with export controls](screenshots/13-diagnostics-settings.png)
 
-Open **Settings → Diagnostics** and choose **Export Diagnostic Report…** to
-create a zip that can be attached to a bug report. It includes:
+### Export Diagnostic Report
+
+Choose **File → Export Diagnostic Report…** to create a zip that can be
+attached to a bug report. The same action is also available from **Settings →
+Diagnostics**. It includes:
 
 - App version/build and macOS version.
 - Recent Panely log lines.
@@ -205,8 +208,15 @@ create a zip that can be attached to a bug report. It includes:
   and type.
 - Extraction cache size, current reader settings, and the last reader error.
 
-**Clear Diagnostic Logs** clears Panely's recent file log. It does not clear
-system OSLog entries, and future diagnostic reports include only new file logs.
+### Clear Diagnostic Logs
+
+Choose **File → Clear Diagnostic Logs** to clear Panely's recent file log.
+The same button is also available in **Settings → Diagnostics**.
+
+This removes Panely's `recent-log.txt` file from the diagnostics cache so
+future diagnostic reports include only new file logs. It does not clear
+macOS system OSLog entries, extraction cache data, recent files, bookmarks,
+favorites, or reading position.
 
 ---
 
