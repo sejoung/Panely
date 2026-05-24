@@ -104,4 +104,54 @@ struct ReaderViewModelPositionMemoryTests {
         #expect(vm.restoredIndex(for: urlA) == 4)
         #expect(vm.restoredIndex(for: urlB) == 8)
     }
+
+    @Test func zipInZipFileIdentityFallbackDoesNotLeakBetweenInnerVolumes() throws {
+        UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey)
+        defer { UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey) }
+
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+
+        let outerArchive = workDir.appendingPathComponent("Series.cbz")
+        try Data("outer".utf8).write(to: outerArchive)
+
+        let extractionRoot = workDir.appendingPathComponent("extracted", isDirectory: true)
+        try FileManager.default.createDirectory(at: extractionRoot, withIntermediateDirectories: true)
+        let volumeOne = extractionRoot.appendingPathComponent("Vol01.cbz")
+        let volumeTwo = extractionRoot.appendingPathComponent("Vol02.cbz")
+
+        let vm = ReaderViewModel()
+        vm.openedSourceURL = outerArchive
+        vm.tempDir.url = extractionRoot
+        vm.currentSourceURL = volumeOne
+
+        vm.currentPageIndex = 9
+        vm.flushPositionImmediately()
+
+        #expect(vm.restoredIndex(for: volumeOne) == 9)
+        #expect(vm.restoredIndex(for: volumeTwo) == 0)
+    }
+
+    @Test func folderListedZipFileIdentityFallbackDoesNotLeakBetweenVolumes() throws {
+        UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey)
+        defer { UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey) }
+
+        let seriesFolder = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: seriesFolder) }
+
+        let volumeOne = seriesFolder.appendingPathComponent("Vol01.cbz")
+        let volumeTwo = seriesFolder.appendingPathComponent("Vol02.cbz")
+        try Data("one".utf8).write(to: volumeOne)
+        try Data("two".utf8).write(to: volumeTwo)
+
+        let vm = ReaderViewModel()
+        vm.openedSourceURL = seriesFolder
+        vm.currentSourceURL = volumeOne
+
+        vm.currentPageIndex = 9
+        vm.flushPositionImmediately()
+
+        #expect(vm.restoredIndex(for: volumeOne) == 9)
+        #expect(vm.restoredIndex(for: volumeTwo) == 0)
+    }
 }

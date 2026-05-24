@@ -54,7 +54,13 @@ extension ReaderViewModel {
         guard canGoNextVolume, let idx = currentSiblingIndex else { return }
         let target = siblings[idx + 1]
         let preservedSiblings = siblings
-        Task { await load(url: target, knownSiblings: preservedSiblings) }
+        Task {
+            await load(
+                url: target,
+                knownSiblings: preservedSiblings,
+                restorePosition: false
+            )
+        }
     }
 
     func previousVolume() {

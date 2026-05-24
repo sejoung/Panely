@@ -98,7 +98,8 @@ extension ReaderViewModel {
         url: URL,
         knownSiblings: [URL]? = nil,
         preferredRelativePath: String? = nil,
-        preservingLibraryRoot: Bool = false
+        preservingLibraryRoot: Bool = false,
+        restorePosition: Bool = true
     ) async {
         imageLoader.cancelPreload()
 
@@ -275,7 +276,9 @@ extension ReaderViewModel {
                 siblings = await Self.scanSiblings(of: targetURL)
                 guard myEpoch == loadEpoch else { return }
             }
-            currentPageIndex = clampedRestoredIndex(for: targetURL, pageCount: loaded.pageCount)
+            currentPageIndex = restorePosition
+                ? clampedRestoredIndex(for: targetURL, pageCount: loaded.pageCount)
+                : 0
             errorMessage = loaded.isEmpty ? "No images found" : nil
             await refreshImages()
         } catch {
@@ -318,9 +321,36 @@ extension ReaderViewModel {
 
     /// Mirror key used as a fallback when the path-keyed entry misses (e.g.,
     /// after a mount-path drift). `nil` when `PositionKey.fileIdentity` can't
-    /// derive an identity (typically for inside-archive paths).
+    /// derive an identity. Temp-backed volumes use the originally opened
+    /// archive plus an inner path because their extracted file identities are
+    /// not stable; normal folder/zip lists use each volume's own identity so
+    /// siblings don't share one fallback slot.
     private func fileIdentityKey(for url: URL) -> String? {
-        PositionKey.fileIdentity(for: openedSourceURL ?? url)
+        if let tempKey = tempBackedFileIdentityKey(for: url) {
+            return tempKey
+        }
+        return PositionKey.fileIdentity(for: url)
+    }
+
+    private func tempBackedFileIdentityKey(for url: URL) -> String? {
+        guard let openedSourceURL,
+              let identity = PositionKey.fileIdentity(for: openedSourceURL),
+              let tempRoot = tempDir.url else {
+            return nil
+        }
+
+        let rootPath = tempRoot.standardizedFileURL.path
+        let sourcePath = url.standardizedFileURL.path
+        if sourcePath == rootPath {
+            return identity
+        }
+
+        guard sourcePath != rootPath,
+              sourcePath.hasPrefix(rootPath + "/") else {
+            return nil
+        }
+        let innerPath = String(sourcePath.dropFirst(rootPath.count + 1))
+        return identity + "#" + innerPath
     }
 
     /// Schedule a debounced save for the current page. Called from the

@@ -156,6 +156,34 @@ struct ReaderViewModelEndOfVolumeTests {
         #expect(vm.currentPageIndex == 4)
     }
 
+    @Test func nextVolumeFromEndStartsAtFirstPageEvenWhenNextVolumeWasCompleted() async throws {
+        UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey)
+        defer { UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey) }
+
+        let library = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: library) }
+
+        let vol1 = library.appendingPathComponent("Vol01", isDirectory: true)
+        let vol2 = library.appendingPathComponent("Vol02", isDirectory: true)
+        try writeFolderVolume(at: vol1, pageCount: 5)
+        try writeFolderVolume(at: vol2, pageCount: 5)
+
+        let vm = makeViewModel(pageCount: 5)
+        vm.layout = .single
+        vm.currentSourceURL = vol1
+        vm.siblings = [vol1, vol2]
+        vm.currentPageIndex = 4
+
+        // Simulate a previously completed next volume. End-of-volume advance
+        // should start the next book from page 1, unlike a normal reopen.
+        vm.positions.cache = [vol2.standardizedFileURL.path: 4]
+
+        await vm.load(url: vol2, knownSiblings: vm.siblings, restorePosition: false)
+
+        #expect(vm.currentSourceURL?.standardizedFileURL == vol2.standardizedFileURL)
+        #expect(vm.currentPageIndex == 0)
+    }
+
     // MARK: restartCurrentVolume
 
     @Test func restartJumpsToFirstPage() {
@@ -299,6 +327,14 @@ struct ReaderViewModelEndOfVolumeTests {
                 source: .file(URL(fileURLWithPath: "/p\(i).jpg")),
                 displayName: "p\(i).jpg"
             )
+        }
+    }
+
+    private func writeFolderVolume(at url: URL, pageCount: Int) throws {
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        for index in 0..<pageCount {
+            try Fixture.makePNG(width: 10, height: 10)
+                .write(to: url.appendingPathComponent(String(format: "%03d.png", index)))
         }
     }
 }
