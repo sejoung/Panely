@@ -49,7 +49,7 @@ extension ReaderViewModel {
                 return self.loadEpoch != epochAtStart
             },
             onError: { [weak self] message in
-                AppLog.error(.image, message)
+                AppLog.error(.image, "Image load failed", metadata: ["error": "\(message)"])
                 self?.errorMessage = message
             }
         )
@@ -89,7 +89,7 @@ extension ReaderViewModel {
             source: source,
             layout: layout,
             onError: { [weak self] message in
-                AppLog.error(.image, message)
+                AppLog.error(.image, "Image load failed", metadata: ["error": "\(message)"])
                 self?.errorMessage = message
             }
         )

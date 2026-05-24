@@ -22,12 +22,20 @@ struct DiagnosticReportExporter {
     }
 
     func exportReport(to destination: URL) async throws {
-        AppLog.info(.diagnostics, "Export diagnostic report requested")
+        AppLog.info(
+            .diagnostics,
+            "Export diagnostic report requested",
+            metadata: ["destination": "\(DiagnosticRedactor.describe(destination))"]
+        )
         let snapshot = await makeSnapshot()
         try await Task.detached(priority: .utility) {
             try DiagnosticReportWriter.write(snapshot: snapshot, to: destination)
         }.value
-        AppLog.info(.diagnostics, "Diagnostic report exported")
+        AppLog.info(
+            .diagnostics,
+            "Diagnostic report exported",
+            metadata: ["destination": "\(DiagnosticRedactor.describe(destination))"]
+        )
     }
 
     private func makeSnapshot() async -> DiagnosticReportSnapshot {
@@ -95,27 +103,13 @@ struct DiagnosticReportExporter {
     private func redactKnownPaths(in text: String) -> String {
         guard text.isEmpty == false else { return text }
 
-        let urls = [
+        return DiagnosticRedactor.redactKnownPaths(in: text, urls: [
             viewModel.currentSourceURL,
             viewModel.openedSourceURL,
             viewModel.libraryRootURL,
             viewModel.tempDir.url,
             cacheMaintenance.cacheRoot(),
-        ].compactMap { $0 }
-        var paths = Set<String>()
-
-        for url in urls {
-            let standardized = url.standardizedFileURL
-            paths.insert(standardized.path)
-            paths.insert(standardized.deletingLastPathComponent().path)
-        }
-
-        return paths
-            .filter { !$0.isEmpty && $0 != "/" }
-            .sorted { $0.count > $1.count }
-            .reduce(text) { redacted, path in
-                redacted.replacingOccurrences(of: path, with: "<redacted-path>")
-            }
+        ])
     }
 
     private static let fileDateFormatter: DateFormatter = {

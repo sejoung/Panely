@@ -26,9 +26,20 @@ nonisolated struct CacheMaintenance: Sendable {
     @discardableResult
     func clearExtractionCache(in root: URL? = nil, excluding activeURL: URL?) -> UInt64 {
         let targetRoot = root ?? extractionCache.cacheRoot()
-        AppLog.info(.cache, "Clear extraction cache started")
+        AppLog.info(
+            .cache,
+            "Clear extraction cache started",
+            metadata: [
+                "activeURL": "\(DiagnosticRedactor.describe(activeURL))",
+                "root": "\(DiagnosticRedactor.describe(targetRoot))",
+            ]
+        )
         let removed = extractionCache.clearCache(in: targetRoot, excluding: activeURL)
-        AppLog.info(.cache, "Clear extraction cache finished removedBytes=\(removed)")
+        AppLog.info(
+            .cache,
+            "Clear extraction cache finished",
+            metadata: ["removedBytes": "\(removed)"]
+        )
         return removed
     }
 

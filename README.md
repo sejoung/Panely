@@ -376,7 +376,7 @@ Panely/
 ├── Core/
 │   ├── Comic/                          # loaders, ComicSource/Page, natural sort, image metadata
 │   ├── Diagnostics/
-│   │   ├── AppLog.swift                # OSLog + redacted diagnostic events
+│   │   ├── AppLog.swift                # swift-log facade + OSLog/file diagnostic backend
 │   │   └── DiagnosticLogStore.swift    # rolling recent-log.txt cache file
 │   └── Extensions/                     # shared Foundation helpers
 ├── DesignSystem/

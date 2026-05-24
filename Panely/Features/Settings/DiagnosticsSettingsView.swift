@@ -76,7 +76,15 @@ struct DiagnosticsSettingsView: View {
                 try await exporter.exportReport(to: url)
                 exportMessage = "Diagnostic report exported."
             } catch {
-                AppLog.error(.diagnostics, "Diagnostic report export failed: \(error.localizedDescription)")
+                let message = DiagnosticRedactor.redactKnownPaths(
+                    in: error.localizedDescription,
+                    urls: [url]
+                )
+                AppLog.error(
+                    .diagnostics,
+                    "Diagnostic report export failed",
+                    metadata: ["error": "\(message)"]
+                )
                 exportMessage = "Export failed: \(error.localizedDescription)"
             }
             isExporting = false

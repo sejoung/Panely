@@ -54,7 +54,11 @@ extension ReaderViewModel {
         guard canGoNextVolume, let idx = currentSiblingIndex else { return }
         let target = siblings[idx + 1]
         let preservedSiblings = siblings
-        AppLog.info(.load, "Next volume requested target=\(DiagnosticRedactor.describe(target))")
+        AppLog.info(
+            .load,
+            "Next volume requested",
+            metadata: ["target": "\(DiagnosticRedactor.describe(target))"]
+        )
         Task {
             await load(
                 url: target,
@@ -68,7 +72,11 @@ extension ReaderViewModel {
         guard canGoPreviousVolume, let idx = currentSiblingIndex else { return }
         let target = siblings[idx - 1]
         let preservedSiblings = siblings
-        AppLog.info(.load, "Previous volume requested target=\(DiagnosticRedactor.describe(target))")
+        AppLog.info(
+            .load,
+            "Previous volume requested",
+            metadata: ["target": "\(DiagnosticRedactor.describe(target))"]
+        )
         Task { await load(url: target, knownSiblings: preservedSiblings, intent: .previousVolume) }
     }
 

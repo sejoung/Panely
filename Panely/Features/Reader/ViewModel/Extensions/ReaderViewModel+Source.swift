@@ -99,19 +99,31 @@ extension ReaderViewModel {
         panel.allowedContentTypes = types
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        AppLog.info(.load, "Open panel selected \(DiagnosticRedactor.describe(url))")
+        AppLog.info(
+            .load,
+            "Open panel selected",
+            metadata: ["source": "\(DiagnosticRedactor.describe(url))"]
+        )
         recentItems.record(url, title: displayTitle(for: url))
         Task { await load(url: url) }
     }
 
     func openURL(_ url: URL) {
-        AppLog.info(.load, "Open URL requested \(DiagnosticRedactor.describe(url))")
+        AppLog.info(
+            .load,
+            "Open URL requested",
+            metadata: ["source": "\(DiagnosticRedactor.describe(url))"]
+        )
         recentItems.record(url, title: displayTitle(for: url))
         Task { await load(url: url) }
     }
 
     func openLibraryURL(_ url: URL) {
-        AppLog.info(.library, "Library URL selected \(DiagnosticRedactor.describe(url))")
+        AppLog.info(
+            .library,
+            "Library URL selected",
+            metadata: ["source": "\(DiagnosticRedactor.describe(url))"]
+        )
         recentItems.record(url, title: displayTitle(for: url))
         Task { await load(url: url, intent: .librarySelection) }
     }
@@ -128,7 +140,11 @@ extension ReaderViewModel {
         }
 
         guard panel.runModal() == .OK, let folderURL = panel.url else { return }
-        AppLog.info(.library, "Folder access granted \(DiagnosticRedactor.describe(folderURL))")
+        AppLog.info(
+            .library,
+            "Folder access granted",
+            metadata: ["source": "\(DiagnosticRedactor.describe(folderURL))"]
+        )
 
         libraryScope.acquire(folderURL)
 
@@ -155,7 +171,14 @@ extension ReaderViewModel {
         knownSiblings: [URL]? = nil,
         intent: ReaderLoadIntent = .open
     ) async {
-        AppLog.info(.load, "Load started intent=\(intent.diagnosticName) source=\(DiagnosticRedactor.describe(url))")
+        AppLog.info(
+            .load,
+            "Load started",
+            metadata: [
+                "intent": "\(intent.diagnosticName)",
+                "source": "\(DiagnosticRedactor.describe(url))",
+            ]
+        )
         let myEpoch = startLoad()
         let preservedLibraryRootURL = intent.preservesLibraryRoot
             ? libraryRootURLIfItContains(url)
@@ -192,11 +215,19 @@ extension ReaderViewModel {
                 if let siblings {
                     AppLog.info(
                         .load,
-                        "Folder resolved to book \(DiagnosticRedactor.describe(url)) siblings=\(siblings.count)"
+                        "Folder resolved to book",
+                        metadata: [
+                            "siblings": "\(siblings.count)",
+                            "source": "\(DiagnosticRedactor.describe(url))",
+                        ]
                     )
                 }
             case .empty:
-                AppLog.info(.load, "Folder resolved empty \(DiagnosticRedactor.describe(targetURL))")
+                AppLog.info(
+                    .load,
+                    "Folder resolved empty",
+                    metadata: ["source": "\(DiagnosticRedactor.describe(targetURL))"]
+                )
                 clearLoadedSource(message: "Folder is empty or has no supported content")
                 return
             }
@@ -216,14 +247,27 @@ extension ReaderViewModel {
             errorMessage = loaded.isEmpty ? "No images found" : nil
             AppLog.info(
                 .load,
-                "Load finished source=\(DiagnosticRedactor.describe(targetURL)) pages=\(loaded.pageCount) siblings=\(siblings.count)"
+                "Load finished",
+                metadata: [
+                    "pages": "\(loaded.pageCount)",
+                    "siblings": "\(siblings.count)",
+                    "source": "\(DiagnosticRedactor.describe(targetURL))",
+                ]
             )
             await refreshImages()
         } catch {
             guard myEpoch == loadEpoch else { return }
+            let message = DiagnosticRedactor.redactKnownPaths(
+                in: error.localizedDescription,
+                urls: [url, targetURL]
+            )
             AppLog.error(
                 .load,
-                "Load failed source=\(DiagnosticRedactor.describe(url)) error=\(error.localizedDescription)"
+                "Load failed",
+                metadata: [
+                    "error": "\(message)",
+                    "source": "\(DiagnosticRedactor.describe(url))",
+                ]
             )
             clearLoadedSource(message: error.localizedDescription)
             libraryScope.release()
@@ -279,7 +323,11 @@ extension ReaderViewModel {
         }
         guard epoch == loadEpoch else { return nil }
         guard hasNested else { return url }
-        AppLog.info(.load, "Nested archive detected \(DiagnosticRedactor.describe(url))")
+        AppLog.info(
+            .load,
+            "Nested archive detected",
+            metadata: ["source": "\(DiagnosticRedactor.describe(url))"]
+        )
 
         return try await resolveNestedArchiveTarget(for: url, epoch: epoch)
     }
@@ -292,16 +340,34 @@ extension ReaderViewModel {
         let key = extractionCache.cacheKey(for: url)
         if let key,
            let cached = extractionCache.cachedEntry(forKey: key) {
-            AppLog.info(.cache, "Extraction cache hit key=\(key) source=\(DiagnosticRedactor.describe(url))")
+            AppLog.info(
+                .cache,
+                "Extraction cache hit",
+                metadata: [
+                    "key": "\(key)",
+                    "source": "\(DiagnosticRedactor.describe(url))",
+                ]
+            )
             tempDir.adopt(cached)
             return cached
         }
 
         loadingMessage = "Extracting archive…"
         if let key {
-            AppLog.info(.cache, "Extraction cache miss key=\(key) source=\(DiagnosticRedactor.describe(url))")
+            AppLog.info(
+                .cache,
+                "Extraction cache miss",
+                metadata: [
+                    "key": "\(key)",
+                    "source": "\(DiagnosticRedactor.describe(url))",
+                ]
+            )
         } else {
-            AppLog.info(.cache, "Extraction cache unavailable source=\(DiagnosticRedactor.describe(url))")
+            AppLog.info(
+                .cache,
+                "Extraction cache unavailable",
+                metadata: ["source": "\(DiagnosticRedactor.describe(url))"]
+            )
         }
         let candidate = key.map { extractionCache.makeCachedCandidate(forKey: $0) }
             ?? ReaderTempDirectory.makeSessionCandidate()
@@ -313,7 +379,11 @@ extension ReaderViewModel {
                 return nil
             }
             tempDir.adopt(candidate)
-            AppLog.info(.load, "Nested archive extracted source=\(DiagnosticRedactor.describe(url))")
+            AppLog.info(
+                .load,
+                "Nested archive extracted",
+                metadata: ["source": "\(DiagnosticRedactor.describe(url))"]
+            )
             if key != nil {
                 Task.detached(priority: .background) {
                     extractionCache.enforceBudget()
@@ -322,9 +392,14 @@ extension ReaderViewModel {
             return candidate
         } catch {
             try? FileManager.default.removeItem(at: candidate)
+            let message = DiagnosticRedactor.redactKnownPaths(in: error.localizedDescription, urls: [url, candidate])
             AppLog.error(
                 .load,
-                "Nested archive extraction failed source=\(DiagnosticRedactor.describe(url)) error=\(error.localizedDescription)"
+                "Nested archive extraction failed",
+                metadata: [
+                    "error": "\(message)",
+                    "source": "\(DiagnosticRedactor.describe(url))",
+                ]
             )
             throw ReaderLoadError.extractionFailed(error)
         }
@@ -412,7 +487,11 @@ extension ReaderViewModel {
     }
 
     private func clearLoadedSource(message: String) {
-        AppLog.error(.reader, "Reader source cleared message=\(message)")
+        let redactedMessage = DiagnosticRedactor.redactKnownPaths(
+            in: message,
+            urls: [currentSourceURL, openedSourceURL, libraryRootURL, tempDir.url]
+        )
+        AppLog.error(.reader, "Reader source cleared", metadata: ["message": "\(redactedMessage)"])
         errorMessage = message
         source = .empty
         imageLoader.reset()

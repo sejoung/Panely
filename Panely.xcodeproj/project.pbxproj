@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		B263CE8A2F94F819006DD5A0 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = B263CE892F94F819006DD5A0 /* ZIPFoundation */; };
 		B263CE902F94F819006DD5A0 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = B263CE892F94F819006DD5A0 /* ZIPFoundation */; };
+		B27F3C012FAA000100000001 /* Logging in Frameworks */ = {isa = PBXBuildFile; productRef = B27F3C012FAA000100000004 /* Logging */; };
+		B27F3C012FAA000100000002 /* Logging in Frameworks */ = {isa = PBXBuildFile; productRef = B27F3C012FAA000100000004 /* Logging */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -64,6 +66,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B27F3C012FAA000100000001 /* Logging in Frameworks */,
 				B263CE8A2F94F819006DD5A0 /* ZIPFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -72,6 +75,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B27F3C012FAA000100000002 /* Logging in Frameworks */,
 				B263CE902F94F819006DD5A0 /* ZIPFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -133,6 +137,7 @@
 			);
 			name = Panely;
 			packageProductDependencies = (
+				B27F3C012FAA000100000004 /* Logging */,
 				B263CE892F94F819006DD5A0 /* ZIPFoundation */,
 			);
 			productName = Panely;
@@ -157,6 +162,7 @@
 			);
 			name = PanelyTests;
 			packageProductDependencies = (
+				B27F3C012FAA000100000004 /* Logging */,
 				B263CE892F94F819006DD5A0 /* ZIPFoundation */,
 			);
 			productName = PanelyTests;
@@ -192,6 +198,7 @@
 			mainGroup = B263CE0D2F94EE33006DD5A0;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				B27F3C012FAA000100000003 /* XCRemoteSwiftPackageReference "swift-log" */,
 				B263CE812F94F1E3006DD5A0 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -513,6 +520,14 @@
 				minimumVersion = 0.9.20;
 			};
 		};
+		B27F3C012FAA000100000003 /* XCRemoteSwiftPackageReference "swift-log" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-log";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.6.4;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -520,6 +535,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B263CE812F94F1E3006DD5A0 /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
 			productName = ZIPFoundation;
+		};
+		B27F3C012FAA000100000004 /* Logging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B27F3C012FAA000100000003 /* XCRemoteSwiftPackageReference "swift-log" */;
+			productName = Logging;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

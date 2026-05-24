@@ -20,7 +20,11 @@ struct PanelyApp: App {
                 // roadmap; see README.
                 .preferredColorScheme(.dark)
                 .onOpenURL { url in
-                    AppLog.info(.app, "Received open URL: \(DiagnosticRedactor.describe(url))")
+                    AppLog.info(
+                        .app,
+                        "Received open URL",
+                        metadata: ["url": "\(DiagnosticRedactor.describe(url))"]
+                    )
                     viewModel.openURL(url)
                 }
         }

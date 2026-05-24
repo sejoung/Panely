@@ -353,7 +353,7 @@ Panely/
 ├── Core/
 │   ├── Comic/                          # loader, ComicSource/Page, natural sort, 이미지 메타데이터
 │   ├── Diagnostics/
-│   │   ├── AppLog.swift                # OSLog + redacted 진단 이벤트
+│   │   ├── AppLog.swift                # swift-log facade + OSLog/file 진단 backend
 │   │   └── DiagnosticLogStore.swift    # rolling recent-log.txt 캐시 파일
 │   └── Extensions/                     # 공유 Foundation helper
 ├── DesignSystem/

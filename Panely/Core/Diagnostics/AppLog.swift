@@ -1,4 +1,5 @@
 import Foundation
+import Logging
 import OSLog
 
 nonisolated enum DiagnosticCategory: String, Sendable {
@@ -13,56 +14,196 @@ nonisolated enum DiagnosticCategory: String, Sendable {
 }
 
 nonisolated enum DiagnosticLevel: String, Sendable {
+    case trace = "TRACE"
     case debug = "DEBUG"
     case info = "INFO"
+    case notice = "NOTICE"
+    case warning = "WARNING"
     case error = "ERROR"
+    case critical = "CRITICAL"
 }
 
 nonisolated enum AppLog {
+    typealias Metadata = Logging.Logger.Metadata
+
     static let subsystem = Bundle.main.bundleIdentifier ?? "io.github.sejoung.Panely"
 
-    private static let app = Logger(subsystem: subsystem, category: DiagnosticCategory.app.rawValue)
-    private static let reader = Logger(subsystem: subsystem, category: DiagnosticCategory.reader.rawValue)
-    private static let load = Logger(subsystem: subsystem, category: DiagnosticCategory.load.rawValue)
-    private static let cache = Logger(subsystem: subsystem, category: DiagnosticCategory.cache.rawValue)
-    private static let library = Logger(subsystem: subsystem, category: DiagnosticCategory.library.rawValue)
-    private static let persistence = Logger(subsystem: subsystem, category: DiagnosticCategory.persistence.rawValue)
-    private static let image = Logger(subsystem: subsystem, category: DiagnosticCategory.image.rawValue)
-    private static let diagnostics = Logger(subsystem: subsystem, category: DiagnosticCategory.diagnostics.rawValue)
-
-    static func debug(_ category: DiagnosticCategory, _ message: String) {
-        logger(for: category).debug("\(message, privacy: .public)")
-        DiagnosticLogStore.record(level: .debug, category: category, message: message)
+    static func trace(
+        _ category: DiagnosticCategory,
+        _ message: @autoclosure () -> String,
+        metadata: Metadata? = nil,
+        source: String? = nil,
+        file: String = #fileID,
+        function: String = #function,
+        line: UInt = #line
+    ) {
+        log(
+            level: .trace,
+            category,
+            message(),
+            metadata: metadata,
+            source: source,
+            file: file,
+            function: function,
+            line: line
+        )
     }
 
-    static func info(_ category: DiagnosticCategory, _ message: String) {
-        logger(for: category).info("\(message, privacy: .public)")
-        DiagnosticLogStore.record(level: .info, category: category, message: message)
+    static func debug(
+        _ category: DiagnosticCategory,
+        _ message: @autoclosure () -> String,
+        metadata: Metadata? = nil,
+        source: String? = nil,
+        file: String = #fileID,
+        function: String = #function,
+        line: UInt = #line
+    ) {
+        log(
+            level: .debug,
+            category,
+            message(),
+            metadata: metadata,
+            source: source,
+            file: file,
+            function: function,
+            line: line
+        )
     }
 
-    static func error(_ category: DiagnosticCategory, _ message: String) {
-        logger(for: category).error("\(message, privacy: .public)")
-        DiagnosticLogStore.record(level: .error, category: category, message: message)
+    static func info(
+        _ category: DiagnosticCategory,
+        _ message: @autoclosure () -> String,
+        metadata: Metadata? = nil,
+        source: String? = nil,
+        file: String = #fileID,
+        function: String = #function,
+        line: UInt = #line
+    ) {
+        log(
+            level: .info,
+            category,
+            message(),
+            metadata: metadata,
+            source: source,
+            file: file,
+            function: function,
+            line: line
+        )
     }
 
-    private static func logger(for category: DiagnosticCategory) -> Logger {
-        switch category {
-        case .app:
-            app
-        case .reader:
-            reader
-        case .load:
-            load
-        case .cache:
-            cache
-        case .library:
-            library
-        case .persistence:
-            persistence
-        case .image:
-            image
-        case .diagnostics:
-            diagnostics
+    static func warning(
+        _ category: DiagnosticCategory,
+        _ message: @autoclosure () -> String,
+        metadata: Metadata? = nil,
+        source: String? = nil,
+        file: String = #fileID,
+        function: String = #function,
+        line: UInt = #line
+    ) {
+        log(
+            level: .warning,
+            category,
+            message(),
+            metadata: metadata,
+            source: source,
+            file: file,
+            function: function,
+            line: line
+        )
+    }
+
+    static func notice(
+        _ category: DiagnosticCategory,
+        _ message: @autoclosure () -> String,
+        metadata: Metadata? = nil,
+        source: String? = nil,
+        file: String = #fileID,
+        function: String = #function,
+        line: UInt = #line
+    ) {
+        log(
+            level: .notice,
+            category,
+            message(),
+            metadata: metadata,
+            source: source,
+            file: file,
+            function: function,
+            line: line
+        )
+    }
+
+    static func error(
+        _ category: DiagnosticCategory,
+        _ message: @autoclosure () -> String,
+        metadata: Metadata? = nil,
+        source: String? = nil,
+        file: String = #fileID,
+        function: String = #function,
+        line: UInt = #line
+    ) {
+        log(
+            level: .error,
+            category,
+            message(),
+            metadata: metadata,
+            source: source,
+            file: file,
+            function: function,
+            line: line
+        )
+    }
+
+    static func critical(
+        _ category: DiagnosticCategory,
+        _ message: @autoclosure () -> String,
+        metadata: Metadata? = nil,
+        source: String? = nil,
+        file: String = #fileID,
+        function: String = #function,
+        line: UInt = #line
+    ) {
+        log(
+            level: .critical,
+            category,
+            message(),
+            metadata: metadata,
+            source: source,
+            file: file,
+            function: function,
+            line: line
+        )
+    }
+
+    private static func log(
+        level: Logging.Logger.Level,
+        _ category: DiagnosticCategory,
+        _ message: String,
+        metadata: Metadata?,
+        source: String?,
+        file: String,
+        function: String,
+        line: UInt
+    ) {
+        logger(for: category).log(
+            level: level,
+            "\(message)",
+            metadata: metadata,
+            source: source ?? category.rawValue,
+            file: file,
+            function: function,
+            line: line
+        )
+    }
+
+    private static func logger(for category: DiagnosticCategory) -> Logging.Logger {
+        Logging.Logger(label: "\(subsystem).\(category.rawValue)") { label, metadataProvider in
+            PanelyLogHandler(
+                label: label,
+                subsystem: subsystem,
+                category: category,
+                metadataProvider: metadataProvider
+            )
         }
     }
 }
@@ -85,5 +226,129 @@ nonisolated enum DiagnosticRedactor {
             return "\(prefix), +\(urls.count - limit) more"
         }
         return prefix
+    }
+
+    static func redactKnownPaths(in text: String, urls: [URL?]) -> String {
+        guard text.isEmpty == false else { return text }
+
+        var paths = Set<String>()
+        for url in urls.compactMap({ $0 }) {
+            let standardized = url.standardizedFileURL
+            paths.insert(standardized.path)
+            paths.insert(standardized.deletingLastPathComponent().path)
+        }
+
+        return paths
+            .filter { !$0.isEmpty && $0 != "/" }
+            .sorted { $0.count > $1.count }
+            .reduce(text) { redacted, path in
+                redacted.replacingOccurrences(of: path, with: "<redacted-path>")
+            }
+    }
+}
+
+private nonisolated struct PanelyLogHandler: LogHandler {
+    let label: String
+    let subsystem: String
+    let category: DiagnosticCategory
+    private let osLog: OSLog
+
+    var metadata: Logging.Logger.Metadata = [:]
+    var metadataProvider: Logging.Logger.MetadataProvider?
+    var logLevel: Logging.Logger.Level = .debug
+
+    init(
+        label: String,
+        subsystem: String,
+        category: DiagnosticCategory,
+        metadataProvider: Logging.Logger.MetadataProvider?
+    ) {
+        self.label = label
+        self.subsystem = subsystem
+        self.category = category
+        self.metadataProvider = metadataProvider
+        self.osLog = OSLog(subsystem: subsystem, category: category.rawValue)
+    }
+
+    subscript(metadataKey metadataKey: String) -> Logging.Logger.Metadata.Value? {
+        get { metadata[metadataKey] }
+        set { metadata[metadataKey] = newValue }
+    }
+
+    func log(event: Logging.LogEvent) {
+        var mergedMetadata = metadata
+        let providedMetadata = metadataProvider?.get() ?? [:]
+        if providedMetadata.isEmpty == false {
+            mergedMetadata.merge(providedMetadata) { _, providedValue in providedValue }
+        }
+        if let callsiteMetadata = event.metadata, callsiteMetadata.isEmpty == false {
+            mergedMetadata.merge(callsiteMetadata) { _, callsiteValue in callsiteValue }
+        }
+        if let error = event.error {
+            mergedMetadata["error.message"] = "\(error)"
+            mergedMetadata["error.type"] = "\(String(reflecting: type(of: error)))"
+        }
+
+        let renderedMessage = Self.render(message: "\(event.message)", metadata: mergedMetadata)
+        writeToOSLog(level: event.level, message: renderedMessage)
+        DiagnosticLogStore.record(
+            level: DiagnosticLevel(event.level),
+            category: category,
+            message: renderedMessage
+        )
+    }
+
+    private func writeToOSLog(level: Logging.Logger.Level, message: String) {
+        let type: OSLogType
+        switch level {
+        case .trace, .debug:
+            type = .debug
+        case .info, .notice:
+            type = .info
+        case .warning:
+            type = .default
+        case .error:
+            type = .error
+        case .critical:
+            type = .fault
+        }
+        os_log("%{public}@", log: osLog, type: type, message)
+    }
+
+    private static func render(message: String, metadata: Logging.Logger.Metadata) -> String {
+        let renderedMetadata = metadata
+            .sorted { $0.key < $1.key }
+            .map { key, value in "\(key)=\(sanitize("\(value)"))" }
+            .joined(separator: " ")
+        let cleanMessage = sanitize(message)
+        guard renderedMetadata.isEmpty == false else { return cleanMessage }
+        return "\(cleanMessage) \(renderedMetadata)"
+    }
+
+    private static func sanitize(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
+    }
+}
+
+private extension DiagnosticLevel {
+    nonisolated init(_ level: Logging.Logger.Level) {
+        switch level {
+        case .trace:
+            self = .trace
+        case .debug:
+            self = .debug
+        case .info:
+            self = .info
+        case .notice:
+            self = .notice
+        case .warning:
+            self = .warning
+        case .error:
+            self = .error
+        case .critical:
+            self = .critical
+        }
     }
 }
