@@ -35,12 +35,13 @@ extension PanelyApp {
             Divider()
 
             SettingsLink {
-                Text("Storage Settings…")
+                Text("Settings…")
             }
 
             Button("Clear Extraction Cache") {
                 let activeURL = viewModel.tempDir.url
                 let cacheMaintenance = CacheMaintenance(extractionCache: viewModel.dependencies.extractionCache)
+                AppLog.info(.cache, "Clear extraction cache requested from File menu")
                 Task {
                     let removedBytes = await Task.detached(priority: .utility) {
                         cacheMaintenance.clearExtractionCache(excluding: activeURL)

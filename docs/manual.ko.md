@@ -175,8 +175,8 @@ LRU 정리). 따라서 같은 아카이브를 다시 열 때는 즉시 표시됩
 
 ![추출 캐시 컨트롤이 있는 Storage 설정](screenshots/12-storage-cache.png)
 
-**File → Storage Settings…**(또는 **Panely → Settings…**)에서 zip-in-zip
-추출 캐시 용량을 확인하고 비울 수 있습니다.
+**File → Settings…**(또는 **Panely → Settings…**)의 Storage 탭에서
+zip-in-zip 추출 캐시 용량을 확인하고 비울 수 있습니다.
 
 - **Extraction cache** — 추출된 중첩 아카이브가 현재 디스크에서
   사용하는 전체 용량.
@@ -188,6 +188,18 @@ LRU 정리). 따라서 같은 아카이브를 다시 열 때는 즉시 표시됩
 
 같은 정리는 **File → Clear Extraction Cache** 에서도 실행할 수 있습니다.
 책을 로딩하거나 압축 해제 중일 때는 캐시 삭제가 비활성화됩니다.
+
+## 진단
+
+![진단 리포트 export 컨트롤이 있는 Diagnostics 설정](screenshots/13-diagnostics-settings.png)
+
+**Settings → Diagnostics** 에서 **Export Diagnostic Report…** 를 누르면
+버그 리포트에 첨부할 수 있는 zip을 생성합니다. 포함 내용:
+
+- 앱 버전/build와 macOS 버전.
+- 최근 Panely 로그.
+- 파일 경로가 filename, extension, type 수준으로 redacted 된 최근 열기/로드 이벤트.
+- 추출 캐시 용량, 현재 reader 설정, 마지막 reader 에러.
 
 ---
 

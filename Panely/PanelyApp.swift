@@ -20,6 +20,7 @@ struct PanelyApp: App {
                 // roadmap; see README.
                 .preferredColorScheme(.dark)
                 .onOpenURL { url in
+                    AppLog.info(.app, "Received open URL: \(DiagnosticRedactor.describe(url))")
                     viewModel.openURL(url)
                 }
         }
@@ -31,7 +32,7 @@ struct PanelyApp: App {
         }
 
         Settings {
-            StorageSettingsView(viewModel: viewModel)
+            SettingsView(viewModel: viewModel)
                 .preferredColorScheme(.dark)
         }
     }
@@ -41,6 +42,14 @@ struct PanelyApp: App {
 /// single-window viewer — keeping the process alive with no window visible
 /// would leave users wondering why the red close button "only minimizes".
 final class PanelyAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        AppLog.info(.app, "Application did finish launching")
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        AppLog.info(.app, "Application will terminate")
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
     }

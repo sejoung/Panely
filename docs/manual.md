@@ -177,8 +177,8 @@ so reopening the same archive is instant on subsequent launches.
 
 ![Storage settings with extraction cache controls](screenshots/12-storage-cache.png)
 
-Open **File → Storage Settings…** (or **Panely → Settings…**) to inspect
-and clear the zip-in-zip extraction cache.
+Open **File → Settings…** (or **Panely → Settings…**) to inspect and clear
+the zip-in-zip extraction cache from the Storage tab.
 
 - **Extraction cache** — total disk space currently used by extracted
   nested archives.
@@ -191,6 +191,19 @@ and clear the zip-in-zip extraction cache.
 
 The same cleanup is available from **File → Clear Extraction Cache**.
 Cache clearing is disabled while a book is loading or extracting.
+
+## Diagnostics
+
+![Diagnostics settings with export controls](screenshots/13-diagnostics-settings.png)
+
+Open **Settings → Diagnostics** and choose **Export Diagnostic Report…** to
+create a zip that can be attached to a bug report. It includes:
+
+- App version/build and macOS version.
+- Recent Panely log lines.
+- Recent open/load events with file paths redacted to filename, extension,
+  and type.
+- Extraction cache size, current reader settings, and the last reader error.
 
 ---
 

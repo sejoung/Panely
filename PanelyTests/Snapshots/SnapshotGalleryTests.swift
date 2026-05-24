@@ -189,6 +189,20 @@ struct SnapshotGalleryTests {
         )
     }
 
+    @Test func diagnosticsSettings() async throws {
+        let vm = SnapshotSampleContent.loadedViewModel()
+        vm.errorMessage = "Failed to open nested archive."
+
+        try await render(
+            ZStack {
+                PanelyColor.bgPrimary
+                DiagnosticsSettingsView(viewModel: vm)
+            },
+            size: SnapshotRenderer.settingsSize,
+            named: "13-diagnostics-settings.png"
+        )
+    }
+
     // MARK: - Helpers
 
     private func render<V: View>(_ view: V, size: CGSize, named name: String) async throws {
@@ -204,7 +218,11 @@ struct SnapshotGalleryTests {
 
 private enum SnapshotGenerationGate {
     static var isEnabled: Bool {
-        FileManager.default.fileExists(atPath: flagURL.path)
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: flagURL.path),
+              let modified = attributes[.modificationDate] as? Date
+        else { return false }
+
+        return Date().timeIntervalSince(modified) < 30 * 60
     }
 
     private static var flagURL: URL {

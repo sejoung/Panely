@@ -33,6 +33,7 @@ EXPECTED_SNAPSHOTS=(
   "10-loading-overlay.png"
   "11-slider-quickjump.png"
   "12-storage-cache.png"
+  "13-diagnostics-settings.png"
 )
 
 cd "$PROJECT_ROOT"

@@ -84,8 +84,11 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   `~/Library/Caches/panely-extraction-cache/`에 보관됨. 10 GB LRU 예산
   안에서 관리되어 같은 아카이브를 다시 열 때 즉시 표시. 소스 파일 편집
   시 mtime이 바뀌어 키도 바뀌므로 자동 재추출. 캐시 용량 확인과 수동
-  정리는 **File → Storage Settings…**(또는 **Panely → Settings…**)와
+  정리는 **File → Settings…**(또는 **Panely → Settings…**)와
   **File → Clear Extraction Cache** 에서 가능.
+- **진단 리포트 내보내기** — **Settings → Diagnostics** 에서 앱 버전/build,
+  macOS 버전, 최근 Panely 로그, redacted 열기/로드 이벤트, 캐시 용량,
+  현재 설정, 마지막 reader 에러를 담은 zip을 생성해 버그 리포트에 첨부할 수 있음.
 - 자연 파일명 정렬(`1, 2, 10` — `1, 10, 2` 아님) — `NaturalSort` 헬퍼로
   모든 로더/스캐너에서 일관 적용
 - 비이미지 파일과 숨김 항목 필터링
@@ -347,6 +350,12 @@ Panely/
 │   ├── PanelyApp+FileCommands.swift    # Open / Open Recent
 │   ├── PanelyApp+ViewCommands.swift    # chrome / 레이아웃 / 맞춤 / 줌 / autofit
 │   └── PanelyApp+GoCommands.swift      # 페이지 이동 / 북마크 / 즐겨찾기 / 볼륨
+├── Core/
+│   ├── Comic/                          # loader, ComicSource/Page, natural sort, 이미지 메타데이터
+│   ├── Diagnostics/
+│   │   ├── AppLog.swift                # OSLog + redacted 진단 이벤트
+│   │   └── DiagnosticLogStore.swift    # rolling recent-log.txt 캐시 파일
+│   └── Extensions/                     # 공유 Foundation helper
 ├── DesignSystem/
 │   ├── Tokens/                         # Color / Spacing / Typography / Motion
 │   └── Primitives/                     # 아이콘 버튼, 슬라이더
@@ -406,7 +415,10 @@ Panely/
 │   │       ├── ThumbnailSidebar.swift  # 우측 썸네일 패널 (LazyVStack)
 │   │       └── ThumbnailLoader.swift   # Image I/O 썸네일 + NSCache
 │   ├── Settings/
+│   │   ├── SettingsView.swift          # Storage + Diagnostics 탭
 │   │   ├── StorageSettingsView.swift   # Storage 설정 UI + 캐시 용량 / 삭제 컨트롤
+│   │   ├── DiagnosticsSettingsView.swift # 진단 리포트 export UI
+│   │   ├── DiagnosticReportExporter.swift # zip 리포트 writer
 │   │   └── CacheMaintenance.swift      # 캐시 삭제 결과와 포맷팅 헬퍼
 │   └── Library/
 │       ├── LibrarySidebar.swift        # 고정 버튼 + 확장자 배지 + 2단계 로드
@@ -447,12 +459,12 @@ PanelyTests/                            # 소스 트리를 미러링
 ├── Snapshots/                          # docs/screenshots/ 생성기 (CI에서 skip)
 │   ├── SnapshotRenderer.swift          # NSHostingView + offscreen window → PNG
 │   ├── SnapshotSampleContent.swift     # placeholder 페이지 + LibraryFixture
-│   └── SnapshotGalleryTests.swift      # 12개 매뉴얼 시나리오
+│   └── SnapshotGalleryTests.swift      # 13개 매뉴얼 시나리오
 ├── Core/Comic/                         # CBZLoader, FolderLoader, ImageLoader{Load,Dimensions},
 │                                       # ComicModel, LoaderExtension, NaturalSort
 ├── Features/Library/                   # FavoritesStore, PageBookmarksStore, RecentItem,
 │                                       # FileNode, FavoriteBook, PageBookmark
-├── Features/Settings/                  # CacheMaintenance
+├── Features/Settings/                  # CacheMaintenance, Settings UI, diagnostic report export
 └── Features/Reader/
     ├── Model/                          # FitCalculator, PositionKey, ReaderEnum, SidebarMode
     ├── Viewer/                         # CenteringClipView, FitMagnificationStability,
@@ -469,7 +481,7 @@ PanelyTests/                            # 소스 트리를 미러링
 docs/
 ├── manual.md                           # 영문 사용 설명서 (스크린샷 둘러보기)
 ├── manual.ko.md                        # 한글 사용 설명서
-├── screenshots/                        # SnapshotGalleryTests가 생성하는 12개 PNG
+├── screenshots/                        # SnapshotGalleryTests가 생성하는 13개 PNG
 ├── panely_design_system_mac_os.md
 └── icon/panely-icon-stacked.svg
 
