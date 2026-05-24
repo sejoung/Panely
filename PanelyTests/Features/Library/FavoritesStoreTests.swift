@@ -85,8 +85,38 @@ struct FavoritesStoreTests {
         #expect(store.isFavorite(url: fileURL, innerPath: "Vol02"))
     }
 
-    private func freshStore() -> FavoritesStore {
+    @Test func toggleFavoriteUsesInjectedBookmarkResolver() {
+        let store = freshStore(bookmarks: FakeBookmarkResolver())
+        let url = URL(fileURLWithPath: "/fake/book.cbz")
+
+        store.toggleFavorite(url: url, title: "book")
+
+        #expect(store.favorites.first?.bookmarkData == Data([0xBA, 0xAD]))
+        #expect(store.favorites.first?.isDirectory == true)
+    }
+
+    private func freshStore(
+        bookmarks: any SecurityScopedBookmarking = LiveSecurityScopedBookmarkResolver()
+    ) -> FavoritesStore {
         UserDefaults.standard.removeObject(forKey: FavoritesStore.favoritesKey)
-        return FavoritesStore()
+        return FavoritesStore(bookmarks: bookmarks)
+    }
+}
+
+private nonisolated struct FakeBookmarkResolver: SecurityScopedBookmarking {
+    func data(for url: URL) throws -> Data {
+        Data([0xBA, 0xAD])
+    }
+
+    func resolve(_ bookmarkData: Data) -> SecurityScopedBookmark.Resolution? {
+        SecurityScopedBookmark.Resolution(url: URL(fileURLWithPath: "/fake/book.cbz"), isStale: false)
+    }
+
+    func refreshedData(for url: URL) -> Data? {
+        Data([0xF0, 0x0D])
+    }
+
+    func isDirectory(_ url: URL) -> Bool {
+        true
     }
 }

@@ -6,9 +6,11 @@ final class RecentItemsStore {
     private static let defaultsKey = "panely.recentItems"
     private static let maxItems = 10
 
+    private let bookmarks: any SecurityScopedBookmarking
     private(set) var items: [RecentItem] = []
 
-    init() {
+    init(bookmarks: any SecurityScopedBookmarking = LiveSecurityScopedBookmarkResolver()) {
+        self.bookmarks = bookmarks
         load()
     }
 
@@ -17,8 +19,8 @@ final class RecentItemsStore {
             var existing = items.remove(at: existingIndex)
             existing.openedAt = Date()
             existing.title = title
-            if SecurityScopedBookmark.resolve(existing.bookmarkData)?.isStale == true,
-               let refreshed = SecurityScopedBookmark.refreshedData(for: url) {
+            if bookmarks.resolve(existing.bookmarkData)?.isStale == true,
+               let refreshed = bookmarks.refreshedData(for: url) {
                 existing.bookmarkData = refreshed
             }
             items.insert(existing, at: 0)
@@ -32,8 +34,8 @@ final class RecentItemsStore {
                 path: url.path,
                 title: title,
                 openedAt: Date(),
-                bookmarkData: try SecurityScopedBookmark.data(for: url),
-                isDirectory: SecurityScopedBookmark.isDirectory(url)
+                bookmarkData: try bookmarks.data(for: url),
+                isDirectory: bookmarks.isDirectory(url)
             )
             items.insert(item, at: 0)
 
@@ -48,12 +50,12 @@ final class RecentItemsStore {
     }
 
     func resolve(_ item: RecentItem) -> URL? {
-        guard let resolution = SecurityScopedBookmark.resolve(item.bookmarkData) else {
+        guard let resolution = bookmarks.resolve(item.bookmarkData) else {
             return nil
         }
         let url = resolution.url
         if resolution.isStale,
-           let refreshed = SecurityScopedBookmark.refreshedData(for: url),
+           let refreshed = bookmarks.refreshedData(for: url),
            let idx = items.firstIndex(where: { $0.id == item.id }) {
             items[idx].bookmarkData = refreshed
             items[idx].path = url.path

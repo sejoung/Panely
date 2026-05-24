@@ -29,8 +29,9 @@ final class ReaderViewModel {
     let preferences = ReaderPreferences()
     let positions = ReaderPositionStore()
     let imageLoader = ReaderImageLoader()
-    let tempDir = ReaderTempDirectory()
+    let tempDir: ReaderTempDirectory
     let libraryScope = ReaderLibraryScope()
+    let dependencies: AppDependencies
     let recentItems: RecentItemsStore
     let favorites: FavoritesStore
     let pageBookmarks: PageBookmarksStore
@@ -148,9 +149,11 @@ final class ReaderViewModel {
 
     // MARK: - Init
 
-    init() {
-        self.recentItems = RecentItemsStore()
-        self.favorites = FavoritesStore()
+    init(dependencies: AppDependencies = .live) {
+        self.dependencies = dependencies
+        self.tempDir = ReaderTempDirectory(extractionCache: dependencies.extractionCache)
+        self.recentItems = RecentItemsStore(bookmarks: dependencies.bookmarkResolver)
+        self.favorites = FavoritesStore(bookmarks: dependencies.bookmarkResolver)
         self.pageBookmarks = PageBookmarksStore()
 
         observeAppTermination()
@@ -158,8 +161,9 @@ final class ReaderViewModel {
         // Fire-and-forget: a previous session may have crashed mid-extraction
         // and orphaned a `panely-*` temp dir. Do this off the main actor so
         // a slow tmp scan doesn't delay first paint.
+        let extractionCache = dependencies.extractionCache
         Task.detached(priority: .background) {
-            ReaderTempDirectory.cleanupStaleEntries()
+            ReaderTempDirectory.cleanupStaleEntries(extractionCache: extractionCache)
         }
     }
 

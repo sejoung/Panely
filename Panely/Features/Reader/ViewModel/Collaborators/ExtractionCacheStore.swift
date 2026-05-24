@@ -1,6 +1,54 @@
 import CryptoKit
 import Foundation
 
+nonisolated protocol ExtractionCacheManaging: Sendable {
+    var cacheBudgetBytes: UInt64 { get }
+    func cacheRoot() -> URL
+    func isCacheURL(_ url: URL) -> Bool
+    func cacheKey(for url: URL) -> String?
+    func cachedEntry(forKey key: String) -> URL?
+    func makeCachedCandidate(forKey key: String) -> URL
+    func enforceBudget()
+    func cacheSizeBytes(in root: URL, excluding activeURL: URL?) -> UInt64
+    func clearCache(in root: URL, excluding activeURL: URL?) -> UInt64
+}
+
+nonisolated struct LiveExtractionCacheManager: ExtractionCacheManaging {
+    let cacheBudgetBytes = ExtractionCacheStore.cacheBudgetBytes
+
+    func cacheRoot() -> URL {
+        ExtractionCacheStore.cacheRoot()
+    }
+
+    func isCacheURL(_ url: URL) -> Bool {
+        ExtractionCacheStore.isCacheURL(url)
+    }
+
+    func cacheKey(for url: URL) -> String? {
+        ExtractionCacheStore.cacheKey(for: url)
+    }
+
+    func cachedEntry(forKey key: String) -> URL? {
+        ExtractionCacheStore.cachedEntry(forKey: key)
+    }
+
+    func makeCachedCandidate(forKey key: String) -> URL {
+        ExtractionCacheStore.makeCachedCandidate(forKey: key)
+    }
+
+    func enforceBudget() {
+        ExtractionCacheStore.enforceBudget()
+    }
+
+    func cacheSizeBytes(in root: URL, excluding activeURL: URL?) -> UInt64 {
+        ExtractionCacheStore.cacheSizeBytes(in: root, excluding: activeURL)
+    }
+
+    func clearCache(in root: URL, excluding activeURL: URL?) -> UInt64 {
+        ExtractionCacheStore.clearCache(in: root, excluding: activeURL)
+    }
+}
+
 nonisolated enum ExtractionCacheStore {
     static let cacheBudgetBytes: UInt64 = 10 * 1024 * 1024 * 1024
 

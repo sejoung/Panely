@@ -40,11 +40,12 @@ extension PanelyApp {
 
             Button("Clear Extraction Cache") {
                 let activeURL = viewModel.tempDir.url
+                let cacheMaintenance = CacheMaintenance(extractionCache: viewModel.dependencies.extractionCache)
                 Task {
                     let removedBytes = await Task.detached(priority: .utility) {
-                        CacheMaintenance.clearExtractionCache(excluding: activeURL)
+                        cacheMaintenance.clearExtractionCache(excluding: activeURL)
                     }.value
-                    CacheMaintenance.presentClearResult(removedBytes: removedBytes)
+                    cacheMaintenance.presentClearResult(removedBytes: removedBytes)
                 }
             }
             .disabled(viewModel.isLoading)

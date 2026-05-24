@@ -4,12 +4,25 @@ import SwiftUI
 @MainActor
 struct StorageSettingsView: View {
     let viewModel: ReaderViewModel
-    var cacheRoot: URL = ReaderTempDirectory.cacheRoot()
+    let cacheMaintenance: CacheMaintenance
+    let cacheRoot: URL
 
     @State private var totalCacheBytes: UInt64?
     @State private var clearableCacheBytes: UInt64?
     @State private var isRefreshing = false
     @State private var isClearing = false
+
+    init(
+        viewModel: ReaderViewModel,
+        cacheRoot: URL? = nil,
+        cacheMaintenance: CacheMaintenance? = nil
+    ) {
+        self.viewModel = viewModel
+        let cacheMaintenance = cacheMaintenance
+            ?? CacheMaintenance(extractionCache: viewModel.dependencies.extractionCache)
+        self.cacheMaintenance = cacheMaintenance
+        self.cacheRoot = cacheRoot ?? cacheMaintenance.cacheRoot()
+    }
 
     private var canClear: Bool {
         !viewModel.isLoading && !isClearing && (clearableCacheBytes ?? 0) > 0
@@ -27,7 +40,7 @@ struct StorageSettingsView: View {
                 }
 
                 LabeledContent("Cache limit") {
-                    Text(CacheMaintenance.formattedBytes(ReaderTempDirectory.cacheBudgetBytes))
+                    Text(cacheMaintenance.formattedBytes(cacheMaintenance.cacheBudgetBytes))
                         .monospacedDigit()
                 }
 
@@ -66,7 +79,7 @@ struct StorageSettingsView: View {
     @ViewBuilder
     private func cacheValue(_ bytes: UInt64?) -> some View {
         if let bytes, !isRefreshing {
-            Text(CacheMaintenance.formattedBytes(bytes))
+            Text(cacheMaintenance.formattedBytes(bytes))
                 .monospacedDigit()
         } else {
             ProgressView()
@@ -77,8 +90,10 @@ struct StorageSettingsView: View {
     private func refreshCacheSize() async {
         isRefreshing = true
         let activeURL = viewModel.tempDir.url
+        let cacheMaintenance = cacheMaintenance
+        let cacheRoot = cacheRoot
         let sizes = await Task.detached(priority: .utility) {
-            CacheMaintenance.cacheSizes(in: cacheRoot, excluding: activeURL)
+            cacheMaintenance.cacheSizes(in: cacheRoot, excluding: activeURL)
         }.value
         totalCacheBytes = sizes.total
         clearableCacheBytes = sizes.clearable
@@ -89,13 +104,15 @@ struct StorageSettingsView: View {
         guard canClear else { return }
         isClearing = true
         let activeURL = viewModel.tempDir.url
+        let cacheMaintenance = cacheMaintenance
+        let cacheRoot = cacheRoot
         Task {
             let removedBytes = await Task.detached(priority: .utility) {
-                CacheMaintenance.clearExtractionCache(in: cacheRoot, excluding: activeURL)
+                cacheMaintenance.clearExtractionCache(in: cacheRoot, excluding: activeURL)
             }.value
             isClearing = false
             await refreshCacheSize()
-            CacheMaintenance.presentClearResult(removedBytes: removedBytes)
+            cacheMaintenance.presentClearResult(removedBytes: removedBytes)
         }
     }
 }

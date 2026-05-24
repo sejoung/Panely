@@ -6,7 +6,10 @@ final class LibrarySidebarModel {
     private(set) var nodes: [FileNode] = []
     private(set) var scanCompleted = false
 
-    func reload(rootURL: URL?) async {
+    func reload(
+        rootURL: URL?,
+        loader: any LibraryTreeLoading = LiveLibraryTreeLoader()
+    ) async {
         guard let rootURL else {
             nodes = []
             scanCompleted = false
@@ -14,12 +17,12 @@ final class LibrarySidebarModel {
         }
         scanCompleted = false
 
-        let shallow = await FileNode.loadTree(from: rootURL, maxDepth: 1)
+        let shallow = await loader.loadTree(from: rootURL, maxDepth: 1)
         if Task.isCancelled { return }
         nodes = shallow
         scanCompleted = true
 
-        let deep = await FileNode.loadTree(from: rootURL, maxDepth: 3)
+        let deep = await loader.loadTree(from: rootURL, maxDepth: 3)
         if Task.isCancelled { return }
         if deep != shallow {
             nodes = deep

@@ -17,6 +17,7 @@ struct SidebarHost: View {
             favorites: viewModel.favorites.favorites,
             pageBookmarks: viewModel.currentBookPageBookmarks,
             volumes: viewModel.sidebarVolumes,
+            libraryTreeLoader: viewModel.dependencies.libraryTreeLoader,
             currentPageIndex: viewModel.currentPageIndex,
             onSelect: { url in
                 viewModel.openLibraryURL(url)

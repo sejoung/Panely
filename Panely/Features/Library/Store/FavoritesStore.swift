@@ -10,13 +10,16 @@ import Foundation
 final class FavoritesStore {
     static let favoritesKey = "panely.favoriteBooks"
 
+    private let bookmarks: any SecurityScopedBookmarking
+
     /// In-memory favorites list. Direct assignment is supported so tests
     /// and snapshot fixtures can stage favorites without creating real
     /// security-scoped bookmarks; production code should go through
     /// `toggleFavorite` / `removeFavorite` so persistence stays in sync.
     var favorites: [FavoriteBook] = []
 
-    init() {
+    init(bookmarks: any SecurityScopedBookmarking = LiveSecurityScopedBookmarkResolver()) {
+        self.bookmarks = bookmarks
         load()
     }
 
@@ -42,8 +45,8 @@ final class FavoritesStore {
                 path: url.path,
                 title: title,
                 addedAt: Date(),
-                bookmarkData: try SecurityScopedBookmark.data(for: url),
-                isDirectory: isDirectory ?? SecurityScopedBookmark.isDirectory(url),
+                bookmarkData: try bookmarks.data(for: url),
+                isDirectory: isDirectory ?? bookmarks.isDirectory(url),
                 innerPath: innerPath
             )
             favorites.insert(fav, at: 0)
@@ -55,12 +58,12 @@ final class FavoritesStore {
     }
 
     func resolve(_ favorite: FavoriteBook) -> URL? {
-        guard let resolution = SecurityScopedBookmark.resolve(favorite.bookmarkData) else {
+        guard let resolution = bookmarks.resolve(favorite.bookmarkData) else {
             return nil
         }
         let url = resolution.url
         if resolution.isStale,
-           let refreshed = SecurityScopedBookmark.refreshedData(for: url),
+           let refreshed = bookmarks.refreshedData(for: url),
            let idx = favorites.firstIndex(where: { $0.id == favorite.id }) {
             favorites[idx].bookmarkData = refreshed
             favorites[idx].path = url.path

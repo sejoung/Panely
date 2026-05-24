@@ -1,27 +1,41 @@
 import AppKit
 import Foundation
 
-nonisolated enum CacheMaintenance {
-    static func cacheSizes(in root: URL, excluding activeURL: URL?) -> (total: UInt64, clearable: UInt64) {
+nonisolated struct CacheMaintenance: Sendable {
+    private let extractionCache: any ExtractionCacheManaging
+
+    init(extractionCache: any ExtractionCacheManaging = LiveExtractionCacheManager()) {
+        self.extractionCache = extractionCache
+    }
+
+    var cacheBudgetBytes: UInt64 {
+        extractionCache.cacheBudgetBytes
+    }
+
+    func cacheRoot() -> URL {
+        extractionCache.cacheRoot()
+    }
+
+    func cacheSizes(in root: URL, excluding activeURL: URL?) -> (total: UInt64, clearable: UInt64) {
         (
-            total: ReaderTempDirectory.cacheSizeBytes(in: root),
-            clearable: ReaderTempDirectory.cacheSizeBytes(in: root, excluding: activeURL)
+            total: extractionCache.cacheSizeBytes(in: root, excluding: nil),
+            clearable: extractionCache.cacheSizeBytes(in: root, excluding: activeURL)
         )
     }
 
     @discardableResult
-    static func clearExtractionCache(in root: URL = ReaderTempDirectory.cacheRoot(), excluding activeURL: URL?) -> UInt64 {
-        ReaderTempDirectory.clearCache(in: root, excluding: activeURL)
+    func clearExtractionCache(in root: URL? = nil, excluding activeURL: URL?) -> UInt64 {
+        extractionCache.clearCache(in: root ?? extractionCache.cacheRoot(), excluding: activeURL)
     }
 
-    static func formattedBytes(_ bytes: UInt64) -> String {
+    func formattedBytes(_ bytes: UInt64) -> String {
         let formatter = ByteCountFormatter()
         formatter.countStyle = .binary
         return formatter.string(fromByteCount: Int64(min(bytes, UInt64(Int64.max))))
     }
 
     @MainActor
-    static func presentClearResult(removedBytes: UInt64) {
+    func presentClearResult(removedBytes: UInt64) {
         let alert = NSAlert()
         alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")

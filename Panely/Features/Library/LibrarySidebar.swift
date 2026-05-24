@@ -8,6 +8,7 @@ struct LibrarySidebar: View {
     let favorites: [FavoriteBook]
     let pageBookmarks: [PageBookmark]
     let volumes: [URL]
+    var libraryTreeLoader: any LibraryTreeLoading = LiveLibraryTreeLoader()
     let currentPageIndex: Int
     let onSelect: (URL) -> Void
     let onSelectFavorite: (FavoriteBook) -> Void
@@ -33,7 +34,7 @@ struct LibrarySidebar: View {
         .frame(width: 240)
         .background(PanelyColor.bgSecondary)
         .task(id: taskID) {
-            await model.reload(rootURL: rootURL)
+            await model.reload(rootURL: rootURL, loader: libraryTreeLoader)
         }
     }
 

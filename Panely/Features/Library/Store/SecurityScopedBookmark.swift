@@ -1,7 +1,32 @@
 import Foundation
 
+nonisolated protocol SecurityScopedBookmarking: Sendable {
+    func data(for url: URL) throws -> Data
+    func resolve(_ bookmarkData: Data) -> SecurityScopedBookmark.Resolution?
+    func refreshedData(for url: URL) -> Data?
+    func isDirectory(_ url: URL) -> Bool
+}
+
+nonisolated struct LiveSecurityScopedBookmarkResolver: SecurityScopedBookmarking {
+    func data(for url: URL) throws -> Data {
+        try SecurityScopedBookmark.data(for: url)
+    }
+
+    func resolve(_ bookmarkData: Data) -> SecurityScopedBookmark.Resolution? {
+        SecurityScopedBookmark.resolve(bookmarkData)
+    }
+
+    func refreshedData(for url: URL) -> Data? {
+        SecurityScopedBookmark.refreshedData(for: url)
+    }
+
+    func isDirectory(_ url: URL) -> Bool {
+        SecurityScopedBookmark.isDirectory(url)
+    }
+}
+
 nonisolated enum SecurityScopedBookmark {
-    struct Resolution {
+    struct Resolution: Sendable {
         let url: URL
         let isStale: Bool
     }

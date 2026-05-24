@@ -28,4 +28,30 @@ struct LibrarySidebarModelTests {
         #expect(model.nodes.contains { $0.name == "Vol01" })
         #expect(model.nodes.contains { $0.name == "Nested" })
     }
+
+    @Test func reloadUsesInjectedTreeLoader() async {
+        let model = LibrarySidebarModel()
+
+        await model.reload(
+            rootURL: URL(fileURLWithPath: "/fake-library", isDirectory: true),
+            loader: FakeLibraryTreeLoader()
+        )
+
+        #expect(model.scanCompleted)
+        #expect(model.nodes.map(\.name) == ["depth-3"])
+    }
+}
+
+private nonisolated struct FakeLibraryTreeLoader: LibraryTreeLoading {
+    func loadTree(from url: URL, maxDepth: Int) async -> [FileNode] {
+        [
+            FileNode(
+                id: url.appendingPathComponent("depth-\(maxDepth).cbz"),
+                url: url.appendingPathComponent("depth-\(maxDepth).cbz"),
+                name: "depth-\(maxDepth)",
+                kind: .archive,
+                children: nil
+            ),
+        ]
+    }
 }

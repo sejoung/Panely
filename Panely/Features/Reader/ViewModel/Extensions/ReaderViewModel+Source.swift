@@ -252,15 +252,16 @@ extension ReaderViewModel {
         // Cache hit fast path — same archive (same path + size + mtime)
         // reuses the previous extraction so reopen is instant. Edits to the
         // source bump mtime → new key → automatic re-extraction.
-        let key = ReaderTempDirectory.cacheKey(for: url)
+        let extractionCache = dependencies.extractionCache
+        let key = extractionCache.cacheKey(for: url)
         if let key,
-           let cached = ReaderTempDirectory.cachedEntry(forKey: key) {
+           let cached = extractionCache.cachedEntry(forKey: key) {
             tempDir.adopt(cached)
             return cached
         }
 
         loadingMessage = "Extracting archive…"
-        let candidate = key.map(ReaderTempDirectory.makeCachedCandidate(forKey:))
+        let candidate = key.map { extractionCache.makeCachedCandidate(forKey: $0) }
             ?? ReaderTempDirectory.makeSessionCandidate()
 
         do {
@@ -272,7 +273,7 @@ extension ReaderViewModel {
             tempDir.adopt(candidate)
             if key != nil {
                 Task.detached(priority: .background) {
-                    ReaderTempDirectory.enforceCacheBudget()
+                    extractionCache.enforceBudget()
                 }
             }
             return candidate

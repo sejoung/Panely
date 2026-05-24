@@ -7,12 +7,17 @@ import Foundation
 /// readable from the reader pipeline.
 @MainActor
 final class ReaderTempDirectory {
-    nonisolated static let cacheBudgetBytes = ExtractionCacheStore.cacheBudgetBytes
+    nonisolated static let cacheBudgetBytes = LiveExtractionCacheManager().cacheBudgetBytes
     nonisolated private static let sessionDirPrefix = "panely-"
 
+    private let extractionCache: any ExtractionCacheManaging
     var url: URL?
 
     var isActive: Bool { url != nil }
+
+    init(extractionCache: any ExtractionCacheManaging = LiveExtractionCacheManager()) {
+        self.extractionCache = extractionCache
+    }
 
     func adopt(_ dir: URL) {
         url = dir
@@ -20,7 +25,7 @@ final class ReaderTempDirectory {
 
     func cleanup() {
         guard let dir = url else { return }
-        if !ExtractionCacheStore.isCacheURL(dir) {
+        if !extractionCache.isCacheURL(dir) {
             try? FileManager.default.removeItem(at: dir)
         }
         url = nil
@@ -36,26 +41,26 @@ final class ReaderTempDirectory {
     }
 
     static func cacheKey(for url: URL) -> String? {
-        ExtractionCacheStore.cacheKey(for: url)
+        LiveExtractionCacheManager().cacheKey(for: url)
     }
 
     static func cachedEntry(forKey key: String) -> URL? {
-        ExtractionCacheStore.cachedEntry(forKey: key)
+        LiveExtractionCacheManager().cachedEntry(forKey: key)
     }
 
     static func makeCachedCandidate(forKey key: String) -> URL {
-        ExtractionCacheStore.makeCachedCandidate(forKey: key)
+        LiveExtractionCacheManager().makeCachedCandidate(forKey: key)
     }
 
     nonisolated static func enforceCacheBudget() {
-        ExtractionCacheStore.enforceBudget()
+        LiveExtractionCacheManager().enforceBudget()
     }
 
     nonisolated static func cacheSizeBytes(
         in root: URL = cacheRoot(),
         excluding activeURL: URL? = nil
     ) -> UInt64 {
-        ExtractionCacheStore.cacheSizeBytes(in: root, excluding: activeURL)
+        LiveExtractionCacheManager().cacheSizeBytes(in: root, excluding: activeURL)
     }
 
     @discardableResult
@@ -63,14 +68,16 @@ final class ReaderTempDirectory {
         in root: URL = cacheRoot(),
         excluding activeURL: URL? = nil
     ) -> UInt64 {
-        ExtractionCacheStore.clearCache(in: root, excluding: activeURL)
+        LiveExtractionCacheManager().clearCache(in: root, excluding: activeURL)
     }
 
     nonisolated static func cacheRoot() -> URL {
-        ExtractionCacheStore.cacheRoot()
+        LiveExtractionCacheManager().cacheRoot()
     }
 
-    nonisolated static func cleanupStaleEntries() {
+    nonisolated static func cleanupStaleEntries(
+        extractionCache: any ExtractionCacheManaging = LiveExtractionCacheManager()
+    ) {
         let tmpRoot = FileManager.default.temporaryDirectory
         guard let entries = try? FileManager.default.contentsOfDirectory(
             at: tmpRoot,
@@ -88,6 +95,6 @@ final class ReaderTempDirectory {
             try? FileManager.default.removeItem(at: entry)
         }
 
-        ExtractionCacheStore.enforceBudget()
+        extractionCache.enforceBudget()
     }
 }
