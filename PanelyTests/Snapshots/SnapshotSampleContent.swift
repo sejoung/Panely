@@ -135,7 +135,7 @@ enum SnapshotSampleContent {
     // MARK: - Pre-configured viewmodels
 
     private static func snapshotViewModel() -> ReaderViewModel {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.favorites.favorites = []
         vm.pageBookmarks.pageBookmarksByBook = [:]
         return vm

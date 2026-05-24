@@ -9,7 +9,7 @@ import Foundation
 struct ReaderViewModelSetLayoutTests {
 
     @Test func setLayoutSwitchesToTarget() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.layout = .single
 
         vm.setLayout(.double)
@@ -21,7 +21,7 @@ struct ReaderViewModelSetLayoutTests {
         // didSet's lack of side effects on `layout`. (We can't easily observe
         // the handler firing here without bringing in a full source, so we
         // check that the value stays stable and a redundant call is silent.)
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.layout = .vertical
 
         vm.setLayout(.vertical)
@@ -31,7 +31,7 @@ struct ReaderViewModelSetLayoutTests {
     @Test func setLayoutGoesDirectlyAcrossModesWithoutCycling() {
         // The whole point of split-from-toggle: vertical → double must NOT
         // detour through .single (which `toggleLayout()` would do twice).
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.layout = .vertical
 
         vm.setLayout(.double)
@@ -42,7 +42,7 @@ struct ReaderViewModelSetLayoutTests {
         // Backwards-compat: the cycle method survives for tests / any caller
         // that wants to advance one step. setLayout is additive, not a
         // replacement.
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.layout = .single
         vm.toggleLayout()
         #expect(vm.layout == .double)
@@ -56,7 +56,7 @@ struct ReaderViewModelSetLayoutTests {
         // Same contract as toggleLayout — fitMode is the user's choice and
         // must not be reset by a layout switch. Verifies the segmented
         // picker doesn't accidentally clobber it.
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.layout = .single
         vm.fitMode = .fitWidth
 
@@ -67,7 +67,7 @@ struct ReaderViewModelSetLayoutTests {
     // MARK: setFitMode
 
     @Test func setFitModeSwitchesToTarget() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.fitMode = .fitScreen
 
         vm.setFitMode(.fitHeight)
@@ -75,7 +75,7 @@ struct ReaderViewModelSetLayoutTests {
     }
 
     @Test func setFitModeNoOpsWhenAlreadyAtTarget() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.fitMode = .fitWidth
 
         vm.setFitMode(.fitWidth)
@@ -85,7 +85,7 @@ struct ReaderViewModelSetLayoutTests {
     @Test func setFitModeGoesDirectlyAcrossModesWithoutCycling() {
         // Same selling point as setLayout: fitScreen → fitHeight skips the
         // fitWidth detour that `toggleFitMode()` would take.
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.fitMode = .fitScreen
 
         vm.setFitMode(.fitHeight)
@@ -93,7 +93,7 @@ struct ReaderViewModelSetLayoutTests {
     }
 
     @Test func toggleFitModeStillCyclesThroughNext() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.fitMode = .fitScreen
         vm.toggleFitMode()
         #expect(vm.fitMode == .fitWidth)

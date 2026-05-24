@@ -2,23 +2,23 @@ import Testing
 import Foundation
 @testable import Panely
 
-/// Covers the in-memory positions mirror added on top of UserDefaults. The
+/// Covers the in-memory positions mirror added on top of KeyValueStoring. The
 /// mirror is meant to keep saves O(1) memcpy + one write instead of an
 /// O(N) read-modify-write of the full positions dict every time.
 @MainActor
 @Suite(.serialized)
 struct ReaderViewModelPositionMemoryTests {
 
-    @Test func cachePopulatesFromUserDefaultsOnFirstAccess() {
-        withClearedPositions {
+    @Test func cachePopulatesFromStoreOnFirstAccess() {
+        withPositionStore { defaults in
             // PositionKey.make returns the standardized path when no temp dir
             // is set, so seeding under that exact path round-trips cleanly.
             let url = URL(fileURLWithPath: "/tmp/seed-test-\(UUID()).cbz")
             let key = url.standardizedFileURL.path
 
-            UserDefaults.standard.set([key: 42] as [String: Int], forKey: ReaderPositionStore.positionsKey)
+            defaults.set([key: 42] as [String: Int], forKey: ReaderPositionStore.positionsKey)
 
-            let vm = ReaderViewModel()
+            let vm = makeTestViewModel(keyValueStore: defaults)
             // Cache is empty before any access.
             #expect(vm.positions.cache == nil)
 
@@ -29,28 +29,28 @@ struct ReaderViewModelPositionMemoryTests {
         }
     }
 
-    @Test func writeRoundTripsThroughCacheAndUserDefaults() {
-        withClearedPositions {
+    @Test func writeRoundTripsThroughCacheAndStore() {
+        withPositionStore { defaults in
             let url = URL(fileURLWithPath: "/tmp/positions-test-\(UUID()).cbz")
-            let vm = makePositionViewModel(url: url)
+            let vm = makePositionViewModel(url: url, defaults: defaults)
 
             // Mutating currentPageIndex schedules a debounced save; flush it
             // synchronously to avoid sleeping in the test.
             vm.currentPageIndex = 5
             vm.flushPositionImmediately()
 
-            // A fresh VM should restore the same value via UserDefaults —
+            // A fresh VM should restore the same value via the injected store —
             // proves the write actually persisted, not just landed in memory.
-            let vm2 = ReaderViewModel()
+            let vm2 = makeTestViewModel(keyValueStore: defaults)
             vm2.openedSourceURL = url
             #expect(vm2.restoredIndex(for: url) == 5)
         }
     }
 
     @Test func mirrorReflectsLatestWriteWithoutReReadingDefaults() {
-        withClearedPositions {
+        withPositionStore { defaults in
             let url = URL(fileURLWithPath: "/tmp/mirror-test-\(UUID()).cbz")
-            let vm = makePositionViewModel(url: url)
+            let vm = makePositionViewModel(url: url, defaults: defaults)
 
             vm.currentPageIndex = 3
             vm.flushPositionImmediately()
@@ -64,8 +64,8 @@ struct ReaderViewModelPositionMemoryTests {
     }
 
     @Test func multipleBooksCoexistInTheSameMirror() {
-        withClearedPositions {
-            let vm = ReaderViewModel()
+        withPositionStore { defaults in
+            let vm = makeTestViewModel(keyValueStore: defaults)
             let urlA = URL(fileURLWithPath: "/tmp/book-a-\(UUID()).cbz")
             let urlB = URL(fileURLWithPath: "/tmp/book-b-\(UUID()).cbz")
             let pages = makePages()
@@ -88,7 +88,7 @@ struct ReaderViewModelPositionMemoryTests {
     }
 
     @Test func zipInZipFileIdentityFallbackDoesNotLeakBetweenInnerVolumes() throws {
-        try withClearedPositions {
+        try withPositionStore { defaults in
             let workDir = try Fixture.makeTempDir()
             defer { try? FileManager.default.removeItem(at: workDir) }
 
@@ -98,7 +98,7 @@ struct ReaderViewModelPositionMemoryTests {
             let volumeOne = extractionRoot.appendingPathComponent("Vol01.cbz")
             let volumeTwo = extractionRoot.appendingPathComponent("Vol02.cbz")
 
-            let vm = ReaderViewModel()
+            let vm = makeTestViewModel(keyValueStore: defaults)
             vm.openedSourceURL = outerArchive
             vm.tempDir.url = extractionRoot
             vm.currentSourceURL = volumeOne
@@ -112,14 +112,14 @@ struct ReaderViewModelPositionMemoryTests {
     }
 
     @Test func folderListedZipFileIdentityFallbackDoesNotLeakBetweenVolumes() throws {
-        try withClearedPositions {
+        try withPositionStore { defaults in
             let seriesFolder = try Fixture.makeTempDir()
             defer { try? FileManager.default.removeItem(at: seriesFolder) }
 
             let volumeOne = try writeDummyFile(seriesFolder.appendingPathComponent("Vol01.cbz"))
             let volumeTwo = try writeDummyFile(seriesFolder.appendingPathComponent("Vol02.cbz"))
 
-            let vm = ReaderViewModel()
+            let vm = makeTestViewModel(keyValueStore: defaults)
             vm.openedSourceURL = seriesFolder
             vm.currentSourceURL = volumeOne
 
@@ -131,14 +131,16 @@ struct ReaderViewModelPositionMemoryTests {
         }
     }
 
-    private func withClearedPositions(_ body: () throws -> Void) rethrows {
-        UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey)
-        defer { UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey) }
-        try body()
+    private func withPositionStore(_ body: (InMemoryKeyValueStore) throws -> Void) rethrows {
+        try body(InMemoryKeyValueStore())
     }
 
-    private func makePositionViewModel(url: URL, pageCount: Int = 10) -> ReaderViewModel {
-        let vm = ReaderViewModel()
+    private func makePositionViewModel(
+        url: URL,
+        defaults: InMemoryKeyValueStore,
+        pageCount: Int = 10
+    ) -> ReaderViewModel {
+        let vm = makeTestViewModel(keyValueStore: defaults)
         vm.currentSourceURL = url
         vm.source = ComicSource(title: "t", pages: makePages(count: pageCount))
         return vm

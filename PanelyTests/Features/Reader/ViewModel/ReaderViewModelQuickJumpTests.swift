@@ -20,7 +20,7 @@ struct ReaderViewModelQuickJumpTests {
     }
 
     @Test func currentPageNumberIsZeroWithoutSource() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         #expect(vm.currentPageNumber == 0)
     }
 
@@ -92,7 +92,7 @@ struct ReaderViewModelQuickJumpTests {
     }
 
     @Test func jumpToPageNumberIsNoOpWithoutSource() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.jump(toPageNumber: 5)
         #expect(vm.currentPageIndex == 0)
     }
@@ -100,7 +100,7 @@ struct ReaderViewModelQuickJumpTests {
     // MARK: helpers
 
     private func makeViewModel(pageCount: Int) -> ReaderViewModel {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.source = ComicSource(title: "Test", pages: makePages(pageCount))
         return vm
     }

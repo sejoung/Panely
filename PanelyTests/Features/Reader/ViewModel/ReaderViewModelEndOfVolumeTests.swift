@@ -11,7 +11,7 @@ struct ReaderViewModelEndOfVolumeTests {
     // MARK: isAtLastPage
 
     @Test func isAtLastPageFalseWhenNoSource() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         #expect(vm.isAtLastPage == false)
     }
 
@@ -157,9 +157,6 @@ struct ReaderViewModelEndOfVolumeTests {
     }
 
     @Test func nextVolumeFromEndStartsAtFirstPageEvenWhenNextVolumeWasCompleted() async throws {
-        UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey)
-        defer { UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey) }
-
         let library = try Fixture.makeTempDir()
         defer { try? FileManager.default.removeItem(at: library) }
 
@@ -196,7 +193,7 @@ struct ReaderViewModelEndOfVolumeTests {
     }
 
     @Test func restartIsNoOpWhenNoSource() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.restartCurrentVolume()
         #expect(vm.currentPageIndex == 0)
     }
@@ -316,7 +313,7 @@ struct ReaderViewModelEndOfVolumeTests {
     // MARK: helpers
 
     private func makeViewModel(pageCount: Int) -> ReaderViewModel {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.source = ComicSource(title: "Test", pages: makePages(pageCount))
         return vm
     }

@@ -4,13 +4,13 @@ import Testing
 @MainActor
 struct ReaderViewModelToolbarPinTests {
     @Test func toolbarStartsUnpinnedByDefault() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         // Default behavior: toolbar auto-hides; pinning is opt-in.
         #expect(vm.toolbarPinned == false)
     }
 
     @Test func togglingPinFlipsState() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.toolbarPinned = false // explicit baseline (init may have read true from prior tests)
 
         vm.toggleToolbarPin()

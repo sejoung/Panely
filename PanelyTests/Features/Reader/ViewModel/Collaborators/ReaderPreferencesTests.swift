@@ -7,7 +7,7 @@ struct ReaderPreferencesTests {
 
     // MARK: - Init reads existing values
 
-    @Test func initLeavesDefaultsWhenUserDefaultsIsEmpty() {
+    @Test func initLeavesDefaultsWhenStoreIsEmpty() {
         let defaults = InMemoryKeyValueStore()
 
         let prefs = ReaderPreferences(defaults: defaults)
@@ -21,7 +21,7 @@ struct ReaderPreferencesTests {
         #expect(prefs.sidebarMode.pinned == true)
     }
 
-    @Test func initHydratesEachPropertyFromUserDefaults() {
+    @Test func initHydratesEachPropertyFromStore() {
         let defaults = InMemoryKeyValueStore([
             ReaderPreferences.layoutKey: PageLayout.vertical.rawValue,
             ReaderPreferences.directionKey: ReadingDirection.rightToLeft.rawValue,
@@ -82,7 +82,7 @@ struct ReaderPreferencesTests {
 
     // MARK: - didSet persistence
 
-    @Test func mutatingEachPropertyPersistsThroughUserDefaults() {
+    @Test func mutatingEachPropertyPersistsThroughStore() {
         let defaults = InMemoryKeyValueStore()
 
         let prefs = ReaderPreferences(defaults: defaults)
@@ -94,7 +94,7 @@ struct ReaderPreferencesTests {
         prefs.thumbnailSidebarVisible = true
         prefs.sidebarMode.pinned = true
 
-        // A second instance reads back everything from disk — proves the
+        // A second instance reads back everything from persistence — proves the
         // didSet actually rounded-tripped, not just landed in the live
         // observable instance.
         let reloaded = ReaderPreferences(defaults: defaults)

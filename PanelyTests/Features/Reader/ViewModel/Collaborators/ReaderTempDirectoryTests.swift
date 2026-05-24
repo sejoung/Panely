@@ -39,8 +39,9 @@ struct ReaderTempDirectoryTests {
     @Test func cleanupPreservesCacheDirOnDisk() throws {
         // Cache dirs survive book switches so re-opening the same archive
         // is instant. Only the active reference is cleared; the bytes
-        // stay on disk until `enforceCacheBudget()` evicts them.
-        let cacheRoot = LiveExtractionCacheManager().cacheRoot()
+        // stay on disk until `enforceBudget()` evicts them.
+        let cache = TestExtractionCacheManager()
+        let cacheRoot = cache.cacheRoot()
         try FileManager.default.createDirectory(at: cacheRoot, withIntermediateDirectories: true)
         let cached = cacheRoot.appendingPathComponent("paneltest-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: cached, withIntermediateDirectories: true)
@@ -48,7 +49,7 @@ struct ReaderTempDirectoryTests {
         try Data("x".utf8).write(to: marker)
         defer { try? FileManager.default.removeItem(at: cached) }
 
-        let tempDir = ReaderTempDirectory()
+        let tempDir = ReaderTempDirectory(extractionCache: cache)
         tempDir.adopt(cached)
         tempDir.cleanup()
 
@@ -111,7 +112,7 @@ struct ReaderTempDirectoryTests {
         defer { try? FileManager.default.removeItem(at: dir) }
         let file = dir.appendingPathComponent("book.cbz")
         _ = try Fixture.writeFile(file, bytes: Array(repeating: UInt8(0xAB), count: 1024))
-        let cache = LiveExtractionCacheManager()
+        let cache = TestExtractionCacheManager()
 
         let a = cache.cacheKey(for: file)
         let b = cache.cacheKey(for: file)
@@ -127,7 +128,7 @@ struct ReaderTempDirectoryTests {
         defer { try? FileManager.default.removeItem(at: dir) }
         let file = dir.appendingPathComponent("book.cbz")
         _ = try Fixture.writeFile(file, bytes: [0])
-        let cache = LiveExtractionCacheManager()
+        let cache = TestExtractionCacheManager()
 
         let before = cache.cacheKey(for: file)
         try FileManager.default.setAttributes(
@@ -143,21 +144,21 @@ struct ReaderTempDirectoryTests {
 
     @Test func cacheKeyIsNilForMissingFile() {
         let absent = URL(fileURLWithPath: "/tmp/definitely-not-here-\(UUID()).cbz")
-        #expect(LiveExtractionCacheManager().cacheKey(for: absent) == nil)
+        #expect(TestExtractionCacheManager().cacheKey(for: absent) == nil)
     }
 
     // MARK: - cachedEntry
 
     @Test func cachedEntryReturnsNilForMissingDir() {
         let bogusKey = "absent-\(UUID().uuidString)"
-        #expect(LiveExtractionCacheManager().cachedEntry(forKey: bogusKey) == nil)
+        #expect(TestExtractionCacheManager().cachedEntry(forKey: bogusKey) == nil)
     }
 
     @Test func cachedEntryReturnsNilForEmptyDir() throws {
         // A leftover empty dir from a partial extraction must NOT be served
         // as a cache hit — we'd render an empty source. The non-empty
         // check guards that.
-        let cache = LiveExtractionCacheManager()
+        let cache = TestExtractionCacheManager()
         let key = "empty-\(UUID().uuidString)"
         let url = cache.makeCachedCandidate(forKey: key)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
@@ -167,7 +168,7 @@ struct ReaderTempDirectoryTests {
     }
 
     @Test func cachedEntryReturnsURLAndTouchesMtimeOnHit() throws {
-        let cache = LiveExtractionCacheManager()
+        let cache = TestExtractionCacheManager()
         let key = "hit-\(UUID().uuidString)"
         let url = cache.makeCachedCandidate(forKey: key)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
@@ -189,9 +190,9 @@ struct ReaderTempDirectoryTests {
         #expect(mtime.timeIntervalSince(pastDate) > 60, "cachedEntry should touch mtime so LRU treats it as fresh")
     }
 
-    // MARK: - enforceCacheBudget
+    // MARK: - enforceBudget
 
-    @Test func enforceCacheBudgetEvictsOldestWhenOverLimit() throws {
+    @Test func enforceBudgetEvictsOldestWhenOverLimit() throws {
         // Seed three cache entries totalling more than a tiny test budget,
         // then prove the oldest two get evicted. We temporarily clear and
         // restore the cache root to avoid colliding with whatever a real
@@ -215,8 +216,8 @@ struct ReaderTempDirectoryTests {
             try FileManager.default.setAttributes([.modificationDate: mtime], ofItemAtPath: dir.path)
         }
 
-        // The real `enforceCacheBudget` walks the cache root and uses
-        // `cacheBudgetBytes`. We mirror its logic here against our isolated
+        // The real `enforceBudget` walks the cache root and uses
+        // `cacheBudgetBytes`. We mirror its policy here against our isolated
         // root + a tight budget so the test doesn't depend on touching
         // ~/Library/Caches and doesn't actually need 10 GB to trigger.
         let budget: UInt64 = 2_000_000
@@ -249,7 +250,7 @@ struct ReaderTempDirectoryTests {
         try writeCacheEntry(first, byteCount: 128)
         try writeCacheEntry(second, byteCount: 256)
 
-        #expect(LiveExtractionCacheManager().cacheSizeBytes(in: root, excluding: nil) >= 384)
+        #expect(TestExtractionCacheManager().cacheSizeBytes(in: root, excluding: nil) >= 384)
     }
 
     @Test func clearCachePreservesActiveCacheEntry() throws {
@@ -262,7 +263,7 @@ struct ReaderTempDirectoryTests {
         try writeCacheEntry(inactive, byteCount: 256)
 
         let activeFile = active.appendingPathComponent("blob")
-        let cache = LiveExtractionCacheManager()
+        let cache = TestExtractionCacheManager()
         let clearableBefore = cache.cacheSizeBytes(in: root, excluding: activeFile)
         #expect(clearableBefore > 0)
 
@@ -292,7 +293,7 @@ struct ReaderTempDirectoryTests {
             try? FileManager.default.removeItem(at: fresh)
         }
 
-        ReaderTempDirectory.cleanupStaleEntries()
+        ReaderTempDirectory.cleanupStaleEntries(extractionCache: TestExtractionCacheManager())
 
         #expect(FileManager.default.fileExists(atPath: stale.path) == false)
         #expect(FileManager.default.fileExists(atPath: fresh.path))
@@ -308,7 +309,7 @@ struct ReaderTempDirectoryTests {
         )
         defer { try? FileManager.default.removeItem(at: unrelated) }
 
-        ReaderTempDirectory.cleanupStaleEntries()
+        ReaderTempDirectory.cleanupStaleEntries(extractionCache: TestExtractionCacheManager())
 
         #expect(FileManager.default.fileExists(atPath: unrelated.path))
     }

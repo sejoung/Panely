@@ -12,19 +12,17 @@ struct ReaderPositionStoreTests {
 
     @Test func restoredIndexReturnsZeroWhenStoreIsEmpty() {
         let fixture = makeIsolatedStore()
-        defer { fixture.cleanup() }
 
         #expect(fixture.store.restoredIndex(forKey: "anything", fileIdentityKey: nil) == 0)
     }
 
-    @Test func flushImmediatelyWritesThroughToUserDefaults() {
+    @Test func flushImmediatelyWritesThroughToStore() {
         let fixture = makeIsolatedStore()
-        defer { fixture.cleanup() }
 
         let key = "test-\(UUID()).cbz"
         fixture.store.flushImmediately(forKey: key, fileIdentityKey: nil, pageIndex: 42)
 
-        // A fresh store hits UserDefaults on first read — proves the write
+        // A fresh store hits the injected store on first read — proves the write
         // actually persisted, not just landed in the in-memory mirror.
         let reloaded = fixture.reloadedStore()
         #expect(reloaded.restoredIndex(forKey: key, fileIdentityKey: nil) == 42)
@@ -32,7 +30,6 @@ struct ReaderPositionStoreTests {
 
     @Test func cacheHydratesLazilyOnFirstAccess() {
         let fixture = makeIsolatedStore()
-        defer { fixture.cleanup() }
 
         let key = "lazy-\(UUID()).cbz"
         fixture.defaults.set([key: 17] as [String: Int], forKey: fixture.positionsKey)
@@ -45,7 +42,6 @@ struct ReaderPositionStoreTests {
 
     @Test func fileIdentityKeyServesAsFallbackWhenPrimaryMisses() {
         let fixture = makeIsolatedStore()
-        defer { fixture.cleanup() }
 
         // Simulates the external-drive remount case: original save was
         // keyed by path "/Volumes/X/book.cbz", but the drive re-mounted as
@@ -63,7 +59,6 @@ struct ReaderPositionStoreTests {
 
     @Test func primaryKeyTakesPrecedenceOverFileIdentityKey() {
         let fixture = makeIsolatedStore()
-        defer { fixture.cleanup() }
 
         // Both keys present, different values. Primary wins — the user's
         // most recent save under the current path is more trustworthy than
@@ -81,7 +76,6 @@ struct ReaderPositionStoreTests {
 
     @Test func flushMirrorsUnderBothPrimaryAndFileIdentityKeys() {
         let fixture = makeIsolatedStore()
-        defer { fixture.cleanup() }
 
         let pathKey = "path-\(UUID()).cbz"
         let fidKey = "fid-\(UUID())"
@@ -96,12 +90,11 @@ struct ReaderPositionStoreTests {
 
     @Test func savePositionDebouncesAndEventuallyPersists() async throws {
         let fixture = makeIsolatedStore()
-        defer { fixture.cleanup() }
 
         // The debounced path sleeps ~300 ms before writing. Multiple rapid
         // calls within that window must coalesce into a single write of
         // the last value — that's the whole reason this exists (60 Hz
-        // vertical scroll was thrashing UserDefaults).
+        // vertical scroll was thrashing persistence).
         let key = "debounce-\(UUID()).cbz"
         fixture.store.savePosition(forKey: key, fileIdentityKey: nil, pageIndex: 1)
         fixture.store.savePosition(forKey: key, fileIdentityKey: nil, pageIndex: 2)
@@ -116,7 +109,6 @@ struct ReaderPositionStoreTests {
 
     @Test func multipleBooksRoundTripIndependently() {
         let fixture = makeIsolatedStore()
-        defer { fixture.cleanup() }
 
         let bookA = "a-\(UUID()).cbz"
         let bookB = "b-\(UUID()).cbz"
@@ -131,28 +123,21 @@ struct ReaderPositionStoreTests {
 
     private struct IsolatedStore {
         let store: ReaderPositionStore
-        let defaults: UserDefaults
-        let suiteName: String
+        let defaults: InMemoryKeyValueStore
         let positionsKey: String
 
         @MainActor
         func reloadedStore() -> ReaderPositionStore {
             ReaderPositionStore(defaults: defaults, positionsKey: positionsKey)
         }
-
-        func cleanup() {
-            defaults.removePersistentDomain(forName: suiteName)
-        }
     }
 
     private func makeIsolatedStore() -> IsolatedStore {
-        let suiteName = "PanelyTests.ReaderPositionStore.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = InMemoryKeyValueStore()
         let positionsKey = "positions-\(UUID().uuidString)"
         return IsolatedStore(
             store: ReaderPositionStore(defaults: defaults, positionsKey: positionsKey),
             defaults: defaults,
-            suiteName: suiteName,
             positionsKey: positionsKey
         )
     }

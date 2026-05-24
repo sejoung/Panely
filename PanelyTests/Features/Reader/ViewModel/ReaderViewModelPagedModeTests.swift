@@ -36,7 +36,7 @@ struct ReaderViewModelPagedModeTests {
     }
 
     @Test func visiblePagesIsEmptyWhenSourceHasNoPages() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.layout = .single
 
         #expect(vm.visiblePages.isEmpty)
@@ -65,7 +65,7 @@ struct ReaderViewModelPagedModeTests {
     // MARK: toggleLayout side effects in paged modes
 
     @Test func togglingFromSingleToDoublePreservesFitMode() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.layout = .single
         vm.fitMode = .fitScreen
 
@@ -78,13 +78,13 @@ struct ReaderViewModelPagedModeTests {
     // MARK: navigationStep mirrors PageLayout
 
     @Test func navigationStepIsOneInSingleLayout() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.layout = .single
         #expect(vm.navigationStep == 1)
     }
 
     @Test func navigationStepIsTwoInDoubleLayout() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.layout = .double
         #expect(vm.navigationStep == 2)
     }
@@ -92,7 +92,7 @@ struct ReaderViewModelPagedModeTests {
     // MARK: reading direction is honored in paged modes
 
     @Test func toggleDirectionFlipsInSingleLayout() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.layout = .single
         vm.direction = .leftToRight
 
@@ -104,7 +104,7 @@ struct ReaderViewModelPagedModeTests {
     }
 
     @Test func toggleDirectionFlipsInDoubleLayout() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.layout = .double
         vm.direction = .leftToRight
 
@@ -113,7 +113,7 @@ struct ReaderViewModelPagedModeTests {
     }
 
     @Test func effectiveDirectionMatchesUserPreferenceInPagedModes() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
 
         vm.layout = .single
         vm.direction = .rightToLeft
@@ -127,7 +127,7 @@ struct ReaderViewModelPagedModeTests {
     // MARK: helpers
 
     private func makeViewModel(pageCount: Int) -> ReaderViewModel {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.source = ComicSource(title: "Test", pages: makePages(pageCount))
         return vm
     }

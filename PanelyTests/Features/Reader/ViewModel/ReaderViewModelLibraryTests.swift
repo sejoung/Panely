@@ -11,7 +11,7 @@ struct ReaderViewModelLibraryTests {
     // MARK: - sidebarVolumes
 
     @Test func sidebarVolumesIsEmptyForFolderSeriesWithoutTempDir() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         // Folder series: siblings live in the user's library tree, so a
         // separate Volumes section would just duplicate the Files tree.
         vm.siblings = [
@@ -25,7 +25,7 @@ struct ReaderViewModelLibraryTests {
     }
 
     @Test func sidebarVolumesIsEmptyWhenOnlyOneSibling() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.siblings = [URL(fileURLWithPath: "/var/folders/T/panely-X/Vol01.cbz")]
         vm.tempDir.url = URL(fileURLWithPath: "/var/folders/T/panely-X")
 
@@ -33,7 +33,7 @@ struct ReaderViewModelLibraryTests {
     }
 
     @Test func sidebarVolumesReturnsSiblingsForZipInZip() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         let temp = URL(fileURLWithPath: "/var/folders/T/panely-X")
         vm.tempDir.url = temp
         vm.siblings = [
@@ -49,14 +49,14 @@ struct ReaderViewModelLibraryTests {
     // MARK: - tempDir.contains
 
     @Test func tempDirContainsIsFalseWhenNoTempDir() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.tempDir.url = nil
 
         #expect(vm.tempDir.contains(URL(fileURLWithPath: "/anywhere")) == false)
     }
 
     @Test func tempDirContainsMatchesURLsInsideTheTempRoot() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         let temp = URL(fileURLWithPath: "/var/folders/T/panely-X")
         vm.tempDir.url = temp
 
@@ -66,7 +66,7 @@ struct ReaderViewModelLibraryTests {
     }
 
     @Test func tempDirContainsRejectsURLsOutsideTheTempRoot() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.tempDir.url = URL(fileURLWithPath: "/var/folders/T/panely-X")
 
         #expect(vm.tempDir.contains(URL(fileURLWithPath: "/var/folders/T/panely-Y/file")) == false)
@@ -76,7 +76,7 @@ struct ReaderViewModelLibraryTests {
     @Test func tempDirContainsRejectsSiblingDirectoryWithSamePrefix() {
         // /a/panely-X must not be considered inside /a/panely — the prefix
         // check has to be path-component aware (uses "/" boundary).
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.tempDir.url = URL(fileURLWithPath: "/var/folders/T/panely")
 
         #expect(vm.tempDir.contains(URL(fileURLWithPath: "/var/folders/T/panely-X/file")) == false)
@@ -85,14 +85,14 @@ struct ReaderViewModelLibraryTests {
     // MARK: - libraryScope.contains
 
     @Test func libraryScopeContainsIsFalseWhenNoRoot() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.libraryScope.url = nil
 
         #expect(vm.libraryScope.contains(URL(fileURLWithPath: "/Users/me/Comics/book.cbz")) == false)
     }
 
     @Test func libraryScopeContainsMatchesURLsInsideTheRoot() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         let root = URL(fileURLWithPath: "/Users/me/Comics")
         vm.libraryScope.url = root
 
@@ -101,7 +101,7 @@ struct ReaderViewModelLibraryTests {
     }
 
     @Test func libraryScopeContainsRejectsURLsOutsideTheRoot() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.libraryScope.url = URL(fileURLWithPath: "/Users/me/Comics")
 
         #expect(vm.libraryScope.contains(URL(fileURLWithPath: "/Users/me/Downloads/x.cbz")) == false)
@@ -110,7 +110,7 @@ struct ReaderViewModelLibraryTests {
     // MARK: - isInsideCurrentTree
 
     @Test func isInsideCurrentTreeAcceptsTempOrRootScope() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         let root = URL(fileURLWithPath: "/Users/me/Comics")
         let temp = URL(fileURLWithPath: "/var/folders/T/panely-X")
         vm.libraryScope.url = root
@@ -124,7 +124,7 @@ struct ReaderViewModelLibraryTests {
     // MARK: - libraryRootURL
 
     @Test func libraryRootURLPrefersExplicitOverCurrentSourceParent() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.explicitLibraryRootURL = URL(fileURLWithPath: "/Users/me/Comics")
         vm.currentSourceURL = URL(fileURLWithPath: "/Users/me/Comics/series/01")
 
@@ -132,7 +132,7 @@ struct ReaderViewModelLibraryTests {
     }
 
     @Test func libraryRootURLFallsBackToCurrentSourceParent() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.explicitLibraryRootURL = nil
         vm.openedSourceURL = nil
         vm.currentSourceURL = URL(fileURLWithPath: "/Users/me/Comics/series/01")
@@ -145,7 +145,7 @@ struct ReaderViewModelLibraryTests {
         // temp dir, but the user opened the outer archive from their library.
         // The library tree must reflect the user's actual location, not the
         // temp folder (whose contents are surfaced via the Volumes section).
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.explicitLibraryRootURL = nil
         vm.openedSourceURL = URL(fileURLWithPath: "/Users/me/Comics/zip-in-zip.cbz")
         vm.currentSourceURL = URL(fileURLWithPath: "/var/folders/T/panely-X/Vol01.cbz")
@@ -154,7 +154,7 @@ struct ReaderViewModelLibraryTests {
     }
 
     @Test func libraryRootURLIsNilWhenNoSourceAndNoExplicitRoot() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.explicitLibraryRootURL = nil
         vm.openedSourceURL = nil
         vm.currentSourceURL = nil
@@ -192,7 +192,7 @@ struct ReaderViewModelLibraryTests {
             try? FileManager.default.removeItem(at: unrelated)
         }
 
-        ReaderTempDirectory.cleanupStaleEntries()
+        ReaderTempDirectory.cleanupStaleEntries(extractionCache: TestExtractionCacheManager())
 
         #expect(!FileManager.default.fileExists(atPath: stale.path),
                 "Stale panely-* dir must be removed")
@@ -212,7 +212,7 @@ struct ReaderViewModelLibraryTests {
         try FileManager.default.createDirectory(at: fresh, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: fresh) }
 
-        ReaderTempDirectory.cleanupStaleEntries()
+        ReaderTempDirectory.cleanupStaleEntries(extractionCache: TestExtractionCacheManager())
 
         #expect(FileManager.default.fileExists(atPath: fresh.path),
                 "Freshly created panely-* dir must survive the sweep")
@@ -238,7 +238,7 @@ struct ReaderViewModelLibraryTests {
         // hit a permission wall (FileManager returns []) and the sidebar
         // would render the misleading "No books to show" prompt. The opened
         // folder itself must be the library root.
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         let droppedFolder = try Fixture.makeTempDir()
         defer { try? FileManager.default.removeItem(at: droppedFolder) }
 
@@ -261,7 +261,7 @@ struct ReaderViewModelLibraryTests {
         let temp = try Fixture.makeTempDir()
         let innerVolume = temp.appendingPathComponent("Vol01.cbz")
 
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.openedSourceURL = library.appendingPathComponent("zip-in-zip.cbz")
         vm.currentSourceURL = innerVolume
         vm.tempDir.url = temp
@@ -285,7 +285,7 @@ struct ReaderViewModelLibraryTests {
         try Fixture.zipDirectory(outerSrc, to: outerZip)
         try? FileManager.default.removeItem(at: outerSrc)
 
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         await vm.load(url: outerZip)
 
         #expect(vm.source.isEmpty)
@@ -311,7 +311,7 @@ struct ReaderViewModelLibraryTests {
         try Fixture.zipDirectory(outerSrc, to: outerZip)
         try? FileManager.default.removeItem(at: outerSrc)
 
-        let cache = LiveExtractionCacheManager()
+        let cache = TestExtractionCacheManager()
         guard let cacheKey = cache.cacheKey(for: outerZip) else {
             Issue.record("expected cache key for fixture archive")
             return
@@ -330,7 +330,7 @@ struct ReaderViewModelLibraryTests {
             try? FileManager.default.removeItem(at: outside)
         }
 
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel(extractionCache: cache)
         await vm.load(url: outerZip, intent: .favorite(innerPath: "../outside"))
 
         #expect(
@@ -342,7 +342,7 @@ struct ReaderViewModelLibraryTests {
     // MARK: - hasMultipleVolumes
 
     @Test func hasMultipleVolumesReflectsSiblingCount() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         #expect(vm.hasMultipleVolumes == false)
 
         vm.siblings = [URL(fileURLWithPath: "/a")]

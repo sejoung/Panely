@@ -20,7 +20,7 @@ struct ReaderViewModelVerticalModeTests {
     }
 
     @Test func visiblePagesIsEmptyWhenSourceHasNoPagesInVertical() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.layout = .vertical
 
         #expect(vm.visiblePages.isEmpty)
@@ -64,7 +64,7 @@ struct ReaderViewModelVerticalModeTests {
         // Layout transitions don't change fitMode anymore — the user's
         // explicit fit choice (or zoom) survives mode flips. Auto-defaulting
         // to fit-screen on entry would clobber a user who'd manually zoomed.
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.layout = .double
         vm.fitMode = .fitWidth
 
@@ -75,7 +75,7 @@ struct ReaderViewModelVerticalModeTests {
     }
 
     @Test func togglingFromSingleSkipsVerticalFitChange() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.layout = .single
         vm.fitMode = .fitScreen
 
@@ -116,7 +116,7 @@ struct ReaderViewModelVerticalModeTests {
     }
 
     @Test func togglingOutOfVerticalDoesNotResetFitMode() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.layout = .vertical
         vm.fitMode = .fitWidth
 
@@ -187,7 +187,7 @@ struct ReaderViewModelVerticalModeTests {
     // MARK: navigationStep stays at 1 (vertical advances per-image)
 
     @Test func navigationStepIsOneInVerticalLayout() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.layout = .vertical
         #expect(vm.navigationStep == 1)
     }
@@ -195,7 +195,7 @@ struct ReaderViewModelVerticalModeTests {
     // MARK: reading direction has no meaning in vertical (top-to-bottom strip)
 
     @Test func toggleDirectionIsNoOpInVerticalLayout() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.layout = .vertical
         vm.direction = .leftToRight
 
@@ -204,7 +204,7 @@ struct ReaderViewModelVerticalModeTests {
     }
 
     @Test func effectiveDirectionIsLTRInVerticalEvenIfUserPrefIsRTL() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.direction = .rightToLeft
         vm.layout = .vertical
 
@@ -212,7 +212,7 @@ struct ReaderViewModelVerticalModeTests {
     }
 
     @Test func togglingOutOfVerticalRestoresUserDirectionPreference() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.direction = .rightToLeft
         vm.layout = .vertical
 
@@ -228,7 +228,7 @@ struct ReaderViewModelVerticalModeTests {
     // MARK: helpers
 
     private func makeViewModel(pageCount: Int) -> ReaderViewModel {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.source = ComicSource(title: "Test", pages: makePages(pageCount))
         return vm
     }

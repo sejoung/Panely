@@ -5,14 +5,14 @@ import Testing
 struct ReaderViewModelThumbnailSidebarTests {
 
     @Test func thumbnailSidebarStartsHiddenByDefault() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         // Explicit baseline — prior test runs may have persisted `true`.
         vm.thumbnailSidebarVisible = false
         #expect(vm.thumbnailSidebarVisible == false)
     }
 
     @Test func togglingFlipsState() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.thumbnailSidebarVisible = false
 
         vm.toggleThumbnailSidebar()

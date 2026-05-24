@@ -11,26 +11,23 @@ import Foundation
 struct ReaderViewModelBookmarksTests {
 
     @Test func currentPositionKeyIsNilWithoutSource() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         #expect(vm.currentPositionKey == nil)
     }
 
     @Test func isCurrentBookFavoriteIsFalseWithoutSource() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         #expect(vm.isCurrentBookFavorite == false)
     }
 
     @Test func toggleFavoriteIsNoOpWithoutSource() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         let before = vm.favorites.favorites.count
         vm.toggleFavoriteForCurrentBook()
         #expect(vm.favorites.favorites.count == before)
     }
 
     @Test func zipInZipFavoriteStoresOuterArchiveAndInnerPath() throws {
-        UserDefaults.standard.removeObject(forKey: FavoritesStore.favoritesKey)
-        defer { UserDefaults.standard.removeObject(forKey: FavoritesStore.favoritesKey) }
-
         let outerDir = try Fixture.makeTempDir()
         let tempRoot = try Fixture.makeTempDir()
         defer {
@@ -42,7 +39,7 @@ struct ReaderViewModelBookmarksTests {
         let innerVolume = tempRoot.appendingPathComponent("Vol02", isDirectory: true)
         try FileManager.default.createDirectory(at: innerVolume, withIntermediateDirectories: true)
 
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         vm.openedSourceURL = outer
         vm.tempDir.url = tempRoot
         vm.currentSourceURL = innerVolume
@@ -59,25 +56,25 @@ struct ReaderViewModelBookmarksTests {
     }
 
     @Test func isCurrentPageBookmarkedIsFalseWithoutSource() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         #expect(vm.isCurrentPageBookmarked == false)
     }
 
     @Test func toggleCurrentPageBookmarkIsNoOpWithoutSource() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         let beforeKeys = vm.pageBookmarks.pageBookmarksByBook.keys.count
         vm.toggleCurrentPageBookmark()
         #expect(vm.pageBookmarks.pageBookmarksByBook.keys.count == beforeKeys)
     }
 
     @Test func currentBookPageBookmarksIsEmptyWithoutSource() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         #expect(vm.currentBookPageBookmarks.isEmpty)
         #expect(vm.hasPageBookmarks == false)
     }
 
     @Test func bookmarkNavigationIsDisabledWithoutSource() {
-        let vm = ReaderViewModel()
+        let vm = makeTestViewModel()
         #expect(vm.canGoNextBookmark == false)
         #expect(vm.canGoPreviousBookmark == false)
 
