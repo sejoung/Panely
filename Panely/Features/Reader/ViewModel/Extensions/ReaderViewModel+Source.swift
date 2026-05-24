@@ -2,6 +2,43 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
+enum ReaderLoadIntent: Equatable {
+    case open
+    case librarySelection
+    case favorite(innerPath: String?)
+    case previousVolume
+    case nextVolumeFromEnd
+
+    var preferredRelativePath: String? {
+        guard case .favorite(let innerPath) = self else { return nil }
+        return innerPath
+    }
+
+    var preservesLibraryRoot: Bool {
+        self == .librarySelection
+    }
+
+    var restoresPosition: Bool {
+        self != .nextVolumeFromEnd
+    }
+}
+
+private enum ReaderLoadError: LocalizedError {
+    case extractionFailed(Error)
+
+    var errorDescription: String? {
+        switch self {
+        case .extractionFailed(let error):
+            return "Failed to extract archive: \(error.localizedDescription)"
+        }
+    }
+}
+
+private enum FolderTargetResolution {
+    case book(URL, siblings: [URL]?)
+    case empty
+}
+
 /// Source loading — Open dialogs, the main `load(url:)` pipeline, security
 /// scope acquisition, and the off-main folder/archive scanners. Volume
 /// navigation (counters, sibling stepping, end-of-volume cards) lives in
@@ -58,7 +95,7 @@ extension ReaderViewModel {
 
     func openLibraryURL(_ url: URL) {
         recentItems.record(url, title: displayTitle(for: url))
-        Task { await load(url: url, preservingLibraryRoot: true) }
+        Task { await load(url: url, intent: .librarySelection) }
     }
 
     func requestFolderAccess() {
@@ -97,30 +134,10 @@ extension ReaderViewModel {
     func load(
         url: URL,
         knownSiblings: [URL]? = nil,
-        preferredRelativePath: String? = nil,
-        preservingLibraryRoot: Bool = false,
-        restorePosition: Bool = true
+        intent: ReaderLoadIntent = .open
     ) async {
-        imageLoader.cancelPreload()
-
-        // Any new book load — explicit, via prev/next volume, or via library
-        // — resets the prev-volume cue. Without this, opening Vol N+1 after
-        // dismissing Vol N's card by jumping pages could carry the stale flag
-        // when the new book's saved position lands at index 0 (didSet on
-        // currentPageIndex doesn't fire when oldValue == newValue == 0).
-        wantsPreviousVolumePrompt = false
-
-        // Each load captures its own epoch and re-checks after every await.
-        // If a newer load has bumped the counter, this one bails out without
-        // overwriting the newer load's state. The defer is also epoch-aware
-        // so an interrupted earlier load doesn't clear `isLoading` while the
-        // later load is still in flight.
-        loadEpoch &+= 1
-        let myEpoch = loadEpoch
-
-        isLoading = true
-        loadingMessage = "Opening…"
-        let preservedLibraryRootURL = preservingLibraryRoot
+        let myEpoch = startLoad()
+        let preservedLibraryRootURL = intent.preservesLibraryRoot
             ? libraryRootURLIfItContains(url)
             : nil
         defer {
@@ -130,6 +147,71 @@ extension ReaderViewModel {
             }
         }
 
+        prepareScope(for: url, preservedLibraryRootURL: preservedLibraryRootURL)
+
+        var targetURL = url
+        var siblingsToUse = knownSiblings
+
+        do {
+            guard let archiveTarget = try await resolveArchiveTarget(for: targetURL, epoch: myEpoch) else {
+                return
+            }
+            targetURL = targetByApplyingPreferredRelativePath(
+                to: archiveTarget,
+                applyingPreferredRelativePath: intent.preferredRelativePath
+            )
+
+            guard let folderTarget = await resolveFolderTarget(for: targetURL, epoch: myEpoch) else {
+                return
+            }
+
+            switch folderTarget {
+            case .book(let url, let siblings):
+                targetURL = url
+                siblingsToUse = siblings ?? siblingsToUse
+            case .empty:
+                clearLoadedSource(message: "Folder is empty or has no supported content")
+                return
+            }
+
+            loadingMessage = "Loading pages…"
+            let loaded = try await loadComicSource(from: targetURL)
+            guard myEpoch == loadEpoch else { return }
+
+            let didApply = await applyLoadedSource(
+                loaded,
+                targetURL: targetURL,
+                siblingsToUse: siblingsToUse,
+                restorePosition: intent.restoresPosition,
+                epoch: myEpoch
+            )
+            guard didApply else { return }
+            errorMessage = loaded.isEmpty ? "No images found" : nil
+            await refreshImages()
+        } catch {
+            guard myEpoch == loadEpoch else { return }
+            clearLoadedSource(message: error.localizedDescription)
+            libraryScope.release()
+        }
+    }
+
+    private func startLoad() -> Int {
+        imageLoader.cancelPreload()
+
+        // Any new book load — explicit, via prev/next volume, or via library
+        // — resets the prev-volume cue. Without this, opening Vol N+1 after
+        // dismissing Vol N's card by jumping pages could carry the stale flag
+        // when the new book's saved position lands at index 0 (didSet on
+        // currentPageIndex doesn't fire when oldValue == newValue == 0).
+        wantsPreviousVolumePrompt = false
+
+        loadEpoch &+= 1
+        isLoading = true
+        loadingMessage = "Opening…"
+        return loadEpoch
+    }
+
+    private func prepareScope(for url: URL, preservedLibraryRootURL: URL?) {
         if !isInsideCurrentTree(url) {
             tempDir.cleanup()
             libraryScope.acquire(url)
@@ -148,148 +230,145 @@ extension ReaderViewModel {
             }
             openedSourceURL = url
         }
+    }
 
-        var targetURL = url
-        var siblingsToUse = knownSiblings
-
-        if !tempDir.isActive {
-            let ext = url.pathExtension.lowercased()
-            let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
-            if !isDir && CBZLoader.supportedExtensions.contains(ext) {
-                loadingMessage = "Analyzing archive…"
-                if let hasNested = try? await CBZLoader.hasNestedArchives(at: url) {
-                    guard myEpoch == loadEpoch else { return }
-                    if hasNested {
-                        // Cache hit fast path — same archive (same path +
-                        // size + mtime) reuses the previous extraction so
-                        // reopen is instant. Edits to the source bump
-                        // mtime → new key → automatic re-extraction.
-                        let key = ReaderTempDirectory.cacheKey(for: url)
-                        if let key,
-                           let cached = ReaderTempDirectory.cachedEntry(forKey: key) {
-                            tempDir.adopt(cached)
-                            targetURL = cached
-                        } else {
-                            loadingMessage = "Extracting archive…"
-                            // Use the cached destination when we have a
-                            // key; fall back to a UUID session dir when
-                            // the source can't be stat'd.
-                            let candidate = key.map(ReaderTempDirectory.makeCachedCandidate(forKey:))
-                                ?? ReaderTempDirectory.makeSessionCandidate()
-                            do {
-                                try await CBZLoader.extractAll(from: url, to: candidate)
-                                guard myEpoch == loadEpoch else {
-                                    // Newer load is in flight; don't keep
-                                    // the candidate we just extracted —
-                                    // partial state isn't safe to serve
-                                    // and would otherwise leak.
-                                    try? FileManager.default.removeItem(at: candidate)
-                                    return
-                                }
-                                tempDir.adopt(candidate)
-                                targetURL = candidate
-                                // New cache entry might push us over budget.
-                                // Sweep async on a background queue so the
-                                // size walk doesn't block first-paint.
-                                if key != nil {
-                                    Task.detached(priority: .background) {
-                                        ReaderTempDirectory.enforceCacheBudget()
-                                    }
-                                }
-                            } catch {
-                                try? FileManager.default.removeItem(at: candidate)
-                                guard myEpoch == loadEpoch else { return }
-                                errorMessage = "Failed to extract archive: \(error.localizedDescription)"
-                                source = .empty
-                                imageLoader.reset()
-                                currentSourceURL = nil
-                                siblings = []
-                                libraryScope.release()
-                                return
-                            }
-                        }
-                    }
-                }
-            }
+    private func resolveArchiveTarget(for url: URL, epoch: Int) async throws -> URL? {
+        guard !tempDir.isActive,
+              isSupportedArchive(url) else {
+            return url
         }
 
-        if let preferredRelativePath,
-           !preferredRelativePath.isEmpty,
-           tempDir.isActive,
-           let root = tempDir.url {
-            let preferred = root
-                .appendingPathComponent(preferredRelativePath)
-                .standardizedFileURL
-            if root.isAncestor(of: preferred),
-               FileManager.default.fileExists(atPath: preferred.path) {
-                targetURL = preferred
-            }
+        loadingMessage = "Analyzing archive…"
+        guard let hasNested = try? await CBZLoader.hasNestedArchives(at: url) else {
+            return url
+        }
+        guard epoch == loadEpoch else { return nil }
+        guard hasNested else { return url }
+
+        return try await resolveNestedArchiveTarget(for: url, epoch: epoch)
+    }
+
+    private func resolveNestedArchiveTarget(for url: URL, epoch: Int) async throws -> URL? {
+        // Cache hit fast path — same archive (same path + size + mtime)
+        // reuses the previous extraction so reopen is instant. Edits to the
+        // source bump mtime → new key → automatic re-extraction.
+        let key = ReaderTempDirectory.cacheKey(for: url)
+        if let key,
+           let cached = ReaderTempDirectory.cachedEntry(forKey: key) {
+            tempDir.adopt(cached)
+            return cached
         }
 
-        let isDirectory = (try? targetURL.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
-
-        if isDirectory {
-            loadingMessage = "Scanning folder…"
-            let (hasImages, volumes) = await Self.analyzeFolder(targetURL)
-            guard myEpoch == loadEpoch else { return }
-
-            if !hasImages && !volumes.isEmpty {
-                guard let first = volumes.first else { return }
-                targetURL = first
-                siblingsToUse = volumes
-            } else if !hasImages && volumes.isEmpty {
-                source = .empty
-                imageLoader.reset()
-                currentSourceURL = nil
-                siblings = []
-                errorMessage = "Folder is empty or has no supported content"
-                return
-            }
-        }
-
-        let finalIsDirectory = (try? targetURL.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
+        loadingMessage = "Extracting archive…"
+        let candidate = key.map(ReaderTempDirectory.makeCachedCandidate(forKey:))
+            ?? ReaderTempDirectory.makeSessionCandidate()
 
         do {
-            loadingMessage = "Loading pages…"
-            let loaded: ComicSource
-            if finalIsDirectory {
-                loaded = try await Task.detached(priority: .userInitiated) {
-                    try FolderLoader.load(from: targetURL)
-                }.value
-            } else {
-                loaded = try await CBZLoader.load(from: targetURL)
+            try await CBZLoader.extractAll(from: url, to: candidate)
+            guard epoch == loadEpoch else {
+                try? FileManager.default.removeItem(at: candidate)
+                return nil
             }
-            guard myEpoch == loadEpoch else { return }
-
-            source = loaded
-            currentSourceURL = targetURL
-            if let siblingsToUse {
-                siblings = siblingsToUse
-            } else if siblings.contains(where: {
-                $0.standardizedFileURL == targetURL.standardizedFileURL
-            }) {
-                // Already in the active siblings group (sidebar volume click,
-                // re-opening the same book, etc.). Keep them as-is and skip
-                // the disk enumeration — saves a directory scan per click in
-                // large series.
-            } else {
-                siblings = await Self.scanSiblings(of: targetURL)
-                guard myEpoch == loadEpoch else { return }
+            tempDir.adopt(candidate)
+            if key != nil {
+                Task.detached(priority: .background) {
+                    ReaderTempDirectory.enforceCacheBudget()
+                }
             }
-            currentPageIndex = restorePosition
-                ? clampedRestoredIndex(for: targetURL, pageCount: loaded.pageCount)
-                : 0
-            errorMessage = loaded.isEmpty ? "No images found" : nil
-            await refreshImages()
+            return candidate
         } catch {
-            guard myEpoch == loadEpoch else { return }
-            errorMessage = error.localizedDescription
-            source = .empty
-            imageLoader.reset()
-            currentSourceURL = nil
-            siblings = []
-            libraryScope.release()
+            try? FileManager.default.removeItem(at: candidate)
+            throw ReaderLoadError.extractionFailed(error)
         }
+    }
+
+    private func targetByApplyingPreferredRelativePath(
+        to targetURL: URL,
+        applyingPreferredRelativePath relativePath: String?
+    ) -> URL {
+        guard let relativePath,
+              !relativePath.isEmpty,
+              tempDir.isActive,
+              let root = tempDir.url else {
+            return targetURL
+        }
+
+        let preferred = root
+            .appendingPathComponent(relativePath)
+            .standardizedFileURL
+        guard root.isAncestor(of: preferred),
+              FileManager.default.fileExists(atPath: preferred.path) else {
+            return targetURL
+        }
+        return preferred
+    }
+
+    private func resolveFolderTarget(for url: URL, epoch: Int) async -> FolderTargetResolution? {
+        guard isDirectory(url) else {
+            return .book(url, siblings: nil)
+        }
+
+        loadingMessage = "Scanning folder…"
+        let (hasImages, volumes) = await Self.analyzeFolder(url)
+        guard epoch == loadEpoch else { return nil }
+
+        if !hasImages && !volumes.isEmpty {
+            guard let first = volumes.first else { return .empty }
+            return .book(first, siblings: volumes)
+        }
+
+        if !hasImages {
+            return .empty
+        }
+
+        return .book(url, siblings: nil)
+    }
+
+    private func loadComicSource(from url: URL) async throws -> ComicSource {
+        if isDirectory(url) {
+            return try await Task.detached(priority: .userInitiated) {
+                try FolderLoader.load(from: url)
+            }.value
+        }
+        return try await CBZLoader.load(from: url)
+    }
+
+    private func applyLoadedSource(
+        _ loaded: ComicSource,
+        targetURL: URL,
+        siblingsToUse: [URL]?,
+        restorePosition: Bool,
+        epoch: Int
+    ) async -> Bool {
+        let resolvedSiblings: [URL]?
+        if let siblingsToUse {
+            resolvedSiblings = siblingsToUse
+        } else if siblings.contains(where: {
+            $0.standardizedFileURL == targetURL.standardizedFileURL
+        }) {
+            resolvedSiblings = nil
+        } else {
+            resolvedSiblings = await Self.scanSiblings(of: targetURL)
+            guard epoch == loadEpoch else { return false }
+        }
+
+        source = loaded
+        currentSourceURL = targetURL
+        if let resolvedSiblings {
+            siblings = resolvedSiblings
+        }
+        currentPageIndex = restorePosition
+            ? clampedRestoredIndex(for: targetURL, pageCount: loaded.pageCount)
+            : 0
+        return true
+    }
+
+    private func clearLoadedSource(message: String) {
+        errorMessage = message
+        source = .empty
+        imageLoader.reset()
+        currentSourceURL = nil
+        siblings = []
     }
 
     // MARK: - Scope helpers
@@ -297,6 +376,14 @@ extension ReaderViewModel {
     func isInsideCurrentTree(_ url: URL) -> Bool {
         if tempDir.contains(url) { return true }
         return libraryScope.contains(url)
+    }
+
+    private func isSupportedArchive(_ url: URL) -> Bool {
+        !isDirectory(url) && CBZLoader.supportedExtensions.contains(url.pathExtension.lowercased())
+    }
+
+    private func isDirectory(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
     }
 
     private func libraryRootURLIfItContains(_ url: URL) -> URL? {
@@ -312,45 +399,15 @@ extension ReaderViewModel {
     /// Position key for `url`, derived from the URL + the active temp root
     /// (so zip-in-zip volumes get a stable key that survives re-extractions).
     func positionKey(for url: URL) -> String {
-        PositionKey.make(
+        positionKeys(for: url).primary
+    }
+
+    private func positionKeys(for url: URL) -> PositionKey.Keys {
+        PositionKey.keys(
             for: url,
             opened: openedSourceURL,
             tempRoot: tempDir.url
         )
-    }
-
-    /// Mirror key used as a fallback when the path-keyed entry misses (e.g.,
-    /// after a mount-path drift). `nil` when `PositionKey.fileIdentity` can't
-    /// derive an identity. Temp-backed volumes use the originally opened
-    /// archive plus an inner path because their extracted file identities are
-    /// not stable; normal folder/zip lists use each volume's own identity so
-    /// siblings don't share one fallback slot.
-    private func fileIdentityKey(for url: URL) -> String? {
-        if let tempKey = tempBackedFileIdentityKey(for: url) {
-            return tempKey
-        }
-        return PositionKey.fileIdentity(for: url)
-    }
-
-    private func tempBackedFileIdentityKey(for url: URL) -> String? {
-        guard let openedSourceURL,
-              let identity = PositionKey.fileIdentity(for: openedSourceURL),
-              let tempRoot = tempDir.url else {
-            return nil
-        }
-
-        let rootPath = tempRoot.standardizedFileURL.path
-        let sourcePath = url.standardizedFileURL.path
-        if sourcePath == rootPath {
-            return identity
-        }
-
-        guard sourcePath != rootPath,
-              sourcePath.hasPrefix(rootPath + "/") else {
-            return nil
-        }
-        let innerPath = String(sourcePath.dropFirst(rootPath.count + 1))
-        return identity + "#" + innerPath
     }
 
     /// Schedule a debounced save for the current page. Called from the
@@ -358,9 +415,10 @@ extension ReaderViewModel {
     /// during 60 Hz vertical scroll the store coalesces into a single write.
     func savePosition() {
         guard let url = currentSourceURL else { return }
+        let keys = positionKeys(for: url)
         positions.savePosition(
-            forKey: positionKey(for: url),
-            fileIdentityKey: fileIdentityKey(for: url),
+            forKey: keys.primary,
+            fileIdentityKey: keys.fileIdentity,
             pageIndex: currentPageIndex
         )
     }
@@ -368,17 +426,19 @@ extension ReaderViewModel {
     /// Synchronous flush used by the app-terminate observer.
     func flushPositionImmediately() {
         guard let url = currentSourceURL else { return }
+        let keys = positionKeys(for: url)
         positions.flushImmediately(
-            forKey: positionKey(for: url),
-            fileIdentityKey: fileIdentityKey(for: url),
+            forKey: keys.primary,
+            fileIdentityKey: keys.fileIdentity,
             pageIndex: currentPageIndex
         )
     }
 
     func restoredIndex(for url: URL) -> Int {
-        positions.restoredIndex(
-            forKey: positionKey(for: url),
-            fileIdentityKey: fileIdentityKey(for: url)
+        let keys = positionKeys(for: url)
+        return positions.restoredIndex(
+            forKey: keys.primary,
+            fileIdentityKey: keys.fileIdentity
         )
     }
 

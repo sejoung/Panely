@@ -2,7 +2,7 @@ import Foundation
 
 /// Volume / sibling navigation: counter labels, prev/next sibling stepping,
 /// and the end- and start-of-volume card decisions. Reads `siblings` and
-/// `currentSourceURL` from the viewmodel; drives `load(url:knownSiblings:)`
+/// `currentSourceURL` from the viewmodel; drives `load(url:knownSiblings:intent:)`
 /// for the actual book switch.
 extension ReaderViewModel {
 
@@ -58,7 +58,7 @@ extension ReaderViewModel {
             await load(
                 url: target,
                 knownSiblings: preservedSiblings,
-                restorePosition: false
+                intent: .nextVolumeFromEnd
             )
         }
     }
@@ -67,7 +67,7 @@ extension ReaderViewModel {
         guard canGoPreviousVolume, let idx = currentSiblingIndex else { return }
         let target = siblings[idx - 1]
         let preservedSiblings = siblings
-        Task { await load(url: target, knownSiblings: preservedSiblings) }
+        Task { await load(url: target, knownSiblings: preservedSiblings, intent: .previousVolume) }
     }
 
     // MARK: - End-of-volume card

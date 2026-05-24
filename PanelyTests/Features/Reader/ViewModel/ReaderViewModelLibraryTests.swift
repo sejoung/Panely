@@ -266,7 +266,7 @@ struct ReaderViewModelLibraryTests {
         vm.currentSourceURL = innerVolume
         vm.tempDir.url = temp
 
-        await vm.load(url: selectedFolder, preservingLibraryRoot: true)
+        await vm.load(url: selectedFolder, intent: .librarySelection)
 
         #expect(vm.tempDir.isActive == false)
         #expect(vm.explicitLibraryRootURL?.standardizedFileURL == library.standardizedFileURL)
@@ -330,7 +330,7 @@ struct ReaderViewModelLibraryTests {
         }
 
         let vm = ReaderViewModel()
-        await vm.load(url: outerZip, preferredRelativePath: "../outside")
+        await vm.load(url: outerZip, intent: .favorite(innerPath: "../outside"))
 
         #expect(
             vm.currentSourceURL?.standardizedFileURL

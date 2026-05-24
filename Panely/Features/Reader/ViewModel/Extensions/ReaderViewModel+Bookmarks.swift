@@ -36,7 +36,7 @@ extension ReaderViewModel {
     func openFavorite(_ favorite: FavoriteBook) {
         guard let url = favorites.resolve(favorite) else { return }
         recentItems.record(url, title: displayTitle(for: url))
-        Task { await load(url: url, preferredRelativePath: favorite.innerPath) }
+        Task { await load(url: url, intent: .favorite(innerPath: favorite.innerPath)) }
     }
 
     // MARK: - Page bookmark toggle + queries

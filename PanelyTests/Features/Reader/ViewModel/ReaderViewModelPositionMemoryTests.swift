@@ -10,148 +10,149 @@ import Foundation
 struct ReaderViewModelPositionMemoryTests {
 
     @Test func cachePopulatesFromUserDefaultsOnFirstAccess() {
-        // PositionKey.make returns the standardized path when no temp dir
-        // is set, so seeding under that exact path round-trips cleanly.
-        let url = URL(fileURLWithPath: "/tmp/seed-test-\(UUID()).cbz")
-        let key = url.standardizedFileURL.path
+        withClearedPositions {
+            // PositionKey.make returns the standardized path when no temp dir
+            // is set, so seeding under that exact path round-trips cleanly.
+            let url = URL(fileURLWithPath: "/tmp/seed-test-\(UUID()).cbz")
+            let key = url.standardizedFileURL.path
 
-        UserDefaults.standard.set([key: 42] as [String: Int], forKey: ReaderPositionStore.positionsKey)
-        defer { UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey) }
+            UserDefaults.standard.set([key: 42] as [String: Int], forKey: ReaderPositionStore.positionsKey)
 
-        let vm = ReaderViewModel()
-        // Cache is empty before any access.
-        #expect(vm.positions.cache == nil)
+            let vm = ReaderViewModel()
+            // Cache is empty before any access.
+            #expect(vm.positions.cache == nil)
 
-        let restored = vm.restoredIndex(for: url)
-        #expect(restored == 42)
-        // First access hydrates the mirror.
-        #expect(vm.positions.cache?[key] == 42)
+            let restored = vm.restoredIndex(for: url)
+            #expect(restored == 42)
+            // First access hydrates the mirror.
+            #expect(vm.positions.cache?[key] == 42)
+        }
     }
 
     @Test func writeRoundTripsThroughCacheAndUserDefaults() {
-        UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey)
-        defer { UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey) }
+        withClearedPositions {
+            let url = URL(fileURLWithPath: "/tmp/positions-test-\(UUID()).cbz")
+            let vm = makePositionViewModel(url: url)
 
-        let vm = ReaderViewModel()
-        let url = URL(fileURLWithPath: "/tmp/positions-test-\(UUID()).cbz")
-        vm.currentSourceURL = url
-        vm.source = ComicSource(
-            title: "t",
-            pages: (0..<10).map {
-                ComicPage(source: .file(URL(fileURLWithPath: "/p\($0).jpg")), displayName: "p\($0)")
-            }
-        )
+            // Mutating currentPageIndex schedules a debounced save; flush it
+            // synchronously to avoid sleeping in the test.
+            vm.currentPageIndex = 5
+            vm.flushPositionImmediately()
 
-        // Mutating currentPageIndex schedules a debounced save; flush it
-        // synchronously to avoid sleeping in the test.
-        vm.currentPageIndex = 5
-        vm.flushPositionImmediately()
-
-        // A fresh VM should restore the same value via UserDefaults — proves
-        // the write actually persisted, not just landed in our mirror.
-        let vm2 = ReaderViewModel()
-        vm2.openedSourceURL = url
-        #expect(vm2.restoredIndex(for: url) == 5)
+            // A fresh VM should restore the same value via UserDefaults —
+            // proves the write actually persisted, not just landed in memory.
+            let vm2 = ReaderViewModel()
+            vm2.openedSourceURL = url
+            #expect(vm2.restoredIndex(for: url) == 5)
+        }
     }
 
     @Test func mirrorReflectsLatestWriteWithoutReReadingDefaults() {
-        UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey)
-        defer { UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey) }
+        withClearedPositions {
+            let url = URL(fileURLWithPath: "/tmp/mirror-test-\(UUID()).cbz")
+            let vm = makePositionViewModel(url: url)
 
-        let vm = ReaderViewModel()
-        let url = URL(fileURLWithPath: "/tmp/mirror-test-\(UUID()).cbz")
-        vm.currentSourceURL = url
-        vm.source = ComicSource(
-            title: "t",
-            pages: (0..<10).map {
-                ComicPage(source: .file(URL(fileURLWithPath: "/p\($0).jpg")), displayName: "p\($0)")
-            }
-        )
+            vm.currentPageIndex = 3
+            vm.flushPositionImmediately()
+            #expect(vm.restoredIndex(for: url) == 3)
 
-        vm.currentPageIndex = 3
-        vm.flushPositionImmediately()
-        #expect(vm.restoredIndex(for: url) == 3)
-
-        vm.currentPageIndex = 7
-        vm.flushPositionImmediately()
-        // Same VM — must read latest from the in-memory mirror.
-        #expect(vm.restoredIndex(for: url) == 7)
+            vm.currentPageIndex = 7
+            vm.flushPositionImmediately()
+            // Same VM — must read latest from the in-memory mirror.
+            #expect(vm.restoredIndex(for: url) == 7)
+        }
     }
 
     @Test func multipleBooksCoexistInTheSameMirror() {
-        UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey)
-        defer { UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey) }
+        withClearedPositions {
+            let vm = ReaderViewModel()
+            let urlA = URL(fileURLWithPath: "/tmp/book-a-\(UUID()).cbz")
+            let urlB = URL(fileURLWithPath: "/tmp/book-b-\(UUID()).cbz")
+            let pages = makePages()
 
-        let vm = ReaderViewModel()
-        let urlA = URL(fileURLWithPath: "/tmp/book-a-\(UUID()).cbz")
-        let urlB = URL(fileURLWithPath: "/tmp/book-b-\(UUID()).cbz")
-        let pages = (0..<10).map {
-            ComicPage(source: .file(URL(fileURLWithPath: "/p\($0).jpg")), displayName: "p\($0)")
+            vm.source = ComicSource(title: "A", pages: pages)
+            vm.currentSourceURL = urlA
+            vm.currentPageIndex = 4
+            vm.flushPositionImmediately()
+
+            vm.source = ComicSource(title: "B", pages: pages)
+            vm.currentSourceURL = urlB
+            vm.currentPageIndex = 8
+            vm.flushPositionImmediately()
+
+            // Both must come back independently — proves we're not overwriting
+            // one book's slot when saving another.
+            #expect(vm.restoredIndex(for: urlA) == 4)
+            #expect(vm.restoredIndex(for: urlB) == 8)
         }
-
-        vm.source = ComicSource(title: "A", pages: pages)
-        vm.currentSourceURL = urlA
-        vm.currentPageIndex = 4
-        vm.flushPositionImmediately()
-
-        vm.source = ComicSource(title: "B", pages: pages)
-        vm.currentSourceURL = urlB
-        vm.currentPageIndex = 8
-        vm.flushPositionImmediately()
-
-        // Both must come back independently — proves we're not overwriting
-        // one book's slot when saving another.
-        #expect(vm.restoredIndex(for: urlA) == 4)
-        #expect(vm.restoredIndex(for: urlB) == 8)
     }
 
     @Test func zipInZipFileIdentityFallbackDoesNotLeakBetweenInnerVolumes() throws {
-        UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey)
-        defer { UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey) }
+        try withClearedPositions {
+            let workDir = try Fixture.makeTempDir()
+            defer { try? FileManager.default.removeItem(at: workDir) }
 
-        let workDir = try Fixture.makeTempDir()
-        defer { try? FileManager.default.removeItem(at: workDir) }
+            let outerArchive = try writeDummyFile(workDir.appendingPathComponent("Series.cbz"))
+            let extractionRoot = workDir.appendingPathComponent("extracted", isDirectory: true)
+            try FileManager.default.createDirectory(at: extractionRoot, withIntermediateDirectories: true)
+            let volumeOne = extractionRoot.appendingPathComponent("Vol01.cbz")
+            let volumeTwo = extractionRoot.appendingPathComponent("Vol02.cbz")
 
-        let outerArchive = workDir.appendingPathComponent("Series.cbz")
-        try Data("outer".utf8).write(to: outerArchive)
+            let vm = ReaderViewModel()
+            vm.openedSourceURL = outerArchive
+            vm.tempDir.url = extractionRoot
+            vm.currentSourceURL = volumeOne
 
-        let extractionRoot = workDir.appendingPathComponent("extracted", isDirectory: true)
-        try FileManager.default.createDirectory(at: extractionRoot, withIntermediateDirectories: true)
-        let volumeOne = extractionRoot.appendingPathComponent("Vol01.cbz")
-        let volumeTwo = extractionRoot.appendingPathComponent("Vol02.cbz")
+            vm.currentPageIndex = 9
+            vm.flushPositionImmediately()
 
-        let vm = ReaderViewModel()
-        vm.openedSourceURL = outerArchive
-        vm.tempDir.url = extractionRoot
-        vm.currentSourceURL = volumeOne
-
-        vm.currentPageIndex = 9
-        vm.flushPositionImmediately()
-
-        #expect(vm.restoredIndex(for: volumeOne) == 9)
-        #expect(vm.restoredIndex(for: volumeTwo) == 0)
+            #expect(vm.restoredIndex(for: volumeOne) == 9)
+            #expect(vm.restoredIndex(for: volumeTwo) == 0)
+        }
     }
 
     @Test func folderListedZipFileIdentityFallbackDoesNotLeakBetweenVolumes() throws {
+        try withClearedPositions {
+            let seriesFolder = try Fixture.makeTempDir()
+            defer { try? FileManager.default.removeItem(at: seriesFolder) }
+
+            let volumeOne = try writeDummyFile(seriesFolder.appendingPathComponent("Vol01.cbz"))
+            let volumeTwo = try writeDummyFile(seriesFolder.appendingPathComponent("Vol02.cbz"))
+
+            let vm = ReaderViewModel()
+            vm.openedSourceURL = seriesFolder
+            vm.currentSourceURL = volumeOne
+
+            vm.currentPageIndex = 9
+            vm.flushPositionImmediately()
+
+            #expect(vm.restoredIndex(for: volumeOne) == 9)
+            #expect(vm.restoredIndex(for: volumeTwo) == 0)
+        }
+    }
+
+    private func withClearedPositions(_ body: () throws -> Void) rethrows {
         UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey)
         defer { UserDefaults.standard.removeObject(forKey: ReaderPositionStore.positionsKey) }
+        try body()
+    }
 
-        let seriesFolder = try Fixture.makeTempDir()
-        defer { try? FileManager.default.removeItem(at: seriesFolder) }
-
-        let volumeOne = seriesFolder.appendingPathComponent("Vol01.cbz")
-        let volumeTwo = seriesFolder.appendingPathComponent("Vol02.cbz")
-        try Data("one".utf8).write(to: volumeOne)
-        try Data("two".utf8).write(to: volumeTwo)
-
+    private func makePositionViewModel(url: URL, pageCount: Int = 10) -> ReaderViewModel {
         let vm = ReaderViewModel()
-        vm.openedSourceURL = seriesFolder
-        vm.currentSourceURL = volumeOne
+        vm.currentSourceURL = url
+        vm.source = ComicSource(title: "t", pages: makePages(count: pageCount))
+        return vm
+    }
 
-        vm.currentPageIndex = 9
-        vm.flushPositionImmediately()
+    private func makePages(count: Int = 10) -> [ComicPage] {
+        (0..<count).map {
+            ComicPage(source: .file(URL(fileURLWithPath: "/p\($0).jpg")), displayName: "p\($0)")
+        }
+    }
 
-        #expect(vm.restoredIndex(for: volumeOne) == 9)
-        #expect(vm.restoredIndex(for: volumeTwo) == 0)
+    @discardableResult
+    private func writeDummyFile(_ url: URL) throws -> URL {
+        try Data(url.lastPathComponent.utf8).write(to: url)
+        return url
     }
 }

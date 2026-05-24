@@ -178,7 +178,7 @@ struct ReaderViewModelEndOfVolumeTests {
         // should start the next book from page 1, unlike a normal reopen.
         vm.positions.cache = [vol2.standardizedFileURL.path: 4]
 
-        await vm.load(url: vol2, knownSiblings: vm.siblings, restorePosition: false)
+        await vm.load(url: vol2, knownSiblings: vm.siblings, intent: .nextVolumeFromEnd)
 
         #expect(vm.currentSourceURL?.standardizedFileURL == vol2.standardizedFileURL)
         #expect(vm.currentPageIndex == 0)
