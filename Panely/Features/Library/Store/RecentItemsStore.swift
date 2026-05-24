@@ -7,10 +7,15 @@ final class RecentItemsStore {
     private static let maxItems = 10
 
     private let bookmarks: any SecurityScopedBookmarking
+    private let defaults: any KeyValueStoring
     private(set) var items: [RecentItem] = []
 
-    init(bookmarks: any SecurityScopedBookmarking = LiveSecurityScopedBookmarkResolver()) {
+    init(
+        bookmarks: any SecurityScopedBookmarking = LiveSecurityScopedBookmarkResolver(),
+        defaults: any KeyValueStoring = LiveKeyValueStore()
+    ) {
         self.bookmarks = bookmarks
+        self.defaults = defaults
         load()
     }
 
@@ -75,10 +80,10 @@ final class RecentItemsStore {
     }
 
     private func load() {
-        items = UserDefaults.standard.loadCodable([RecentItem].self, forKey: Self.defaultsKey) ?? []
+        items = defaults.loadCodable([RecentItem].self, forKey: Self.defaultsKey) ?? []
     }
 
     private func save() {
-        UserDefaults.standard.saveCodable(items, forKey: Self.defaultsKey)
+        defaults.saveCodable(items, forKey: Self.defaultsKey)
     }
 }

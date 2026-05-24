@@ -9,6 +9,7 @@ import Foundation
 @MainActor
 final class PageBookmarksStore {
     static let pageBookmarksKey = "panely.pageBookmarks"
+    private let defaults: any KeyValueStoring
 
     /// Per-book bookmark cap. Picked so that even a maxed-out book stays
     /// well under the UserDefaults practical limit when multiplied across
@@ -26,7 +27,8 @@ final class PageBookmarksStore {
     /// so persistence + caps stay in sync.
     var pageBookmarksByBook: [String: [PageBookmark]] = [:]
 
-    init() {
+    init(defaults: any KeyValueStoring = LiveKeyValueStore()) {
+        self.defaults = defaults
         load()
     }
 
@@ -120,12 +122,12 @@ final class PageBookmarksStore {
     // MARK: - Persistence
 
     private func load() {
-        if let decoded = UserDefaults.standard.loadCodable([String: [PageBookmark]].self, forKey: Self.pageBookmarksKey) {
+        if let decoded = defaults.loadCodable([String: [PageBookmark]].self, forKey: Self.pageBookmarksKey) {
             pageBookmarksByBook = decoded
         }
     }
 
     private func save() {
-        UserDefaults.standard.saveCodable(pageBookmarksByBook, forKey: Self.pageBookmarksKey)
+        defaults.saveCodable(pageBookmarksByBook, forKey: Self.pageBookmarksKey)
     }
 }

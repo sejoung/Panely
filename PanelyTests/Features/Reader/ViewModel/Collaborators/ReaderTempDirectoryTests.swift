@@ -40,7 +40,7 @@ struct ReaderTempDirectoryTests {
         // Cache dirs survive book switches so re-opening the same archive
         // is instant. Only the active reference is cleared; the bytes
         // stay on disk until `enforceCacheBudget()` evicts them.
-        let cacheRoot = ReaderTempDirectory.cacheRoot()
+        let cacheRoot = LiveExtractionCacheManager().cacheRoot()
         try FileManager.default.createDirectory(at: cacheRoot, withIntermediateDirectories: true)
         let cached = cacheRoot.appendingPathComponent("paneltest-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: cached, withIntermediateDirectories: true)
@@ -111,9 +111,10 @@ struct ReaderTempDirectoryTests {
         defer { try? FileManager.default.removeItem(at: dir) }
         let file = dir.appendingPathComponent("book.cbz")
         _ = try Fixture.writeFile(file, bytes: Array(repeating: UInt8(0xAB), count: 1024))
+        let cache = LiveExtractionCacheManager()
 
-        let a = ReaderTempDirectory.cacheKey(for: file)
-        let b = ReaderTempDirectory.cacheKey(for: file)
+        let a = cache.cacheKey(for: file)
+        let b = cache.cacheKey(for: file)
 
         #expect(a != nil)
         #expect(a == b, "same file = same key, otherwise the cache would always miss")
@@ -126,13 +127,14 @@ struct ReaderTempDirectoryTests {
         defer { try? FileManager.default.removeItem(at: dir) }
         let file = dir.appendingPathComponent("book.cbz")
         _ = try Fixture.writeFile(file, bytes: [0])
+        let cache = LiveExtractionCacheManager()
 
-        let before = ReaderTempDirectory.cacheKey(for: file)
+        let before = cache.cacheKey(for: file)
         try FileManager.default.setAttributes(
             [.modificationDate: Date().addingTimeInterval(120)],
             ofItemAtPath: file.path
         )
-        let after = ReaderTempDirectory.cacheKey(for: file)
+        let after = cache.cacheKey(for: file)
 
         #expect(before != nil)
         #expect(after != nil)
@@ -141,31 +143,33 @@ struct ReaderTempDirectoryTests {
 
     @Test func cacheKeyIsNilForMissingFile() {
         let absent = URL(fileURLWithPath: "/tmp/definitely-not-here-\(UUID()).cbz")
-        #expect(ReaderTempDirectory.cacheKey(for: absent) == nil)
+        #expect(LiveExtractionCacheManager().cacheKey(for: absent) == nil)
     }
 
     // MARK: - cachedEntry
 
     @Test func cachedEntryReturnsNilForMissingDir() {
         let bogusKey = "absent-\(UUID().uuidString)"
-        #expect(ReaderTempDirectory.cachedEntry(forKey: bogusKey) == nil)
+        #expect(LiveExtractionCacheManager().cachedEntry(forKey: bogusKey) == nil)
     }
 
     @Test func cachedEntryReturnsNilForEmptyDir() throws {
         // A leftover empty dir from a partial extraction must NOT be served
         // as a cache hit — we'd render an empty source. The non-empty
         // check guards that.
+        let cache = LiveExtractionCacheManager()
         let key = "empty-\(UUID().uuidString)"
-        let url = ReaderTempDirectory.makeCachedCandidate(forKey: key)
+        let url = cache.makeCachedCandidate(forKey: key)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: url) }
 
-        #expect(ReaderTempDirectory.cachedEntry(forKey: key) == nil)
+        #expect(cache.cachedEntry(forKey: key) == nil)
     }
 
     @Test func cachedEntryReturnsURLAndTouchesMtimeOnHit() throws {
+        let cache = LiveExtractionCacheManager()
         let key = "hit-\(UUID().uuidString)"
-        let url = ReaderTempDirectory.makeCachedCandidate(forKey: key)
+        let url = cache.makeCachedCandidate(forKey: key)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         let marker = url.appendingPathComponent("vol.cbz")
         try Data("x".utf8).write(to: marker)
@@ -177,7 +181,7 @@ struct ReaderTempDirectoryTests {
         )
         defer { try? FileManager.default.removeItem(at: url) }
 
-        let hit = ReaderTempDirectory.cachedEntry(forKey: key)
+        let hit = cache.cachedEntry(forKey: key)
         #expect(hit == url)
 
         let mtime = (try url.resourceValues(forKeys: [.contentModificationDateKey]))
@@ -245,7 +249,7 @@ struct ReaderTempDirectoryTests {
         try writeCacheEntry(first, byteCount: 128)
         try writeCacheEntry(second, byteCount: 256)
 
-        #expect(ReaderTempDirectory.cacheSizeBytes(in: root) >= 384)
+        #expect(LiveExtractionCacheManager().cacheSizeBytes(in: root, excluding: nil) >= 384)
     }
 
     @Test func clearCachePreservesActiveCacheEntry() throws {
@@ -258,15 +262,16 @@ struct ReaderTempDirectoryTests {
         try writeCacheEntry(inactive, byteCount: 256)
 
         let activeFile = active.appendingPathComponent("blob")
-        let clearableBefore = ReaderTempDirectory.cacheSizeBytes(in: root, excluding: activeFile)
+        let cache = LiveExtractionCacheManager()
+        let clearableBefore = cache.cacheSizeBytes(in: root, excluding: activeFile)
         #expect(clearableBefore > 0)
 
-        let removed = ReaderTempDirectory.clearCache(in: root, excluding: activeFile)
+        let removed = cache.clearCache(in: root, excluding: activeFile)
 
         #expect(removed > 0)
         #expect(FileManager.default.fileExists(atPath: active.path))
         #expect(FileManager.default.fileExists(atPath: inactive.path) == false)
-        #expect(ReaderTempDirectory.cacheSizeBytes(in: root, excluding: activeFile) == 0)
+        #expect(cache.cacheSizeBytes(in: root, excluding: activeFile) == 0)
     }
 
     // MARK: - cleanupStaleEntries (session dirs only)

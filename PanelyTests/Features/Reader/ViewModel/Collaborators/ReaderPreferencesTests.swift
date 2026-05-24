@@ -2,19 +2,15 @@ import Testing
 import Foundation
 @testable import Panely
 
-/// Round-trip tests for `ReaderPreferences`. UserDefaults is process-global,
-/// so each test scrubs every key it touches both before (in case a prior
-/// run aborted mid-test) and after via defer.
 @MainActor
 struct ReaderPreferencesTests {
 
     // MARK: - Init reads existing values
 
     @Test func initLeavesDefaultsWhenUserDefaultsIsEmpty() {
-        clearAllPrefKeys()
-        defer { clearAllPrefKeys() }
+        let defaults = InMemoryKeyValueStore()
 
-        let prefs = ReaderPreferences()
+        let prefs = ReaderPreferences(defaults: defaults)
 
         #expect(prefs.layout == .single)
         #expect(prefs.direction == .leftToRight)
@@ -26,18 +22,17 @@ struct ReaderPreferencesTests {
     }
 
     @Test func initHydratesEachPropertyFromUserDefaults() {
-        clearAllPrefKeys()
-        defer { clearAllPrefKeys() }
+        let defaults = InMemoryKeyValueStore([
+            ReaderPreferences.layoutKey: PageLayout.vertical.rawValue,
+            ReaderPreferences.directionKey: ReadingDirection.rightToLeft.rawValue,
+            ReaderPreferences.fitModeKey: FitMode.fitWidth.rawValue,
+            ReaderPreferences.autoFitOnResizeKey: false,
+            ReaderPreferences.toolbarPinnedKey: true,
+            ReaderPreferences.thumbnailSidebarVisibleKey: true,
+            ReaderPreferences.sidebarPinnedKey: true,
+        ])
 
-        UserDefaults.standard.set(PageLayout.vertical.rawValue, forKey: ReaderPreferences.layoutKey)
-        UserDefaults.standard.set(ReadingDirection.rightToLeft.rawValue, forKey: ReaderPreferences.directionKey)
-        UserDefaults.standard.set(FitMode.fitWidth.rawValue, forKey: ReaderPreferences.fitModeKey)
-        UserDefaults.standard.set(false, forKey: ReaderPreferences.autoFitOnResizeKey)
-        UserDefaults.standard.set(true, forKey: ReaderPreferences.toolbarPinnedKey)
-        UserDefaults.standard.set(true, forKey: ReaderPreferences.thumbnailSidebarVisibleKey)
-        UserDefaults.standard.set(true, forKey: ReaderPreferences.sidebarPinnedKey)
-
-        let prefs = ReaderPreferences()
+        let prefs = ReaderPreferences(defaults: defaults)
 
         #expect(prefs.layout == .vertical)
         #expect(prefs.direction == .rightToLeft)
@@ -49,17 +44,13 @@ struct ReaderPreferencesTests {
     }
 
     @Test func initIgnoresInvalidRawValuesAndKeepsDefaults() {
-        clearAllPrefKeys()
-        defer { clearAllPrefKeys() }
+        let defaults = InMemoryKeyValueStore([
+            ReaderPreferences.layoutKey: "notARealLayout",
+            ReaderPreferences.directionKey: "notARealDirection",
+            ReaderPreferences.fitModeKey: "notARealFitMode",
+        ])
 
-        // Garbage left by a hand-edited plist or a future-version downgrade.
-        // The init guards `PageLayout(rawValue:)` etc. — invalid input must
-        // fall back to the type's hardcoded default, not crash.
-        UserDefaults.standard.set("notARealLayout", forKey: ReaderPreferences.layoutKey)
-        UserDefaults.standard.set("notARealDirection", forKey: ReaderPreferences.directionKey)
-        UserDefaults.standard.set("notARealFitMode", forKey: ReaderPreferences.fitModeKey)
-
-        let prefs = ReaderPreferences()
+        let prefs = ReaderPreferences(defaults: defaults)
 
         #expect(prefs.layout == .single)
         #expect(prefs.direction == .leftToRight)
@@ -69,31 +60,22 @@ struct ReaderPreferencesTests {
     // MARK: - Legacy sidebar migration
 
     @Test func legacySidebarVisibleMigratesToPinnedWhenModernKeyAbsent() {
-        clearAllPrefKeys()
-        defer { clearAllPrefKeys() }
+        let defaults = InMemoryKeyValueStore([
+            ReaderPreferences.legacySidebarVisibleKey: true,
+        ])
 
-        // Pre-1.x build: there was only `sidebarVisible: Bool` meaning
-        // "always visible". The new `sidebarPinned: Bool` is the same
-        // concept under a new name. First launch after upgrade must carry
-        // the user's "always visible" preference over.
-        UserDefaults.standard.set(true, forKey: ReaderPreferences.legacySidebarVisibleKey)
-
-        let prefs = ReaderPreferences()
+        let prefs = ReaderPreferences(defaults: defaults)
 
         #expect(prefs.sidebarMode.pinned == true)
     }
 
     @Test func modernSidebarPinnedKeyOverridesLegacyValue() {
-        clearAllPrefKeys()
-        defer { clearAllPrefKeys() }
+        let defaults = InMemoryKeyValueStore([
+            ReaderPreferences.legacySidebarVisibleKey: true,
+            ReaderPreferences.sidebarPinnedKey: false,
+        ])
 
-        // If both keys are present, the user has already set the new
-        // pinned key — that's the source of truth. The legacy value is
-        // only consulted when the modern key is absent.
-        UserDefaults.standard.set(true, forKey: ReaderPreferences.legacySidebarVisibleKey)
-        UserDefaults.standard.set(false, forKey: ReaderPreferences.sidebarPinnedKey)
-
-        let prefs = ReaderPreferences()
+        let prefs = ReaderPreferences(defaults: defaults)
 
         #expect(prefs.sidebarMode.pinned == false)
     }
@@ -101,10 +83,9 @@ struct ReaderPreferencesTests {
     // MARK: - didSet persistence
 
     @Test func mutatingEachPropertyPersistsThroughUserDefaults() {
-        clearAllPrefKeys()
-        defer { clearAllPrefKeys() }
+        let defaults = InMemoryKeyValueStore()
 
-        let prefs = ReaderPreferences()
+        let prefs = ReaderPreferences(defaults: defaults)
         prefs.layout = .double
         prefs.direction = .rightToLeft
         prefs.fitMode = .fitHeight
@@ -116,7 +97,7 @@ struct ReaderPreferencesTests {
         // A second instance reads back everything from disk — proves the
         // didSet actually rounded-tripped, not just landed in the live
         // observable instance.
-        let reloaded = ReaderPreferences()
+        let reloaded = ReaderPreferences(defaults: defaults)
         #expect(reloaded.layout == .double)
         #expect(reloaded.direction == .rightToLeft)
         #expect(reloaded.fitMode == .fitHeight)
@@ -127,31 +108,13 @@ struct ReaderPreferencesTests {
     }
 
     @Test func sidebarTogglePinPersistsBothDirections() {
-        clearAllPrefKeys()
-        defer { clearAllPrefKeys() }
+        let defaults = InMemoryKeyValueStore()
 
-        let prefs = ReaderPreferences()
+        let prefs = ReaderPreferences(defaults: defaults)
         prefs.sidebarMode.togglePin() // true → false
-        #expect(ReaderPreferences().sidebarMode.pinned == false)
+        #expect(ReaderPreferences(defaults: defaults).sidebarMode.pinned == false)
 
         prefs.sidebarMode.togglePin() // false → true
-        #expect(ReaderPreferences().sidebarMode.pinned == true)
-    }
-
-    // MARK: - Helpers
-
-    private func clearAllPrefKeys() {
-        for key in [
-            ReaderPreferences.layoutKey,
-            ReaderPreferences.directionKey,
-            ReaderPreferences.fitModeKey,
-            ReaderPreferences.autoFitOnResizeKey,
-            ReaderPreferences.toolbarPinnedKey,
-            ReaderPreferences.thumbnailSidebarVisibleKey,
-            ReaderPreferences.sidebarPinnedKey,
-            ReaderPreferences.legacySidebarVisibleKey,
-        ] {
-            UserDefaults.standard.removeObject(forKey: key)
-        }
+        #expect(ReaderPreferences(defaults: defaults).sidebarMode.pinned == true)
     }
 }

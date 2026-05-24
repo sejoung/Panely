@@ -26,8 +26,8 @@ import UniformTypeIdentifiers
 final class ReaderViewModel {
     // MARK: - Collaborators
 
-    let preferences = ReaderPreferences()
-    let positions = ReaderPositionStore()
+    let preferences: ReaderPreferences
+    let positions: ReaderPositionStore
     let imageLoader = ReaderImageLoader()
     let tempDir: ReaderTempDirectory
     let libraryScope = ReaderLibraryScope()
@@ -151,10 +151,18 @@ final class ReaderViewModel {
 
     init(dependencies: AppDependencies = .live) {
         self.dependencies = dependencies
+        self.preferences = ReaderPreferences(defaults: dependencies.keyValueStore)
+        self.positions = ReaderPositionStore(defaults: dependencies.keyValueStore)
         self.tempDir = ReaderTempDirectory(extractionCache: dependencies.extractionCache)
-        self.recentItems = RecentItemsStore(bookmarks: dependencies.bookmarkResolver)
-        self.favorites = FavoritesStore(bookmarks: dependencies.bookmarkResolver)
-        self.pageBookmarks = PageBookmarksStore()
+        self.recentItems = RecentItemsStore(
+            bookmarks: dependencies.bookmarkResolver,
+            defaults: dependencies.keyValueStore
+        )
+        self.favorites = FavoritesStore(
+            bookmarks: dependencies.bookmarkResolver,
+            defaults: dependencies.keyValueStore
+        )
+        self.pageBookmarks = PageBookmarksStore(defaults: dependencies.keyValueStore)
 
         observeAppTermination()
 

@@ -17,81 +17,85 @@ final class ReaderPreferences {
     static let toolbarPinnedKey = "panely.toolbarPinned"
     static let thumbnailSidebarVisibleKey = "panely.thumbnailSidebarVisible"
 
+    private let defaults: any KeyValueStoring
+
     var layout: PageLayout = .single {
         didSet {
-            UserDefaults.standard.set(layout.rawValue, forKey: Self.layoutKey)
+            defaults.set(layout.rawValue, forKey: Self.layoutKey)
         }
     }
 
     var direction: ReadingDirection = .leftToRight {
         didSet {
-            UserDefaults.standard.set(direction.rawValue, forKey: Self.directionKey)
+            defaults.set(direction.rawValue, forKey: Self.directionKey)
         }
     }
 
     var sidebarMode = SidebarMode(pinned: true) {
         didSet {
-            UserDefaults.standard.set(sidebarMode.pinned, forKey: Self.sidebarPinnedKey)
+            defaults.set(sidebarMode.pinned, forKey: Self.sidebarPinnedKey)
         }
     }
 
     var fitMode: FitMode = .fitScreen {
         didSet {
-            UserDefaults.standard.set(fitMode.rawValue, forKey: Self.fitModeKey)
+            defaults.set(fitMode.rawValue, forKey: Self.fitModeKey)
         }
     }
 
     var autoFitOnResize: Bool = true {
         didSet {
-            UserDefaults.standard.set(autoFitOnResize, forKey: Self.autoFitOnResizeKey)
+            defaults.set(autoFitOnResize, forKey: Self.autoFitOnResizeKey)
         }
     }
 
     var toolbarPinned: Bool = false {
         didSet {
-            UserDefaults.standard.set(toolbarPinned, forKey: Self.toolbarPinnedKey)
+            defaults.set(toolbarPinned, forKey: Self.toolbarPinnedKey)
         }
     }
 
     var thumbnailSidebarVisible: Bool = false {
         didSet {
-            UserDefaults.standard.set(thumbnailSidebarVisible, forKey: Self.thumbnailSidebarVisibleKey)
+            defaults.set(thumbnailSidebarVisible, forKey: Self.thumbnailSidebarVisibleKey)
         }
     }
 
-    init() {
-        // Snapshot once. Each individual `UserDefaults.standard.string(...)`
+    init(defaults: any KeyValueStoring = LiveKeyValueStore()) {
+        self.defaults = defaults
+
+        // Snapshot once. Each individual defaults lookup
         // / `.bool(...)` / `.object(...)` call is a syscall + KVO check; on
         // cold start the dozen lookups added up to ~10–50 ms. A single
         // `dictionaryRepresentation()` is one cross-process trip and we
         // type-cast from in-memory dict locally.
-        let defaults = UserDefaults.standard.dictionaryRepresentation()
+        let storedDefaults = defaults.dictionaryRepresentation()
 
-        if let raw = defaults[Self.layoutKey] as? String,
+        if let raw = storedDefaults[Self.layoutKey] as? String,
            let stored = PageLayout(rawValue: raw) {
             layout = stored
         }
-        if let raw = defaults[Self.directionKey] as? String,
+        if let raw = storedDefaults[Self.directionKey] as? String,
            let stored = ReadingDirection(rawValue: raw) {
             direction = stored
         }
-        if let pinned = defaults[Self.sidebarPinnedKey] as? Bool {
+        if let pinned = storedDefaults[Self.sidebarPinnedKey] as? Bool {
             sidebarMode.pinned = pinned
-        } else if let legacy = defaults[Self.legacySidebarVisibleKey] as? Bool {
+        } else if let legacy = storedDefaults[Self.legacySidebarVisibleKey] as? Bool {
             // Migrate prior "always visible" preference to the new pinned mode.
             sidebarMode.pinned = legacy
         }
-        if let raw = defaults[Self.fitModeKey] as? String,
+        if let raw = storedDefaults[Self.fitModeKey] as? String,
            let stored = FitMode(rawValue: raw) {
             fitMode = stored
         }
-        if let value = defaults[Self.autoFitOnResizeKey] as? Bool {
+        if let value = storedDefaults[Self.autoFitOnResizeKey] as? Bool {
             autoFitOnResize = value
         }
-        if let value = defaults[Self.toolbarPinnedKey] as? Bool {
+        if let value = storedDefaults[Self.toolbarPinnedKey] as? Bool {
             toolbarPinned = value
         }
-        if let value = defaults[Self.thumbnailSidebarVisibleKey] as? Bool {
+        if let value = storedDefaults[Self.thumbnailSidebarVisibleKey] as? Bool {
             thumbnailSidebarVisible = value
         }
     }

@@ -110,7 +110,7 @@ nonisolated enum ExtractionCacheStore {
             return Entry(url: url, mtime: mtime, size: directorySize(at: url))
         }
 
-        let total = measured.reduce(UInt64(0)) { $0 + $1.size }
+        let total = measured.reduce(UInt64(0)) { saturatedAdd($0, $1.size) }
         guard total > limit else { return }
 
         var remaining = total

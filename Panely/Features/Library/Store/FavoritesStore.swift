@@ -11,6 +11,7 @@ final class FavoritesStore {
     static let favoritesKey = "panely.favoriteBooks"
 
     private let bookmarks: any SecurityScopedBookmarking
+    private let defaults: any KeyValueStoring
 
     /// In-memory favorites list. Direct assignment is supported so tests
     /// and snapshot fixtures can stage favorites without creating real
@@ -18,8 +19,12 @@ final class FavoritesStore {
     /// `toggleFavorite` / `removeFavorite` so persistence stays in sync.
     var favorites: [FavoriteBook] = []
 
-    init(bookmarks: any SecurityScopedBookmarking = LiveSecurityScopedBookmarkResolver()) {
+    init(
+        bookmarks: any SecurityScopedBookmarking = LiveSecurityScopedBookmarkResolver(),
+        defaults: any KeyValueStoring = LiveKeyValueStore()
+    ) {
         self.bookmarks = bookmarks
+        self.defaults = defaults
         load()
     }
 
@@ -80,12 +85,12 @@ final class FavoritesStore {
     // MARK: - Persistence
 
     private func load() {
-        if let decoded = UserDefaults.standard.loadCodable([FavoriteBook].self, forKey: Self.favoritesKey) {
+        if let decoded = defaults.loadCodable([FavoriteBook].self, forKey: Self.favoritesKey) {
             favorites = decoded
         }
     }
 
     private func save() {
-        UserDefaults.standard.saveCodable(favorites, forKey: Self.favoritesKey)
+        defaults.saveCodable(favorites, forKey: Self.favoritesKey)
     }
 }

@@ -2,11 +2,7 @@ import Testing
 import Foundation
 @testable import Panely
 
-/// `PageBookmarksStore` reads/writes `UserDefaults.standard`, so the suite
-/// is serialised to avoid tests clobbering each other's state through the
-/// shared defaults.
 @MainActor
-@Suite(.serialized)
 struct PageBookmarksStoreTests {
 
     @Test func togglingPageBookmarkAddsThenRemovesIt() {
@@ -108,17 +104,17 @@ struct PageBookmarksStoreTests {
 
     @Test func pageBookmarksPersistAcrossStoreInstances() {
         let key = "book-\(UUID().uuidString)"
-        let writer = freshStore()
+        let defaults = InMemoryKeyValueStore()
+        let writer = PageBookmarksStore(defaults: defaults)
         _ = writer.togglePageBookmark(key: key, pageIndex: 42)
 
         // A brand-new store must read what the previous one wrote through
-        // UserDefaults — proves the load/save symmetry.
-        let reader = PageBookmarksStore()
+        // the key-value store — proves the load/save symmetry.
+        let reader = PageBookmarksStore(defaults: defaults)
         #expect(reader.isPageBookmarked(key: key, pageIndex: 42) == true)
     }
 
     private func freshStore() -> PageBookmarksStore {
-        UserDefaults.standard.removeObject(forKey: PageBookmarksStore.pageBookmarksKey)
-        return PageBookmarksStore()
+        PageBookmarksStore(defaults: InMemoryKeyValueStore())
     }
 }

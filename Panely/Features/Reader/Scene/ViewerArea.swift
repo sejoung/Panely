@@ -30,7 +30,7 @@ struct ViewerArea: View {
                 viewerController: viewerController
             )
             .overlay(alignment: .top) {
-                TitleBarPassthrough()
+                TitleBarPassthrough(systemSettings: viewModel.dependencies.systemSettings)
                     .frame(height: 28)
                     .ignoresSafeArea(edges: .top)
             }

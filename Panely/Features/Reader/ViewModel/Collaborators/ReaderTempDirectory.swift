@@ -3,11 +3,10 @@ import Foundation
 /// Lifecycle of the temp directory used to extract zip-in-zip archives.
 /// Session directories are removed on book switch and stale sessions are
 /// swept on startup. Persistent extraction cache policy lives in
-/// `ExtractionCacheStore`; the static wrappers here keep older call sites
-/// readable from the reader pipeline.
+/// `ExtractionCacheStore` behind the injected `ExtractionCacheManaging`
+/// service.
 @MainActor
 final class ReaderTempDirectory {
-    nonisolated static let cacheBudgetBytes = LiveExtractionCacheManager().cacheBudgetBytes
     nonisolated private static let sessionDirPrefix = "panely-"
 
     private let extractionCache: any ExtractionCacheManaging
@@ -38,41 +37,6 @@ final class ReaderTempDirectory {
     static func makeSessionCandidate() -> URL {
         FileManager.default.temporaryDirectory
             .appendingPathComponent("\(sessionDirPrefix)\(UUID().uuidString)", isDirectory: true)
-    }
-
-    static func cacheKey(for url: URL) -> String? {
-        LiveExtractionCacheManager().cacheKey(for: url)
-    }
-
-    static func cachedEntry(forKey key: String) -> URL? {
-        LiveExtractionCacheManager().cachedEntry(forKey: key)
-    }
-
-    static func makeCachedCandidate(forKey key: String) -> URL {
-        LiveExtractionCacheManager().makeCachedCandidate(forKey: key)
-    }
-
-    nonisolated static func enforceCacheBudget() {
-        LiveExtractionCacheManager().enforceBudget()
-    }
-
-    nonisolated static func cacheSizeBytes(
-        in root: URL = cacheRoot(),
-        excluding activeURL: URL? = nil
-    ) -> UInt64 {
-        LiveExtractionCacheManager().cacheSizeBytes(in: root, excluding: activeURL)
-    }
-
-    @discardableResult
-    nonisolated static func clearCache(
-        in root: URL = cacheRoot(),
-        excluding activeURL: URL? = nil
-    ) -> UInt64 {
-        LiveExtractionCacheManager().clearCache(in: root, excluding: activeURL)
-    }
-
-    nonisolated static func cacheRoot() -> URL {
-        LiveExtractionCacheManager().cacheRoot()
     }
 
     nonisolated static func cleanupStaleEntries(

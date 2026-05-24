@@ -101,10 +101,11 @@ pages.
 - **Keyboard-first** — `← → Space` for pages, `⌘[ ⌘]` for volumes,
   `⌘1 ⌘2 ⌘3` for fit modes, `⌘+ ⌘- ⌘0` for zoom, `⌃⌘S` to pin the sidebar,
   `⌃⌘T` to pin the toolbar, `⌘L` to lock view size, `⌘O` to open
-- **Auto-hide library sidebar** — hidden by default to give the page maximum
-  room. Hover the **left edge** (200 ms) and the sidebar slides in as an
-  overlay (with drop shadow, no page shift). Mouse-out auto-dismisses after
-  300 ms; `ESC` dismisses immediately
+- **Pinned library sidebar by default** — the folder tree stays visible on a
+  fresh install. Unpin with `⌃⌘S` (or the pin button) to switch to auto-hide:
+  hover the **left edge** (200 ms) and the sidebar slides in as an overlay
+  (with drop shadow, no page shift). Mouse-out auto-dismisses after 300 ms;
+  `ESC` dismisses immediately
 - **Auto-hide toolbar + slider** — float in only when the cursor is near the
   top or bottom of the viewer. `⌃⌘T` (or the pin button) keeps both visible
 - **Sidebar / toolbar pin** — both follow the same `pin` ↔ `pin.fill` toggle
@@ -235,7 +236,7 @@ xcodebuild test \
   CODE_SIGN_IDENTITY="-"
 ```
 
-**310 tests across 47 suites** cover:
+**331 tests across 52 suites** cover:
 
 `SnapshotGalleryTests` is discovered in normal runs but gated off unless
 `scripts/generate-snapshots.sh` creates the snapshot-generation flag, so the
@@ -258,9 +259,10 @@ default `xcodebuild test` path does not render or copy manual PNGs.
   unzoomed, preserves manual zoom on resize, lock (`⌘L`) preserves on
   doc-size change, force still resets, releases observer on deinit
 - **CenteringClipView** — document centering when smaller than the viewport
-- **SidebarMode** — pure value-type covering pinned / overlay state
-  transitions (default unpinned, pin idempotency, overlay no-op while
-  pinned, unpin clears any lingering overlay)
+- **SidebarMode / sidebar preference** — pure value-type covering pinned /
+  overlay state transitions (default value unpinned, pin idempotency,
+  overlay no-op while pinned, unpin clears any lingering overlay) plus
+  `ReaderPreferences` default-pinned behavior and persistence
 - **PageLayout cycle** — `single → double → vertical → single` ordering,
   per-mode `navigationStep`, `isContinuous` flag for vertical
 - **`ReaderViewModel` paged-mode behavior** — `visiblePages` slicing,
@@ -285,10 +287,10 @@ default `xcodebuild test` path does not render or copy manual PNGs.
   inputs and snaps to navigation step in double mode
 - **`PageBookmarksStore`** — toggle add/remove, keys isolated, sort by page
   index, next/previous navigation, remove-by-id, persistence round-trip
-  through `UserDefaults`
+  through injected `KeyValueStoring`
 - **`FavoritesStore`** — toggle add/remove against a real temp file,
   security-scoped bookmark resolves back to the original URL
-- **`ReaderPreferences`** — UserDefaults round-trip for every persisted
+- **`ReaderPreferences`** — `KeyValueStoring` round-trip for every persisted
   setting (layout / direction / fit / sidebar pin / etc.), invalid raw
   values fall back to defaults, legacy `panely.sidebarVisible` migrates to
   the new pin flag
@@ -298,14 +300,14 @@ default `xcodebuild test` path does not render or copy manual PNGs.
 - **`ReaderLibraryScope`** — `contains()` accepts at-or-below paths and
   rejects sibling-prefix collisions, acquire/release lifecycle (including
   prev-URL released even when new acquire fails on a non-Powerbox URL)
-- **`ReaderTempDirectory`** — adopt/cleanup against real temp dirs,
-  contains() boundary correctness, session-candidate uniqueness,
-  `cleanupStaleEntries()` mtime gating (stale removed, fresh kept,
-  non-panely entries ignored), and the extraction cache: stable
-  `cacheKey` per file (mtime-sensitive), `cachedEntry` hit/miss + mtime
-  touch on hit, `enforceCacheBudget()` LRU eviction when over 10 GB,
-  `cacheSizeBytes()` / `clearCache(excluding:)` manual cleanup, and
-  `cleanup()` preserves cache dirs while removing session dirs
+- **`ReaderTempDirectory` / `ExtractionCacheStore`** — session adopt/cleanup
+  against real temp dirs, contains() boundary correctness, session-candidate
+  uniqueness, `cleanupStaleEntries()` mtime gating (stale removed, fresh kept,
+  non-panely entries ignored), and the extraction cache: stable `cacheKey`
+  per file (mtime-sensitive), `cachedEntry` hit/miss + mtime touch on hit,
+  `enforceBudget()` LRU eviction when over 10 GB, `cacheSizeBytes()` /
+  `clearCache(excluding:)` manual cleanup, and `cleanup()` preserves cache
+  dirs while removing session dirs
 - **`ReaderImageLoader`** — reset / `prepareForVerticalRebuild` /
   `cancelPreload` state transitions, `estimatedBitmapCost` uses pixel
   dimensions for Retina backing and falls back to size for placeholders,
@@ -332,16 +334,20 @@ default `xcodebuild test` path does not render or copy manual PNGs.
   intent). Includes the symmetry test that the prev card is hidden on a
   fresh open at page 0
 - **Position memory in-memory mirror** — first restore hydrates the
-  cache from `UserDefaults`, subsequent saves and reads hit the in-memory
-  dict; mirror correctly carries multiple books and reflects the latest
-  write without a re-read
+  cache from the injected key-value store, subsequent saves and reads hit
+  the in-memory dict; mirror correctly carries multiple books and reflects
+  the latest write without a re-read
+- **`TitleBarPassthrough`** — system double-click preference mapping
+  (`zoom` / `minimize` / `none`) through the injected settings reader
 - **`PanelyAppDelegate`** — `applicationShouldTerminateAfterLastWindowClosed`
   returns true so the red close button quits the app
 
 Tests mirror the source tree: `PanelyTests/Core/Comic/`,
-`PanelyTests/Features/Library/`, and `PanelyTests/Features/Reader/{Model,
-Viewer, Thumbnails, ViewModel, ViewModel/Collaborators}`. Shared fixtures
-(including a real PNG generator) live in `PanelyTests/TestFixtures.swift`.
+`PanelyTests/Features/Library/`, `PanelyTests/Features/Settings/`, and
+`PanelyTests/Features/Reader/{Model, Viewer, Thumbnails, ViewModel,
+ViewModel/Collaborators}`. Shared fixtures (including a real PNG generator)
+live in `PanelyTests/TestFixtures.swift`; persistence tests use
+`PanelyTests/TestKeyValueStore.swift`.
 
 `RecentItem.Codable` includes a `decodeIfPresent` path for `isDirectory` so
 old stored entries survive a schema bump.
@@ -357,6 +363,7 @@ at a glance.
 Panely/
 ├── PanelyApp.swift                     # @main, window style, .commands { fileCommands + viewCommands + goCommands }
 ├── ContentView.swift
+├── AppDependencies.swift               # injected app services (cache, bookmarks, persistence, system settings)
 ├── AppIcon.icns                        # generated from docs/icon/*.svg
 ├── Commands/                           # @CommandsBuilder extensions on PanelyApp
 │   ├── PanelyApp+FileCommands.swift    # Open / Open Recent
@@ -392,10 +399,12 @@ Panely/
 │   │   │   │   ├── ReaderViewModel+ImageLoading.swift # facade over ReaderImageLoader
 │   │   │   │   └── ReaderViewModel+Bookmarks.swift    # favorites + page bookmarks integration
 │   │   │   └── Collaborators/                  # composed by ReaderViewModel; each single-responsibility
-│   │   │       ├── ReaderPreferences.swift     # UserDefaults-backed layout / fit / pins
+│   │   │       ├── ReaderPreferences.swift     # KeyValueStoring-backed layout / fit / pins
 │   │   │       ├── ReaderPositionStore.swift   # debounced per-book page memory
 │   │   │       ├── ReaderImageLoader.swift     # cache + paged refresh + vertical lazy window + preload
-│   │   │       ├── ReaderTempDirectory.swift   # zip-in-zip extraction + content-addressed cache (10 GB LRU)
+│   │   │       ├── ReaderImageLoadingSupport.swift # image memory cache + loading helpers
+│   │   │       ├── ReaderTempDirectory.swift   # zip-in-zip session extraction lifecycle
+│   │   │       ├── ExtractionCacheStore.swift  # content-addressed extraction cache (10 GB LRU)
 │   │   │       └── ReaderLibraryScope.swift    # security-scope grant ownership
 │   │   ├── Viewer/                     # AppKit-backed scrollable image stage
 │   │   │   ├── ViewerContainer.swift           # SwiftUI shell (entry into the scroller)
@@ -418,8 +427,13 @@ Panely/
 │   │   └── Thumbnails/
 │   │       ├── ThumbnailSidebar.swift  # right-side thumbnail panel (LazyVStack)
 │   │       └── ThumbnailLoader.swift   # Image I/O thumbnails + NSCache
+│   ├── Settings/
+│   │   ├── StorageSettingsView.swift   # Storage settings UI + cache size / clear controls
+│   │   └── CacheMaintenance.swift      # clear-cache result and formatting helpers
 │   └── Library/
 │       ├── LibrarySidebar.swift        # pin button + extension badge + two-phase load
+│       ├── LibrarySidebarModel.swift   # sidebar presentation model
+│       ├── LibraryTreeLoader.swift     # injectable FileNode.loadTree wrapper
 │       ├── Model/
 │       │   ├── FileNode.swift          # iconName + fileExtension + parallel top-level scan
 │       │   ├── RecentItem.swift        # security-scoped recent entry
@@ -437,7 +451,7 @@ Panely/
 └── Core/
     ├── Extensions/                     # shared Foundation utility extensions (DRY)
     │   ├── URL+IsAncestor.swift        # path-component-aware prefix containment
-    │   └── UserDefaults+Codable.swift  # JSON encode/decode helpers for the stores
+    │   └── UserDefaults+Codable.swift  # KeyValueStoring + JSON encode/decode helpers
     └── Comic/
         ├── ComicPage.swift / ComicSource.swift / ComicPageSource.swift
         ├── FolderLoader.swift
@@ -451,6 +465,7 @@ PanelyTests/                            # mirrors the source tree
 ├── TestFixtures.swift                  # shared temp-dir / zip / PNG helpers
 ├── PanelyAppDelegateTests.swift
 ├── FileAssociationTests.swift
+├── TestKeyValueStore.swift             # in-memory KeyValueStoring for persistence tests
 ├── Snapshots/                          # docs/screenshots/ generator (skipped in CI)
 │   ├── SnapshotRenderer.swift          # NSHostingView + offscreen window → PNG
 │   ├── SnapshotSampleContent.swift     # placeholder pages + LibraryFixture
@@ -459,18 +474,19 @@ PanelyTests/                            # mirrors the source tree
 │                                       # ComicModel, LoaderExtension, NaturalSort
 ├── Features/Library/                   # FavoritesStore, PageBookmarksStore, RecentItem,
 │                                       # FileNode, FavoriteBook, PageBookmark
+├── Features/Settings/                  # CacheMaintenance
 └── Features/Reader/
     ├── Model/                          # FitCalculator, PositionKey, ReaderEnum, SidebarMode
     ├── Viewer/                         # CenteringClipView, FitMagnificationStability,
     │                                   # ImageStackVertical, ScrollZoomCalculator,
     │                                   # ViewerController, ViewerResizeFit,
-    │                                   # AppKitScrollerCoordinator
+    │                                   # AppKitScrollerCoordinator, TitleBarPassthrough
     ├── Thumbnails/                     # ThumbnailLoader
     └── ViewModel/                      # 10 integration files (Bookmarks, EndOfVolume,
         │                               # Library, PagedMode, PositionMemory, QuickJump,
         │                               # SetLayout, ThumbnailSidebar, ToolbarPin,
         │                               # VerticalMode)
-        └── Collaborators/              # focused unit tests for the 5 collaborators
+        └── Collaborators/              # focused unit tests for the collaborators
 
 docs/
 ├── manual.md                           # English user manual (screenshot walkthrough)
@@ -496,14 +512,21 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
 
 - **`@Observable` + `@MainActor`** — `ReaderViewModel` is main-actor isolated
   and orchestrates async loads via explicit stage messages to drive the
-  loading overlay. The class file holds session state + composition of five
-  single-responsibility **collaborators** (`ReaderPreferences`,
+  loading overlay. The class file holds session state + composition of focused
+  **collaborators** (`ReaderPreferences`,
   `ReaderPositionStore`, `ReaderImageLoader`, `ReaderTempDirectory`,
-  `ReaderLibraryScope`) and forwards their observable properties so view
-  callsites (`viewModel.layout`, `viewModel.currentImages`) stay unchanged
-  while the underlying types own their state independently. Per-concern
-  logic is split across five extensions (`+Navigation`, `+Source`,
-  `+Volumes`, `+ImageLoading`, `+Bookmarks`).
+  `ReaderLibraryScope`) plus `AppDependencies` for shared services
+  (extraction cache, security-scoped bookmarks, library tree loading,
+  key-value persistence, and system settings). It forwards collaborator
+  properties so view callsites (`viewModel.layout`, `viewModel.currentImages`)
+  stay unchanged while the underlying types own their state independently.
+  Per-concern logic is split across five extensions (`+Navigation`,
+  `+Source`, `+Volumes`, `+ImageLoading`, `+Bookmarks`).
+- **Dependency-injected app services** — production uses `AppDependencies.live`,
+  while tests can inject protocol-backed services (`ExtractionCacheManaging`,
+  `SecurityScopedBookmarking`, `LibraryTreeLoading`, `KeyValueStoring`,
+  `SystemSettingsReading`) without touching real app preferences, cache roots,
+  or sandbox bookmarks.
 - **`nonisolated` core types** — `ComicPage`, `FolderLoader`, `CBZLoader`,
   `ImageLoader`, `FitCalculator`, `PositionKey` run off-main via
   `Task.detached`.
@@ -525,9 +548,10 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   viewer. `mouseDownCanMoveWindow = true` gives native window drag; two
   `NSTrackingArea`s split the strip at the ~78 pt traffic-light inset so the
   open-hand cursor never leaks onto the close / minimize / zoom buttons,
-  and a `mouseDown` override handles double-click zoom via
-  `AppleActionOnDoubleClick`. The overlay uses `.ignoresSafeArea(edges: .top)`
-  so it lines up with the actual window edge under `.hiddenTitleBar`.
+  and a `mouseDown` override handles double-click zoom/minimize/none through
+  injected `SystemSettingsReading` (`AppleActionOnDoubleClick` in production).
+  The overlay uses `.ignoresSafeArea(edges: .top)` so it lines up with the
+  actual window edge under `.hiddenTitleBar`.
 - **`FitCalculator`** — physical viewport (`scrollView.contentSize`) is
   magnification-invariant, so toggling fit modes produces stable
   magnifications (no feedback loop).
@@ -614,8 +638,8 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   in place, so moving a favorited file doesn't break it —
   `RecentItemsStore.record`'s fast reopen path also runs the same
   staleness check. All three stores share JSON encode/decode through
-  `UserDefaults.loadCodable(_:forKey:)` / `saveCodable(_:forKey:)` in
-  `Core/Extensions/`.
+  `KeyValueStoring.loadCodable(_:forKey:)` / `saveCodable(_:forKey:)` in
+  `Core/Extensions/` (`LiveKeyValueStore` is backed by `UserDefaults`).
 - **CBZ extraction size cap** — `CBZLoader.maxExtractedBytes = 5 GB`.
   After each `unzipItem` (top-level and nested), the destination is
   walked once to sum file sizes; if the cumulative total crosses the
@@ -627,18 +651,20 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   `contentModificationDate` is more than 10 minutes old, so a concurrent
   first-launch extraction can't be deleted by the cleanup task racing it
   in the background. Cache dirs under
-  `~/Library/Caches/panely-extraction-cache/` are managed separately by
-  the LRU `enforceCacheBudget()`, which the same startup hook invokes.
-- **Content-addressed extraction cache** — `cacheKey(for:)` hashes the
-  source archive's path + size + mtime (SHA256, truncated to 64 bits).
+  `~/Library/Caches/panely-extraction-cache/` are managed separately by the
+  injected extraction cache manager, whose `enforceBudget()` is invoked by
+  the same startup hook.
+- **Content-addressed extraction cache** — `ExtractionCacheStore` hashes the
+  source archive's path + size + mtime in `cacheKey(for:)` (SHA256, truncated
+  to 64 bits).
   `cachedEntry(forKey:)` returns an existing cache dir if it's present
   and non-empty (the non-empty check guards against partial extractions
   being served), touching the dir's mtime so the LRU policy treats it as
   most-recently-used. New extractions go to
   `makeCachedCandidate(forKey:)`; the load pipeline only falls back to a
   UUID-keyed session dir when the source can't be stat'd.
-  `enforceCacheBudget()` runs asynchronously after a new cache entry is
-  adopted and on app launch.
+  `enforceBudget()` runs asynchronously after a new cache entry is adopted
+  and on app launch.
 - **Last-spread-reachable position restore** — `clampedRestoredIndex`
   clamps to the last step-aligned index (`((pageCount - 1) / step) * step`)
   instead of `pageCount - 1`, so quitting on the final spread in
@@ -684,10 +710,10 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   background and replaces the tree once ready. `FileNode.loadTree`
   parallelizes top-level subtree scans via chunked `TaskGroup` so big
   libraries open in ~100–200 ms instead of 1–2 s.
-- **Settings batch-read** — `ReaderViewModel.init` snapshots
-  `UserDefaults.standard.dictionaryRepresentation()` once and reads every
-  key from the in-memory dict, avoiding a dozen separate cross-process
-  `UserDefaults` calls on cold start.
+- **Settings batch-read** — `ReaderPreferences.init` snapshots the injected
+  `KeyValueStoring.dictionaryRepresentation()` once and reads every key from
+  the in-memory dict, avoiding a dozen separate cross-process `UserDefaults`
+  calls on cold start in the live store.
 - **Debounced position save with in-memory mirror** — `currentPageIndex`'s
   didSet routes to `ReaderPositionStore.savePosition(...)`, which schedules
   a 300 ms-debounced write so vertical-scroll-driven page changes at

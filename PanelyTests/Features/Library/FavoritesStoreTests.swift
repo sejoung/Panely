@@ -2,11 +2,7 @@ import Testing
 import Foundation
 @testable import Panely
 
-/// `FavoritesStore` reads/writes `UserDefaults.standard`, so the suite is
-/// serialised to avoid tests clobbering each other's state through the
-/// shared defaults.
 @MainActor
-@Suite(.serialized)
 struct FavoritesStoreTests {
 
     @Test func toggleFavoriteAddsRealFileThenRemoves() throws {
@@ -98,8 +94,7 @@ struct FavoritesStoreTests {
     private func freshStore(
         bookmarks: any SecurityScopedBookmarking = LiveSecurityScopedBookmarkResolver()
     ) -> FavoritesStore {
-        UserDefaults.standard.removeObject(forKey: FavoritesStore.favoritesKey)
-        return FavoritesStore(bookmarks: bookmarks)
+        FavoritesStore(bookmarks: bookmarks, defaults: InMemoryKeyValueStore())
     }
 }
 

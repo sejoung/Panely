@@ -1,13 +1,20 @@
 import Foundation
 
-nonisolated struct AppDependencies: Sendable {
-    var extractionCache: any ExtractionCacheManaging
-    var bookmarkResolver: any SecurityScopedBookmarking
-    var libraryTreeLoader: any LibraryTreeLoading
+nonisolated struct AppDependencies {
+    let extractionCache: any ExtractionCacheManaging
+    let bookmarkResolver: any SecurityScopedBookmarking
+    let libraryTreeLoader: any LibraryTreeLoading
+    let keyValueStore: any KeyValueStoring
+    let systemSettings: any SystemSettingsReading
 
-    static let live = AppDependencies(
-        extractionCache: LiveExtractionCacheManager(),
-        bookmarkResolver: LiveSecurityScopedBookmarkResolver(),
-        libraryTreeLoader: LiveLibraryTreeLoader()
-    )
+    static let live: AppDependencies = {
+        let keyValueStore = LiveKeyValueStore()
+        return AppDependencies(
+            extractionCache: LiveExtractionCacheManager(),
+            bookmarkResolver: LiveSecurityScopedBookmarkResolver(),
+            libraryTreeLoader: LiveLibraryTreeLoader(),
+            keyValueStore: keyValueStore,
+            systemSettings: LiveSystemSettings(keyValueStore: keyValueStore)
+        )
+    }()
 }

@@ -94,10 +94,11 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
 - **키보드 우선** — `← → Space` 페이지, `⌘[ ⌘]` 볼륨,
   `⌘1 ⌘2 ⌘3` 맞춤 모드, `⌘+ ⌘- ⌘0` 줌, `⌃⌘S` 사이드바 고정,
   `⌃⌘T` 툴바 고정, `⌘L` 뷰 크기 잠금, `⌘O` 열기
-- **라이브러리 사이드바 자동 숨김** — 기본으로 숨겨서 페이지에 최대 공간
-  제공. **왼쪽 가장자리**에 호버(200 ms) 시 오버레이로 슬라이드 인
-  (드롭 섀도, 페이지 시프트 없음). 마우스 나가면 300 ms 후 자동 해제,
-  `ESC`는 즉시 해제
+- **라이브러리 사이드바 기본 고정** — fresh install에서는 폴더 트리가
+  보이도록 고정되어 시작. `⌃⌘S`(또는 고정 버튼)로 고정을 풀면 자동
+  숨김 모드가 되고, **왼쪽 가장자리**에 호버(200 ms) 시 오버레이로
+  슬라이드 인(드롭 섀도, 페이지 시프트 없음). 마우스가 나가면 300 ms
+  후 자동 해제, `ESC`는 즉시 해제
 - **툴바 + 슬라이더 자동 숨김** — 뷰어 상/하단 근처에 커서 있을 때만
   플로팅. `⌃⌘T`(또는 고정 버튼)로 항상 표시
 - **사이드바 / 툴바 고정** — 둘 다 `pin` ↔ `pin.fill` 토글 패턴. 고정
@@ -222,7 +223,7 @@ xcodebuild test \
   CODE_SIGN_IDENTITY="-"
 ```
 
-**47 스위트에 걸친 310개 테스트**가 다음을 커버:
+**52 스위트에 걸친 331개 테스트**가 다음을 커버:
 
 `SnapshotGalleryTests`는 기본 테스트에서 발견은 되지만
 `scripts/generate-snapshots.sh`가 스냅샷 생성 flag를 만들 때만 활성화됩니다.
@@ -243,9 +244,10 @@ xcodebuild test \
 - **뷰어 리사이즈 자동 맞춤** — 줌 안 했을 때 뷰포트 따라가고, 리사이즈 시 수동 줌
   보존, `⌘L` 잠금은 문서 크기 변경에도 유지, 강제는 여전히 리셋, deinit에서 옵저버 해제
 - **CenteringClipView** — 문서가 뷰포트보다 작을 때 중앙 정렬
-- **SidebarMode** — pinned / overlay 상태 전이를 다루는 순수 값 타입
-  (기본 unpinned, pin 멱등, pinned 중 overlay no-op, unpin 시 남아있는
-  overlay 정리)
+- **SidebarMode / 사이드바 선호값** — pinned / overlay 상태 전이를 다루는
+  순수 값 타입(값 타입 기본은 unpinned, pin 멱등, pinned 중 overlay
+  no-op, unpin 시 남아있는 overlay 정리)과 `ReaderPreferences`의 기본
+  고정 및 영속성
 - **PageLayout 순환** — `single → double → vertical → single` 순서,
   모드별 `navigationStep`, 세로용 `isContinuous` 플래그
 - **`ReaderViewModel` 페이지 모드 동작** — `visiblePages` 슬라이싱,
@@ -268,11 +270,12 @@ xcodebuild test \
   `currentPageRangeEndNumber`, `jump(toPageNumber:)`는 범위 밖 입력 클램프 및
   이중 모드에서 네비게이션 step에 스냅
 - **`PageBookmarksStore`** — 토글 추가/제거, 키 격리, 페이지 인덱스로
-  정렬, next/previous 네비게이션, ID로 제거, `UserDefaults` 영속성 왕복
+  정렬, next/previous 네비게이션, ID로 제거, 주입된 `KeyValueStoring`
+  영속성 왕복
 - **`FavoritesStore`** — 실제 임시 파일에 대한 토글 추가/제거,
   security-scoped 북마크가 원래 URL로 resolve
 - **`ReaderPreferences`** — 모든 영속 설정(레이아웃 / 방향 / 맞춤 /
-  사이드바 고정 등)의 UserDefaults 왕복, 잘못된 raw 값은 기본값으로
+  사이드바 고정 등)의 `KeyValueStoring` 왕복, 잘못된 raw 값은 기본값으로
   fallback, 레거시 `panely.sidebarVisible` 키가 새 고정 플래그로 자동
   마이그레이션
 - **`ReaderPositionStore`** — 빈 store는 0 반환, 캐시 lazy hydration,
@@ -281,13 +284,14 @@ xcodebuild test \
 - **`ReaderLibraryScope`** — `contains()`가 at-or-below 경로는 허용하고
   sibling-prefix 충돌은 거부, acquire/release 라이프사이클(비-Powerbox
   URL에서 acquire가 실패해도 이전 URL은 해제됨)
-- **`ReaderTempDirectory`** — 실제 임시 디렉터리 대상 adopt/cleanup,
-  contains() 경계 정확성, session candidate 유일성, `cleanupStaleEntries()`
-  mtime 게이트(stale 제거, fresh 유지, 비-panely 항목 무시), 그리고
-  추출 캐시: 파일별 안정적 `cacheKey` (mtime 민감), `cachedEntry` 히트/
-  미스 + 히트 시 mtime touch, `enforceCacheBudget()` 10 GB 초과 시 LRU
-  eviction, `cacheSizeBytes()` / `clearCache(excluding:)` 수동 정리,
-  `cleanup()`이 session dir은 삭제하되 cache dir은 보존
+- **`ReaderTempDirectory` / `ExtractionCacheStore`** — 실제 임시 디렉터리
+  대상 session adopt/cleanup, contains() 경계 정확성, session candidate
+  유일성, `cleanupStaleEntries()` mtime 게이트(stale 제거, fresh 유지,
+  비-panely 항목 무시), 그리고 추출 캐시: 파일별 안정적 `cacheKey`
+  (mtime 민감), `cachedEntry` 히트/미스 + 히트 시 mtime touch,
+  `enforceBudget()` 10 GB 초과 시 LRU eviction, `cacheSizeBytes()` /
+  `clearCache(excluding:)` 수동 정리, `cleanup()`이 session dir은 삭제하되
+  cache dir은 보존
 - **`ReaderImageLoader`** — reset / `prepareForVerticalRebuild` /
   `cancelPreload` 상태 전이, `estimatedBitmapCost`가 Retina 백킹에는 픽셀
   치수 사용 + 플레이스홀더에는 size fallback, `lazyConcurrencyLimit`이
@@ -309,16 +313,20 @@ xcodebuild test \
   `advanceForward()` / `goBackward()` 디스패치, prev 카드의 비대칭 트리거
   (사용자 명시 의도가 있어야만 cue arm). 페이지 0의 첫 fresh open에선
   카드가 안 뜨는 것까지 대칭 보장 테스트 포함
-- **위치 메모리 in-memory mirror** — 첫 restore에서 `UserDefaults`로부터
-  캐시 hydrate, 이후 save/read 모두 in-memory dict에 hit. 여러 책이
-  올바르게 공존하고, 같은 VM 내 최신 write가 재읽기 없이 반영됨
+- **위치 메모리 in-memory mirror** — 첫 restore에서 주입된 key-value
+  store로부터 캐시 hydrate, 이후 save/read 모두 in-memory dict에 hit.
+  여러 책이 올바르게 공존하고, 같은 VM 내 최신 write가 재읽기 없이 반영됨
+- **`TitleBarPassthrough`** — 주입된 settings reader를 통한 시스템
+  더블클릭 선호값 매핑(`zoom` / `minimize` / `none`)
 - **`PanelyAppDelegate`** — `applicationShouldTerminateAfterLastWindowClosed`가
   true 반환해서 빨간 닫기 버튼이 앱 종료
 
 테스트는 소스 트리를 그대로 반영합니다: `PanelyTests/Core/Comic/`,
-`PanelyTests/Features/Library/`, 그리고 `PanelyTests/Features/Reader/{Model,
-Viewer, Thumbnails, ViewModel, ViewModel/Collaborators}`. 공유 픽스처
-(실제 PNG 생성기 포함)는 `PanelyTests/TestFixtures.swift`에 있습니다.
+`PanelyTests/Features/Library/`, `PanelyTests/Features/Settings/`, 그리고
+`PanelyTests/Features/Reader/{Model, Viewer, Thumbnails, ViewModel,
+ViewModel/Collaborators}`. 공유 픽스처(실제 PNG 생성기 포함)는
+`PanelyTests/TestFixtures.swift`에 있고, persistence 테스트는
+`PanelyTests/TestKeyValueStore.swift`를 씁니다.
 
 `RecentItem.Codable`은 `isDirectory`용 `decodeIfPresent` 경로를 포함하여
 오래된 저장 엔트리가 스키마 범프를 넘어 살아남습니다.
@@ -333,6 +341,7 @@ Viewer, Thumbnails, ViewModel, ViewModel/Collaborators}`. 공유 픽스처
 Panely/
 ├── PanelyApp.swift                     # @main, 윈도우 스타일, .commands { fileCommands + viewCommands + goCommands }
 ├── ContentView.swift
+├── AppDependencies.swift               # 주입되는 앱 서비스(cache, bookmark, persistence, system settings)
 ├── AppIcon.icns                        # docs/icon/*.svg에서 생성
 ├── Commands/                           # PanelyApp에 대한 @CommandsBuilder extension
 │   ├── PanelyApp+FileCommands.swift    # Open / Open Recent
@@ -368,10 +377,12 @@ Panely/
 │   │   │   │   ├── ReaderViewModel+ImageLoading.swift # ReaderImageLoader 위 얇은 facade
 │   │   │   │   └── ReaderViewModel+Bookmarks.swift    # 즐겨찾기 + 페이지 북마크 연동
 │   │   │   └── Collaborators/                  # ReaderViewModel이 합성, 각각 단일 책임
-│   │   │       ├── ReaderPreferences.swift     # UserDefaults 기반 레이아웃 / 맞춤 / 고정
+│   │   │       ├── ReaderPreferences.swift     # KeyValueStoring 기반 레이아웃 / 맞춤 / 고정
 │   │   │       ├── ReaderPositionStore.swift   # 디바운스된 책별 페이지 메모리
 │   │   │       ├── ReaderImageLoader.swift     # 캐시 + 페이지 새로고침 + 세로 지연 윈도 + 프리로드
-│   │   │       ├── ReaderTempDirectory.swift   # zip-in-zip 추출 + content-addressed 캐시 (10 GB LRU)
+│   │   │       ├── ReaderImageLoadingSupport.swift # 이미지 메모리 캐시 + 로딩 헬퍼
+│   │   │       ├── ReaderTempDirectory.swift   # zip-in-zip session 추출 라이프사이클
+│   │   │       ├── ExtractionCacheStore.swift  # content-addressed 추출 캐시 (10 GB LRU)
 │   │   │       └── ReaderLibraryScope.swift    # security-scope grant 보유
 │   │   ├── Viewer/                     # AppKit 기반 스크롤 가능 이미지 스테이지
 │   │   │   ├── ViewerContainer.swift           # SwiftUI 셸 (스크롤러 진입점)
@@ -394,8 +405,13 @@ Panely/
 │   │   └── Thumbnails/
 │   │       ├── ThumbnailSidebar.swift  # 우측 썸네일 패널 (LazyVStack)
 │   │       └── ThumbnailLoader.swift   # Image I/O 썸네일 + NSCache
+│   ├── Settings/
+│   │   ├── StorageSettingsView.swift   # Storage 설정 UI + 캐시 용량 / 삭제 컨트롤
+│   │   └── CacheMaintenance.swift      # 캐시 삭제 결과와 포맷팅 헬퍼
 │   └── Library/
 │       ├── LibrarySidebar.swift        # 고정 버튼 + 확장자 배지 + 2단계 로드
+│       ├── LibrarySidebarModel.swift   # 사이드바 표시 모델
+│       ├── LibraryTreeLoader.swift     # 주입 가능한 FileNode.loadTree 래퍼
 │       ├── Model/
 │       │   ├── FileNode.swift          # iconName + fileExtension + 최상위 병렬 스캔
 │       │   ├── RecentItem.swift        # security-scoped 최근 항목
@@ -413,7 +429,7 @@ Panely/
 └── Core/
     ├── Extensions/                     # 공유 Foundation 유틸 extension (DRY)
     │   ├── URL+IsAncestor.swift        # path-component 단위 접두사 포함 체크
-    │   └── UserDefaults+Codable.swift  # store들을 위한 JSON encode/decode 헬퍼
+    │   └── UserDefaults+Codable.swift  # KeyValueStoring + JSON encode/decode 헬퍼
     └── Comic/
         ├── ComicPage.swift / ComicSource.swift / ComicPageSource.swift
         ├── FolderLoader.swift
@@ -427,6 +443,7 @@ PanelyTests/                            # 소스 트리를 미러링
 ├── TestFixtures.swift                  # 공유 temp-dir / zip / PNG 헬퍼
 ├── PanelyAppDelegateTests.swift
 ├── FileAssociationTests.swift
+├── TestKeyValueStore.swift             # persistence 테스트용 in-memory KeyValueStoring
 ├── Snapshots/                          # docs/screenshots/ 생성기 (CI에서 skip)
 │   ├── SnapshotRenderer.swift          # NSHostingView + offscreen window → PNG
 │   ├── SnapshotSampleContent.swift     # placeholder 페이지 + LibraryFixture
@@ -435,18 +452,19 @@ PanelyTests/                            # 소스 트리를 미러링
 │                                       # ComicModel, LoaderExtension, NaturalSort
 ├── Features/Library/                   # FavoritesStore, PageBookmarksStore, RecentItem,
 │                                       # FileNode, FavoriteBook, PageBookmark
+├── Features/Settings/                  # CacheMaintenance
 └── Features/Reader/
     ├── Model/                          # FitCalculator, PositionKey, ReaderEnum, SidebarMode
     ├── Viewer/                         # CenteringClipView, FitMagnificationStability,
     │                                   # ImageStackVertical, ScrollZoomCalculator,
     │                                   # ViewerController, ViewerResizeFit,
-    │                                   # AppKitScrollerCoordinator
+    │                                   # AppKitScrollerCoordinator, TitleBarPassthrough
     ├── Thumbnails/                     # ThumbnailLoader
     └── ViewModel/                      # 통합 테스트 10개 (Bookmarks, EndOfVolume,
         │                               # Library, PagedMode, PositionMemory, QuickJump,
         │                               # SetLayout, ThumbnailSidebar, ToolbarPin,
         │                               # VerticalMode)
-        └── Collaborators/              # 5개 collaborator의 포커싱된 단위 테스트
+        └── Collaborators/              # collaborator들의 포커싱된 단위 테스트
 
 docs/
 ├── manual.md                           # 영문 사용 설명서 (스크린샷 둘러보기)
@@ -472,13 +490,20 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북�
 
 - **`@Observable` + `@MainActor`** — `ReaderViewModel`은 메인 액터 격리
   상태로 async 로드를 지휘하며, 로딩 오버레이를 위한 명시적 단계 메시지를
-  보냅니다. 클래스 본체는 세션 상태와 다섯 개의 단일 책임 **collaborator**
+  보냅니다. 클래스 본체는 세션 상태와 포커싱된 **collaborator**
   (`ReaderPreferences`, `ReaderPositionStore`, `ReaderImageLoader`,
-  `ReaderTempDirectory`, `ReaderLibraryScope`) 합성만 보유하고, 각 observable
+  `ReaderTempDirectory`, `ReaderLibraryScope`)와 공유 서비스용
+  `AppDependencies`(추출 캐시, security-scoped bookmark, 라이브러리 트리
+  로딩, key-value persistence, 시스템 설정)를 보유합니다. 각 observable
   프로퍼티를 forwarding으로 노출해서 뷰 호출(`viewModel.layout`,
   `viewModel.currentImages`)이 그대로 동작하면서도 내부 타입들은 독립적으로
   상태를 소유합니다. 관심사별 로직은 다섯 extension(`+Navigation`,
   `+Source`, `+Volumes`, `+ImageLoading`, `+Bookmarks`)에 분할됩니다.
+- **Dependency-injected 앱 서비스** — production은 `AppDependencies.live`를
+  쓰고, 테스트는 protocol 기반 서비스(`ExtractionCacheManaging`,
+  `SecurityScopedBookmarking`, `LibraryTreeLoading`, `KeyValueStoring`,
+  `SystemSettingsReading`)를 주입해 실제 앱 preference, cache root,
+  sandbox bookmark를 건드리지 않음.
 - **`nonisolated` 코어 타입** — `ComicPage`, `FolderLoader`, `CBZLoader`,
   `ImageLoader`, `FitCalculator`, `PositionKey`는 `Task.detached`로
   메인 스레드 밖에서 실행.
@@ -498,9 +523,9 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북�
   `mouseDownCanMoveWindow = true`로 네이티브 창 드래그,
   `NSTrackingArea`를 신호등 영역 외부에만 걸어 open-hand 커서가
   close/minimize/zoom 버튼 위에 새지 않도록 함, `mouseDown` 오버라이드에서
-  `AppleActionOnDoubleClick`에 따라 더블클릭 줌 처리. `.hiddenTitleBar`
-  아래에서 실제 창 가장자리와 정렬되도록 `.ignoresSafeArea(edges: .top)`
-  사용.
+  주입된 `SystemSettingsReading`을 통해 더블클릭 zoom/minimize/none 처리
+  (production에서는 `AppleActionOnDoubleClick`). `.hiddenTitleBar` 아래에서
+  실제 창 가장자리와 정렬되도록 `.ignoresSafeArea(edges: .top)` 사용.
 - **`FitCalculator`** — 물리 뷰포트(`scrollView.contentSize`)가 배율
   불변이라서, 맞춤 모드 토글이 안정적인 배율을 생성(피드백 루프 없음).
 - **리사이즈 시 뷰어 자동 재맞춤** — `AppKitImageScroller`가 자신의
@@ -578,8 +603,9 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북�
   bookmark를 만들어 store에 갱신해 외장 디스크 이름 변경/파일 이동을
   실패 없이 흡수. `RecentItemsStore.record`의 빠른 reopen 경로도 같은
   stale 체크를 수행. 세 store 모두 `Core/Extensions/`의
-  `UserDefaults.loadCodable(_:forKey:)` / `saveCodable(_:forKey:)`를
-  공유해 JSON 인/디코드 보일러플레이트를 한 곳에 둠.
+  `KeyValueStoring.loadCodable(_:forKey:)` / `saveCodable(_:forKey:)`를
+  공유해 JSON 인/디코드 보일러플레이트를 한 곳에 둠
+  (`LiveKeyValueStore`는 `UserDefaults` 기반).
 - **CBZ 추출 안전 상한** — `CBZLoader.maxExtractedBytes = 5 GB`. `extractAll`
   완료 후(그리고 각 중첩 추출 후) 디렉터리 트리를 한 번 walk하여
   누적 크기가 상한을 넘으면 `LoadError.extractedSizeExceeded`를 throw
@@ -589,15 +615,17 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북�
   mtime이 10분 이상 지난 session `panely-<uuid>` 디렉터리만 정리. 첫 실행
   중 진행 중인 추출 디렉터리가 동시에 삭제되는 경쟁 방지.
   `~/Library/Caches/panely-extraction-cache/` 아래의 캐시 디렉터리는
-  같은 startup 훅이 호출하는 `enforceCacheBudget()`이 LRU로 별도 관리.
-- **Content-addressed 추출 캐시** — `cacheKey(for:)`가 소스 아카이브의
-  경로 + 크기 + mtime을 SHA256으로 해시(64 bit로 truncate). `cachedEntry(forKey:)`는
+  주입된 extraction cache manager가 관리하며, 같은 startup 훅이
+  `enforceBudget()`을 호출.
+- **Content-addressed 추출 캐시** — `ExtractionCacheStore`의 `cacheKey(for:)`가
+  소스 아카이브의 경로 + 크기 + mtime을 SHA256으로 해시(64 bit로 truncate).
+  `cachedEntry(forKey:)`는
   캐시 디렉터리가 존재하고 비어있지 않을 때만 반환(비어있지 않은지 체크는
   부분 추출이 serve되는 것을 방지)하며, 히트 시 디렉터리 mtime을
   touch해서 LRU 정책에서 가장 최근으로 마크. 새 추출은
   `makeCachedCandidate(forKey:)`로 가고, 소스가 stat 불가일 때만 UUID
-  기반 session dir로 fallback. `enforceCacheBudget()`은 새 캐시 entry
-  adopt 후 백그라운드에서 + 앱 시작 시 실행.
+  기반 session dir로 fallback. `enforceBudget()`은 새 캐시 entry adopt 후
+  백그라운드에서 + 앱 시작 시 실행.
 - **마지막 spread 도달 가능한 위치 복원** — `clampedRestoredIndex`가
   `pageCount - 1`이 아니라 step 정렬된 마지막 인덱스
   (`((pageCount - 1) / step) * step`)로 클램프. 더블 페이지 모드에서
@@ -638,10 +666,10 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북�
   즉시 전달한 뒤, 더 깊은 depth-3 스캔을 백그라운드에서 실행하고 준비
   완료 시 트리 교체. `FileNode.loadTree`는 최상위 서브트리 스캔을 청크
   `TaskGroup`으로 병렬화하여 큰 라이브러리가 1–2초 대신 ~100–200 ms에 열림.
-- **설정 배치 읽기** — `ReaderViewModel.init`이
-  `UserDefaults.standard.dictionaryRepresentation()`을 한 번 스냅샷하고
-  메모리 dict에서 모든 키를 읽어, 콜드 스타트 때 수십 개의 개별
-  cross-process `UserDefaults` 호출 회피.
+- **설정 배치 읽기** — `ReaderPreferences.init`이 주입된
+  `KeyValueStoring.dictionaryRepresentation()`을 한 번 스냅샷하고 메모리
+  dict에서 모든 키를 읽어, live store 기준 콜드 스타트 때 수십 개의
+  개별 cross-process `UserDefaults` 호출 회피.
 - **디바운스된 위치 저장 + in-memory mirror** — `currentPageIndex`
   didSet이 `ReaderPositionStore.savePosition(...)`으로 라우팅되어 300 ms
   디바운스된 쓰기를 예약하므로 세로 스크롤의 ~60 Hz 페이지 변경이

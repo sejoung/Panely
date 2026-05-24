@@ -15,10 +15,13 @@ final class ReaderPositionStore {
     /// the UserDefaults write paired.
     var cache: [String: Int]?
     private var pendingSaveTask: Task<Void, Never>?
-    private let defaults: UserDefaults
+    private let defaults: any KeyValueStoring
     private let positionsKey: String
 
-    init(defaults: UserDefaults = .standard, positionsKey: String = ReaderPositionStore.positionsKey) {
+    init(
+        defaults: any KeyValueStoring = LiveKeyValueStore(),
+        positionsKey: String = ReaderPositionStore.positionsKey
+    ) {
         self.defaults = defaults
         self.positionsKey = positionsKey
     }

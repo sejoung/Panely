@@ -311,11 +311,12 @@ struct ReaderViewModelLibraryTests {
         try Fixture.zipDirectory(outerSrc, to: outerZip)
         try? FileManager.default.removeItem(at: outerSrc)
 
-        guard let cacheKey = ReaderTempDirectory.cacheKey(for: outerZip) else {
+        let cache = LiveExtractionCacheManager()
+        guard let cacheKey = cache.cacheKey(for: outerZip) else {
             Issue.record("expected cache key for fixture archive")
             return
         }
-        let extractionRoot = ReaderTempDirectory.makeCachedCandidate(forKey: cacheKey)
+        let extractionRoot = cache.makeCachedCandidate(forKey: cacheKey)
         let outside = extractionRoot
             .deletingLastPathComponent()
             .appendingPathComponent("outside", isDirectory: true)

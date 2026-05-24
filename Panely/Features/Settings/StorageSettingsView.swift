@@ -11,6 +11,7 @@ struct StorageSettingsView: View {
     @State private var clearableCacheBytes: UInt64?
     @State private var isRefreshing = false
     @State private var isClearing = false
+    @State private var refreshGeneration = 0
 
     init(
         viewModel: ReaderViewModel,
@@ -88,6 +89,8 @@ struct StorageSettingsView: View {
     }
 
     private func refreshCacheSize() async {
+        refreshGeneration += 1
+        let generation = refreshGeneration
         isRefreshing = true
         let activeURL = viewModel.tempDir.url
         let cacheMaintenance = cacheMaintenance
@@ -95,6 +98,9 @@ struct StorageSettingsView: View {
         let sizes = await Task.detached(priority: .utility) {
             cacheMaintenance.cacheSizes(in: cacheRoot, excluding: activeURL)
         }.value
+        guard !Task.isCancelled, generation == refreshGeneration else {
+            return
+        }
         totalCacheBytes = sizes.total
         clearableCacheBytes = sizes.clearable
         isRefreshing = false
@@ -110,8 +116,8 @@ struct StorageSettingsView: View {
             let removedBytes = await Task.detached(priority: .utility) {
                 cacheMaintenance.clearExtractionCache(in: cacheRoot, excluding: activeURL)
             }.value
-            isClearing = false
             await refreshCacheSize()
+            isClearing = false
             cacheMaintenance.presentClearResult(removedBytes: removedBytes)
         }
     }

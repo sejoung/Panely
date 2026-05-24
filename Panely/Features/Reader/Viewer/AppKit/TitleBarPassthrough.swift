@@ -1,15 +1,54 @@
 import AppKit
 import SwiftUI
 
+nonisolated protocol SystemSettingsReading {
+    var windowDoubleClickAction: WindowDoubleClickAction { get }
+}
+
+nonisolated struct LiveSystemSettings: SystemSettingsReading {
+    private let keyValueStore: any KeyValueStoring
+
+    init(keyValueStore: any KeyValueStoring = LiveKeyValueStore()) {
+        self.keyValueStore = keyValueStore
+    }
+
+    var windowDoubleClickAction: WindowDoubleClickAction {
+        WindowDoubleClickAction(
+            rawSystemValue: keyValueStore.dictionaryRepresentation()["AppleActionOnDoubleClick"] as? String
+        )
+    }
+}
+
+nonisolated enum WindowDoubleClickAction: Equatable {
+    case zoom
+    case minimize
+    case none
+
+    init(rawSystemValue: String?) {
+        switch rawSystemValue {
+        case "Minimize":
+            self = .minimize
+        case "None":
+            self = .none
+        default:
+            self = .zoom
+        }
+    }
+}
+
 /// Transparent top strip overlaid on the viewer. Catches window-drag,
 /// double-click-to-zoom, and cursor styling for the area above the comic
 /// while leaving the traffic-light buttons fully usable.
 struct TitleBarPassthrough: NSViewRepresentable {
+    var systemSettings: any SystemSettingsReading = LiveSystemSettings()
+
     func makeNSView(context: Context) -> NSView {
-        TitleBarPassthroughView()
+        TitleBarPassthroughView(systemSettings: systemSettings)
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {}
+    func updateNSView(_ nsView: NSView, context: Context) {
+        (nsView as? TitleBarPassthroughView)?.systemSettings = systemSettings
+    }
 }
 
 private final class TitleBarPassthroughView: NSView {
@@ -18,12 +57,31 @@ private final class TitleBarPassthroughView: NSView {
     /// three buttons plus their margins inside the leading ~78pt.
     private static let trafficLightInset: CGFloat = 78
 
+    var systemSettings: any SystemSettingsReading
+
     override var mouseDownCanMoveWindow: Bool { true }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
+    init(systemSettings: any SystemSettingsReading) {
+        self.systemSettings = systemSettings
+        super.init(frame: .zero)
+        setUpTrackingInvalidation()
+    }
+
     override init(frame frameRect: NSRect) {
+        self.systemSettings = LiveSystemSettings()
         super.init(frame: frameRect)
+        setUpTrackingInvalidation()
+    }
+
+    required init?(coder: NSCoder) {
+        self.systemSettings = LiveSystemSettings()
+        super.init(coder: coder)
+        setUpTrackingInvalidation()
+    }
+
+    private func setUpTrackingInvalidation() {
         // Re-run `updateTrackingAreas` when our window-position shifts (e.g.,
         // library sidebar pin toggle) so the traffic-light exclusion stays
         // accurate. Only our own frame changes fire this — a window-resize
@@ -35,10 +93,6 @@ private final class TitleBarPassthroughView: NSView {
             name: NSView.frameDidChangeNotification,
             object: self
         )
-    }
-
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
     }
 
     deinit {
@@ -122,13 +176,12 @@ private final class TitleBarPassthroughView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         if event.clickCount == 2 {
-            let action = UserDefaults.standard.string(forKey: "AppleActionOnDoubleClick")
-            switch action {
-            case "Minimize":
+            switch systemSettings.windowDoubleClickAction {
+            case .minimize:
                 window?.performMiniaturize(nil)
-            case "None":
+            case .none:
                 break
-            default:
+            case .zoom:
                 window?.performZoom(nil)
             }
             return
