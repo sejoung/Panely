@@ -22,7 +22,7 @@ struct ReaderPreferencesTests {
         #expect(prefs.autoFitOnResize == true)
         #expect(prefs.toolbarPinned == false)
         #expect(prefs.thumbnailSidebarVisible == false)
-        #expect(prefs.sidebarMode.pinned == false)
+        #expect(prefs.sidebarMode.pinned == true)
     }
 
     @Test func initHydratesEachPropertyFromUserDefaults() {
@@ -131,11 +131,11 @@ struct ReaderPreferencesTests {
         defer { clearAllPrefKeys() }
 
         let prefs = ReaderPreferences()
-        prefs.sidebarMode.togglePin() // false → true
-        #expect(ReaderPreferences().sidebarMode.pinned == true)
-
         prefs.sidebarMode.togglePin() // true → false
         #expect(ReaderPreferences().sidebarMode.pinned == false)
+
+        prefs.sidebarMode.togglePin() // false → true
+        #expect(ReaderPreferences().sidebarMode.pinned == true)
     }
 
     // MARK: - Helpers

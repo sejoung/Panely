@@ -249,6 +249,32 @@ struct ReaderViewModelLibraryTests {
         #expect(vm.libraryRootURL?.standardizedFileURL == droppedFolder.standardizedFileURL)
     }
 
+    @Test func sidebarFolderSelectionAfterZipInZipPreservesLibraryRoot() async throws {
+        let library = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: library) }
+
+        let selectedFolder = library.appendingPathComponent("Other Series", isDirectory: true)
+        try FileManager.default.createDirectory(at: selectedFolder, withIntermediateDirectories: true)
+        try Fixture.makePNG(width: 10, height: 10)
+            .write(to: selectedFolder.appendingPathComponent("001.png"))
+
+        let temp = try Fixture.makeTempDir()
+        let innerVolume = temp.appendingPathComponent("Vol01.cbz")
+
+        let vm = ReaderViewModel()
+        vm.openedSourceURL = library.appendingPathComponent("zip-in-zip.cbz")
+        vm.currentSourceURL = innerVolume
+        vm.tempDir.url = temp
+
+        await vm.load(url: selectedFolder, preservingLibraryRoot: true)
+
+        #expect(vm.tempDir.isActive == false)
+        #expect(vm.explicitLibraryRootURL?.standardizedFileURL == library.standardizedFileURL)
+        #expect(vm.libraryRootURL?.standardizedFileURL == library.standardizedFileURL)
+        #expect(vm.openedSourceURL?.standardizedFileURL == selectedFolder.standardizedFileURL)
+        #expect(vm.currentSourceURL?.standardizedFileURL == selectedFolder.standardizedFileURL)
+    }
+
     @Test func nestedArchiveExtractionFailureStopsLoadAndPreservesError() async throws {
         let workDir = try Fixture.makeTempDir()
         defer { try? FileManager.default.removeItem(at: workDir) }

@@ -19,7 +19,7 @@ struct SidebarHost: View {
             volumes: viewModel.sidebarVolumes,
             currentPageIndex: viewModel.currentPageIndex,
             onSelect: { url in
-                viewModel.openURL(url)
+                viewModel.openLibraryURL(url)
                 viewModel.dismissSidebarOverlay()
                 requestFocus()
             },

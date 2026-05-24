@@ -56,6 +56,11 @@ extension ReaderViewModel {
         Task { await load(url: url) }
     }
 
+    func openLibraryURL(_ url: URL) {
+        recentItems.record(url, title: displayTitle(for: url))
+        Task { await load(url: url, preservingLibraryRoot: true) }
+    }
+
     func requestFolderAccess() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
@@ -92,7 +97,8 @@ extension ReaderViewModel {
     func load(
         url: URL,
         knownSiblings: [URL]? = nil,
-        preferredRelativePath: String? = nil
+        preferredRelativePath: String? = nil,
+        preservingLibraryRoot: Bool = false
     ) async {
         imageLoader.cancelPreload()
 
@@ -113,6 +119,9 @@ extension ReaderViewModel {
 
         isLoading = true
         loadingMessage = "Opening…"
+        let preservedLibraryRootURL = preservingLibraryRoot
+            ? libraryRootURLIfItContains(url)
+            : nil
         defer {
             if myEpoch == loadEpoch {
                 isLoading = false
@@ -123,7 +132,7 @@ extension ReaderViewModel {
         if !isInsideCurrentTree(url) {
             tempDir.cleanup()
             libraryScope.acquire(url)
-            explicitLibraryRootURL = nil
+            explicitLibraryRootURL = preservedLibraryRootURL
             openedSourceURL = url
         } else if tempDir.isActive && !tempDir.contains(url) {
             // Inside the library scope but outside the active temp dir —
@@ -133,6 +142,9 @@ extension ReaderViewModel {
             // URL; without this, the original extraction is reused and we
             // try to load the outer archive directly.
             tempDir.cleanup()
+            if let preservedLibraryRootURL {
+                explicitLibraryRootURL = preservedLibraryRootURL
+            }
             openedSourceURL = url
         }
 
@@ -282,6 +294,14 @@ extension ReaderViewModel {
     func isInsideCurrentTree(_ url: URL) -> Bool {
         if tempDir.contains(url) { return true }
         return libraryScope.contains(url)
+    }
+
+    private func libraryRootURLIfItContains(_ url: URL) -> URL? {
+        guard let root = libraryRootURL,
+              root.isAncestor(of: url) else {
+            return nil
+        }
+        return root
     }
 
     // MARK: - Per-book position memory

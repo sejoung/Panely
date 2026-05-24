@@ -29,7 +29,7 @@ final class ReaderPreferences {
         }
     }
 
-    var sidebarMode = SidebarMode() {
+    var sidebarMode = SidebarMode(pinned: true) {
         didSet {
             UserDefaults.standard.set(sidebarMode.pinned, forKey: Self.sidebarPinnedKey)
         }
