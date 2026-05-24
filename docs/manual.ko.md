@@ -201,6 +201,9 @@ zip-in-zip 추출 캐시 용량을 확인하고 비울 수 있습니다.
 - 파일 경로가 filename, extension, type 수준으로 redacted 된 최근 열기/로드 이벤트.
 - 추출 캐시 용량, 현재 reader 설정, 마지막 reader 에러.
 
+**Clear Diagnostic Logs** 는 최근 파일 로그를 비웁니다. OSLog의 시스템
+로그는 지우지 않고, 다음 진단 리포트부터 새 로그만 포함됩니다.
+
 ---
 
 ## 북마크와 즐겨찾기

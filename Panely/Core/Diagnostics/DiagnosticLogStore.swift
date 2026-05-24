@@ -4,8 +4,9 @@ actor DiagnosticLogStore {
     static let shared = DiagnosticLogStore()
 
     private let maxLogBytes: UInt64 = 768 * 1024
-    private let directoryName = "panely-diagnostics"
     private let logFileName = "recent-log.txt"
+    private nonisolated static let productionDirectoryName = "panely-diagnostics"
+    private nonisolated static let testDirectoryName = "panely-diagnostics-tests"
 
     nonisolated static func record(
         level: DiagnosticLevel,
@@ -46,6 +47,10 @@ actor DiagnosticLogStore {
         return filtered.suffix(maxLines).joined(separator: "\n")
     }
 
+    func clear() {
+        try? FileManager.default.removeItem(at: logFileURL())
+    }
+
     private func append(level: DiagnosticLevel, category: DiagnosticCategory, message: String) {
         let line = "\(Self.timestamp()) [\(level.rawValue)] [\(category.rawValue)] \(message)\n"
         let url = logFileURL()
@@ -73,7 +78,7 @@ actor DiagnosticLogStore {
         let caches = FileManager.default
             .urls(for: .cachesDirectory, in: .userDomainMask)
             .first ?? FileManager.default.temporaryDirectory
-        return caches.appendingPathComponent(directoryName, isDirectory: true)
+        return caches.appendingPathComponent(Self.directoryName, isDirectory: true)
     }
 
     private func rotateIfNeeded(at url: URL, incomingBytes: Int) {
@@ -90,5 +95,16 @@ actor DiagnosticLogStore {
 
     private nonisolated static func timestamp() -> String {
         ISO8601DateFormatter().string(from: Date())
+    }
+
+    private nonisolated static var directoryName: String {
+        isRunningTests ? testDirectoryName : productionDirectoryName
+    }
+
+    private nonisolated static var isRunningTests: Bool {
+        let environment = ProcessInfo.processInfo.environment
+        return environment["XCTestConfigurationFilePath"] != nil
+            || environment["XCTestSessionIdentifier"] != nil
+            || NSClassFromString("XCTestCase") != nil
     }
 }

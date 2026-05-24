@@ -205,6 +205,9 @@ create a zip that can be attached to a bug report. It includes:
   and type.
 - Extraction cache size, current reader settings, and the last reader error.
 
+**Clear Diagnostic Logs** clears Panely's recent file log. It does not clear
+system OSLog entries, and future diagnostic reports include only new file logs.
+
 ---
 
 ## Bookmarks and favorites

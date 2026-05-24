@@ -36,6 +36,11 @@ struct DiagnosticsSettingsView: View {
                     }
                     .disabled(isExporting)
 
+                    Button("Clear Diagnostic Logs") {
+                        clearDiagnosticLogs()
+                    }
+                    .disabled(isExporting)
+
                     if isExporting {
                         ProgressView()
                             .controlSize(.small)
@@ -88,6 +93,14 @@ struct DiagnosticsSettingsView: View {
                 exportMessage = "Export failed: \(error.localizedDescription)"
             }
             isExporting = false
+        }
+    }
+
+    private func clearDiagnosticLogs() {
+        Task {
+            await DiagnosticLogStore.shared.clear()
+            AppLog.info(.diagnostics, "Diagnostic logs cleared")
+            exportMessage = "Diagnostic logs cleared."
         }
     }
 }
