@@ -19,8 +19,7 @@ struct LibrarySidebar: View {
     let onTogglePin: () -> Void
     let onRequestFolderAccess: () -> Void
 
-    @State private var nodes: [FileNode] = []
-    @State private var scanCompleted = false
+    @State private var model = LibrarySidebarModel()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -34,7 +33,7 @@ struct LibrarySidebar: View {
         .frame(width: 240)
         .background(PanelyColor.bgSecondary)
         .task(id: taskID) {
-            await reload()
+            await model.reload(rootURL: rootURL)
         }
     }
 
@@ -42,7 +41,7 @@ struct LibrarySidebar: View {
     private var content: some View {
         if rootURL == nil && favorites.isEmpty && pageBookmarks.isEmpty && volumes.isEmpty {
             emptyState
-        } else if rootURL != nil && scanCompleted && nodes.isEmpty && favorites.isEmpty && pageBookmarks.isEmpty && volumes.isEmpty {
+        } else if rootURL != nil && model.scanCompleted && model.nodes.isEmpty && favorites.isEmpty && pageBookmarks.isEmpty && volumes.isEmpty {
             accessPrompt
         } else {
             tree
@@ -139,9 +138,9 @@ struct LibrarySidebar: View {
 
     @ViewBuilder
     private func filesSection(activeStdURL: URL?) -> some View {
-        if !nodes.isEmpty {
+        if !model.nodes.isEmpty {
             Section(header: sectionHeader("Files", systemImage: "folder")) {
-                OutlineGroup(nodes, children: \.children) { node in
+                OutlineGroup(model.nodes, children: \.children) { node in
                     FileNodeRow(
                         node: node,
                         isActive: activeStdURL == node.url.standardizedFileURL,
@@ -173,32 +172,6 @@ struct LibrarySidebar: View {
             return activePath.hasSuffix("/" + innerPath)
         }
         return activePath == URL(fileURLWithPath: favorite.path).standardizedFileURL.path
-    }
-
-    private func reload() async {
-        guard let rootURL else {
-            nodes = []
-            scanCompleted = false
-            return
-        }
-        scanCompleted = false
-
-        // Two-phase load: ship the shallow (depth-1) tree immediately so the
-        // sidebar fills in fast on big libraries (was 1–2 s of blank for
-        // 10 k-file libraries when the depth-3 scan ran serially), then
-        // replace with the deeper tree once the background scan finishes.
-        let shallow = await FileNode.loadTree(from: rootURL, maxDepth: 1)
-        if Task.isCancelled { return }
-        nodes = shallow
-        scanCompleted = true
-
-        let deep = await FileNode.loadTree(from: rootURL, maxDepth: 3)
-        if Task.isCancelled { return }
-        // Skip the swap if the deep tree didn't add anything (avoids a
-        // redundant SwiftUI render for shallow libraries).
-        if deep != shallow {
-            nodes = deep
-        }
     }
 
     private var emptyState: some View {

@@ -27,7 +27,7 @@ struct StorageSettingsView: View {
                 }
 
                 LabeledContent("Cache limit") {
-                    Text(Self.formatBytes(ReaderTempDirectory.cacheBudgetBytes))
+                    Text(CacheMaintenance.formattedBytes(ReaderTempDirectory.cacheBudgetBytes))
                         .monospacedDigit()
                 }
 
@@ -66,7 +66,7 @@ struct StorageSettingsView: View {
     @ViewBuilder
     private func cacheValue(_ bytes: UInt64?) -> some View {
         if let bytes, !isRefreshing {
-            Text(Self.formatBytes(bytes))
+            Text(CacheMaintenance.formattedBytes(bytes))
                 .monospacedDigit()
         } else {
             ProgressView()
@@ -78,10 +78,7 @@ struct StorageSettingsView: View {
         isRefreshing = true
         let activeURL = viewModel.tempDir.url
         let sizes = await Task.detached(priority: .utility) {
-            (
-                total: ReaderTempDirectory.cacheSizeBytes(in: cacheRoot),
-                clearable: ReaderTempDirectory.cacheSizeBytes(in: cacheRoot, excluding: activeURL)
-            )
+            CacheMaintenance.cacheSizes(in: cacheRoot, excluding: activeURL)
         }.value
         totalCacheBytes = sizes.total
         clearableCacheBytes = sizes.clearable
@@ -94,18 +91,12 @@ struct StorageSettingsView: View {
         let activeURL = viewModel.tempDir.url
         Task {
             let removedBytes = await Task.detached(priority: .utility) {
-                ReaderTempDirectory.clearCache(in: cacheRoot, excluding: activeURL)
+                CacheMaintenance.clearExtractionCache(in: cacheRoot, excluding: activeURL)
             }.value
             isClearing = false
             await refreshCacheSize()
-            presentCacheClearResult(removedBytes: removedBytes)
+            CacheMaintenance.presentClearResult(removedBytes: removedBytes)
         }
-    }
-
-    private static func formatBytes(_ bytes: UInt64) -> String {
-        let formatter = ByteCountFormatter()
-        formatter.countStyle = .binary
-        return formatter.string(fromByteCount: Int64(min(bytes, UInt64(Int64.max))))
     }
 }
 

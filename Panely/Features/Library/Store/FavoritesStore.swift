@@ -37,21 +37,13 @@ final class FavoritesStore {
             return
         }
         do {
-            let bookmark = try url.bookmarkData(
-                options: .withSecurityScope,
-                includingResourceValuesForKeys: nil,
-                relativeTo: nil
-            )
-            let isDir = isDirectory
-                ?? (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory
-                ?? false
             let fav = FavoriteBook(
                 id: UUID(),
                 path: url.path,
                 title: title,
                 addedAt: Date(),
-                bookmarkData: bookmark,
-                isDirectory: isDir,
+                bookmarkData: try SecurityScopedBookmark.data(for: url),
+                isDirectory: isDirectory ?? SecurityScopedBookmark.isDirectory(url),
                 innerPath: innerPath
             )
             favorites.insert(fav, at: 0)
@@ -63,22 +55,13 @@ final class FavoritesStore {
     }
 
     func resolve(_ favorite: FavoriteBook) -> URL? {
-        var isStale = false
-        guard let url = try? URL(
-            resolvingBookmarkData: favorite.bookmarkData,
-            options: .withSecurityScope,
-            relativeTo: nil,
-            bookmarkDataIsStale: &isStale
-        ) else {
+        guard let resolution = SecurityScopedBookmark.resolve(favorite.bookmarkData) else {
             return nil
         }
-        // Refresh the bookmark in place when stale — keeps Favorites usable
-        // across file moves without forcing the user to re-add them.
-        if isStale, let refreshed = try? url.bookmarkData(
-            options: .withSecurityScope,
-            includingResourceValuesForKeys: nil,
-            relativeTo: nil
-        ), let idx = favorites.firstIndex(where: { $0.id == favorite.id }) {
+        let url = resolution.url
+        if resolution.isStale,
+           let refreshed = SecurityScopedBookmark.refreshedData(for: url),
+           let idx = favorites.firstIndex(where: { $0.id == favorite.id }) {
             favorites[idx].bookmarkData = refreshed
             favorites[idx].path = url.path
             save()

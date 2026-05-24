@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 extension PanelyApp {
@@ -43,41 +42,12 @@ extension PanelyApp {
                 let activeURL = viewModel.tempDir.url
                 Task {
                     let removedBytes = await Task.detached(priority: .utility) {
-                        ReaderTempDirectory.clearCache(excluding: activeURL)
+                        CacheMaintenance.clearExtractionCache(excluding: activeURL)
                     }.value
-                    presentCacheClearResult(removedBytes: removedBytes)
+                    CacheMaintenance.presentClearResult(removedBytes: removedBytes)
                 }
             }
             .disabled(viewModel.isLoading)
         }
     }
-}
-
-/// File-menu cache cleanup runs in the background; this modal gives the user a
-/// visible result when the menu action completes.
-@MainActor
-func presentCacheClearResult(removedBytes: UInt64) {
-    let alert = NSAlert()
-    alert.alertStyle = .informational
-    alert.addButton(withTitle: "OK")
-
-    if removedBytes > 0 {
-        alert.messageText = "Extraction Cache Cleared"
-        alert.informativeText = "\(formatCacheBytes(removedBytes)) was removed."
-    } else {
-        alert.messageText = "No Extraction Cache Cleared"
-        alert.informativeText = "There is no inactive extraction cache to remove."
-    }
-
-    if let window = NSApp.keyWindow ?? NSApp.mainWindow {
-        alert.beginSheetModal(for: window)
-    } else {
-        alert.runModal()
-    }
-}
-
-private func formatCacheBytes(_ bytes: UInt64) -> String {
-    let formatter = ByteCountFormatter()
-    formatter.countStyle = .binary
-    return formatter.string(fromByteCount: Int64(min(bytes, UInt64(Int64.max))))
 }

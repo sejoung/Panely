@@ -13,26 +13,12 @@ final class RecentItemsStore {
     }
 
     func record(_ url: URL, title: String) {
-        // Re-opening a recently used item: skip the security-scoped bookmark
-        // creation (the most expensive part of this method) and just bump
-        // the existing entry to the top. If the existing bookmark is stale,
-        // refresh it now — that's the whole reason we kept the URL around.
         if let existingIndex = items.firstIndex(where: { $0.path == url.path }) {
             var existing = items.remove(at: existingIndex)
             existing.openedAt = Date()
             existing.title = title
-            var isStale = false
-            if (try? URL(
-                resolvingBookmarkData: existing.bookmarkData,
-                options: .withSecurityScope,
-                relativeTo: nil,
-                bookmarkDataIsStale: &isStale
-            )) != nil, isStale,
-               let refreshed = try? url.bookmarkData(
-                options: .withSecurityScope,
-                includingResourceValuesForKeys: nil,
-                relativeTo: nil
-               ) {
+            if SecurityScopedBookmark.resolve(existing.bookmarkData)?.isStale == true,
+               let refreshed = SecurityScopedBookmark.refreshedData(for: url) {
                 existing.bookmarkData = refreshed
             }
             items.insert(existing, at: 0)
@@ -41,21 +27,13 @@ final class RecentItemsStore {
         }
 
         do {
-            let bookmark = try url.bookmarkData(
-                options: .withSecurityScope,
-                includingResourceValuesForKeys: nil,
-                relativeTo: nil
-            )
-
-            let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
-
             let item = RecentItem(
                 id: UUID(),
                 path: url.path,
                 title: title,
                 openedAt: Date(),
-                bookmarkData: bookmark,
-                isDirectory: isDir
+                bookmarkData: try SecurityScopedBookmark.data(for: url),
+                isDirectory: SecurityScopedBookmark.isDirectory(url)
             )
             items.insert(item, at: 0)
 
@@ -70,23 +48,13 @@ final class RecentItemsStore {
     }
 
     func resolve(_ item: RecentItem) -> URL? {
-        var isStale = false
-        guard let url = try? URL(
-            resolvingBookmarkData: item.bookmarkData,
-            options: .withSecurityScope,
-            relativeTo: nil,
-            bookmarkDataIsStale: &isStale
-        ) else {
+        guard let resolution = SecurityScopedBookmark.resolve(item.bookmarkData) else {
             return nil
         }
-        // If macOS marked the bookmark stale (file moved/renamed but still
-        // resolvable), regenerate it now so the next launch doesn't pay the
-        // resolution cost or risk failure as the staleness compounds.
-        if isStale, let refreshed = try? url.bookmarkData(
-            options: .withSecurityScope,
-            includingResourceValuesForKeys: nil,
-            relativeTo: nil
-        ), let idx = items.firstIndex(where: { $0.id == item.id }) {
+        let url = resolution.url
+        if resolution.isStale,
+           let refreshed = SecurityScopedBookmark.refreshedData(for: url),
+           let idx = items.firstIndex(where: { $0.id == item.id }) {
             items[idx].bookmarkData = refreshed
             items[idx].path = url.path
             save()

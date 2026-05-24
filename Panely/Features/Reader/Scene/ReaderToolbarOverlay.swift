@@ -10,35 +10,39 @@ struct ReaderToolbarOverlay: View {
 
     var body: some View {
         PanelyToolbar(
-            layout: viewModel.layout,
-            direction: viewModel.direction,
-            fitMode: viewModel.fitMode,
-            sidebarPinned: viewModel.sidebarPinned,
-            onOpen: { viewModel.openSource() },
-            onPrev: { viewModel.previous() },
-            onNext: { viewModel.next() },
-            onSetLayout: { viewModel.setLayout($0) },
-            onToggleDirection: { viewModel.toggleDirection() },
-            onSetFitMode: { viewModel.setFitMode($0) },
-            onToggleSidebarPin: { viewModel.toggleSidebarPin() },
-            onZoomIn: { viewerController.zoomIn() },
-            onZoomOut: { viewerController.zoomOut() },
-            autoFitOnResize: viewModel.autoFitOnResize,
-            onToggleAutoFit: { viewModel.toggleAutoFitOnResize() },
-            toolbarPinned: viewModel.toolbarPinned,
-            onToggleToolbarPin: { viewModel.toggleToolbarPin() },
-            showVolumeNav: viewModel.hasMultipleVolumes,
-            canGoPreviousVolume: viewModel.canGoPreviousVolume,
-            canGoNextVolume: viewModel.canGoNextVolume,
-            onPreviousVolume: { viewModel.previousVolume() },
-            onNextVolume: { viewModel.nextVolume() },
-            hasSource: viewModel.hasSource,
-            isBookFavorite: viewModel.isCurrentBookFavorite,
-            isPageBookmarked: viewModel.isCurrentPageBookmarked,
-            onToggleFavorite: { viewModel.toggleFavoriteForCurrentBook() },
-            onTogglePageBookmark: { viewModel.toggleCurrentPageBookmark() },
-            thumbnailSidebarVisible: viewModel.thumbnailSidebarVisible,
-            onToggleThumbnailSidebar: { viewModel.toggleThumbnailSidebar() }
+            state: PanelyToolbarState(
+                layout: viewModel.layout,
+                direction: viewModel.direction,
+                fitMode: viewModel.fitMode,
+                sidebarPinned: viewModel.sidebarPinned,
+                autoFitOnResize: viewModel.autoFitOnResize,
+                toolbarPinned: viewModel.toolbarPinned,
+                showVolumeNav: viewModel.hasMultipleVolumes,
+                canGoPreviousVolume: viewModel.canGoPreviousVolume,
+                canGoNextVolume: viewModel.canGoNextVolume,
+                hasSource: viewModel.hasSource,
+                isBookFavorite: viewModel.isCurrentBookFavorite,
+                isPageBookmarked: viewModel.isCurrentPageBookmarked,
+                thumbnailSidebarVisible: viewModel.thumbnailSidebarVisible
+            ),
+            actions: PanelyToolbarActions(
+                onOpen: { viewModel.openSource() },
+                onPrev: { viewModel.previous() },
+                onNext: { viewModel.next() },
+                onSetLayout: { viewModel.setLayout($0) },
+                onToggleDirection: { viewModel.toggleDirection() },
+                onSetFitMode: { viewModel.setFitMode($0) },
+                onToggleSidebarPin: { viewModel.toggleSidebarPin() },
+                onZoomIn: { viewerController.zoomIn() },
+                onZoomOut: { viewerController.zoomOut() },
+                onToggleAutoFit: { viewModel.toggleAutoFitOnResize() },
+                onToggleToolbarPin: { viewModel.toggleToolbarPin() },
+                onPreviousVolume: { viewModel.previousVolume() },
+                onNextVolume: { viewModel.nextVolume() },
+                onToggleFavorite: { viewModel.toggleFavoriteForCurrentBook() },
+                onTogglePageBookmark: { viewModel.toggleCurrentPageBookmark() },
+                onToggleThumbnailSidebar: { viewModel.toggleThumbnailSidebar() }
+            )
         )
         .padding(PanelySpacing.md)
         .opacity(shown ? 1 : 0)

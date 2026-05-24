@@ -1,43 +1,48 @@
 import SwiftUI
 
+struct PanelyToolbarState: Equatable {
+    var layout: PageLayout
+    var direction: ReadingDirection
+    var fitMode: FitMode
+    var sidebarPinned: Bool
+    var autoFitOnResize = true
+    var toolbarPinned = false
+    var showVolumeNav = false
+    var canGoPreviousVolume = false
+    var canGoNextVolume = false
+    var hasSource = false
+    var isBookFavorite = false
+    var isPageBookmarked = false
+    var thumbnailSidebarVisible = false
+}
+
+struct PanelyToolbarActions {
+    var onOpen: () -> Void = {}
+    var onPrev: () -> Void = {}
+    var onNext: () -> Void = {}
+    var onSetLayout: (PageLayout) -> Void = { _ in }
+    var onToggleDirection: () -> Void = {}
+    var onSetFitMode: (FitMode) -> Void = { _ in }
+    var onToggleSidebarPin: () -> Void = {}
+    var onZoomIn: () -> Void = {}
+    var onZoomOut: () -> Void = {}
+    var onToggleAutoFit: () -> Void = {}
+    var onToggleToolbarPin: () -> Void = {}
+    var onPreviousVolume: () -> Void = {}
+    var onNextVolume: () -> Void = {}
+    var onToggleFavorite: () -> Void = {}
+    var onTogglePageBookmark: () -> Void = {}
+    var onToggleThumbnailSidebar: () -> Void = {}
+}
+
 /// The floating reader toolbar. Presentation-only — every action is a
 /// closure injected by the parent, so the toolbar has no opinion about
 /// view models or controllers. The body composes five logical groups in
 /// fixed left-to-right order: chrome → layout → fit/zoom → bookmarks →
 /// navigation, separated by dividers.
 struct PanelyToolbar: View {
-    let layout: PageLayout
-    let direction: ReadingDirection
-    let fitMode: FitMode
-    let sidebarPinned: Bool
-    let onOpen: () -> Void
-    let onPrev: () -> Void
-    let onNext: () -> Void
-    let onSetLayout: (PageLayout) -> Void
-    let onToggleDirection: () -> Void
-    let onSetFitMode: (FitMode) -> Void
-    let onToggleSidebarPin: () -> Void
-    var onZoomIn: () -> Void = {}
-    var onZoomOut: () -> Void = {}
-    var autoFitOnResize: Bool = true
-    var onToggleAutoFit: () -> Void = {}
-    var toolbarPinned: Bool = false
-    var onToggleToolbarPin: () -> Void = {}
-
-    var showVolumeNav: Bool = false
-    var canGoPreviousVolume: Bool = false
-    var canGoNextVolume: Bool = false
-    var onPreviousVolume: () -> Void = {}
-    var onNextVolume: () -> Void = {}
-
-    var hasSource: Bool = false
-    var isBookFavorite: Bool = false
-    var isPageBookmarked: Bool = false
-    var onToggleFavorite: () -> Void = {}
-    var onTogglePageBookmark: () -> Void = {}
-
-    var thumbnailSidebarVisible: Bool = false
-    var onToggleThumbnailSidebar: () -> Void = {}
+    let state: PanelyToolbarState
+    let actions: PanelyToolbarActions
 
     var body: some View {
         HStack(spacing: PanelySpacing.xs) {
@@ -59,22 +64,22 @@ struct PanelyToolbar: View {
 
     private var chromeGroup: some View {
         Group {
-            PanelyIconButton(systemImage: "folder", action: onOpen)
+            PanelyIconButton(systemImage: "folder", action: actions.onOpen)
                 .help("Open Folder, CBZ, or ZIP… (⌘O)")
 
             PanelyIconButton(
-                systemImage: sidebarPinned ? "pin.fill" : "pin",
-                isActive: sidebarPinned,
-                action: onToggleSidebarPin
+                systemImage: state.sidebarPinned ? "pin.fill" : "pin",
+                isActive: state.sidebarPinned,
+                action: actions.onToggleSidebarPin
             )
-            .help(sidebarPinned ? "Unpin Library (⌃⌘S)" : "Pin Library (⌃⌘S)")
+            .help(state.sidebarPinned ? "Unpin Library (⌃⌘S)" : "Pin Library (⌃⌘S)")
 
             PanelyIconButton(
-                systemImage: toolbarPinned ? "pin.square.fill" : "pin.square",
-                isActive: toolbarPinned,
-                action: onToggleToolbarPin
+                systemImage: state.toolbarPinned ? "pin.square.fill" : "pin.square",
+                isActive: state.toolbarPinned,
+                action: actions.onToggleToolbarPin
             )
-            .help(toolbarPinned ? "Unpin Toolbar (⌃⌘T)" : "Pin Toolbar (⌃⌘T)")
+            .help(state.toolbarPinned ? "Unpin Toolbar (⌃⌘T)" : "Pin Toolbar (⌃⌘T)")
         }
     }
 
@@ -85,15 +90,15 @@ struct PanelyToolbar: View {
         Group {
             PanelyIconButton(
                 systemImage: "rectangle.portrait",
-                isActive: layout == .single,
-                action: { onSetLayout(.single) }
+                isActive: state.layout == .single,
+                action: { actions.onSetLayout(.single) }
             )
             .help("Single Page (⌘⇧1)")
 
             PanelyIconButton(
                 systemImage: "rectangle.split.2x1",
-                isActive: layout == .double,
-                action: { onSetLayout(.double) }
+                isActive: state.layout == .double,
+                action: { actions.onSetLayout(.double) }
             )
             .help("Double Page (⌘⇧2)")
 
@@ -104,16 +109,16 @@ struct PanelyToolbar: View {
                 // (which legitimately owns `arrow.up.and.down` as part of the
                 // directional-resize triplet).
                 systemImage: "rectangle.stack",
-                isActive: layout == .vertical,
-                action: { onSetLayout(.vertical) }
+                isActive: state.layout == .vertical,
+                action: { actions.onSetLayout(.vertical) }
             )
             .help("Vertical Scroll (⌘⇧3)")
 
             PanelyIconButton(
                 systemImage: directionSymbol,
-                action: onToggleDirection
+                action: actions.onToggleDirection
             )
-            .disabled(layout.isContinuous)
+            .disabled(state.layout.isContinuous)
             .help(directionHelp)
         }
     }
@@ -125,43 +130,43 @@ struct PanelyToolbar: View {
         Group {
             PanelyIconButton(
                 systemImage: "arrow.up.left.and.arrow.down.right",
-                isActive: fitMode == .fitScreen,
-                action: { onSetFitMode(.fitScreen) }
+                isActive: state.fitMode == .fitScreen,
+                action: { actions.onSetFitMode(.fitScreen) }
             )
             .help("Fit to Screen (⌘1)")
 
             PanelyIconButton(
                 systemImage: "arrow.left.and.right",
-                isActive: fitMode == .fitWidth,
-                action: { onSetFitMode(.fitWidth) }
+                isActive: state.fitMode == .fitWidth,
+                action: { actions.onSetFitMode(.fitWidth) }
             )
             .help("Fit Width (⌘2)")
 
             PanelyIconButton(
                 systemImage: "arrow.up.and.down",
-                isActive: fitMode == .fitHeight,
-                action: { onSetFitMode(.fitHeight) }
+                isActive: state.fitMode == .fitHeight,
+                action: { actions.onSetFitMode(.fitHeight) }
             )
             .help("Fit Height (⌘3)")
 
             PanelyIconButton(
                 systemImage: "minus.magnifyingglass",
-                action: onZoomOut
+                action: actions.onZoomOut
             )
             .help("Zoom Out (⌘−)")
 
             PanelyIconButton(
                 systemImage: "plus.magnifyingglass",
-                action: onZoomIn
+                action: actions.onZoomIn
             )
             .help("Zoom In (⌘+)")
 
             PanelyIconButton(
-                systemImage: autoFitOnResize ? "lock.open" : "lock.fill",
-                isActive: !autoFitOnResize,
-                action: onToggleAutoFit
+                systemImage: state.autoFitOnResize ? "lock.open" : "lock.fill",
+                isActive: !state.autoFitOnResize,
+                action: actions.onToggleAutoFit
             )
-            .help(autoFitOnResize
+            .help(state.autoFitOnResize
                   ? "Lock view size (don't auto-fit on resize) (⌘L)"
                   : "Unlock view size (auto-fit on resize) (⌘L)")
         }
@@ -170,28 +175,28 @@ struct PanelyToolbar: View {
     private var bookmarkGroup: some View {
         Group {
             PanelyIconButton(
-                systemImage: isBookFavorite ? "star.fill" : "star",
-                isActive: isBookFavorite,
-                action: onToggleFavorite
+                systemImage: state.isBookFavorite ? "star.fill" : "star",
+                isActive: state.isBookFavorite,
+                action: actions.onToggleFavorite
             )
-            .disabled(!hasSource)
-            .help(isBookFavorite ? "Remove from Favorites (⌘⇧D)" : "Add to Favorites (⌘⇧D)")
+            .disabled(!state.hasSource)
+            .help(state.isBookFavorite ? "Remove from Favorites (⌘⇧D)" : "Add to Favorites (⌘⇧D)")
 
             PanelyIconButton(
-                systemImage: isPageBookmarked ? "bookmark.fill" : "bookmark",
-                isActive: isPageBookmarked,
-                action: onTogglePageBookmark
+                systemImage: state.isPageBookmarked ? "bookmark.fill" : "bookmark",
+                isActive: state.isPageBookmarked,
+                action: actions.onTogglePageBookmark
             )
-            .disabled(!hasSource)
-            .help(isPageBookmarked ? "Remove Page Bookmark (⌘D)" : "Bookmark Current Page (⌘D)")
+            .disabled(!state.hasSource)
+            .help(state.isPageBookmarked ? "Remove Page Bookmark (⌘D)" : "Bookmark Current Page (⌘D)")
 
             PanelyIconButton(
                 systemImage: "square.stack",
-                isActive: thumbnailSidebarVisible,
-                action: onToggleThumbnailSidebar
+                isActive: state.thumbnailSidebarVisible,
+                action: actions.onToggleThumbnailSidebar
             )
-            .disabled(!hasSource)
-            .help(thumbnailSidebarVisible
+            .disabled(!state.hasSource)
+            .help(state.thumbnailSidebarVisible
                   ? "Hide Thumbnails (⌃⌘P)"
                   : "Show Thumbnails (⌃⌘P)")
         }
@@ -199,21 +204,21 @@ struct PanelyToolbar: View {
 
     @ViewBuilder
     private var navigationGroup: some View {
-        if showVolumeNav {
-            PanelyIconButton(systemImage: "chevron.backward.2", action: onPreviousVolume)
-                .disabled(!canGoPreviousVolume)
+        if state.showVolumeNav {
+            PanelyIconButton(systemImage: "chevron.backward.2", action: actions.onPreviousVolume)
+                .disabled(!state.canGoPreviousVolume)
                 .help("Previous Volume (⌘[)")
         }
 
-        PanelyIconButton(systemImage: "chevron.left", action: onPrev)
+        PanelyIconButton(systemImage: "chevron.left", action: actions.onPrev)
             .help("Previous Page (\(previousKeyHint))")
 
-        PanelyIconButton(systemImage: "chevron.right", action: onNext)
+        PanelyIconButton(systemImage: "chevron.right", action: actions.onNext)
             .help("Next Page (\(nextKeyHint) or Space)")
 
-        if showVolumeNav {
-            PanelyIconButton(systemImage: "chevron.forward.2", action: onNextVolume)
-                .disabled(!canGoNextVolume)
+        if state.showVolumeNav {
+            PanelyIconButton(systemImage: "chevron.forward.2", action: actions.onNextVolume)
+                .disabled(!state.canGoNextVolume)
                 .help("Next Volume (⌘])")
         }
     }
@@ -238,43 +243,37 @@ struct PanelyToolbar: View {
     // MARK: - Direction-aware labels
 
     private var directionSymbol: String {
-        direction.isRTL ? "arrow.left" : "arrow.right"
+        state.direction.isRTL ? "arrow.left" : "arrow.right"
     }
 
     private var directionHelp: String {
-        if layout.isContinuous {
+        if state.layout.isContinuous {
             return "Reading direction is fixed in vertical mode"
         }
-        return direction.isRTL ? "Read Left to Right" : "Read Right to Left"
+        return state.direction.isRTL ? "Read Left to Right" : "Read Right to Left"
     }
 
     private var previousKeyHint: String {
-        direction.isRTL ? "→" : "←"
+        state.direction.isRTL ? "→" : "←"
     }
 
     private var nextKeyHint: String {
-        direction.isRTL ? "←" : "→"
+        state.direction.isRTL ? "←" : "→"
     }
 }
 
 #Preview {
     PanelyToolbar(
-        layout: .double,
-        direction: .rightToLeft,
-        fitMode: .fitScreen,
-        sidebarPinned: true,
-        onOpen: {},
-        onPrev: {},
-        onNext: {},
-        onSetLayout: { _ in },
-        onToggleDirection: {},
-        onSetFitMode: { _ in },
-        onToggleSidebarPin: {},
-        showVolumeNav: true,
-        canGoPreviousVolume: true,
-        canGoNextVolume: false,
-        onPreviousVolume: {},
-        onNextVolume: {}
+        state: PanelyToolbarState(
+            layout: .double,
+            direction: .rightToLeft,
+            fitMode: .fitScreen,
+            sidebarPinned: true,
+            showVolumeNav: true,
+            canGoPreviousVolume: true,
+            canGoNextVolume: false
+        ),
+        actions: PanelyToolbarActions()
     )
     .padding(PanelySpacing.xl)
     .frame(width: 640)

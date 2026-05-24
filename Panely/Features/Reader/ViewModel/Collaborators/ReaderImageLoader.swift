@@ -1,12 +1,8 @@
 import AppKit
 import Foundation
 
-/// Owns everything the viewer needs to render images: the decoded image array
-/// for the active layout, the per-page dimension table that drives vertical
-/// strip placeholders, the bounded NSCache, and the lazy-window/preload
-/// orchestration. State that depends on the open book lives here so that
-/// `ReaderViewModel` doesn't have to mix cache-budget tuning constants in
-/// with navigation/source state.
+/// Owns the viewer-facing image state and orchestrates paged, vertical,
+/// cache-backed, and preload paths through smaller collaborators.
 ///
 /// All decisions take a snapshot of `ComicSource` / `PageLayout` / page index
 /// as parameters — the loader has no opinion about which book or where the
@@ -31,24 +27,7 @@ final class ReaderImageLoader {
 
     // MARK: - Cache + async state
 
-    let imageCache: NSCache<NSString, NSImage> = {
-        let cache = NSCache<NSString, NSImage>()
-        // countLimit is intentionally loose — the real budget is `totalCostLimit`.
-        // Vertical lazy windows (`lazyWindowRadius` + `lazyKeepBuffer`) can pin
-        // ~25 pages around the visible band; setting the count cap close to that
-        // caused premature eviction of small pages even when far under the byte
-        // budget, hurting prefetch hit-rate on flips. Cost-driven eviction does
-        // the right thing for both huge and small pages.
-        cache.countLimit = 100
-        // High-res scans (10000×14000 ≈ 600 MB decoded) could otherwise stack
-        // up to many GB of RSS. The byte cap means typical smaller pages stay
-        // cached generously, while a few huge pages get evicted before they
-        // pin too much memory. Per-entry cost is fed in by `cacheImage(_:for:)`
-        // based on pixel area × 4.
-        cache.totalCostLimit = 150 * 1024 * 1024
-        return cache
-    }()
-
+    private let imageCache = ReaderImageMemoryCache()
     private var preloadTask: Task<Void, Never>?
     private var lazyLoadTask: Task<Void, Never>?
 
@@ -59,16 +38,6 @@ final class ReaderImageLoader {
     private var lastLayout: PageLayout = .single
     private var lastPageIndex: Int = 0
     private var lastNavigationStep: Int = 1
-
-    // MARK: - Tuning
-
-    private let preloadRadius = 2
-    private let lazyWindowRadius = 3
-    /// Pages outside `[visibleRange ± lazyKeepBuffer]` get evicted back to
-    /// placeholders so a long strip doesn't pin every loaded image in memory.
-    /// Wider than the load buffer so small back-scrolls don't immediately
-    /// re-decode. NSCache still holds recents for fast restore.
-    private let lazyKeepBuffer = 10
 
     // MARK: - Lifecycle
 
@@ -186,7 +155,7 @@ final class ReaderImageLoader {
         //    portrait aspect for any page whose header read fails so layout
         //    still holds.
         let fallbackSize = CGSize(width: 1000, height: 1500)
-        let maxConcurrent = Self.lazyConcurrencyLimit
+        let maxConcurrent = ReaderImageLoadingPolicy.lazyConcurrencyLimit
         var dims = Array(repeating: fallbackSize, count: pages.count)
         for chunkStart in stride(from: 0, to: pages.count, by: maxConcurrent) {
             let chunkEnd = min(chunkStart + maxConcurrent, pages.count)
@@ -232,12 +201,10 @@ final class ReaderImageLoader {
         // Free pages outside the keep window first — runs sync so memory
         // is released even if the load below gets cancelled by another
         // setVisibleRange before completing.
-        evictPagesOutsideKeepWindow(visibleRange: range)
+        let window = ReaderVerticalImageWindow(pageCount: source.pageCount)
+        evictPagesOutsideKeepWindow(visibleRange: range, window: window)
 
-        let buffer = 2
-        let lower = max(0, range.lowerBound - buffer)
-        let upper = min(source.pageCount, range.upperBound + buffer)
-        let needed = (lower..<upper).filter { !loadedPageIndices.contains($0) }
+        let needed = window.loadIndices(forVisibleRange: range, excluding: loadedPageIndices)
         guard !needed.isEmpty else { return }
 
         lazyLoadTask?.cancel()
@@ -246,18 +213,20 @@ final class ReaderImageLoader {
         }
     }
 
-    /// Replace pages outside `[range ± lazyKeepBuffer]` with placeholder
+    /// Replace pages outside the vertical keep window with placeholder
     /// NSImages so their decoded bitmaps can be released. NSCache still
     /// holds the recently-decoded images, so scrolling back within a few
     /// pages typically hits the cache and re-displays instantly.
-    private func evictPagesOutsideKeepWindow(visibleRange: Range<Int>) {
+    private func evictPagesOutsideKeepWindow(
+        visibleRange: Range<Int>,
+        window: ReaderVerticalImageWindow
+    ) {
         guard !pageDimensions.isEmpty, !loadedPageIndices.isEmpty else { return }
-        let lower = max(0, visibleRange.lowerBound - lazyKeepBuffer)
-        let upper = min(currentImages.count, visibleRange.upperBound + lazyKeepBuffer)
+        let keepRange = window.keepRange(forVisibleRange: visibleRange, loadedImageCount: currentImages.count)
 
         var newImages = currentImages
         var evicted: [Int] = []
-        for i in loadedPageIndices where i < lower || i >= upper {
+        for i in loadedPageIndices where !keepRange.contains(i) {
             guard i < newImages.count, i < pageDimensions.count else { continue }
             newImages[i] = Self.makePlaceholder(size: pageDimensions[i])
             evicted.append(i)
@@ -280,7 +249,7 @@ final class ReaderImageLoader {
     ) async {
         guard !indices.isEmpty else { return }
         var loaded: [(Int, NSImage)] = []
-        let maxConcurrent = Self.lazyConcurrencyLimit
+        let maxConcurrent = ReaderImageLoadingPolicy.lazyConcurrencyLimit
 
         // Decode in bounded chunks. Decoding is CPU-heavy so spawning every
         // page at once would saturate the pool with no real benefit (cores
@@ -329,10 +298,8 @@ final class ReaderImageLoader {
         source: ComicSource,
         onError: @MainActor @escaping (String) -> Void
     ) async {
-        let lower = max(0, index - lazyWindowRadius)
-        let upper = min(source.pageCount - 1, index + lazyWindowRadius)
-        guard lower <= upper else { return }
-        let needed = (lower...upper).filter { !loadedPageIndices.contains($0) }
+        let needed = ReaderVerticalImageWindow(pageCount: source.pageCount)
+            .initialIndices(around: index, excluding: loadedPageIndices)
         guard !needed.isEmpty else { return }
 
         await loadPagesBatched(needed, source: source, onError: onError)
@@ -341,36 +308,15 @@ final class ReaderImageLoader {
     // MARK: - Cache helpers
 
     private func cachedImage(for page: ComicPage) -> NSImage? {
-        imageCache.object(forKey: page.id as NSString)
+        imageCache.image(for: page)
     }
 
     private func cacheImage(_ image: NSImage, for page: ComicPage) {
-        // Decoded byte estimate. Prefer the actual bitmap rep's pixel
-        // dimensions when available — `image.size` is in points, so Retina
-        // (2×) backing or 16-bit/HDR scans were systematically under-priced
-        // by the simple "points × 4" formula. Falls back to the point-based
-        // estimate when no rep advertises pixel dimensions.
-        let cost = Self.estimatedBitmapCost(of: image)
-        imageCache.setObject(image, forKey: page.id as NSString, cost: cost)
+        imageCache.store(image, for: page)
     }
 
     static func estimatedBitmapCost(of image: NSImage) -> Int {
-        if let rep = image.representations.first {
-            // pixelsWide/High return 0 for non-bitmap reps; guard against
-            // that by falling through to the size-based estimate.
-            let w = rep.pixelsWide
-            let h = rep.pixelsHigh
-            if w > 0 && h > 0 {
-                // bitsPerSample × samplesPerPixel ÷ 8 is the per-pixel byte
-                // cost; defaults of 8/4 cover the common 32-bit RGBA case
-                // and conservatively over-estimate sub-8-bit reps.
-                let bitsPerSample = (rep as? NSBitmapImageRep)?.bitsPerSample ?? 8
-                let samplesPerPixel = (rep as? NSBitmapImageRep)?.samplesPerPixel ?? 4
-                let bytesPerPixel = max(1, (bitsPerSample * samplesPerPixel) / 8)
-                return w * h * bytesPerPixel
-            }
-        }
-        return Int(image.size.width * image.size.height * 4)
+        ReaderImageMemoryCache.estimatedBitmapCost(of: image)
     }
 
     private func loadVisibleImage(_ page: ComicPage, onError: @MainActor @escaping (String) -> Void) async -> NSImage? {
@@ -404,6 +350,7 @@ final class ReaderImageLoader {
         guard !lastSource.pages.isEmpty else { return [] }
         let step = lastNavigationStep
         let visibleEnd = min(lastPageIndex + step, lastSource.pageCount)
+        let preloadRadius = ReaderImageLoadingPolicy.preloadRadius
         let start = max(0, lastPageIndex - preloadRadius * step)
         let end = min(lastSource.pageCount, visibleEnd + preloadRadius * step)
 
@@ -440,13 +387,7 @@ final class ReaderImageLoader {
     // MARK: - Placeholders + concurrency limit
 
     static func makePlaceholder(size: CGSize) -> NSImage {
-        // drawingHandler is invoked lazily by AppKit when the image is actually
-        // drawn, so this stays cheap (no upfront pixel allocation).
-        NSImage(size: size, flipped: false) { rect in
-            NSColor(white: 0.13, alpha: 1).setFill()
-            rect.fill()
-            return true
-        }
+        ReaderImagePlaceholder.make(size: size)
     }
 
     /// Concurrency cap for header-fetch / decode TaskGroups. ~Core count
@@ -454,6 +395,6 @@ final class ReaderImageLoader {
     /// neither single-core hosts nor monster CPUs spin up pathological
     /// numbers of tasks.
     static var lazyConcurrencyLimit: Int {
-        max(2, min(8, ProcessInfo.processInfo.activeProcessorCount))
+        ReaderImageLoadingPolicy.lazyConcurrencyLimit
     }
 }
