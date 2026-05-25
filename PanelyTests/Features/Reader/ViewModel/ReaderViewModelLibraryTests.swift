@@ -46,6 +46,30 @@ struct ReaderViewModelLibraryTests {
         #expect(vm.sidebarVolumes.last?.lastPathComponent == "Vol03.cbz")
     }
 
+    @Test func sidebarActiveURLPrefersPendingSourceWhileLoading() {
+        let vm = makeTestViewModel()
+        let current = URL(fileURLWithPath: "/library/Vol01.cbz")
+        let pending = URL(fileURLWithPath: "/library/Vol02.cbz")
+        vm.currentSourceURL = current
+        vm.pendingSourceURL = pending
+
+        #expect(vm.sidebarActiveURL?.standardizedFileURL == pending.standardizedFileURL)
+    }
+
+    @Test func successfulLoadClearsPendingSourceURL() async throws {
+        let root = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let imageURL = root.appendingPathComponent("001.png")
+        try Fixture.makePNG(width: 10, height: 10).write(to: imageURL)
+
+        let vm = makeTestViewModel()
+        await vm.load(url: root)
+
+        #expect(vm.currentSourceURL?.standardizedFileURL == root.standardizedFileURL)
+        #expect(vm.pendingSourceURL == nil)
+        #expect(vm.sidebarActiveURL?.standardizedFileURL == root.standardizedFileURL)
+    }
+
     // MARK: - tempDir.contains
 
     @Test func tempDirContainsIsFalseWhenNoTempDir() {

@@ -83,6 +83,10 @@ extension ReaderViewModel {
         return currentSourceURL?.deletingLastPathComponent()
     }
 
+    var sidebarActiveURL: URL? {
+        pendingSourceURL ?? currentSourceURL
+    }
+
     // MARK: - Opening new sources
 
     func openSource() {
@@ -180,6 +184,7 @@ extension ReaderViewModel {
             ]
         )
         let myEpoch = startLoad()
+        pendingSourceURL = url
         let preservedLibraryRootURL = intent.preservesLibraryRoot
             ? libraryRootURLIfItContains(url)
             : nil
@@ -477,6 +482,7 @@ extension ReaderViewModel {
 
         source = loaded
         currentSourceURL = targetURL
+        pendingSourceURL = nil
         if let resolvedSiblings {
             siblings = resolvedSiblings
         }
@@ -496,6 +502,7 @@ extension ReaderViewModel {
         source = .empty
         imageLoader.reset()
         currentSourceURL = nil
+        pendingSourceURL = nil
         siblings = []
     }
 

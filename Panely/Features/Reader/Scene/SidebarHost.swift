@@ -11,7 +11,7 @@ struct SidebarHost: View {
     var body: some View {
         LibrarySidebar(
             rootURL: viewModel.libraryRootURL,
-            activeURL: viewModel.currentSourceURL,
+            activeURL: viewModel.sidebarActiveURL,
             refreshToken: viewModel.libraryRefreshToken,
             pinned: viewModel.sidebarPinned,
             favorites: viewModel.favorites.favorites,

@@ -53,6 +53,7 @@ final class ReaderViewModel {
     var loadingMessage: String = ""
 
     var currentSourceURL: URL?
+    var pendingSourceURL: URL?
     var siblings: [URL] = []
 
     /// One-press cue for advancing to the previous volume from page 0.
