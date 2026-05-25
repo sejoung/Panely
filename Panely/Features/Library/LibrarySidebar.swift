@@ -34,7 +34,10 @@ struct LibrarySidebar: View {
         .frame(width: 240)
         .background(PanelyColor.bgSecondary)
         .task(id: taskID) {
-            await model.reload(rootURL: rootURL, loader: libraryTreeLoader)
+            await model.reload(rootURL: rootURL, activeURL: activeURL, loader: libraryTreeLoader)
+        }
+        .onChange(of: activeURL) { _, newValue in
+            model.expandAncestors(of: newValue)
         }
     }
 
@@ -141,11 +144,12 @@ struct LibrarySidebar: View {
     private func filesSection(activeStdURL: URL?) -> some View {
         if !model.nodes.isEmpty {
             Section(header: sectionHeader("Files", systemImage: "folder")) {
-                OutlineGroup(model.nodes, children: \.children) { node in
-                    FileNodeRow(
+                ForEach(model.nodes) { node in
+                    FileTreeNodeRow(
                         node: node,
-                        isActive: activeStdURL == node.url.standardizedFileURL,
-                        onTap: { onSelect(node.url) }
+                        activeStdURL: activeStdURL,
+                        expandedNodeIDs: $model.expandedNodeIDs,
+                        onSelect: onSelect
                     )
                     .listRowBackground(Color.clear)
                 }
@@ -220,6 +224,53 @@ struct LibrarySidebar: View {
         }
         .frame(maxWidth: .infinity)
         .padding(PanelySpacing.md)
+    }
+}
+
+private struct FileTreeNodeRow: View {
+    let node: FileNode
+    let activeStdURL: URL?
+    @Binding var expandedNodeIDs: Set<URL>
+    let onSelect: (URL) -> Void
+
+    var body: some View {
+        if let children = node.children, !children.isEmpty {
+            DisclosureGroup(isExpanded: expansionBinding(for: node.id)) {
+                ForEach(children) { child in
+                    FileTreeNodeRow(
+                        node: child,
+                        activeStdURL: activeStdURL,
+                        expandedNodeIDs: $expandedNodeIDs,
+                        onSelect: onSelect
+                    )
+                }
+            } label: {
+                row
+            }
+        } else {
+            row
+        }
+    }
+
+    private var row: some View {
+        FileNodeRow(
+            node: node,
+            isActive: activeStdURL == node.url.standardizedFileURL,
+            onTap: { onSelect(node.url) }
+        )
+    }
+
+    private func expansionBinding(for id: URL) -> Binding<Bool> {
+        Binding(
+            get: { expandedNodeIDs.contains(id) },
+            set: { isExpanded in
+                if isExpanded {
+                    expandedNodeIDs.insert(id)
+                } else {
+                    expandedNodeIDs.remove(id)
+                }
+            }
+        )
     }
 }
 
