@@ -126,6 +126,17 @@ struct ReaderViewModelVerticalModeTests {
         #expect(vm.fitMode == .fitWidth) // we don't undo on the way out
     }
 
+    @Test func togglingOutOfVerticalClearsStaleStripImagesImmediately() {
+        let vm = makeTestViewModel()
+        vm.layout = .vertical
+        vm.currentImages = (0..<4).map { _ in NSImage(size: NSSize(width: 100, height: 150)) }
+
+        vm.toggleLayout() // .vertical → .single
+
+        #expect(vm.layout == .single)
+        #expect(vm.currentImages.isEmpty)
+    }
+
     // MARK: applyFit uses the first image as reference in vertical mode
 
     @Test func applyFitInVerticalUsesFirstImageNotEntireStrip() {

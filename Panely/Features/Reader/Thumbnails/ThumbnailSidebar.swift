@@ -155,7 +155,10 @@ private struct ThumbnailCell: View {
         }
         .buttonStyle(.plain)
         .task(id: page.id) {
-            image = await ThumbnailLoader.shared.thumbnail(for: page)
+            image = nil
+            let loaded = await ThumbnailLoader.shared.thumbnail(for: page)
+            guard !Task.isCancelled else { return }
+            image = loaded
         }
     }
 }

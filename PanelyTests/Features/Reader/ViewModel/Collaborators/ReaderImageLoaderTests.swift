@@ -25,7 +25,7 @@ struct ReaderImageLoaderTests {
         #expect(loader.loadedPageIndices.isEmpty)
     }
 
-    @Test func prepareForVerticalRebuildClearsImagesButLeavesDimensions() {
+    @Test func prepareForLayoutRebuildClearsImagesButLeavesDimensions() {
         let loader = ReaderImageLoader()
         loader.currentImages = [
             ReaderImageLoader.makePlaceholder(size: CGSize(width: 100, height: 150)),
@@ -36,7 +36,7 @@ struct ReaderImageLoaderTests {
             CGSize(width: 100, height: 150),
         ]
 
-        loader.prepareForVerticalRebuild()
+        loader.prepareForLayoutRebuild()
 
         // Images go (callers will repopulate via refresh()) but dimensions
         // stay so the strip's frame doesn't collapse mid-transition.

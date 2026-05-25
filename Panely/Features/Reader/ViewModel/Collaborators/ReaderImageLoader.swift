@@ -53,10 +53,9 @@ final class ReaderImageLoader {
         loadedPageIndices.removeAll()
     }
 
-    /// Clear the strip in preparation for a paged→vertical rebuild. The
-    /// caller is responsible for calling `refresh(...)` immediately after to
-    /// repopulate.
-    func prepareForVerticalRebuild() {
+    /// Clear images before a layout rebuild. The caller is responsible for
+    /// calling `refresh(...)` immediately after to repopulate.
+    func prepareForLayoutRebuild() {
         currentImages = []
     }
 

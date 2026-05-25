@@ -15,6 +15,7 @@ final class LibrarySidebarModel {
             scanCompleted = false
             return
         }
+        nodes = []
         scanCompleted = false
 
         let shallow = await loader.loadTree(from: rootURL, maxDepth: 1)

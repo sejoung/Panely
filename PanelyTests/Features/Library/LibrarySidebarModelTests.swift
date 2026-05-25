@@ -40,6 +40,30 @@ struct LibrarySidebarModelTests {
         #expect(model.scanCompleted)
         #expect(model.nodes.map(\.name) == ["depth-3"])
     }
+
+    @Test func reloadClearsPreviousNodesBeforeLoadingNewRoot() async {
+        let model = LibrarySidebarModel()
+        await model.reload(
+            rootURL: URL(fileURLWithPath: "/old-library", isDirectory: true),
+            loader: FakeLibraryTreeLoader()
+        )
+        #expect(model.nodes.isEmpty == false)
+
+        let loader = SuspendedLibraryTreeLoader()
+        let task = Task {
+            await model.reload(
+                rootURL: URL(fileURLWithPath: "/new-library", isDirectory: true),
+                loader: loader
+            )
+        }
+        await loader.waitUntilStarted()
+
+        #expect(model.nodes.isEmpty)
+        #expect(model.scanCompleted == false)
+
+        await loader.finish()
+        await task.value
+    }
 }
 
 private nonisolated struct FakeLibraryTreeLoader: LibraryTreeLoading {
@@ -53,5 +77,55 @@ private nonisolated struct FakeLibraryTreeLoader: LibraryTreeLoading {
                 children: nil
             ),
         ]
+    }
+}
+
+private actor SuspendedLibraryTreeLoader: LibraryTreeLoading {
+    private var startedContinuation: CheckedContinuation<Void, Never>?
+    private var finishContinuation: CheckedContinuation<Void, Never>?
+    private var didStart = false
+    private var didSuspend = false
+    private var didFinish = false
+
+    nonisolated func loadTree(from url: URL, maxDepth: Int) async -> [FileNode] {
+        await markStarted()
+        await waitForFinishIfNeeded()
+        return [
+            FileNode(
+                id: url.appendingPathComponent("loaded-\(maxDepth).cbz"),
+                url: url.appendingPathComponent("loaded-\(maxDepth).cbz"),
+                name: "loaded-\(maxDepth)",
+                kind: .archive,
+                children: nil
+            ),
+        ]
+    }
+
+    func waitUntilStarted() async {
+        if didStart { return }
+        await withCheckedContinuation { continuation in
+            startedContinuation = continuation
+        }
+    }
+
+    func finish() {
+        didFinish = true
+        finishContinuation?.resume()
+        finishContinuation = nil
+    }
+
+    private func markStarted() {
+        didStart = true
+        startedContinuation?.resume()
+        startedContinuation = nil
+    }
+
+    private func waitForFinishIfNeeded() async {
+        guard !didSuspend else { return }
+        didSuspend = true
+        guard !didFinish else { return }
+        await withCheckedContinuation { continuation in
+            finishContinuation = continuation
+        }
     }
 }

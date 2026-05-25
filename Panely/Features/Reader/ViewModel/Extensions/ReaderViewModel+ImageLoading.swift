@@ -17,13 +17,14 @@ extension ReaderViewModel {
         let step = navigationStep
         currentPageIndex = (currentPageIndex / step) * step
 
+        imageLoader.prepareForLayoutRebuild()
+
         // Going from paged to vertical: clear stale paged images and show
         // a loading indicator immediately. Without this the user sees the
         // viewer's empty state for the duration of the dimension fetch +
         // initial window load (which can be a noticeable beat for big
         // folders). refreshImages clears isLoading when it finishes.
         if layout.isContinuous && !oldLayout.isContinuous {
-            imageLoader.prepareForVerticalRebuild()
             isLoading = true
             loadingMessage = "Building vertical strip…"
         }
