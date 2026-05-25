@@ -115,6 +115,14 @@ struct ViewerResizeFitTests {
         #expect(abs(scrollView.magnification - expectedFit) < 0.001)
     }
 
+    @Test func layoutChangeForcesFitResetEvenWhenFitModeIsUnchanged() {
+        #expect(AppKitImageScroller.shouldForceFitReset(
+            identityChanged: false,
+            fitModeChanged: false,
+            layoutChanged: true
+        ))
+    }
+
     /// When autoFitOnResize is OFF (locked), applyFit must preserve the
     /// current magnification even when the user hasn't manually zoomed —
     /// otherwise layout changes / view option toggles would still trigger

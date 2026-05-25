@@ -136,10 +136,9 @@ extension ReaderViewModel {
 
     func toggleLayout() {
         // Don't auto-change fitMode on layout transitions — the user's last
-        // explicit fit choice is preserved. If they want a different fit
-        // for the new mode they can press ⌘1/⌘2/⌘3. Combined with applyFit
-        // not force-resetting magnification on layout-only changes, this
-        // means a manually-zoomed viewer stays at that zoom across modes.
+        // explicit fit choice is preserved. The viewer still reapplies that
+        // fit against the new layout geometry so vertical zoom does not leak
+        // into single/double page viewing.
         layout = layout.next
     }
 

@@ -116,10 +116,24 @@ struct AppKitImageScroller: NSViewRepresentable {
         /// before applying fit.
         var needsLayoutReset: Bool { identityChanged || fitModeChanged || layoutChanged }
 
-        /// Fundamental changes that override the user's manual zoom. Layout
-        /// alone doesn't qualify — switching single ↔ vertical preserves any
-        /// manual magnification (see lock semantics in `applyFit`).
-        var forceFitReset: Bool { identityChanged || fitModeChanged }
+        /// Fundamental changes that override the user's manual zoom. A layout
+        /// change swaps the document geometry, so a zoom that made sense in a
+        /// vertical strip should not leak into single/double page viewing.
+        var forceFitReset: Bool {
+            AppKitImageScroller.shouldForceFitReset(
+                identityChanged: identityChanged,
+                fitModeChanged: fitModeChanged,
+                layoutChanged: layoutChanged
+            )
+        }
+    }
+
+    static func shouldForceFitReset(
+        identityChanged: Bool,
+        fitModeChanged: Bool,
+        layoutChanged: Bool
+    ) -> Bool {
+        identityChanged || fitModeChanged || layoutChanged
     }
 
     private func recordPropChange(into coordinator: AppKitScrollerCoordinator) -> PropDiff {
