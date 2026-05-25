@@ -124,6 +124,38 @@ struct ReaderViewModelLibraryTests {
         #expect(vm.sourceChangeMessage == nil)
         #expect(monitor.watchedURL?.standardizedFileURL == second.standardizedFileURL)
     }
+
+    @Test func loadingContainerFolderDescendsToNestedZipSeries() async throws {
+        let root = try Fixture.makeTempDir()
+        let series = root.appendingPathComponent("Manga Series", isDirectory: true)
+        let vol01Pages = root.appendingPathComponent("vol01-pages", isDirectory: true)
+        let vol02Pages = root.appendingPathComponent("vol02-pages", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try FileManager.default.createDirectory(at: series, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: vol01Pages, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: vol02Pages, withIntermediateDirectories: true)
+        try Fixture.makePNG(width: 10, height: 10)
+            .write(to: vol01Pages.appendingPathComponent("001.png"))
+        try Fixture.makePNG(width: 12, height: 10)
+            .write(to: vol02Pages.appendingPathComponent("001.png"))
+
+        let vol01 = series.appendingPathComponent("01.zip")
+        let vol02 = series.appendingPathComponent("02.zip")
+        try Fixture.zipDirectory(vol01Pages, to: vol01)
+        try Fixture.zipDirectory(vol02Pages, to: vol02)
+
+        let vm = makeTestViewModel()
+        await vm.load(url: root)
+
+        #expect(vm.errorMessage == nil)
+        #expect(vm.currentSourceURL?.standardizedFileURL == vol01.standardizedFileURL)
+        #expect(vm.source.pageCount == 1)
+        #expect(vm.siblings.map(\.standardizedFileURL) == [
+            vol01.standardizedFileURL,
+            vol02.standardizedFileURL,
+        ])
+    }
     // MARK: - tempDir.contains
 
     @Test func tempDirContainsIsFalseWhenNoTempDir() {

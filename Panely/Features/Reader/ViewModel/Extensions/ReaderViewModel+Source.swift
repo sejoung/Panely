@@ -466,24 +466,32 @@ extension ReaderViewModel {
     }
 
     private func resolveFolderTarget(for url: URL, epoch: Int) async -> FolderTargetResolution? {
-        guard isDirectory(url) else {
-            return .book(url, siblings: nil)
+        var candidate = url
+        var resolvedSiblings: [URL]?
+
+        while isDirectory(candidate) {
+            loadingMessage = "Scanning folder…"
+            let (hasImages, volumes) = await Self.analyzeFolder(candidate)
+            guard epoch == loadEpoch else { return nil }
+
+            if hasImages {
+                return .book(candidate, siblings: resolvedSiblings)
+            }
+
+            guard let first = volumes.first else {
+                return .empty
+            }
+
+            // Folder series can be nested one or more levels deep:
+            // Library/Series/Vol01.zip or Library/Series/Vol01/*.jpg.
+            // Keep descending through "container" folders until we hit
+            // an actual image folder or archive, and use the nearest
+            // sibling set as volume navigation.
+            resolvedSiblings = volumes
+            candidate = first
         }
 
-        loadingMessage = "Scanning folder…"
-        let (hasImages, volumes) = await Self.analyzeFolder(url)
-        guard epoch == loadEpoch else { return nil }
-
-        if !hasImages && !volumes.isEmpty {
-            guard let first = volumes.first else { return .empty }
-            return .book(first, siblings: volumes)
-        }
-
-        if !hasImages {
-            return .empty
-        }
-
-        return .book(url, siblings: nil)
+        return .book(candidate, siblings: resolvedSiblings)
     }
 
     private func loadComicSource(from url: URL) async throws -> ComicSource {
