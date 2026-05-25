@@ -48,7 +48,7 @@ struct ImageStackVerticalTests {
             NSImage(size: NSSize(width: 100, height: 150)),
             NSImage(size: NSSize(width: 100, height: 150))
         ]
-        stack.setImages(placeholders, axis: .vertical)
+        let initialChanged = stack.setImages(placeholders, axis: .vertical)
 
         // Snapshot the existing layer/subview frames as proof of identity.
         let originalFrames = (0..<3).compactMap { stack.frame(forPageAt: $0) }
@@ -57,10 +57,12 @@ struct ImageStackVerticalTests {
         // Replace middle image. Same count, same axis → incremental path.
         let real = NSImage(size: NSSize(width: 100, height: 150))
         let updated = [placeholders[0], real, placeholders[2]]
-        stack.setImages(updated, axis: .vertical)
+        let updateChanged = stack.setImages(updated, axis: .vertical)
 
         // Frames must be unchanged — no rebuild happened.
         let newFrames = (0..<3).compactMap { stack.frame(forPageAt: $0) }
+        #expect(initialChanged)
+        #expect(updateChanged == false)
         #expect(newFrames == originalFrames)
     }
 
@@ -68,12 +70,13 @@ struct ImageStackVerticalTests {
         let stack = ImageStackView(frame: .zero)
         stack.setImages([NSImage(size: NSSize(width: 100, height: 150))], axis: .horizontal)
 
-        stack.setImages([NSImage(size: NSSize(width: 1000, height: 1500))], axis: .horizontal)
+        let changed = stack.setImages([NSImage(size: NSSize(width: 1000, height: 1500))], axis: .horizontal)
 
         guard let pageFrame = stack.frame(forPageAt: 0) else {
             Issue.record("expected a frame for the single horizontal page")
             return
         }
+        #expect(changed)
         #expect(abs(pageFrame.width - 1000) < 0.001)
         #expect(abs(pageFrame.height - 1500) < 0.001)
         #expect(abs(stack.frame.width - 1000) < 0.001)
@@ -122,9 +125,10 @@ struct ImageStackVerticalTests {
         #expect(verticalSecond?.origin.y == 150)
         #expect(verticalSecond?.origin.x == 0)
 
-        stack.setImages(images, axis: .horizontal)
+        let changed = stack.setImages(images, axis: .horizontal)
         let horizontalSecond = stack.frame(forPageAt: 1)
         // Horizontal: image 1 sits to the right of image 0 → (100, 0, 100, 150)
+        #expect(changed)
         #expect(horizontalSecond?.origin.x == 100)
         #expect(horizontalSecond?.origin.y == 0)
     }

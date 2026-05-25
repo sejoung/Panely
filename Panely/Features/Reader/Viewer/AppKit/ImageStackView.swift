@@ -33,7 +33,8 @@ final class ImageStackView: NSView {
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { false }
 
-    func setImages(_ newImages: [NSImage], axis: Axis) {
+    @discardableResult
+    func setImages(_ newImages: [NSImage], axis: Axis) -> Bool {
         let sameCount = newImages.count == currentImages.count
         let sameAxis = self.axis == axis
         let sameGeometry = sameCount && zip(newImages, currentImages).allSatisfy { newImage, currentImage in
@@ -49,7 +50,7 @@ final class ImageStackView: NSView {
             for (index, view) in liveViews where currentImages.indices.contains(index) {
                 view.image = currentImages[index]
             }
-            return
+            return false
         }
 
         // Slow path: structural change → recycle all live views, recompute
@@ -80,6 +81,7 @@ final class ImageStackView: NSView {
         }
         // Vertical mode: views are created lazily by refreshVisibleViews
         // (called by AppKitImageScroller's bounds observer).
+        return true
     }
 
     /// Materializes NSImageViews for pages whose frames intersect

@@ -44,9 +44,12 @@ struct AppKitImageScroller: NSViewRepresentable {
         guard let content = scrollView.documentView as? ImageStackView else { return }
 
         refreshCoordinatorBindings(context.coordinator, scrollView: scrollView)
-        updateContentImages(content)
+        let contentStructureChanged = updateContentImages(content)
 
-        let diff = recordPropChange(into: context.coordinator)
+        let diff = recordPropChange(
+            into: context.coordinator,
+            contentStructureChanged: contentStructureChanged
+        )
         applyFitIfNeeded(scrollView: scrollView, coordinator: context.coordinator, diff: diff)
         syncScrollPositionIfNeeded(scrollView: scrollView, content: content, coordinator: context.coordinator)
         kickInitialVisibleRangeIfVertical(scrollView: scrollView, content: content, coordinator: context.coordinator)
@@ -95,11 +98,11 @@ struct AppKitImageScroller: NSViewRepresentable {
         viewerController?.attach(scrollView: scrollView)
     }
 
-    private func updateContentImages(_ content: ImageStackView) {
+    private func updateContentImages(_ content: ImageStackView) -> Bool {
         let axis: ImageStackView.Axis = layout.isContinuous ? .vertical : .horizontal
         // RTL only applies to paged horizontal modes — webtoon strips are top-to-bottom.
         let ordered = (direction.isRTL && !layout.isContinuous) ? images.reversed() : images
-        content.setImages(ordered, axis: axis)
+        return content.setImages(ordered, axis: axis)
     }
 
     /// Compares incoming props against the coordinator's last-seen snapshot,
@@ -110,20 +113,25 @@ struct AppKitImageScroller: NSViewRepresentable {
         let identityChanged: Bool
         let fitModeChanged: Bool
         let layoutChanged: Bool
+        let contentStructureChanged: Bool
         let pageChanged: Bool
 
         /// Structural changes that demand we re-layout the scroll subtree
         /// before applying fit.
-        var needsLayoutReset: Bool { identityChanged || fitModeChanged || layoutChanged }
+        var needsLayoutReset: Bool {
+            identityChanged || fitModeChanged || layoutChanged || contentStructureChanged
+        }
 
         /// Fundamental changes that override the user's manual zoom. A layout
-        /// change swaps the document geometry, so a zoom that made sense in a
-        /// vertical strip should not leak into single/double page viewing.
+        /// or document-structure change swaps the geometry, so a zoom that made
+        /// sense in a vertical strip should not leak into single/double page
+        /// viewing.
         var forceFitReset: Bool {
             AppKitImageScroller.shouldForceFitReset(
                 identityChanged: identityChanged,
                 fitModeChanged: fitModeChanged,
-                layoutChanged: layoutChanged
+                layoutChanged: layoutChanged,
+                contentStructureChanged: contentStructureChanged
             )
         }
     }
@@ -131,16 +139,21 @@ struct AppKitImageScroller: NSViewRepresentable {
     static func shouldForceFitReset(
         identityChanged: Bool,
         fitModeChanged: Bool,
-        layoutChanged: Bool
+        layoutChanged: Bool,
+        contentStructureChanged: Bool
     ) -> Bool {
-        identityChanged || fitModeChanged || layoutChanged
+        identityChanged || fitModeChanged || layoutChanged || contentStructureChanged
     }
 
-    private func recordPropChange(into coordinator: AppKitScrollerCoordinator) -> PropDiff {
+    private func recordPropChange(
+        into coordinator: AppKitScrollerCoordinator,
+        contentStructureChanged: Bool
+    ) -> PropDiff {
         let diff = PropDiff(
             identityChanged: coordinator.lastIdentity != identity,
             fitModeChanged: coordinator.lastFitMode != fitMode,
             layoutChanged: coordinator.lastLayout != layout,
+            contentStructureChanged: contentStructureChanged,
             // Don't pre-set lastPageIndex here. We only mark a page as
             // "successfully shown" after the scroll actually lands (see
             // syncScrollPositionIfNeeded), otherwise initial vertical

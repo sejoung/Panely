@@ -119,7 +119,17 @@ struct ViewerResizeFitTests {
         #expect(AppKitImageScroller.shouldForceFitReset(
             identityChanged: false,
             fitModeChanged: false,
-            layoutChanged: true
+            layoutChanged: true,
+            contentStructureChanged: false
+        ))
+    }
+
+    @Test func contentStructureChangeForcesFitResetEvenWhenLayoutPropIsAlreadyCurrent() {
+        #expect(AppKitImageScroller.shouldForceFitReset(
+            identityChanged: false,
+            fitModeChanged: false,
+            layoutChanged: false,
+            contentStructureChanged: true
         ))
     }
 
