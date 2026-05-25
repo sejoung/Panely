@@ -1,11 +1,10 @@
 import Foundation
 
 nonisolated struct ComicPage: Identifiable, Sendable {
-    /// Deterministic identifier derived from the page's source. Stable
-    /// across `ComicSource` reloads of the same book, so the image and
-    /// thumbnail caches stay warm when a user closes and re-opens a
-    /// volume. Was a random `UUID()` previously — every reload caused a
-    /// full thumbnail re-decode.
+    /// Deterministic identifier derived from the page's source plus the
+    /// source file's content signature. Stable while the file is unchanged,
+    /// but changes when a file/archive is replaced in-place so image and
+    /// thumbnail caches do not serve stale pages.
     let id: String
     let source: ComicPageSource
     let displayName: String
@@ -26,7 +25,12 @@ nonisolated struct ComicPage: Identifiable, Sendable {
             // caches survive an archive reopen. Include the archive's content
             // signature so replacing a file in-place invalidates image caches
             // while the reader is still open.
-            return "archive:" + reader.archiveURL.standardizedFileURL.path + "#" + contentSignature(for: reader.archiveURL) + "#" + path
+            return "archive:"
+                + reader.archiveURL.standardizedFileURL.path
+                + "#"
+                + contentSignature(for: reader.archiveURL)
+                + "#"
+                + path
         }
     }
 
