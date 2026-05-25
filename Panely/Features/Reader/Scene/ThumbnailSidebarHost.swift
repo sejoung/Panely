@@ -18,5 +18,6 @@ struct ThumbnailSidebarHost: View {
             },
             onClose: { viewModel.toggleThumbnailSidebar() }
         )
+        .id(viewModel.sourceRenderRevision)
     }
 }

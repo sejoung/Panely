@@ -19,12 +19,21 @@ nonisolated struct ComicPage: Identifiable, Sendable {
     private static func makeID(for source: ComicPageSource) -> String {
         switch source {
         case .file(let url):
-            return "file:" + url.standardizedFileURL.path
+            return "file:" + url.standardizedFileURL.path + "#" + contentSignature(for: url)
         case .archiveEntry(let reader, let path):
             // ArchiveReader is identified by its archive URL — different
             // readers for the same archive must produce the same id so
-            // caches survive an archive reopen.
-            return "archive:" + reader.archiveURL.standardizedFileURL.path + "#" + path
+            // caches survive an archive reopen. Include the archive's content
+            // signature so replacing a file in-place invalidates image caches
+            // while the reader is still open.
+            return "archive:" + reader.archiveURL.standardizedFileURL.path + "#" + contentSignature(for: reader.archiveURL) + "#" + path
         }
+    }
+
+    private static func contentSignature(for url: URL) -> String {
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        let modified = (attributes?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+        let size = (attributes?[.size] as? NSNumber)?.int64Value ?? -1
+        return "\(size):\(modified)"
     }
 }

@@ -28,6 +28,10 @@ final class ThumbnailLoader {
 
     private init() {}
 
+    func removeAll() {
+        cache.removeAllObjects()
+    }
+
     func thumbnail(for page: ComicPage, maxPixelSize: CGFloat = 240) async -> NSImage? {
         let key = "\(page.id)@\(Int(maxPixelSize))" as NSString
         if let cached = cache.object(forKey: key) {
@@ -54,7 +58,13 @@ final class ThumbnailLoader {
         switch page.source {
         case .file(let url):
             return try await Task.detached(priority: .userInitiated) {
-                guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else {
+                let data: Data
+                do {
+                    data = try Data(contentsOf: url, options: [.mappedIfSafe])
+                } catch {
+                    throw ThumbnailLoaderError.decodingFailed
+                }
+                guard let src = CGImageSourceCreateWithData(data as CFData, nil) else {
                     throw ThumbnailLoaderError.decodingFailed
                 }
                 return try makeThumbnail(from: src, maxPixelSize: maxPixelSize)

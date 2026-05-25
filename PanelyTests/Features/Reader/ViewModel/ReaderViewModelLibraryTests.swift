@@ -63,13 +63,14 @@ struct ReaderViewModelLibraryTests {
         try Fixture.makePNG(width: 10, height: 10).write(to: imageURL)
 
         let vm = makeTestViewModel()
+        let initialSourceRevision = vm.sourceRenderRevision
         await vm.load(url: root)
 
         #expect(vm.currentSourceURL?.standardizedFileURL == root.standardizedFileURL)
         #expect(vm.pendingSourceURL == nil)
         #expect(vm.sidebarActiveURL?.standardizedFileURL == root.standardizedFileURL)
+        #expect(vm.sourceRenderRevision == initialSourceRevision + 1)
     }
-
     // MARK: - tempDir.contains
 
     @Test func tempDirContainsIsFalseWhenNoTempDir() {

@@ -55,6 +55,7 @@ final class ReaderViewModel {
     var currentSourceURL: URL?
     var pendingSourceURL: URL?
     var siblings: [URL] = []
+    var sourceRenderRevision: Int = 0
 
     /// One-press cue for advancing to the previous volume from page 0.
     /// Set by `goBackward()` (either when arriving at 0 from a higher page,

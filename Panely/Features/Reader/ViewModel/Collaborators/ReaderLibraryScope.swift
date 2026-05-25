@@ -1,5 +1,20 @@
 import Foundation
 
+nonisolated protocol SecurityScopedResourceAccessing {
+    func startAccessing(_ url: URL) -> Bool
+    func stopAccessing(_ url: URL)
+}
+
+private nonisolated struct URLSecurityScopedResourceAccessor: SecurityScopedResourceAccessing {
+    func startAccessing(_ url: URL) -> Bool {
+        url.startAccessingSecurityScopedResource()
+    }
+
+    func stopAccessing(_ url: URL) {
+        url.stopAccessingSecurityScopedResource()
+    }
+}
+
 /// Owns the macOS sandbox security-scoped resource grant for the current
 /// library root. The reader can only read files inside a URL the user
 /// explicitly picked (Open dialog, drag-drop, "Open With"); macOS hands us
@@ -20,6 +35,12 @@ final class ReaderLibraryScope {
     /// `acquire(_:)` / `release()` so the kernel-side grant lifecycle stays
     /// paired.
     var url: URL?
+    private let accessor: any SecurityScopedResourceAccessing
+    private var hasStartedSecurityScope = false
+
+    init(accessor: any SecurityScopedResourceAccessing = URLSecurityScopedResourceAccessor()) {
+        self.accessor = accessor
+    }
 
     /// True when a security-scope grant is currently held.
     var isActive: Bool { url != nil }
@@ -32,8 +53,9 @@ final class ReaderLibraryScope {
     @discardableResult
     func acquire(_ candidate: URL) -> Bool {
         release()
-        if candidate.startAccessingSecurityScopedResource() {
+        if accessor.startAccessing(candidate) {
             url = candidate
+            hasStartedSecurityScope = true
             return true
         }
         return false
@@ -41,8 +63,11 @@ final class ReaderLibraryScope {
 
     /// Release the active grant (if any). No-op when nothing is held.
     func release() {
-        url?.stopAccessingSecurityScopedResource()
+        if hasStartedSecurityScope, let url {
+            accessor.stopAccessing(url)
+        }
         url = nil
+        hasStartedSecurityScope = false
     }
 
     /// True when `candidate` lives at or under the scoped URL. False when no

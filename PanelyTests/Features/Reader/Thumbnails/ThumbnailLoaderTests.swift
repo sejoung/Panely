@@ -59,6 +59,47 @@ struct ThumbnailLoaderTests {
         #expect(first === second)
     }
 
+    @Test func removeAllClearsCachedThumbnail() async throws {
+        let dir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let url = dir.appendingPathComponent("\(UUID().uuidString).png")
+        try Fixture.makePNG(width: 120, height: 160).write(to: url)
+        let page = ComicPage(source: .file(url), displayName: url.lastPathComponent)
+
+        let first = await ThumbnailLoader.shared.thumbnail(for: page)
+        ThumbnailLoader.shared.removeAll()
+        let second = await ThumbnailLoader.shared.thumbnail(for: page)
+
+        guard let first, let second else {
+            Issue.record("expected both thumbnails to resolve")
+            return
+        }
+        #expect(first !== second)
+    }
+
+    @Test func reloadsUpdatedFileAtSameURL() async throws {
+        let dir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let url = dir.appendingPathComponent("\(UUID().uuidString).png")
+        try Fixture.makePNG(width: 24, height: 36).write(to: url)
+        let firstPage = ComicPage(source: .file(url), displayName: url.lastPathComponent)
+        _ = await ThumbnailLoader.shared.thumbnail(for: firstPage, maxPixelSize: 100)
+
+        try Fixture.makePNG(width: 96, height: 48).write(to: url)
+        let secondPage = ComicPage(source: .file(url), displayName: url.lastPathComponent)
+        ThumbnailLoader.shared.removeAll()
+        let reloaded = await ThumbnailLoader.shared.thumbnail(for: secondPage, maxPixelSize: 100)
+
+        guard let reloaded else {
+            Issue.record("expected updated thumbnail to resolve")
+            return
+        }
+        #expect(reloaded.size.width == 96)
+        #expect(reloaded.size.height == 48)
+    }
+
     @Test func differentPagesDoNotCollideInCache() async throws {
         let dir = try Fixture.makeTempDir()
         defer { try? FileManager.default.removeItem(at: dir) }

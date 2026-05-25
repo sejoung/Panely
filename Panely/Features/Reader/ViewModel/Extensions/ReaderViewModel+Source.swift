@@ -281,6 +281,8 @@ extension ReaderViewModel {
 
     private func startLoad() -> Int {
         imageLoader.cancelPreload()
+        ThumbnailLoader.shared.removeAll()
+        sourceRenderRevision &+= 1
 
         // Any new book load — explicit, via prev/next volume, or via library
         // — resets the prev-volume cue. Without this, opening Vol N+1 after

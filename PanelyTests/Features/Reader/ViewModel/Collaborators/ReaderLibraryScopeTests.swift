@@ -69,19 +69,33 @@ struct ReaderLibraryScopeTests {
         #expect(scope.url == nil)
     }
 
-    @Test func acquireOnUnscopedURLLeavesNoScopeButReleasesAnyPrevious() {
-        // A synthetic file:// URL was never granted Powerbox scope, so
-        // `startAccessingSecurityScopedResource()` returns false and the
-        // scope ends up empty. Crucially the previously held URL is still
-        // released — the implementation calls release() first, no matter
-        // whether the new acquire succeeds.
-        let scope = ReaderLibraryScope()
+    @Test func acquireFailureLeavesNoScopeButReleasesAnyPrevious() {
+        // The real URL API is environment-dependent for synthetic file URLs,
+        // so inject a denying accessor and assert the ReaderLibraryScope
+        // contract directly.
+        let accessor = FakeSecurityScopedResourceAccessor(grantsAccess: false)
+        let scope = ReaderLibraryScope(accessor: accessor)
         scope.url = URL(fileURLWithPath: "/previous")
         #expect(scope.isActive)
 
         let granted = scope.acquire(URL(fileURLWithPath: "/new/unscoped"))
         #expect(granted == false)
         #expect(scope.isActive == false)
+    }
+
+    @Test func acquireSuccessStoresURLAndReleaseStopsAccessor() {
+        let accessor = FakeSecurityScopedResourceAccessor(grantsAccess: true)
+        let scope = ReaderLibraryScope(accessor: accessor)
+        let url = URL(fileURLWithPath: "/library")
+
+        let granted = scope.acquire(url)
+        #expect(granted)
+        #expect(scope.url == url)
+        #expect(accessor.startedURLs == [url])
+
+        scope.release()
+        #expect(scope.isActive == false)
+        #expect(accessor.stoppedURLs == [url])
     }
 
     @Test func releaseIsIdempotent() {
@@ -102,5 +116,24 @@ struct ReaderLibraryScopeTests {
 
         scope.url = nil
         #expect(scope.isActive == false)
+    }
+}
+
+private final class FakeSecurityScopedResourceAccessor: SecurityScopedResourceAccessing {
+    let grantsAccess: Bool
+    private(set) var startedURLs: [URL] = []
+    private(set) var stoppedURLs: [URL] = []
+
+    init(grantsAccess: Bool) {
+        self.grantsAccess = grantsAccess
+    }
+
+    func startAccessing(_ url: URL) -> Bool {
+        startedURLs.append(url)
+        return grantsAccess
+    }
+
+    func stopAccessing(_ url: URL) {
+        stoppedURLs.append(url)
     }
 }
