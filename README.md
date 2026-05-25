@@ -80,6 +80,11 @@ pages.
 - **Progress overlay** — stage-aware messages (Opening / Extracting /
   Loading / Building vertical strip) while big sources are processed,
   all on background threads
+- **Reload and source-change notice** — `⌘R` reloads the current book.
+  If the opened file changes on disk, Panely shows a small banner with
+  Reload / Dismiss actions instead of moving the reader unexpectedly
+- **Image error placeholders** — an unreadable page stays visible as a
+  labeled error tile, so one bad image doesn't collapse the spread/strip
 
 ### File support
 - Open **folder**, **CBZ**, or **ZIP**
@@ -107,7 +112,8 @@ pages.
 ### Navigation
 - **Keyboard-first** — `← → Space` for pages, `⌘[ ⌘]` for volumes,
   `⌘1 ⌘2 ⌘3` for fit modes, `⌘+ ⌘- ⌘0` for zoom, `⌃⌘S` to pin the sidebar,
-  `⌃⌘T` to pin the toolbar, `⌘L` to lock view size, `⌘O` to open
+  `⌃⌘T` to pin the toolbar, `⌘L` to lock view size, `⌘O` to open,
+  and `⌘R` to reload
 - **Pinned library sidebar by default** — the folder tree stays visible on a
   fresh install. Unpin with `⌃⌘S` (or the pin button) to switch to auto-hide:
   hover the **left edge** (200 ms) and the sidebar slides in as an overlay
@@ -210,6 +216,7 @@ Terminal) and move the result straight to `/Applications`.
 | Input | Action |
 |:------|:-------|
 | `⌘O` | Open folder / CBZ / ZIP |
+| `⌘R` | Reload current book |
 | `←` / `→` | Previous / next page (direction-aware; advances to the next/previous volume when the matching end-of-volume card is showing) |
 | `Space` | Next page (advances to the next volume when the end-of-volume card is showing) |
 | `⌘[` / `⌘]` | Previous / next volume |
@@ -370,7 +377,7 @@ at a glance.
 Panely/
 ├── PanelyApp.swift                     # @main, window style, .commands { fileCommands + viewCommands + goCommands }
 ├── ContentView.swift
-├── AppDependencies.swift               # injected app services (cache, bookmarks, persistence, system settings)
+├── AppDependencies.swift               # injected app services (cache, bookmarks, persistence, system settings, file watching)
 ├── AppIcon.icns                        # generated from docs/icon/*.svg
 ├── Commands/                           # @CommandsBuilder extensions on PanelyApp
 │   ├── PanelyApp+FileCommands.swift    # Open / Open Recent
@@ -381,6 +388,7 @@ Panely/
 │   ├── Diagnostics/
 │   │   ├── AppLog.swift                # swift-log facade + OSLog/file diagnostic backend
 │   │   └── DiagnosticLogStore.swift    # rolling recent-log.txt cache file
+│   ├── SourceChangeMonitor.swift       # DispatchSource-backed source file watcher
 │   └── Extensions/                     # shared Foundation helpers
 ├── DesignSystem/
 │   ├── Tokens/                         # Color / Spacing / Typography / Motion

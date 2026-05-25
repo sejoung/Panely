@@ -73,6 +73,11 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   동안 forward/backward 키 한 번이면 권을 이동
 - **진행 오버레이** — 큰 소스를 처리하는 동안 단계별 메시지
   (Opening / Extracting / Loading / Building vertical strip), 전부 백그라운드 스레드
+- **리로드와 파일 변경 알림** — `⌘R`로 현재 책을 다시 읽음. 열린 파일이
+  디스크에서 바뀌면 읽던 위치를 갑자기 옮기지 않고 Reload / Dismiss
+  액션이 있는 작은 배너를 표시
+- **이미지 오류 플레이스홀더** — 읽을 수 없는 페이지는 라벨이 있는 오류
+  타일로 남겨 한 장의 깨진 이미지가 펼침/스트립 레이아웃을 무너뜨리지 않음
 
 ### 파일 지원
 - **폴더**, **CBZ**, **ZIP** 열기
@@ -99,7 +104,7 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
 ### 네비게이션
 - **키보드 우선** — `← → Space` 페이지, `⌘[ ⌘]` 볼륨,
   `⌘1 ⌘2 ⌘3` 맞춤 모드, `⌘+ ⌘- ⌘0` 줌, `⌃⌘S` 사이드바 고정,
-  `⌃⌘T` 툴바 고정, `⌘L` 뷰 크기 잠금, `⌘O` 열기
+  `⌃⌘T` 툴바 고정, `⌘L` 뷰 크기 잠금, `⌘O` 열기, `⌘R` 리로드
 - **라이브러리 사이드바 기본 고정** — fresh install에서는 폴더 트리가
   보이도록 고정되어 시작. `⌃⌘S`(또는 고정 버튼)로 고정을 풀면 자동
   숨김 모드가 되고, **왼쪽 가장자리**에 호버(200 ms) 시 오버레이로
@@ -196,6 +201,7 @@ LaunchServices 캐시에 남을 수 있으니, 우클릭 → "다음으로 압�
 | 입력 | 동작 |
 |:------|:-------|
 | `⌘O` | 폴더 / CBZ / ZIP 열기 |
+| `⌘R` | 현재 책 다시 읽기 |
 | `←` / `→` | 이전 / 다음 페이지 (방향 반영. 매칭되는 권 카드가 떠 있으면 다음/이전 권으로 이동) |
 | `Space` | 다음 페이지 (Up next 카드가 떠 있으면 다음 권으로 이동) |
 | `⌘[` / `⌘]` | 이전 / 다음 볼륨 |
@@ -347,7 +353,7 @@ ViewModel/Collaborators}`. 공유 픽스처(실제 PNG 생성기 포함)는
 Panely/
 ├── PanelyApp.swift                     # @main, 윈도우 스타일, .commands { fileCommands + viewCommands + goCommands }
 ├── ContentView.swift
-├── AppDependencies.swift               # 주입되는 앱 서비스(cache, bookmark, persistence, system settings)
+├── AppDependencies.swift               # 주입되는 앱 서비스(cache, bookmark, persistence, system settings, 파일 감시)
 ├── AppIcon.icns                        # docs/icon/*.svg에서 생성
 ├── Commands/                           # PanelyApp에 대한 @CommandsBuilder extension
 │   ├── PanelyApp+FileCommands.swift    # Open / Open Recent
@@ -358,6 +364,7 @@ Panely/
 │   ├── Diagnostics/
 │   │   ├── AppLog.swift                # swift-log facade + OSLog/file 진단 backend
 │   │   └── DiagnosticLogStore.swift    # rolling recent-log.txt 캐시 파일
+│   ├── SourceChangeMonitor.swift       # DispatchSource 기반 소스 파일 감시
 │   └── Extensions/                     # 공유 Foundation helper
 ├── DesignSystem/
 │   ├── Tokens/                         # Color / Spacing / Typography / Motion

@@ -6,6 +6,7 @@ nonisolated struct AppDependencies {
     let libraryTreeLoader: any LibraryTreeLoading
     let keyValueStore: any KeyValueStoring
     let systemSettings: any SystemSettingsReading
+    let sourceChangeMonitorFactory: @MainActor () -> any SourceChangeMonitoring
 
     static let live: AppDependencies = {
         let keyValueStore = LiveKeyValueStore()
@@ -14,7 +15,8 @@ nonisolated struct AppDependencies {
             bookmarkResolver: LiveSecurityScopedBookmarkResolver(),
             libraryTreeLoader: LiveLibraryTreeLoader(),
             keyValueStore: keyValueStore,
-            systemSettings: LiveSystemSettings(keyValueStore: keyValueStore)
+            systemSettings: LiveSystemSettings(keyValueStore: keyValueStore),
+            sourceChangeMonitorFactory: { SourceChangeMonitor() }
         )
     }()
 }

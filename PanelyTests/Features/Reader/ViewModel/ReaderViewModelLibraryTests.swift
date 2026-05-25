@@ -71,6 +71,52 @@ struct ReaderViewModelLibraryTests {
         #expect(vm.sidebarActiveURL?.standardizedFileURL == root.standardizedFileURL)
         #expect(vm.sourceRenderRevision == initialSourceRevision + 1)
     }
+
+    @Test func successfulLoadStartsSourceChangeMonitor() async throws {
+        let root = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try Fixture.makePNG(width: 10, height: 10)
+            .write(to: root.appendingPathComponent("001.png"))
+
+        let monitor = TestSourceChangeMonitor()
+        let vm = ReaderViewModel(
+            dependencies: makeTestDependencies(sourceChangeMonitorFactory: { monitor })
+        )
+
+        await vm.load(url: root)
+
+        #expect(monitor.watchedURL?.standardizedFileURL == root.standardizedFileURL)
+    }
+
+    @Test func sourceChangeMonitorMarksAndNextLoadClearsNotice() async throws {
+        let first = try Fixture.makeTempDir()
+        let second = try Fixture.makeTempDir()
+        defer {
+            try? FileManager.default.removeItem(at: first)
+            try? FileManager.default.removeItem(at: second)
+        }
+        try Fixture.makePNG(width: 10, height: 10)
+            .write(to: first.appendingPathComponent("001.png"))
+        try Fixture.makePNG(width: 10, height: 10)
+            .write(to: second.appendingPathComponent("001.png"))
+
+        let monitor = TestSourceChangeMonitor()
+        let vm = ReaderViewModel(
+            dependencies: makeTestDependencies(sourceChangeMonitorFactory: { monitor })
+        )
+
+        await vm.load(url: first)
+        monitor.triggerChange()
+
+        #expect(vm.sourceChangedOnDisk)
+        #expect(vm.sourceChangeMessage != nil)
+
+        await vm.load(url: second)
+
+        #expect(vm.sourceChangedOnDisk == false)
+        #expect(vm.sourceChangeMessage == nil)
+        #expect(monitor.watchedURL?.standardizedFileURL == second.standardizedFileURL)
+    }
     // MARK: - tempDir.contains
 
     @Test func tempDirContainsIsFalseWhenNoTempDir() {

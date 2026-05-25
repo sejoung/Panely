@@ -64,7 +64,13 @@ struct ReaderScene: View {
                 LoadingOverlay(message: viewModel.loadingMessage)
             }
         }
+        .overlay(alignment: .top) {
+            ReaderStatusBanner()
+                .padding(.top, 42)
+        }
         .animation(PanelyMotion.uiReveal, value: viewModel.isLoading)
+        .animation(PanelyMotion.uiReveal, value: viewModel.sourceChangedOnDisk)
+        .animation(PanelyMotion.uiReveal, value: viewModel.errorMessage)
         .frame(minWidth: 800, minHeight: 600)
     }
 
@@ -88,6 +94,61 @@ struct ReaderScene: View {
     private func cancelSidebarDismiss() {
         sidebarDismissTask?.cancel()
         sidebarDismissTask = nil
+    }
+}
+
+private struct ReaderStatusBanner: View {
+    @Environment(ReaderViewModel.self) private var viewModel
+
+    var body: some View {
+        if let message = viewModel.sourceChangeMessage, viewModel.sourceChangedOnDisk {
+            banner(systemImage: "arrow.clockwise.circle", message: message) {
+                Button("Reload") {
+                    viewModel.reloadCurrentSource()
+                }
+                Button("Dismiss") {
+                    viewModel.clearSourceChangeNotice()
+                }
+            }
+        } else if let message = viewModel.errorMessage, !viewModel.isLoading {
+            banner(systemImage: "exclamationmark.triangle", message: message) {
+                if viewModel.currentSourceURL != nil {
+                    Button("Retry") {
+                        viewModel.reloadCurrentSource()
+                    }
+                }
+                Button("Open…") {
+                    viewModel.openSource()
+                }
+            }
+        }
+    }
+
+    private func banner<Actions: View>(
+        systemImage: String,
+        message: String,
+        @ViewBuilder actions: () -> Actions
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.system(size: 16, weight: .semibold))
+            Text(message)
+                .lineLimit(2)
+                .font(.system(size: 13, weight: .medium))
+            actions()
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.black.opacity(0.84), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(.white.opacity(0.12), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
+        .padding(.horizontal, 24)
     }
 }
 

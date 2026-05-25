@@ -263,6 +263,7 @@ The most-used:
 | Next / previous page | `→` / `←` (also `Space` for next) |
 | Next / previous volume | `⌘]` / `⌘[` |
 | Open file | `⌘O` |
+| Reload current book | `⌘R` |
 | Go to page… | `⌘G` |
 | Bookmark / unbookmark page | `⌘D` |
 | Favorite / unfavorite book | `⌘⇧D` |

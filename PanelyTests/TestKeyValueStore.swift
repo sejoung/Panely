@@ -157,19 +157,41 @@ nonisolated struct TestSystemSettings: SystemSettingsReading {
 }
 
 @MainActor
+final class TestSourceChangeMonitor: SourceChangeMonitoring {
+    private(set) var watchedURL: URL?
+    private var onChange: (@MainActor () -> Void)?
+
+    func startWatching(url: URL, onChange: @MainActor @escaping () -> Void) {
+        watchedURL = url
+        self.onChange = onChange
+    }
+
+    func stopWatching() {
+        watchedURL = nil
+        onChange = nil
+    }
+
+    func triggerChange() {
+        onChange?()
+    }
+}
+
+@MainActor
 func makeTestDependencies(
     keyValueStore: InMemoryKeyValueStore = InMemoryKeyValueStore(),
     extractionCache: any ExtractionCacheManaging = TestExtractionCacheManager(),
     bookmarkResolver: any SecurityScopedBookmarking = TestSecurityScopedBookmarkResolver(),
     libraryTreeLoader: any LibraryTreeLoading = TestLibraryTreeLoader(),
-    systemSettings: any SystemSettingsReading = TestSystemSettings()
+    systemSettings: any SystemSettingsReading = TestSystemSettings(),
+    sourceChangeMonitorFactory: @MainActor @escaping () -> any SourceChangeMonitoring = { TestSourceChangeMonitor() }
 ) -> AppDependencies {
     AppDependencies(
         extractionCache: extractionCache,
         bookmarkResolver: bookmarkResolver,
         libraryTreeLoader: libraryTreeLoader,
         keyValueStore: keyValueStore,
-        systemSettings: systemSettings
+        systemSettings: systemSettings,
+        sourceChangeMonitorFactory: sourceChangeMonitorFactory
     )
 }
 

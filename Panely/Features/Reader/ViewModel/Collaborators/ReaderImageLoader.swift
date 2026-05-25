@@ -65,6 +65,11 @@ final class ReaderImageLoader {
         preloadTask?.cancel()
     }
 
+    func cancelBackgroundWork() {
+        preloadTask?.cancel()
+        lazyLoadTask?.cancel()
+    }
+
     // MARK: - Refresh entry point
 
     func refresh(
@@ -328,7 +333,9 @@ final class ReaderImageLoader {
             return image
         } catch {
             onError("Failed to load \(page.displayName)")
-            return nil
+            let fallbackSize = (try? await ImageLoader.dimensions(for: page))
+                ?? CGSize(width: 1000, height: 1500)
+            return ReaderImagePlaceholder.makeError(size: fallbackSize, title: page.displayName)
         }
     }
 

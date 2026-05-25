@@ -78,4 +78,29 @@ nonisolated enum ReaderImagePlaceholder {
             return true
         }
     }
+
+    static func makeError(size: CGSize, title: String) -> NSImage {
+        let safeSize = CGSize(width: max(size.width, 320), height: max(size.height, 240))
+        return NSImage(size: safeSize, flipped: false) { rect in
+            NSColor(white: 0.10, alpha: 1).setFill()
+            rect.fill()
+
+            let border = NSBezierPath(rect: rect.insetBy(dx: 2, dy: 2))
+            NSColor.systemRed.withAlphaComponent(0.65).setStroke()
+            border.lineWidth = 4
+            border.stroke()
+
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.alignment = .center
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(ofSize: min(42, max(18, safeSize.width / 18)), weight: .semibold),
+                .foregroundColor: NSColor.white.withAlphaComponent(0.92),
+                .paragraphStyle: paragraph,
+            ]
+            let text = "Failed to load\n\(title)"
+            let textRect = rect.insetBy(dx: 32, dy: max(32, rect.height * 0.35))
+            text.draw(in: textRect, withAttributes: attributes)
+            return true
+        }
+    }
 }

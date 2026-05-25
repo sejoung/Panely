@@ -35,6 +35,7 @@ final class ReaderViewModel {
     let recentItems: RecentItemsStore
     let favorites: FavoritesStore
     let pageBookmarks: PageBookmarksStore
+    let makeSourceChangeMonitor: @MainActor () -> any SourceChangeMonitoring
 
     // MARK: - Source state
 
@@ -56,6 +57,9 @@ final class ReaderViewModel {
     var pendingSourceURL: URL?
     var siblings: [URL] = []
     var sourceRenderRevision: Int = 0
+    var sourceChangedOnDisk: Bool = false
+    var sourceChangeMessage: String?
+    var sourceChangeMonitor: (any SourceChangeMonitoring)?
 
     /// One-press cue for advancing to the previous volume from page 0.
     /// Set by `goBackward()` (either when arriving at 0 from a higher page,
@@ -165,6 +169,7 @@ final class ReaderViewModel {
             defaults: dependencies.keyValueStore
         )
         self.pageBookmarks = PageBookmarksStore(defaults: dependencies.keyValueStore)
+        self.makeSourceChangeMonitor = dependencies.sourceChangeMonitorFactory
 
         observeAppTermination()
 

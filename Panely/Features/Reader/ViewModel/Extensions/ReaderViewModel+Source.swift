@@ -122,6 +122,36 @@ extension ReaderViewModel {
         Task { await load(url: url) }
     }
 
+    func reloadCurrentSource() {
+        guard let request = reloadRequest() else { return }
+        AppLog.info(
+            .load,
+            "Reload current source requested",
+            metadata: [
+                "source": "\(DiagnosticRedactor.describe(request.url))",
+                "innerPath": "\(request.innerPath ?? "")",
+            ]
+        )
+        Task {
+            await load(
+                url: request.url,
+                knownSiblings: request.knownSiblings,
+                intent: request.innerPath.map { .favorite(innerPath: $0) } ?? .open
+            )
+        }
+    }
+
+    func clearSourceChangeNotice() {
+        sourceChangedOnDisk = false
+        sourceChangeMessage = nil
+    }
+
+    func markSourceChangedOnDisk() {
+        guard hasSource else { return }
+        sourceChangedOnDisk = true
+        sourceChangeMessage = "The current book changed on disk."
+    }
+
     func openLibraryURL(_ url: URL) {
         AppLog.info(
             .library,
@@ -280,9 +310,11 @@ extension ReaderViewModel {
     }
 
     private func startLoad() -> Int {
-        imageLoader.cancelPreload()
+        imageLoader.cancelBackgroundWork()
         ThumbnailLoader.shared.removeAll()
         sourceRenderRevision &+= 1
+        clearSourceChangeNotice()
+        sourceChangeMonitor?.stopWatching()
 
         // Any new book load — explicit, via prev/next volume, or via library
         // — resets the prev-volume cue. Without this, opening Vol N+1 after
@@ -491,6 +523,7 @@ extension ReaderViewModel {
         currentPageIndex = restorePosition
             ? clampedRestoredIndex(for: targetURL, pageCount: loaded.pageCount)
             : 0
+        startSourceChangeMonitor(for: targetURL)
         return true
     }
 
@@ -506,6 +539,41 @@ extension ReaderViewModel {
         currentSourceURL = nil
         pendingSourceURL = nil
         siblings = []
+        sourceChangeMonitor?.stopWatching()
+        sourceChangeMonitor = nil
+        clearSourceChangeNotice()
+    }
+
+    private func startSourceChangeMonitor(for targetURL: URL) {
+        let monitorURL = sourceMonitorURL(for: targetURL)
+        guard FileManager.default.fileExists(atPath: monitorURL.path) else { return }
+        let monitor = sourceChangeMonitor ?? makeSourceChangeMonitor()
+        sourceChangeMonitor = monitor
+        monitor.startWatching(url: monitorURL) { [weak self] in
+            self?.markSourceChangedOnDisk()
+        }
+    }
+
+    private func sourceMonitorURL(for targetURL: URL) -> URL {
+        tempDir.isActive ? (openedSourceURL ?? targetURL) : targetURL
+    }
+
+    private func reloadRequest() -> (url: URL, innerPath: String?, knownSiblings: [URL]?)? {
+        guard let currentSourceURL else { return nil }
+        if tempDir.isActive,
+           let root = tempDir.url,
+           let openedSourceURL,
+           let relativePath = relativePath(from: root, to: currentSourceURL) {
+            return (openedSourceURL, relativePath, nil)
+        }
+        return (currentSourceURL, nil, siblings.isEmpty ? nil : siblings)
+    }
+
+    private func relativePath(from root: URL, to url: URL) -> String? {
+        let rootPath = root.standardizedFileURL.path
+        let path = url.standardizedFileURL.path
+        guard path == rootPath || path.hasPrefix(rootPath + "/") else { return nil }
+        return String(path.dropFirst(rootPath.count + (path == rootPath ? 0 : 1)))
     }
 
     // MARK: - Scope helpers

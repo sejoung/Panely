@@ -12,6 +12,12 @@ extension PanelyApp {
             }
             .keyboardShortcut("o", modifiers: .command)
 
+            Button("Reload Book") {
+                viewModel.reloadCurrentSource()
+            }
+            .keyboardShortcut("r", modifiers: .command)
+            .disabled(viewModel.currentSourceURL == nil || viewModel.isLoading)
+
             Menu("Open Recent") {
                 if viewModel.recentItems.items.isEmpty {
                     Text("No Recent Items")

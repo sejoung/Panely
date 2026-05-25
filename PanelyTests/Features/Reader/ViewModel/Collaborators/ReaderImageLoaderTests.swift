@@ -50,6 +50,36 @@ struct ReaderImageLoaderTests {
         loader.cancelPreload()
     }
 
+    @Test func cancelBackgroundWorkIsSafeWhenNoTaskInFlight() {
+        let loader = ReaderImageLoader()
+        loader.cancelBackgroundWork()
+    }
+
+    @Test func pagedRefreshShowsErrorPlaceholderForFailedImage() async throws {
+        let root = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let badImage = root.appendingPathComponent("bad.jpg")
+        try Data("not an image".utf8).write(to: badImage)
+
+        let loader = ReaderImageLoader()
+        var errors: [String] = []
+        await loader.refresh(
+            source: ComicSource(
+                title: "Broken",
+                pages: [ComicPage(source: .file(badImage), displayName: "bad.jpg")]
+            ),
+            layout: .single,
+            currentPageIndex: 0,
+            navigationStep: 1,
+            isCancelled: { false },
+            onError: { errors.append($0) }
+        )
+
+        #expect(loader.currentImages.count == 1)
+        #expect(loader.currentImages[0].size == CGSize(width: 1000, height: 1500))
+        #expect(errors == ["Failed to load bad.jpg"])
+    }
+
     // MARK: - estimatedBitmapCost
 
     @Test func bitmapCostUsesPixelDimensionsForBitmapReps() throws {
