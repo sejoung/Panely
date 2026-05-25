@@ -23,6 +23,74 @@ nonisolated enum DiagnosticLevel: String, Sendable {
     case critical = "CRITICAL"
 }
 
+nonisolated enum DiagnosticLogLevel: String, CaseIterable, Identifiable, Sendable {
+    case trace
+    case debug
+    case info
+    case notice
+    case warning
+    case error
+    case critical
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .trace:
+            return "Trace"
+        case .debug:
+            return "Debug"
+        case .info:
+            return "Info"
+        case .notice:
+            return "Notice"
+        case .warning:
+            return "Warning"
+        case .error:
+            return "Error"
+        case .critical:
+            return "Critical"
+        }
+    }
+
+    var loggerLevel: Logging.Logger.Level {
+        switch self {
+        case .trace:
+            return .trace
+        case .debug:
+            return .debug
+        case .info:
+            return .info
+        case .notice:
+            return .notice
+        case .warning:
+            return .warning
+        case .error:
+            return .error
+        case .critical:
+            return .critical
+        }
+    }
+}
+
+nonisolated enum DiagnosticLogConfiguration {
+    static let logLevelKey = "panely.diagnostics.logLevel"
+
+    static var currentLogLevel: DiagnosticLogLevel {
+        let rawValue = UserDefaults.standard.string(forKey: logLevelKey)
+        return rawValue.flatMap(DiagnosticLogLevel.init(rawValue:)) ?? .info
+    }
+
+    static func setCurrentLogLevel(_ level: DiagnosticLogLevel) {
+        UserDefaults.standard.set(level.rawValue, forKey: logLevelKey)
+    }
+}
+
+nonisolated enum DiagnosticSession {
+    static let id = UUID().uuidString
+    static let launchedAt = ISO8601DateFormatter().string(from: Date())
+}
+
 nonisolated enum AppLog {
     typealias Metadata = Logging.Logger.Metadata
 
@@ -255,7 +323,7 @@ private nonisolated struct PanelyLogHandler: LogHandler {
 
     var metadata: Logging.Logger.Metadata = [:]
     var metadataProvider: Logging.Logger.MetadataProvider?
-    var logLevel: Logging.Logger.Level = .debug
+    var logLevel: Logging.Logger.Level
 
     init(
         label: String,
@@ -268,6 +336,7 @@ private nonisolated struct PanelyLogHandler: LogHandler {
         self.category = category
         self.metadataProvider = metadataProvider
         self.osLog = OSLog(subsystem: subsystem, category: category.rawValue)
+        self.logLevel = DiagnosticLogConfiguration.currentLogLevel.loggerLevel
     }
 
     subscript(metadataKey metadataKey: String) -> Logging.Logger.Metadata.Value? {
@@ -276,6 +345,8 @@ private nonisolated struct PanelyLogHandler: LogHandler {
     }
 
     func log(event: Logging.LogEvent) {
+        guard event.level >= logLevel else { return }
+
         var mergedMetadata = metadata
         let providedMetadata = metadataProvider?.get() ?? [:]
         if providedMetadata.isEmpty == false {

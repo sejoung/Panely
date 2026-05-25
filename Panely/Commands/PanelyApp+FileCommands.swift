@@ -54,10 +54,15 @@ extension PanelyApp {
             }
 
             Button("Clear Diagnostic Logs") {
+                guard DiagnosticReportExporter.confirmClearLogs() else { return }
                 Task {
                     await DiagnosticLogStore.shared.clear()
                     DiagnosticReportExporter.presentClearLogsResult()
                 }
+            }
+
+            Button("Open Diagnostic Logs Folder") {
+                DiagnosticReportExporter.openDiagnosticsFolder()
             }
 
             Button("Clear Extraction Cache") {

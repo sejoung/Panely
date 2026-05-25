@@ -16,7 +16,7 @@ struct ReaderViewModelVerticalModeTests {
         vm.currentPageIndex = 5 // index does not narrow the slice in vertical
 
         #expect(vm.visiblePages.count == 10)
-        #expect(vm.visiblePages.map(\.displayName) == (0..<10).map { "p\($0).jpg" })
+        #expect(vm.visiblePages.map(\.displayName) == (0..<10).map { "p\($0).png" })
     }
 
     @Test func visiblePagesIsEmptyWhenSourceHasNoPagesInVertical() {
@@ -229,16 +229,7 @@ struct ReaderViewModelVerticalModeTests {
 
     private func makeViewModel(pageCount: Int) -> ReaderViewModel {
         let vm = makeTestViewModel()
-        vm.source = ComicSource(title: "Test", pages: makePages(pageCount))
+        vm.source = ComicSource(title: "Test", pages: Fixture.makeImagePages(count: pageCount))
         return vm
-    }
-
-    private func makePages(_ count: Int) -> [ComicPage] {
-        (0..<count).map { i in
-            ComicPage(
-                source: .file(URL(fileURLWithPath: "/p\(i).jpg")),
-                displayName: "p\(i).jpg"
-            )
-        }
     }
 }

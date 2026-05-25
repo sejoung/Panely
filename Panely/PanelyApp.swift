@@ -47,7 +47,14 @@ struct PanelyApp: App {
 /// would leave users wondering why the red close button "only minimizes".
 final class PanelyAppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        AppLog.info(.app, "Application did finish launching")
+        AppLog.info(
+            .app,
+            "Application did finish launching",
+            metadata: [
+                "launchedAt": "\(DiagnosticSession.launchedAt)",
+                "sessionID": "\(DiagnosticSession.id)",
+            ]
+        )
     }
 
     func applicationWillTerminate(_ notification: Notification) {

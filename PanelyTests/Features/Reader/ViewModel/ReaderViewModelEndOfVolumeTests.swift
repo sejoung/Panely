@@ -314,17 +314,8 @@ struct ReaderViewModelEndOfVolumeTests {
 
     private func makeViewModel(pageCount: Int) -> ReaderViewModel {
         let vm = makeTestViewModel()
-        vm.source = ComicSource(title: "Test", pages: makePages(pageCount))
+        vm.source = ComicSource(title: "Test", pages: Fixture.makeImagePages(count: pageCount))
         return vm
-    }
-
-    private func makePages(_ count: Int) -> [ComicPage] {
-        (0..<count).map { i in
-            ComicPage(
-                source: .file(URL(fileURLWithPath: "/p\(i).jpg")),
-                displayName: "p\(i).jpg"
-            )
-        }
     }
 
     private func writeFolderVolume(at url: URL, pageCount: Int) throws {

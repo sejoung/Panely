@@ -3,6 +3,7 @@ import CoreGraphics
 import ImageIO
 import UniformTypeIdentifiers
 import ZIPFoundation
+@testable import Panely
 
 enum Fixture {
     static func makeTempDir() throws -> URL {
@@ -22,6 +23,20 @@ enum Fixture {
 
     static func zipDirectory(_ sourceDir: URL, to zipURL: URL) throws {
         try FileManager.default.zipItem(at: sourceDir, to: zipURL, shouldKeepParent: false)
+    }
+
+    static func makeImagePages(count: Int, title: String = "p") -> [ComicPage] {
+        do {
+            let dir = try makeTempDir()
+            let imageData = try makePNG(width: 10, height: 10)
+            return try (0..<count).map { index in
+                let url = dir.appendingPathComponent("\(title)\(index).png")
+                try imageData.write(to: url)
+                return ComicPage(source: .file(url), displayName: url.lastPathComponent)
+            }
+        } catch {
+            fatalError("Failed to create test image pages: \(error)")
+        }
     }
 
     /// Generates a real PNG with the given pixel dimensions. Used by tests

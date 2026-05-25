@@ -8,6 +8,8 @@ struct DiagnosticsSettingsView: View {
 
     @State private var isExporting = false
     @State private var exportMessage: String?
+    @State private var logSizeBytes: UInt64?
+    @State private var selectedLogLevel = DiagnosticLogConfiguration.currentLogLevel
 
     init(
         viewModel: ReaderViewModel,
@@ -29,20 +31,57 @@ struct DiagnosticsSettingsView: View {
                     Text(ProcessInfo.processInfo.operatingSystemVersionString)
                 }
 
-                HStack {
-                    Button("Export Diagnostic Report…") {
-                        exportDiagnosticReport()
-                    }
-                    .disabled(isExporting)
+                LabeledContent("Session") {
+                    Text(String(DiagnosticSession.id.prefix(8)))
+                        .monospaced()
+                }
 
-                    Button("Clear Diagnostic Logs") {
-                        clearDiagnosticLogs()
-                    }
-                    .disabled(isExporting)
-
-                    if isExporting {
+                LabeledContent("File log") {
+                    if let logSizeBytes {
+                        Text(DiagnosticReportExporter.formattedBytes(logSizeBytes))
+                            .monospacedDigit()
+                    } else {
                         ProgressView()
                             .controlSize(.small)
+                    }
+                }
+
+                LabeledContent("Retention") {
+                    Text("\(DiagnosticReportExporter.formattedBytes(DiagnosticLogPolicy.maxLogBytes)) max, reports include \(DiagnosticReportExporter.formattedBytes(DiagnosticLogPolicy.reportLogBytes))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Picker("Log level", selection: $selectedLogLevel) {
+                    ForEach(DiagnosticLogLevel.allCases) { level in
+                        Text(level.displayName).tag(level)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Button("Export Diagnostic Report…") {
+                            exportDiagnosticReport()
+                        }
+                        .disabled(isExporting)
+
+                        if isExporting {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                    }
+
+                    HStack {
+                        Button("Clear Diagnostic Logs") {
+                            clearDiagnosticLogs()
+                        }
+                        .disabled(isExporting)
+
+                        Button("Open Logs Folder") {
+                            DiagnosticReportExporter.openDiagnosticsFolder()
+                        }
+                        .disabled(isExporting)
                     }
                 }
 
@@ -54,8 +93,15 @@ struct DiagnosticsSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 520)
+        .frame(width: 560)
         .padding(.vertical, 12)
+        .task {
+            await refreshLogSize()
+        }
+        .onChange(of: selectedLogLevel) { _, newValue in
+            DiagnosticLogConfiguration.setCurrentLogLevel(newValue)
+            exportMessage = "Diagnostic log level set to \(newValue.displayName)."
+        }
     }
 
     private var appVersionText: String {
@@ -86,14 +132,21 @@ struct DiagnosticsSettingsView: View {
                 exportMessage = "Export failed: \(error.localizedDescription)"
             }
             isExporting = false
+            await refreshLogSize()
         }
     }
 
     private func clearDiagnosticLogs() {
+        guard DiagnosticReportExporter.confirmClearLogs() else { return }
         Task {
             await DiagnosticLogStore.shared.clear()
+            await refreshLogSize()
             exportMessage = "Diagnostic logs cleared."
         }
+    }
+
+    private func refreshLogSize() async {
+        logSizeBytes = await DiagnosticLogStore.shared.logSizeBytes()
     }
 }
 

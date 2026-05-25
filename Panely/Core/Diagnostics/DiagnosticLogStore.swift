@@ -1,12 +1,25 @@
 import Foundation
 
+nonisolated enum DiagnosticLogPolicy {
+    static let maxLogBytes: UInt64 = 768 * 1024
+    static let reportLogBytes: UInt64 = 256 * 1024
+
+    static var trimToBytes: UInt64 {
+        maxLogBytes / 2
+    }
+}
+
 actor DiagnosticLogStore {
     static let shared = DiagnosticLogStore()
 
-    private let maxLogBytes: UInt64 = 768 * 1024
     private let logFileName = "recent-log.txt"
+    private let directoryNameOverride: String?
     private nonisolated static let productionDirectoryName = "panely-diagnostics"
     private nonisolated static let testDirectoryName = "panely-diagnostics-tests"
+
+    init(directoryName: String? = nil) {
+        self.directoryNameOverride = directoryName
+    }
 
     nonisolated static func record(
         level: DiagnosticLevel,
@@ -26,8 +39,27 @@ actor DiagnosticLogStore {
         diagnosticsDirectory().appendingPathComponent(logFileName)
     }
 
-    func recentLogText(maxBytes: Int = 256 * 1024) -> String {
+    func diagnosticsDirectoryURL() -> URL {
+        diagnosticsDirectory()
+    }
+
+    func ensureDiagnosticsDirectory() -> URL {
+        let url = diagnosticsDirectory()
+        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    func logSizeBytes() -> UInt64 {
         let url = logFileURL()
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let size = attrs[.size] as? UInt64
+        else { return 0 }
+        return size
+    }
+
+    func recentLogText(maxBytes: Int? = nil) -> String {
+        let url = logFileURL()
+        let maxBytes = maxBytes ?? Int(DiagnosticLogPolicy.reportLogBytes)
         guard let data = try? Data(contentsOf: url) else { return "" }
         let slice: Data
         if data.count > maxBytes {
@@ -35,7 +67,7 @@ actor DiagnosticLogStore {
         } else {
             slice = data
         }
-        return String(data: slice, encoding: .utf8) ?? ""
+        return String(decoding: slice, as: UTF8.self)
     }
 
     func recentEvents(categories: Set<DiagnosticCategory>, maxLines: Int = 100) -> String {
@@ -78,17 +110,17 @@ actor DiagnosticLogStore {
         let caches = FileManager.default
             .urls(for: .cachesDirectory, in: .userDomainMask)
             .first ?? FileManager.default.temporaryDirectory
-        return caches.appendingPathComponent(Self.directoryName, isDirectory: true)
+        return caches.appendingPathComponent(directoryNameOverride ?? Self.directoryName, isDirectory: true)
     }
 
     private func rotateIfNeeded(at url: URL, incomingBytes: Int) {
         guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
               let currentSize = attrs[.size] as? UInt64,
-              currentSize + UInt64(incomingBytes) > maxLogBytes,
+              currentSize + UInt64(incomingBytes) > DiagnosticLogPolicy.maxLogBytes,
               let data = try? Data(contentsOf: url)
         else { return }
 
-        let keepBytes = Int(maxLogBytes / 2)
+        let keepBytes = Int(DiagnosticLogPolicy.trimToBytes)
         let trimmed = data.suffix(keepBytes)
         try? trimmed.write(to: url, options: .atomic)
     }

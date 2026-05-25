@@ -218,6 +218,10 @@ struct SnapshotGalleryTests {
 
 private enum SnapshotGenerationGate {
     static var isEnabled: Bool {
+        if ProcessInfo.processInfo.environment["PANELY_GENERATE_SNAPSHOTS"] == "1" {
+            return true
+        }
+
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: flagURL.path),
               let modified = attributes[.modificationDate] as? Date
         else { return false }

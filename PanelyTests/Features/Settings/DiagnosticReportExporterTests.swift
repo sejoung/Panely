@@ -20,6 +20,7 @@ struct DiagnosticReportExporterTests {
     }
 
     @Test func exportWritesReportZipWithRedactedDiagnostics() async throws {
+        let token = "diagnostic-report-test-\(UUID().uuidString)"
         let cache = TestExtractionCacheManager(cacheBudgetBytes: 1_024)
         let vm = makeTestViewModel(extractionCache: cache)
         vm.errorMessage = "Sample load failure"
@@ -30,7 +31,7 @@ struct DiagnosticReportExporterTests {
         await DiagnosticLogStore.shared.record(
             level: .info,
             category: .load,
-            message: "Load started source=\(DiagnosticRedactor.describe(vm.currentSourceURL))"
+            message: "Load started token=\(token) source=\(DiagnosticRedactor.describe(vm.currentSourceURL))"
         )
 
         let outputDir = try Fixture.makeTempDir()
@@ -60,8 +61,16 @@ struct DiagnosticReportExporterTests {
         #expect(report.contains("# Panely Diagnostic Report"))
         #expect(report.contains("Sample load failure"))
         #expect(report.contains("Extraction cache"))
+        #expect(report.contains("## Session"))
+        #expect(report.contains("- Session ID: \(DiagnosticSession.id)"))
+        #expect(report.contains("- App launched: \(DiagnosticSession.launchedAt)"))
+        #expect(report.contains("## Diagnostics"))
+        #expect(report.contains("Log level"))
+        #expect(report.contains("File log limit"))
+        #expect(report.contains("Report log limit"))
         #expect(report.contains("name=Vol 02.cbz"))
         #expect(report.contains("/Users/example/Comics") == false)
+        #expect(events.contains(token))
         #expect(events.contains("name=Vol 02.cbz"))
         #expect(events.contains("/Users/example/Comics") == false)
     }

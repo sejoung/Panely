@@ -68,7 +68,7 @@ struct ReaderViewModelPositionMemoryTests {
             let vm = makeTestViewModel(keyValueStore: defaults)
             let urlA = URL(fileURLWithPath: "/tmp/book-a-\(UUID()).cbz")
             let urlB = URL(fileURLWithPath: "/tmp/book-b-\(UUID()).cbz")
-            let pages = makePages()
+            let pages = Fixture.makeImagePages(count: 10)
 
             vm.source = ComicSource(title: "A", pages: pages)
             vm.currentSourceURL = urlA
@@ -142,14 +142,8 @@ struct ReaderViewModelPositionMemoryTests {
     ) -> ReaderViewModel {
         let vm = makeTestViewModel(keyValueStore: defaults)
         vm.currentSourceURL = url
-        vm.source = ComicSource(title: "t", pages: makePages(count: pageCount))
+        vm.source = ComicSource(title: "t", pages: Fixture.makeImagePages(count: pageCount))
         return vm
-    }
-
-    private func makePages(count: Int = 10) -> [ComicPage] {
-        (0..<count).map {
-            ComicPage(source: .file(URL(fileURLWithPath: "/p\($0).jpg")), displayName: "p\($0)")
-        }
     }
 
     @discardableResult

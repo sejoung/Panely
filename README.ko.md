@@ -90,6 +90,8 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   앱 버전/build, macOS 버전, 최근 Panely 로그, redacted 열기/로드 이벤트,
   캐시 용량, 현재 설정, 마지막 reader 에러를 담은 zip을 생성해 버그
   리포트에 첨부할 수 있음. 같은 기능은 **Settings → Diagnostics** 에도 있음.
+  Diagnostics에는 현재 파일 로그 크기, 로그 레벨, 로그 폴더 바로 열기,
+  bounded `recent-log.txt`를 비우는 **File → Clear Diagnostic Logs** 도 있음.
 - 자연 파일명 정렬(`1, 2, 10` — `1, 10, 2` 아님) — `NaturalSort` 헬퍼로
   모든 로더/스캐너에서 일관 적용
 - 비이미지 파일과 숨김 항목 필터링
@@ -227,10 +229,10 @@ xcodebuild test \
   CODE_SIGN_IDENTITY="-"
 ```
 
-**52 스위트에 걸친 331개 테스트**가 다음을 커버:
+**56 스위트에 걸친 340개 테스트**가 다음을 커버:
 
 `SnapshotGalleryTests`는 기본 테스트에서 발견은 되지만
-`scripts/generate-snapshots.sh`가 스냅샷 생성 flag를 만들 때만 활성화됩니다.
+`scripts/generate-snapshots.sh`가 스냅샷 생성을 활성화할 때만 실행됩니다.
 따라서 기본 `xcodebuild test` 경로는 매뉴얼 PNG를 렌더링하거나 복사하지 않습니다.
 
 - 순수 데이터 타입 (`ComicPage`, `ComicSource`, `RecentItem`, enum raw 값)

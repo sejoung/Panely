@@ -97,7 +97,9 @@ pages.
   a zip with app/build and macOS versions, recent Panely logs, redacted
   open/load events, cache size, current settings, and the last reader error
   for bug reports. The same action is also available in **Settings →
-  Diagnostics**.
+  Diagnostics**. Diagnostics also exposes the current file-log size, log level,
+  a logs-folder shortcut, and **File → Clear Diagnostic Logs** for clearing the
+  bounded `recent-log.txt` file.
 - Natural filename sort (`1, 2, 10` — not `1, 10, 2`) — applied
   consistently across loaders / scanners via the `NaturalSort` helper
 - Filters non-image files and hidden entries
@@ -241,11 +243,11 @@ xcodebuild test \
   CODE_SIGN_IDENTITY="-"
 ```
 
-**331 tests across 52 suites** cover:
+**340 tests across 56 suites** cover:
 
 `SnapshotGalleryTests` is discovered in normal runs but gated off unless
-`scripts/generate-snapshots.sh` creates the snapshot-generation flag, so the
-default `xcodebuild test` path does not render or copy manual PNGs.
+`scripts/generate-snapshots.sh` enables snapshot generation, so the default
+`xcodebuild test` path does not render or copy manual PNGs.
 
 - Pure data types (`ComicPage`, `ComicSource`, `RecentItem`, enum raw values)
 - Natural-sort contract (Foundation behaviour Panely relies on)

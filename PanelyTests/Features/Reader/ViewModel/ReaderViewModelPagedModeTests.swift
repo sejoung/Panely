@@ -15,7 +15,7 @@ struct ReaderViewModelPagedModeTests {
         vm.currentPageIndex = 3
 
         #expect(vm.visiblePages.count == 1)
-        #expect(vm.visiblePages.first?.displayName == "p3.jpg")
+        #expect(vm.visiblePages.first?.displayName == "p3.png")
     }
 
     @Test func visiblePagesReturnsTwoConsecutivePagesInDoubleLayout() {
@@ -23,7 +23,7 @@ struct ReaderViewModelPagedModeTests {
         vm.layout = .double
         vm.currentPageIndex = 4
 
-        #expect(vm.visiblePages.map(\.displayName) == ["p4.jpg", "p5.jpg"])
+        #expect(vm.visiblePages.map(\.displayName) == ["p4.png", "p5.png"])
     }
 
     @Test func visiblePagesClampsAtEndForDoubleLayoutWhenOnlyOneRemains() {
@@ -32,7 +32,7 @@ struct ReaderViewModelPagedModeTests {
         vm.currentPageIndex = 4 // last page, no partner
 
         #expect(vm.visiblePages.count == 1)
-        #expect(vm.visiblePages.first?.displayName == "p4.jpg")
+        #expect(vm.visiblePages.first?.displayName == "p4.png")
     }
 
     @Test func visiblePagesIsEmptyWhenSourceHasNoPages() {
@@ -128,16 +128,7 @@ struct ReaderViewModelPagedModeTests {
 
     private func makeViewModel(pageCount: Int) -> ReaderViewModel {
         let vm = makeTestViewModel()
-        vm.source = ComicSource(title: "Test", pages: makePages(pageCount))
+        vm.source = ComicSource(title: "Test", pages: Fixture.makeImagePages(count: pageCount))
         return vm
-    }
-
-    private func makePages(_ count: Int) -> [ComicPage] {
-        (0..<count).map { i in
-            ComicPage(
-                source: .file(URL(fileURLWithPath: "/p\(i).jpg")),
-                displayName: "p\(i).jpg"
-            )
-        }
     }
 }

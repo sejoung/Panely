@@ -4,8 +4,8 @@
 #
 # Why the copy step? The test bundle inherits the host app's sandbox, which
 # blocks writes to the repo's docs/ directory. The tests therefore stage
-# their PNGs under the sandbox's own Caches dir; this script copies the
-# results out into the repo after the run.
+# their PNGs under the sandbox's own Caches dir; this script enables only the
+# snapshot suite and copies the results out into the repo after the run.
 #
 # Usage:
 #   scripts/generate-snapshots.sh
@@ -19,6 +19,7 @@ SANDBOX_CACHE="$HOME/Library/Containers/$BUNDLE_ID/Data/Library/Caches/panely-sn
 SNAPSHOT_FLAG="$HOME/Library/Containers/$BUNDLE_ID/Data/tmp/panely-generate-snapshots.flag"
 DEST="$PROJECT_ROOT/docs/screenshots"
 DERIVED_DATA_PATH="/private/tmp/PanelyDerivedData"
+export PANELY_GENERATE_SNAPSHOTS=1
 
 EXPECTED_SNAPSHOTS=(
   "01-hero-single-page.png"
@@ -51,7 +52,8 @@ xcodebuild test \
   -derivedDataPath "$DERIVED_DATA_PATH" \
   -only-testing:PanelyTests/SnapshotGalleryTests \
   CODE_SIGN_IDENTITY="-" \
-  2>&1 | grep -E "📸|error:|✘ Test|Test run with|^\*\* "
+  2>&1 | grep -E "📸|error:|✘ Test|Test run with|^\*\* " \
+    | sed '/com\.apple\.linkd\.autoShortcut/d'
 
 if [[ ! -d "$SANDBOX_CACHE" ]]; then
   echo "✗ Sandbox cache dir not found: $SANDBOX_CACHE"

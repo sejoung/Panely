@@ -24,7 +24,7 @@ enum SnapshotRenderer {
     static let toolbarSize = CGSize(width: 920, height: 64)
     static let cardSize = CGSize(width: 520, height: 220)
     static let overlaySize = CGSize(width: 360, height: 140)
-    static let settingsSize = CGSize(width: 520, height: 320)
+    static let settingsSize = CGSize(width: 620, height: 420)
 
     /// Retina scale baked into the PNG so the asset looks crisp when shown
     /// at logical points (e.g., README on a Retina display).

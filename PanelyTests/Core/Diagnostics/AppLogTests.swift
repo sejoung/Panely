@@ -6,6 +6,11 @@ import Testing
 struct AppLogTests {
     @Test func metadataIsWrittenToDiagnosticLogStore() async throws {
         let token = "app-log-test-\(UUID().uuidString)"
+        let previousLevel = DiagnosticLogConfiguration.currentLogLevel
+        DiagnosticLogConfiguration.setCurrentLogLevel(.trace)
+        defer {
+            DiagnosticLogConfiguration.setCurrentLogLevel(previousLevel)
+        }
 
         AppLog.notice(
             .diagnostics,

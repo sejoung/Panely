@@ -53,8 +53,13 @@ struct DiagnosticReportExporter {
         alert.alertStyle = .informational
         alert.messageText = "Diagnostic Report Exported"
         alert.informativeText = "\(destination.lastPathComponent) was created."
+        alert.addButton(withTitle: "Reveal in Finder")
         alert.addButton(withTitle: "OK")
-        Self.present(alert)
+        Self.present(alert) { response in
+            if response == .alertFirstButtonReturn {
+                Self.revealInFinder(destination)
+            }
+        }
     }
 
     func presentExportFailure(_ error: Error, destination: URL) {
@@ -85,6 +90,29 @@ struct DiagnosticReportExporter {
         present(alert)
     }
 
+    static func confirmClearLogs() -> Bool {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Clear Diagnostic Logs?"
+        alert.informativeText = "This removes Panely's recent file log. It does not clear OSLog, cache data, recent files, bookmarks, favorites, or reading position."
+        alert.addButton(withTitle: "Clear Logs")
+        alert.addButton(withTitle: "Cancel")
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    static func openDiagnosticsFolder() {
+        Task {
+            let url = await DiagnosticLogStore.shared.ensureDiagnosticsDirectory()
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        }
+    }
+
+    static func formattedBytes(_ bytes: UInt64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .binary
+        return formatter.string(fromByteCount: Int64(min(bytes, UInt64(Int64.max))))
+    }
+
     private func makeSnapshot() async -> DiagnosticReportSnapshot {
         let activeURL = viewModel.tempDir.url
         let cacheRoot = cacheMaintenance.cacheRoot()
@@ -104,10 +132,16 @@ struct DiagnosticReportExporter {
             appVersion: Self.bundleString("CFBundleShortVersionString"),
             buildNumber: Self.bundleString("CFBundleVersion"),
             bundleIdentifier: Bundle.main.bundleIdentifier ?? "unknown",
+            sessionID: DiagnosticSession.id,
+            launchedAt: DiagnosticSession.launchedAt,
             macOSVersion: ProcessInfo.processInfo.operatingSystemVersionString,
             cacheTotal: cacheMaintenance.formattedBytes(cacheSizes.total),
             cacheClearable: cacheMaintenance.formattedBytes(cacheSizes.clearable),
             cacheLimit: cacheMaintenance.formattedBytes(cacheMaintenance.cacheBudgetBytes),
+            logLevel: DiagnosticLogConfiguration.currentLogLevel.displayName,
+            logFileSize: Self.formattedBytes(await DiagnosticLogStore.shared.logSizeBytes()),
+            logFileLimit: Self.formattedBytes(DiagnosticLogPolicy.maxLogBytes),
+            reportLogLimit: Self.formattedBytes(DiagnosticLogPolicy.reportLogBytes),
             settingsSummary: settingsSummary(),
             readerSummary: readerSummary(),
             lastErrorMessage: redactKnownPaths(in: viewModel.errorMessage ?? "None"),
@@ -122,6 +156,7 @@ struct DiagnosticReportExporter {
         direction: \(viewModel.direction.rawValue)
         fitMode: \(viewModel.fitMode.rawValue)
         autoFitOnResize: \(viewModel.autoFitOnResize)
+        diagnosticLogLevel: \(DiagnosticLogConfiguration.currentLogLevel.displayName)
         sidebarPinned: \(viewModel.sidebarPinned)
         toolbarPinned: \(viewModel.toolbarPinned)
         thumbnailSidebarVisible: \(viewModel.thumbnailSidebarVisible)
@@ -159,12 +194,22 @@ struct DiagnosticReportExporter {
         ])
     }
 
-    private static func present(_ alert: NSAlert) {
+    private static func present(
+        _ alert: NSAlert,
+        completion: ((NSApplication.ModalResponse) -> Void)? = nil
+    ) {
         if let window = NSApp.keyWindow ?? NSApp.mainWindow {
-            alert.beginSheetModal(for: window)
+            alert.beginSheetModal(for: window) { response in
+                completion?(response)
+            }
         } else {
-            alert.runModal()
+            let response = alert.runModal()
+            completion?(response)
         }
+    }
+
+    private static func revealInFinder(_ url: URL) {
+        NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 
     private static let fileDateFormatter: DateFormatter = {
@@ -179,10 +224,16 @@ private nonisolated struct DiagnosticReportSnapshot: Sendable {
     let appVersion: String
     let buildNumber: String
     let bundleIdentifier: String
+    let sessionID: String
+    let launchedAt: String
     let macOSVersion: String
     let cacheTotal: String
     let cacheClearable: String
     let cacheLimit: String
+    let logLevel: String
+    let logFileSize: String
+    let logFileLimit: String
+    let reportLogLimit: String
     let settingsSummary: String
     let readerSummary: String
     let lastErrorMessage: String
@@ -202,11 +253,23 @@ private nonisolated struct DiagnosticReportSnapshot: Sendable {
         - Bundle ID: \(bundleIdentifier)
         - macOS: \(macOSVersion)
 
+        ## Session
+
+        - Session ID: \(sessionID)
+        - App launched: \(launchedAt)
+
         ## Cache
 
         - Extraction cache: \(cacheTotal)
         - Clearable cache: \(cacheClearable)
         - Cache limit: \(cacheLimit)
+
+        ## Diagnostics
+
+        - Log level: \(logLevel)
+        - File log size: \(logFileSize)
+        - File log limit: \(logFileLimit)
+        - Report log limit: \(reportLogLimit)
 
         ## Current Settings
 

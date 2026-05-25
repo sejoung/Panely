@@ -207,6 +207,8 @@ Diagnostics**. It includes:
 - Recent open/load events with file paths redacted to filename, extension,
   and type.
 - Extraction cache size, current reader settings, and the last reader error.
+- Session ID and app launch time for correlating a report with recent logs.
+- Diagnostic log level and file-log retention policy.
 
 ### Clear Diagnostic Logs
 
@@ -217,6 +219,15 @@ This removes Panely's `recent-log.txt` file from the diagnostics cache so
 future diagnostic reports include only new file logs. It does not clear
 macOS system OSLog entries, extraction cache data, recent files, bookmarks,
 favorites, or reading position.
+
+The file log is intentionally bounded: Panely keeps one `recent-log.txt` file
+up to 768 KB, trims it back to roughly 384 KB when it grows past that limit,
+and includes the latest 256 KB in diagnostic reports. Use **Open Logs Folder**
+in **Settings → Diagnostics** to inspect the file directly.
+
+The **Log level** control changes which future Panely diagnostic events are
+written to OSLog and the file log. It does not rewrite or filter logs that
+were already recorded.
 
 ---
 
