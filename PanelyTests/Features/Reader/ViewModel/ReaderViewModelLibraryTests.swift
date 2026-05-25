@@ -75,8 +75,10 @@ struct ReaderViewModelLibraryTests {
     @Test func successfulLoadStartsSourceChangeMonitor() async throws {
         let root = try Fixture.makeTempDir()
         defer { try? FileManager.default.removeItem(at: root) }
-        try Fixture.makePNG(width: 10, height: 10)
-            .write(to: root.appendingPathComponent("001.png"))
+        let firstPage = root.appendingPathComponent("001.png")
+        let secondPage = root.appendingPathComponent("002.png")
+        try Fixture.makePNG(width: 10, height: 10).write(to: firstPage)
+        try Fixture.makePNG(width: 10, height: 10).write(to: secondPage)
 
         let monitor = TestSourceChangeMonitor()
         let vm = ReaderViewModel(
@@ -86,6 +88,11 @@ struct ReaderViewModelLibraryTests {
         await vm.load(url: root)
 
         #expect(monitor.watchedURL?.standardizedFileURL == root.standardizedFileURL)
+        #expect(Set(monitor.watchedURLs.map(\.standardizedFileURL)) == Set([
+            root.standardizedFileURL,
+            firstPage.standardizedFileURL,
+            secondPage.standardizedFileURL,
+        ]))
     }
 
     @Test func sourceChangeMonitorMarksAndNextLoadClearsNotice() async throws {

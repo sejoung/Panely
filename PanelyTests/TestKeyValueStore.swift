@@ -159,15 +159,22 @@ nonisolated struct TestSystemSettings: SystemSettingsReading {
 @MainActor
 final class TestSourceChangeMonitor: SourceChangeMonitoring {
     private(set) var watchedURL: URL?
+    private(set) var watchedURLs: [URL] = []
     private var onChange: (@MainActor () -> Void)?
 
     func startWatching(url: URL, onChange: @MainActor @escaping () -> Void) {
-        watchedURL = url
+        startWatching(urls: [url], onChange: onChange)
+    }
+
+    func startWatching(urls: [URL], onChange: @MainActor @escaping () -> Void) {
+        watchedURLs = urls
+        watchedURL = urls.first
         self.onChange = onChange
     }
 
     func stopWatching() {
         watchedURL = nil
+        watchedURLs = []
         onChange = nil
     }
 

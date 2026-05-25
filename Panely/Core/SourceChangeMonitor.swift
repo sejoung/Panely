@@ -4,21 +4,39 @@ import Foundation
 @MainActor
 protocol SourceChangeMonitoring: AnyObject {
     func startWatching(url: URL, onChange: @MainActor @escaping () -> Void)
+    func startWatching(urls: [URL], onChange: @MainActor @escaping () -> Void)
     func stopWatching()
 }
 
 @MainActor
 final class SourceChangeMonitor: SourceChangeMonitoring {
-    private var source: DispatchSourceFileSystemObject?
+    private var sources: [DispatchSourceFileSystemObject] = []
     private var hasReportedChange = false
 
     deinit {
-        source?.cancel()
+        for source in sources {
+            source.cancel()
+        }
     }
 
     func startWatching(url: URL, onChange: @MainActor @escaping () -> Void) {
+        startWatching(urls: [url], onChange: onChange)
+    }
+
+    func startWatching(urls: [URL], onChange: @MainActor @escaping () -> Void) {
         stopWatching()
 
+        let uniqueURLs = Array(Set(urls.map(\.standardizedFileURL)))
+        guard !uniqueURLs.isEmpty else { return }
+
+        hasReportedChange = false
+
+        for url in uniqueURLs {
+            watch(url: url, onChange: onChange)
+        }
+    }
+
+    private func watch(url: URL, onChange: @MainActor @escaping () -> Void) {
         let standardized = url.standardizedFileURL
         let descriptor = open(standardized.path, O_EVTONLY)
         guard descriptor >= 0 else {
@@ -29,8 +47,6 @@ final class SourceChangeMonitor: SourceChangeMonitoring {
             )
             return
         }
-
-        hasReportedChange = false
 
         let eventMask: DispatchSource.FileSystemEvent = [
             .write,
@@ -59,13 +75,15 @@ final class SourceChangeMonitor: SourceChangeMonitoring {
         source.setCancelHandler {
             close(descriptor)
         }
-        self.source = source
+        sources.append(source)
         source.resume()
     }
 
     func stopWatching() {
-        source?.cancel()
-        source = nil
+        for source in sources {
+            source.cancel()
+        }
+        sources.removeAll()
         hasReportedChange = false
     }
 }

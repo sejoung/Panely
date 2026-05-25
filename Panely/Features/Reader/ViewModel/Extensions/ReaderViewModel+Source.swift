@@ -523,7 +523,7 @@ extension ReaderViewModel {
         currentPageIndex = restorePosition
             ? clampedRestoredIndex(for: targetURL, pageCount: loaded.pageCount)
             : 0
-        startSourceChangeMonitor(for: targetURL)
+        startSourceChangeMonitor(for: targetURL, source: loaded)
         return true
     }
 
@@ -544,18 +544,34 @@ extension ReaderViewModel {
         clearSourceChangeNotice()
     }
 
-    private func startSourceChangeMonitor(for targetURL: URL) {
-        let monitorURL = sourceMonitorURL(for: targetURL)
-        guard FileManager.default.fileExists(atPath: monitorURL.path) else { return }
+    private func startSourceChangeMonitor(for targetURL: URL, source: ComicSource) {
+        let monitorURLs = sourceMonitorURLs(for: targetURL, source: source)
+        guard !monitorURLs.isEmpty else { return }
         let monitor = sourceChangeMonitor ?? makeSourceChangeMonitor()
         sourceChangeMonitor = monitor
-        monitor.startWatching(url: monitorURL) { [weak self] in
+        monitor.startWatching(urls: monitorURLs) { [weak self] in
             self?.markSourceChangedOnDisk()
         }
     }
 
-    private func sourceMonitorURL(for targetURL: URL) -> URL {
-        tempDir.isActive ? (openedSourceURL ?? targetURL) : targetURL
+    private func sourceMonitorURLs(for targetURL: URL, source: ComicSource) -> [URL] {
+        if tempDir.isActive {
+            return existingURLs([openedSourceURL ?? targetURL])
+        }
+
+        guard isDirectory(targetURL) else {
+            return existingURLs([targetURL])
+        }
+
+        let pageFiles = source.pages.compactMap { page -> URL? in
+            guard case .file(let url) = page.source else { return nil }
+            return url
+        }
+        return existingURLs([targetURL] + pageFiles)
+    }
+
+    private func existingURLs(_ urls: [URL]) -> [URL] {
+        urls.filter { FileManager.default.fileExists(atPath: $0.path) }
     }
 
     private func reloadRequest() -> (url: URL, innerPath: String?, knownSiblings: [URL]?)? {
