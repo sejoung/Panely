@@ -12,6 +12,12 @@ protocol SourceChangeMonitoring: AnyObject {
 final class SourceChangeMonitor: SourceChangeMonitoring {
     private var sources: [DispatchSourceFileSystemObject] = []
     private var hasReportedChange = false
+    /// Bumped on every `startWatching` (and `stopWatching`). Event handlers
+    /// capture the value live at fire time and bail if it's moved — covers
+    /// the race where a DispatchSource event was already queued for the
+    /// global utility queue when we cancel, then drains onto MainActor
+    /// after the next session has started.
+    private var session: UInt = 0
 
     deinit {
         for source in sources {
@@ -29,14 +35,20 @@ final class SourceChangeMonitor: SourceChangeMonitoring {
         let uniqueURLs = Array(Set(urls.map(\.standardizedFileURL)))
         guard !uniqueURLs.isEmpty else { return }
 
+        session &+= 1
+        let mySession = session
         hasReportedChange = false
 
         for url in uniqueURLs {
-            watch(url: url, onChange: onChange)
+            watch(url: url, session: mySession, onChange: onChange)
         }
     }
 
-    private func watch(url: URL, onChange: @MainActor @escaping () -> Void) {
+    private func watch(
+        url: URL,
+        session expectedSession: UInt,
+        onChange: @MainActor @escaping () -> Void
+    ) {
         let standardized = url.standardizedFileURL
         let descriptor = open(standardized.path, O_EVTONLY)
         guard descriptor >= 0 else {
@@ -48,12 +60,18 @@ final class SourceChangeMonitor: SourceChangeMonitoring {
             return
         }
 
+        // `.attrib` is intentionally excluded: it fires on access-time and
+        // xattr updates, which the app itself triggers every time it reads
+        // a page (and which Spotlight / Time Machine / Finder previews can
+        // bump unrelatedly). We only care about real content changes —
+        // `.write` / `.extend` cover edits, `.delete` / `.rename` cover
+        // moves and removals. Folder URLs surface adds/removes via the
+        // directory's own `.write` when its listing changes.
         let eventMask: DispatchSource.FileSystemEvent = [
             .write,
             .delete,
             .rename,
             .extend,
-            .attrib,
         ]
         let source = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: descriptor,
@@ -62,7 +80,9 @@ final class SourceChangeMonitor: SourceChangeMonitoring {
         )
         source.setEventHandler { [weak self] in
             Task { @MainActor [weak self] in
-                guard let self, !self.hasReportedChange else { return }
+                guard let self,
+                      self.session == expectedSession,
+                      !self.hasReportedChange else { return }
                 self.hasReportedChange = true
                 AppLog.info(
                     .reader,
@@ -84,6 +104,7 @@ final class SourceChangeMonitor: SourceChangeMonitoring {
             source.cancel()
         }
         sources.removeAll()
+        session &+= 1
         hasReportedChange = false
     }
 }
