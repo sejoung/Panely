@@ -122,13 +122,14 @@ struct AppKitImageScroller: NSViewRepresentable {
             identityChanged || fitModeChanged || layoutChanged || contentStructureChanged
         }
 
-        /// Fundamental changes that override the user's manual zoom: a new
-        /// book, an explicit fit-mode pick, or a layout swap. `contentStructureChanged`
-        /// is deliberately excluded — in paged mode every page-flip swaps the
-        /// NSImage array (so structure "changes"), and we want the user's
-        /// zoom to survive flipping to the next page. The non-force path in
-        /// `applyFit` still snaps to the new page's fit when the user *hasn't*
-        /// manually zoomed.
+        /// The *only* event that overrides the user's manual zoom is them
+        /// pressing the fit button (or hitting a fit shortcut), which flips
+        /// `fitMode` and surfaces here as `fitModeChanged`. New-book / layout
+        /// / page changes intentionally do **not** force: the user's chosen
+        /// magnification is their preference, and the non-force path in
+        /// `applyFit` still snaps to the new content's fit when they
+        /// *haven't* manually zoomed (so a fresh user never sees a stuck
+        /// magnification).
         var forceFitReset: Bool {
             AppKitImageScroller.shouldForceFitReset(
                 identityChanged: identityChanged,
@@ -145,12 +146,15 @@ struct AppKitImageScroller: NSViewRepresentable {
         layoutChanged: Bool,
         contentStructureChanged: Bool
     ) -> Bool {
-        // `contentStructureChanged` intentionally not OR'd in: routine page
-        // navigation in paged mode trips this flag every flip, and we want
-        // the user's manual zoom to carry across pages. New-book / layout-swap
-        // cases are already caught by `identityChanged` / `layoutChanged`.
+        // Only the fit-mode button forces a re-fit. That button's literal
+        // job is "apply this fit now," so it has to win. Everything else
+        // (new book, layout swap, page flip, viewport resize) defers to the
+        // non-force path: if the user manually zoomed, their magnification
+        // is preserved; if they didn't, magnification follows the new fit.
+        _ = identityChanged
+        _ = layoutChanged
         _ = contentStructureChanged
-        return identityChanged || fitModeChanged || layoutChanged
+        return fitModeChanged
     }
 
     private func recordPropChange(

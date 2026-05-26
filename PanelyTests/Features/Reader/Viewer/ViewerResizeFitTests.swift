@@ -115,38 +115,8 @@ struct ViewerResizeFitTests {
         #expect(abs(scrollView.magnification - expectedFit) < 0.001)
     }
 
-    @Test func layoutChangeForcesFitResetEvenWhenFitModeIsUnchanged() {
-        #expect(AppKitImageScroller.shouldForceFitReset(
-            identityChanged: false,
-            fitModeChanged: false,
-            layoutChanged: true,
-            contentStructureChanged: false
-        ))
-    }
-
-    /// Regression: page-flip in paged mode always reports
-    /// `contentStructureChanged = true` (the NSImage array is swapped), but
-    /// that alone must NOT force a fit reset — otherwise a user who zoomed
-    /// to 2× on page N would snap back to fit on page N+1. New-book and
-    /// layout-swap cases are still covered by the dedicated flags.
-    @Test func contentStructureChangeAloneDoesNotForceFitReset() {
-        #expect(AppKitImageScroller.shouldForceFitReset(
-            identityChanged: false,
-            fitModeChanged: false,
-            layoutChanged: false,
-            contentStructureChanged: true
-        ) == false)
-    }
-
-    @Test func identityChangeForcesFitResetEvenWhenStructureUnchanged() {
-        #expect(AppKitImageScroller.shouldForceFitReset(
-            identityChanged: true,
-            fitModeChanged: false,
-            layoutChanged: false,
-            contentStructureChanged: false
-        ))
-    }
-
+    /// Pressing the fit-mode button is the one path that *must* override the
+    /// user's manual zoom — the button literally exists to "apply this fit."
     @Test func fitModeChangeForcesFitReset() {
         #expect(AppKitImageScroller.shouldForceFitReset(
             identityChanged: false,
@@ -154,6 +124,43 @@ struct ViewerResizeFitTests {
             layoutChanged: false,
             contentStructureChanged: false
         ))
+    }
+
+    /// Opening a new book must NOT override the user's chosen magnification.
+    /// If they were reading at 2×, the next book opens at 2×. The non-force
+    /// path snaps to the new book's fit only when the user hasn't zoomed.
+    @Test func identityChangeAloneDoesNotForceFitReset() {
+        #expect(AppKitImageScroller.shouldForceFitReset(
+            identityChanged: true,
+            fitModeChanged: false,
+            layoutChanged: false,
+            contentStructureChanged: false
+        ) == false)
+    }
+
+    /// Switching layout (single ↔ double ↔ vertical) is the user moving the
+    /// view, not asking for a fresh fit. If they want fit, they press the
+    /// fit button.
+    @Test func layoutChangeAloneDoesNotForceFitReset() {
+        #expect(AppKitImageScroller.shouldForceFitReset(
+            identityChanged: false,
+            fitModeChanged: false,
+            layoutChanged: true,
+            contentStructureChanged: false
+        ) == false)
+    }
+
+    /// Regression: page-flip in paged mode always reports
+    /// `contentStructureChanged = true` (the NSImage array is swapped). It
+    /// must not force a refit either — covered for completeness alongside
+    /// identity / layout changes.
+    @Test func contentStructureChangeAloneDoesNotForceFitReset() {
+        #expect(AppKitImageScroller.shouldForceFitReset(
+            identityChanged: false,
+            fitModeChanged: false,
+            layoutChanged: false,
+            contentStructureChanged: true
+        ) == false)
     }
 
     /// End-to-end behavior at the `applyFit` level: zoom to 2× on the first
@@ -205,6 +212,115 @@ struct ViewerResizeFitTests {
             fitMode: .fitScreen
         )
         #expect(abs(coordinator.baseMagnification - expectedFit) < 0.001)
+    }
+
+    /// Opening a new book at 2× zoom: magnification must carry over. The
+    /// new book's fit becomes the baseline (so a future fit-button or
+    /// reset-zoom lands correctly), but the user's view doesn't snap.
+    @Test func userZoomPersistsAcrossBookOpens() {
+        let scrollView = Self.makeScrollView(size: CGSize(width: 800, height: 600))
+        let firstBook = NSView(frame: NSRect(x: 0, y: 0, width: 1000, height: 1500))
+        scrollView.documentView = firstBook
+        scrollView.layoutSubtreeIfNeeded()
+
+        let coordinator = AppKitScrollerCoordinator()
+        AppKitImageScroller.applyFit(
+            scrollView: scrollView,
+            coordinator: coordinator,
+            fitMode: .fitScreen,
+            force: true
+        )
+
+        // User zooms in while reading the first book.
+        let userZoom: CGFloat = 2.0
+        scrollView.magnification = userZoom
+
+        // A new book loads (different first-page geometry).
+        let secondBook = NSView(frame: NSRect(x: 0, y: 0, width: 1400, height: 2000))
+        scrollView.documentView = secondBook
+        scrollView.layoutSubtreeIfNeeded()
+
+        // New book → identityChanged is the only diff, no longer a force.
+        AppKitImageScroller.applyFit(
+            scrollView: scrollView,
+            coordinator: coordinator,
+            fitMode: .fitScreen,
+            force: false
+        )
+
+        #expect(abs(scrollView.magnification - userZoom) < 0.001)
+        let newFit = FitCalculator.magnification(
+            docSize: secondBook.frame.size,
+            viewport: scrollView.contentSize,
+            fitMode: .fitScreen
+        )
+        #expect(abs(coordinator.baseMagnification - newFit) < 0.001)
+    }
+
+    /// Switching layout at 2× zoom: same expectation as opening a new book.
+    /// User chose to swap layout, not to refit; preserve their magnification.
+    @Test func userZoomPersistsAcrossLayoutSwap() {
+        let scrollView = Self.makeScrollView(size: CGSize(width: 800, height: 600))
+        let singlePage = NSView(frame: NSRect(x: 0, y: 0, width: 1000, height: 1500))
+        scrollView.documentView = singlePage
+        scrollView.layoutSubtreeIfNeeded()
+
+        let coordinator = AppKitScrollerCoordinator()
+        AppKitImageScroller.applyFit(
+            scrollView: scrollView,
+            coordinator: coordinator,
+            fitMode: .fitScreen,
+            force: true
+        )
+        scrollView.magnification = 2.0
+
+        // Simulate single → double layout: doc grows wider.
+        let doublePage = NSView(frame: NSRect(x: 0, y: 0, width: 2000, height: 1500))
+        scrollView.documentView = doublePage
+        scrollView.layoutSubtreeIfNeeded()
+
+        AppKitImageScroller.applyFit(
+            scrollView: scrollView,
+            coordinator: coordinator,
+            fitMode: .fitScreen,
+            force: false
+        )
+
+        #expect(abs(scrollView.magnification - 2.0) < 0.001)
+    }
+
+    /// Pressing the fit button still snaps to fit even if the user had
+    /// zoomed — that's the button's job, and the only path that overrides
+    /// the user's manual magnification.
+    @Test func fitButtonStillSnapsWhenUserHasZoomed() {
+        let scrollView = Self.makeScrollView(size: CGSize(width: 800, height: 600))
+        let doc = NSView(frame: NSRect(x: 0, y: 0, width: 1000, height: 1500))
+        scrollView.documentView = doc
+        scrollView.layoutSubtreeIfNeeded()
+
+        let coordinator = AppKitScrollerCoordinator()
+        AppKitImageScroller.applyFit(
+            scrollView: scrollView,
+            coordinator: coordinator,
+            fitMode: .fitScreen,
+            force: true
+        )
+        scrollView.magnification = 2.0
+
+        // User picks fit-width — fitModeChanged → force in production.
+        AppKitImageScroller.applyFit(
+            scrollView: scrollView,
+            coordinator: coordinator,
+            fitMode: .fitWidth,
+            force: true
+        )
+
+        let expected = FitCalculator.magnification(
+            docSize: doc.frame.size,
+            viewport: scrollView.contentSize,
+            fitMode: .fitWidth
+        )
+        #expect(abs(scrollView.magnification - expected) < 0.001)
     }
 
     /// Counterpart: if the user has *not* manually zoomed, navigating to the
