@@ -110,12 +110,21 @@ final class ReaderImageLoader {
             return
         }
 
-        // Parallel decode. In single-page layout this is a no-op (one task);
-        // in double-page mode the two pages decode concurrently instead of
-        // back-to-back, which is roughly a 2× speedup on the spread refresh.
-        // Index-tagged + sorted so spread order is preserved regardless of
-        // which decode finishes first.
-        let images = await withTaskGroup(of: (Int, NSImage?).self, returning: [NSImage].self) { group in
+        currentImages = await decodeSpreadInParallel(pages, onError: onError)
+        schedulePreload()
+    }
+
+    /// Decode the visible spread concurrently. In single-page layout this is
+    /// a no-op (one task); in double-page mode the two pages decode at the
+    /// same time instead of back-to-back, roughly a 2× speedup on every
+    /// spread refresh. Index-tagged + sorted so spread order is preserved
+    /// regardless of which decode finishes first — do not flatten this back
+    /// into a sequential loop without measuring the regression.
+    private func decodeSpreadInParallel(
+        _ pages: [ComicPage],
+        onError: @MainActor @escaping (String) -> Void
+    ) async -> [NSImage] {
+        await withTaskGroup(of: (Int, NSImage?).self, returning: [NSImage].self) { group in
             for (i, page) in pages.enumerated() {
                 group.addTask { [self] in
                     let image = await self.loadVisibleImage(page, onError: onError)
@@ -129,9 +138,6 @@ final class ReaderImageLoader {
             slots.sort { $0.0 < $1.0 }
             return slots.compactMap { $0.1 }
         }
-        currentImages = images
-
-        schedulePreload()
     }
 
     /// Vertical mode: fetch all page dimensions concurrently (header-only,

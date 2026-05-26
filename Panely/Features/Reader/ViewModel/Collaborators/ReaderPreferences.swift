@@ -1,10 +1,16 @@
 import Foundation
 
-/// User-facing reader preferences persisted via `UserDefaults`. Each property
-/// writes itself through on assignment, so callers can mutate freely and the
-/// next launch reads the current state back from disk. `ReaderViewModel`
-/// composes one of these and forwards its own `layout` / `fitMode` / …
-/// properties through, keeping the public viewmodel API stable.
+/// Canonical owner of all reader **UI/chrome state**: page layout, reading
+/// direction, sidebar/toolbar pin state, thumbnail sidebar visibility, fit
+/// mode, auto-fit-on-resize. Each property writes itself through to
+/// `UserDefaults` on assignment, so callers can mutate freely and the next
+/// launch reads the current state back from disk.
+///
+/// `ReaderViewModel` holds one of these and exposes forwarding computed
+/// properties (`viewModel.layout`, `.direction`, …) for view callsites — the
+/// VM keeps domain state (open book, current page, siblings), this object
+/// keeps presentation state. The split is intentional: clearing a book never
+/// resets the user's layout preference.
 @Observable
 @MainActor
 final class ReaderPreferences {

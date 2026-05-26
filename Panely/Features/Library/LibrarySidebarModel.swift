@@ -10,7 +10,7 @@ final class LibrarySidebarModel {
     func reload(
         rootURL: URL?,
         activeURL: URL? = nil,
-        loader: any LibraryTreeLoading = LiveLibraryTreeLoader()
+        loader: any LibraryTreeLoading
     ) async {
         guard let rootURL else {
             nodes = []

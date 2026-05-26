@@ -198,7 +198,10 @@ func makeTestDependencies(
         libraryTreeLoader: libraryTreeLoader,
         keyValueStore: keyValueStore,
         systemSettings: systemSettings,
-        sourceChangeMonitorFactory: sourceChangeMonitorFactory
+        sourceChangeMonitorFactory: sourceChangeMonitorFactory,
+        makeReaderPreferences: { ReaderPreferences(defaults: keyValueStore) },
+        makeReaderPositions: { ReaderPositionStore(defaults: keyValueStore) },
+        makeReaderTempDirectory: { ReaderTempDirectory(extractionCache: extractionCache) }
     )
 }
 

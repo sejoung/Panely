@@ -8,7 +8,7 @@ struct LibrarySidebarModelTests {
         let model = LibrarySidebarModel()
         model.expandedNodeIDs = [URL(fileURLWithPath: "/old")]
 
-        await model.reload(rootURL: nil)
+        await model.reload(rootURL: nil, loader: FakeLibraryTreeLoader())
 
         #expect(model.nodes.isEmpty)
         #expect(model.scanCompleted == false)
@@ -24,7 +24,7 @@ struct LibrarySidebarModelTests {
         _ = try Fixture.writeFile(nested.appendingPathComponent("Vol02.cbz"))
 
         let model = LibrarySidebarModel()
-        await model.reload(rootURL: root)
+        await model.reload(rootURL: root, loader: LiveLibraryTreeLoader())
 
         #expect(model.scanCompleted)
         #expect(model.nodes.contains { $0.name == "Vol01" })

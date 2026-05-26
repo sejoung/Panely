@@ -8,19 +8,27 @@ import UniformTypeIdentifiers
 /// the open book live in dedicated collaborators, so this class only carries
 /// the navigation/source plumbing that genuinely belongs together:
 ///
-/// - `ReaderPreferences` — layout / fit / sidebar / toolbar persistence
-/// - `ReaderPositionStore` — debounced per-book page memory
-/// - `ReaderImageLoader` — cache, lazy window, preload, paged refresh
-/// - `ReaderTempDirectory` — zip-in-zip extraction lifecycle
-/// - `ReaderViewModel+Navigation` — page stepping, chrome toggles, jumps
-/// - `ReaderViewModel+Source` — load pipeline, volume siblings, library scope
-/// - `ReaderViewModel+ImageLoading` — thin facade over `imageLoader`
-/// - `ReaderViewModel+Bookmarks` — favorites & per-page bookmarks integration
+/// - `ReaderPreferences` — **owns all UI/chrome state** (layout, direction,
+///   fit, sidebar/toolbar pin, thumbnail visibility). Persists each via
+///   `UserDefaults` on assignment.
+/// - `ReaderPositionStore` — debounced per-book page memory + key derivation.
+/// - `ReaderImageLoader` — cache, lazy window, preload, paged refresh.
+/// - `ReaderTempDirectory` — zip-in-zip extraction lifecycle.
+/// - `ReaderViewModel+Source` — open entry points, library root, scope helpers.
+/// - `ReaderViewModel+LoadPipeline` — the `load(url:)` state machine.
+/// - `ReaderViewModel+Navigation` — page stepping, chrome toggles, jumps.
+/// - `ReaderViewModel+ImageLoading` — thin facade over `imageLoader`.
+/// - `ReaderViewModel+Bookmarks` — favorites + per-page bookmarks.
+/// - `ReaderViewModel+Toolbar` — toolbar state/actions wiring.
+/// - `ReaderViewModel+Cache` — extraction-cache management.
 ///
-/// Preference/image fields are exposed as forwarding computed properties so
-/// existing view callsites (`viewModel.layout == .single`,
-/// `viewModel.currentImages`) keep working — `@Observable` tracks through
-/// the chain to the underlying collaborator.
+/// **State separation:** domain state lives directly on this class (`source`,
+/// `currentPageIndex`, `siblings`, error/loading flags). UI state lives on
+/// `ReaderPreferences`. The forwarding computed properties below (`layout`,
+/// `direction`, …) preserve a stable view-facing API; `@Observable` tracks
+/// through them so views never need to know about the collaborator. The
+/// `layout` setter additionally calls `handleLayoutChange` to refresh images
+/// — see `ReaderViewModel+ImageLoading`.
 @Observable
 @MainActor
 final class ReaderViewModel {
@@ -80,7 +88,13 @@ final class ReaderViewModel {
     /// one (race in `currentImages` / `currentSourceURL` assignments).
     var loadEpoch: Int = 0
 
-    // MARK: - Preference forwarding (preserves existing view API)
+    // MARK: - UI-state forwarding to `ReaderPreferences`
+    //
+    // These properties keep the historical `viewModel.layout` / `.direction`
+    // / … API at view callsites. `ReaderPreferences` is the actual source of
+    // truth (and the persistence layer); changes flow through these setters.
+    // The `layout` setter additionally triggers `handleLayoutChange` so an
+    // image refresh and page-index snap happen on the same call.
 
     var layout: PageLayout {
         get { preferences.layout }
@@ -157,9 +171,9 @@ final class ReaderViewModel {
 
     init(dependencies: AppDependencies = .live) {
         self.dependencies = dependencies
-        self.preferences = ReaderPreferences(defaults: dependencies.keyValueStore)
-        self.positions = ReaderPositionStore(defaults: dependencies.keyValueStore)
-        self.tempDir = ReaderTempDirectory(extractionCache: dependencies.extractionCache)
+        self.preferences = dependencies.makeReaderPreferences()
+        self.positions = dependencies.makeReaderPositions()
+        self.tempDir = dependencies.makeReaderTempDirectory()
         self.recentItems = RecentItemsStore(
             bookmarks: dependencies.bookmarkResolver,
             defaults: dependencies.keyValueStore

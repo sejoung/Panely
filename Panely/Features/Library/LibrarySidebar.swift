@@ -1,5 +1,20 @@
 import SwiftUI
 
+/// Mirrors `PanelyToolbarActions`: bundles every callback the sidebar needs
+/// so the host (and previews) build one struct instead of threading nine
+/// closures through `LibrarySidebar`'s initializer.
+struct LibrarySidebarActions {
+    var onSelect: (URL) -> Void = { _ in }
+    var onSelectFavorite: (FavoriteBook) -> Void = { _ in }
+    var onRemoveFavorite: (FavoriteBook) -> Void = { _ in }
+    var onJumpToBookmark: (PageBookmark) -> Void = { _ in }
+    var onRemovePageBookmark: (PageBookmark) -> Void = { _ in }
+    var onSelectVolume: (URL) -> Void = { _ in }
+    var onOpen: () -> Void = {}
+    var onTogglePin: () -> Void = {}
+    var onRequestFolderAccess: () -> Void = {}
+}
+
 struct LibrarySidebar: View {
     let rootURL: URL?
     let activeURL: URL?
@@ -8,17 +23,9 @@ struct LibrarySidebar: View {
     let favorites: [FavoriteBook]
     let pageBookmarks: [PageBookmark]
     let volumes: [URL]
-    var libraryTreeLoader: any LibraryTreeLoading = LiveLibraryTreeLoader()
+    let libraryTreeLoader: any LibraryTreeLoading
     let currentPageIndex: Int
-    let onSelect: (URL) -> Void
-    let onSelectFavorite: (FavoriteBook) -> Void
-    let onRemoveFavorite: (FavoriteBook) -> Void
-    let onJumpToBookmark: (PageBookmark) -> Void
-    let onRemovePageBookmark: (PageBookmark) -> Void
-    let onSelectVolume: (URL) -> Void
-    let onOpen: () -> Void
-    let onTogglePin: () -> Void
-    let onRequestFolderAccess: () -> Void
+    let actions: LibrarySidebarActions
 
     @State private var model = LibrarySidebarModel()
 
@@ -56,7 +63,7 @@ struct LibrarySidebar: View {
         HStack(spacing: PanelySpacing.sm) {
             PanelyIconButton(
                 systemImage: "books.vertical",
-                action: onRequestFolderAccess
+                action: actions.onRequestFolderAccess
             )
             .help("Change Library Root…")
             Text(rootURL?.lastPathComponent ?? "Library")
@@ -67,7 +74,7 @@ struct LibrarySidebar: View {
             PanelyIconButton(
                 systemImage: pinned ? "pin.fill" : "pin",
                 isActive: pinned,
-                action: onTogglePin
+                action: actions.onTogglePin
             )
             .help(pinned ? "Unpin Library (⌃⌘S)" : "Pin Library Open (⌃⌘S)")
         }
@@ -98,7 +105,7 @@ struct LibrarySidebar: View {
                     VolumeRow(
                         url: url,
                         isActive: activeStdURL == url.standardizedFileURL,
-                        onTap: { onSelectVolume(url) }
+                        onTap: { actions.onSelectVolume(url) }
                     )
                     .listRowBackground(Color.clear)
                 }
@@ -114,8 +121,8 @@ struct LibrarySidebar: View {
                     FavoriteRow(
                         favorite: fav,
                         isActive: isFavorite(fav, activeFor: activeStdURL),
-                        onTap: { onSelectFavorite(fav) },
-                        onRemove: { onRemoveFavorite(fav) }
+                        onTap: { actions.onSelectFavorite(fav) },
+                        onRemove: { actions.onRemoveFavorite(fav) }
                     )
                     .listRowBackground(Color.clear)
                 }
@@ -131,8 +138,8 @@ struct LibrarySidebar: View {
                     PageBookmarkRow(
                         bookmark: bm,
                         isCurrent: bm.pageIndex == currentPageIndex,
-                        onTap: { onJumpToBookmark(bm) },
-                        onRemove: { onRemovePageBookmark(bm) }
+                        onTap: { actions.onJumpToBookmark(bm) },
+                        onRemove: { actions.onRemovePageBookmark(bm) }
                     )
                     .listRowBackground(Color.clear)
                 }
@@ -149,7 +156,7 @@ struct LibrarySidebar: View {
                         node: node,
                         activeStdURL: activeStdURL,
                         expandedNodeIDs: $model.expandedNodeIDs,
-                        onSelect: onSelect
+                        onSelect: actions.onSelect
                     )
                     .listRowBackground(Color.clear)
                 }
@@ -188,7 +195,7 @@ struct LibrarySidebar: View {
             Text("No library opened")
                 .font(PanelyTypography.body)
                 .foregroundStyle(PanelyColor.textSecondary)
-            Button(action: onOpen) {
+            Button(action: actions.onOpen) {
                 Text("Open Folder…")
                     .font(PanelyTypography.caption)
                     .foregroundStyle(PanelyColor.accentPrimary)
@@ -213,7 +220,7 @@ struct LibrarySidebar: View {
                 .font(PanelyTypography.caption)
                 .foregroundStyle(PanelyColor.textSecondary)
                 .multilineTextAlignment(.center)
-            Button(action: onRequestFolderAccess) {
+            Button(action: actions.onRequestFolderAccess) {
                 Text("Pick Folder…")
                     .font(PanelyTypography.caption)
                     .foregroundStyle(PanelyColor.accentPrimary)
@@ -283,16 +290,9 @@ private struct FileTreeNodeRow: View {
         favorites: [],
         pageBookmarks: [],
         volumes: [],
+        libraryTreeLoader: LiveLibraryTreeLoader(),
         currentPageIndex: 0,
-        onSelect: { _ in },
-        onSelectFavorite: { _ in },
-        onRemoveFavorite: { _ in },
-        onJumpToBookmark: { _ in },
-        onRemovePageBookmark: { _ in },
-        onSelectVolume: { _ in },
-        onOpen: {},
-        onTogglePin: {},
-        onRequestFolderAccess: {}
+        actions: LibrarySidebarActions()
     )
     .frame(height: 480)
     .background(PanelyColor.bgPrimary)

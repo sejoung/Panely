@@ -19,6 +19,12 @@ struct SidebarHost: View {
             volumes: viewModel.sidebarVolumes,
             libraryTreeLoader: viewModel.dependencies.libraryTreeLoader,
             currentPageIndex: viewModel.currentPageIndex,
+            actions: sidebarActions
+        )
+    }
+
+    private var sidebarActions: LibrarySidebarActions {
+        LibrarySidebarActions(
             onSelect: { url in
                 viewModel.openLibraryURL(url)
                 viewModel.dismissSidebarOverlay()

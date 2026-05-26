@@ -57,6 +57,43 @@ final class ReaderPositionStore {
         return 0
     }
 
+    // MARK: - URL-based addressing
+
+    /// Stable primary key for `sourceURL`. Centralises `PositionKey` derivation
+    /// here so callers (viewmodel, bookmark facade) don't each build their own.
+    func primaryKey(for sourceURL: URL, opened openedURL: URL?, tempRoot: URL?) -> String {
+        PositionKey.keys(for: sourceURL, opened: openedURL, tempRoot: tempRoot).primary
+    }
+
+    func savePosition(
+        for sourceURL: URL,
+        opened openedURL: URL?,
+        tempRoot: URL?,
+        pageIndex: Int
+    ) {
+        let keys = PositionKey.keys(for: sourceURL, opened: openedURL, tempRoot: tempRoot)
+        savePosition(forKey: keys.primary, fileIdentityKey: keys.fileIdentity, pageIndex: pageIndex)
+    }
+
+    func flushImmediately(
+        for sourceURL: URL,
+        opened openedURL: URL?,
+        tempRoot: URL?,
+        pageIndex: Int
+    ) {
+        let keys = PositionKey.keys(for: sourceURL, opened: openedURL, tempRoot: tempRoot)
+        flushImmediately(forKey: keys.primary, fileIdentityKey: keys.fileIdentity, pageIndex: pageIndex)
+    }
+
+    func restoredIndex(
+        for sourceURL: URL,
+        opened openedURL: URL?,
+        tempRoot: URL?
+    ) -> Int {
+        let keys = PositionKey.keys(for: sourceURL, opened: openedURL, tempRoot: tempRoot)
+        return restoredIndex(forKey: keys.primary, fileIdentityKey: keys.fileIdentity)
+    }
+
     private func writeNow(key: String, fileIdentityKey: String?, pageIndex: Int) {
         var dict = loaded()
         dict[key] = pageIndex

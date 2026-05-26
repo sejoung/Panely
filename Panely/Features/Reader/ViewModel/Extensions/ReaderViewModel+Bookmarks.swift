@@ -136,7 +136,4 @@ extension ReaderViewModel {
         return String(currentPath.dropFirst(rootPath.count + 1))
     }
 
-    private func isDirectory(_ url: URL) -> Bool {
-        (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
-    }
 }
