@@ -124,13 +124,127 @@ struct ViewerResizeFitTests {
         ))
     }
 
-    @Test func contentStructureChangeForcesFitResetEvenWhenLayoutPropIsAlreadyCurrent() {
+    /// Regression: page-flip in paged mode always reports
+    /// `contentStructureChanged = true` (the NSImage array is swapped), but
+    /// that alone must NOT force a fit reset — otherwise a user who zoomed
+    /// to 2× on page N would snap back to fit on page N+1. New-book and
+    /// layout-swap cases are still covered by the dedicated flags.
+    @Test func contentStructureChangeAloneDoesNotForceFitReset() {
         #expect(AppKitImageScroller.shouldForceFitReset(
             identityChanged: false,
             fitModeChanged: false,
             layoutChanged: false,
             contentStructureChanged: true
+        ) == false)
+    }
+
+    @Test func identityChangeForcesFitResetEvenWhenStructureUnchanged() {
+        #expect(AppKitImageScroller.shouldForceFitReset(
+            identityChanged: true,
+            fitModeChanged: false,
+            layoutChanged: false,
+            contentStructureChanged: false
         ))
+    }
+
+    @Test func fitModeChangeForcesFitReset() {
+        #expect(AppKitImageScroller.shouldForceFitReset(
+            identityChanged: false,
+            fitModeChanged: true,
+            layoutChanged: false,
+            contentStructureChanged: false
+        ))
+    }
+
+    /// End-to-end behavior at the `applyFit` level: zoom to 2× on the first
+    /// page, then simulate a paged page-flip (new doc-size + non-force call).
+    /// Magnification must stay at the user's 2×; only `baseMagnification`
+    /// updates so that a later "reset zoom" snaps to the new page's fit.
+    @Test func userZoomPersistsAcrossPagedNavigation() {
+        let scrollView = Self.makeScrollView(size: CGSize(width: 800, height: 600))
+        let firstPage = NSView(frame: NSRect(x: 0, y: 0, width: 1000, height: 1500))
+        scrollView.documentView = firstPage
+        scrollView.layoutSubtreeIfNeeded()
+
+        let coordinator = AppKitScrollerCoordinator()
+        // Initial fit on first page.
+        AppKitImageScroller.applyFit(
+            scrollView: scrollView,
+            coordinator: coordinator,
+            fitMode: .fitScreen,
+            force: true
+        )
+
+        // User zooms in.
+        let userZoom: CGFloat = 2.0
+        scrollView.magnification = userZoom
+
+        // Page flip: new page has different dimensions (taller). In production
+        // this comes from `setImages` swapping NSImages with different sizes,
+        // which `updateNSView` then reports as `contentStructureChanged = true`
+        // — i.e. `force: false` because no identity/fit/layout change.
+        let secondPage = NSView(frame: NSRect(x: 0, y: 0, width: 1200, height: 2400))
+        scrollView.documentView = secondPage
+        scrollView.layoutSubtreeIfNeeded()
+
+        AppKitImageScroller.applyFit(
+            scrollView: scrollView,
+            coordinator: coordinator,
+            fitMode: .fitScreen,
+            force: false
+        )
+
+        // The user's zoom must survive the page flip.
+        #expect(abs(scrollView.magnification - userZoom) < 0.001)
+
+        // baseMagnification still tracks the new page's fit so a future
+        // reset/double-click lands correctly.
+        let expectedFit = FitCalculator.magnification(
+            docSize: secondPage.frame.size,
+            viewport: scrollView.contentSize,
+            fitMode: .fitScreen
+        )
+        #expect(abs(coordinator.baseMagnification - expectedFit) < 0.001)
+    }
+
+    /// Counterpart: if the user has *not* manually zoomed, navigating to the
+    /// next page should snap to the new page's fit (so a taller page doesn't
+    /// stay framed at the previous page's magnification).
+    @Test func fitFollowsNextPageWhenUserHasNotZoomed() {
+        let scrollView = Self.makeScrollView(size: CGSize(width: 800, height: 600))
+        let firstPage = NSView(frame: NSRect(x: 0, y: 0, width: 1000, height: 1500))
+        scrollView.documentView = firstPage
+        scrollView.layoutSubtreeIfNeeded()
+
+        let coordinator = AppKitScrollerCoordinator()
+        AppKitImageScroller.applyFit(
+            scrollView: scrollView,
+            coordinator: coordinator,
+            fitMode: .fitScreen,
+            force: true
+        )
+        let firstFit = scrollView.magnification
+
+        // Different-sized next page, user never zoomed.
+        let secondPage = NSView(frame: NSRect(x: 0, y: 0, width: 1200, height: 2400))
+        scrollView.documentView = secondPage
+        scrollView.layoutSubtreeIfNeeded()
+
+        AppKitImageScroller.applyFit(
+            scrollView: scrollView,
+            coordinator: coordinator,
+            fitMode: .fitScreen,
+            force: false
+        )
+
+        let expectedFit = FitCalculator.magnification(
+            docSize: secondPage.frame.size,
+            viewport: scrollView.contentSize,
+            fitMode: .fitScreen
+        )
+        #expect(abs(scrollView.magnification - expectedFit) < 0.001)
+        // Sanity: the taller second page has a smaller fit-screen mag.
+        #expect(scrollView.magnification < firstFit)
     }
 
     /// When autoFitOnResize is OFF (locked), applyFit must preserve the

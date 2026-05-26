@@ -122,10 +122,13 @@ struct AppKitImageScroller: NSViewRepresentable {
             identityChanged || fitModeChanged || layoutChanged || contentStructureChanged
         }
 
-        /// Fundamental changes that override the user's manual zoom. A layout
-        /// or document-structure change swaps the geometry, so a zoom that made
-        /// sense in a vertical strip should not leak into single/double page
-        /// viewing.
+        /// Fundamental changes that override the user's manual zoom: a new
+        /// book, an explicit fit-mode pick, or a layout swap. `contentStructureChanged`
+        /// is deliberately excluded — in paged mode every page-flip swaps the
+        /// NSImage array (so structure "changes"), and we want the user's
+        /// zoom to survive flipping to the next page. The non-force path in
+        /// `applyFit` still snaps to the new page's fit when the user *hasn't*
+        /// manually zoomed.
         var forceFitReset: Bool {
             AppKitImageScroller.shouldForceFitReset(
                 identityChanged: identityChanged,
@@ -142,7 +145,12 @@ struct AppKitImageScroller: NSViewRepresentable {
         layoutChanged: Bool,
         contentStructureChanged: Bool
     ) -> Bool {
-        identityChanged || fitModeChanged || layoutChanged || contentStructureChanged
+        // `contentStructureChanged` intentionally not OR'd in: routine page
+        // navigation in paged mode trips this flag every flip, and we want
+        // the user's manual zoom to carry across pages. New-book / layout-swap
+        // cases are already caught by `identityChanged` / `layoutChanged`.
+        _ = contentStructureChanged
+        return identityChanged || fitModeChanged || layoutChanged
     }
 
     private func recordPropChange(
