@@ -289,6 +289,70 @@ struct ViewerResizeFitTests {
         #expect(abs(scrollView.magnification - 2.0) < 0.001)
     }
 
+    /// After `applyFit` runs, `ViewerController.currentMagnification` must
+    /// match the live scroll-view magnification — otherwise the toolbar's
+    /// `isAtFit` check would drift and the fit-mode button highlight would
+    /// be out of sync.
+    @Test func applyFitSyncsViewerControllerCurrentMagnification() {
+        let scrollView = Self.makeScrollView(size: CGSize(width: 800, height: 600))
+        let doc = NSView(frame: NSRect(x: 0, y: 0, width: 1000, height: 1500))
+        scrollView.documentView = doc
+        scrollView.layoutSubtreeIfNeeded()
+
+        let coordinator = AppKitScrollerCoordinator()
+        let viewerController = ViewerController()
+        viewerController.attach(scrollView: scrollView)
+        coordinator.viewerController = viewerController
+
+        AppKitImageScroller.applyFit(
+            scrollView: scrollView,
+            coordinator: coordinator,
+            fitMode: .fitScreen,
+            force: true
+        )
+
+        #expect(abs(viewerController.currentMagnification - scrollView.magnification) < 0.001)
+        #expect(viewerController.isAtFit)
+    }
+
+    /// And after a non-force apply that preserves the user's manual zoom,
+    /// `currentMagnification` still tracks the live scroll-view value (the
+    /// preserved mag, not the new fit). `isAtFit` is false because the user
+    /// is no longer at the new baseline.
+    @Test func applyFitNonForceLeavesUserZoomedAndOffFit() {
+        let scrollView = Self.makeScrollView(size: CGSize(width: 800, height: 600))
+        let doc = NSView(frame: NSRect(x: 0, y: 0, width: 1000, height: 1500))
+        scrollView.documentView = doc
+        scrollView.layoutSubtreeIfNeeded()
+
+        let coordinator = AppKitScrollerCoordinator()
+        let viewerController = ViewerController()
+        viewerController.attach(scrollView: scrollView)
+        coordinator.viewerController = viewerController
+
+        AppKitImageScroller.applyFit(
+            scrollView: scrollView,
+            coordinator: coordinator,
+            fitMode: .fitScreen,
+            force: true
+        )
+        // User zooms in.
+        scrollView.magnification = 2.0
+        viewerController.currentMagnification = 2.0
+
+        // Some non-force trigger (page flip / new book / layout swap).
+        AppKitImageScroller.applyFit(
+            scrollView: scrollView,
+            coordinator: coordinator,
+            fitMode: .fitScreen,
+            force: false
+        )
+
+        #expect(abs(scrollView.magnification - 2.0) < 0.001)
+        #expect(abs(viewerController.currentMagnification - 2.0) < 0.001)
+        #expect(viewerController.isAtFit == false)
+    }
+
     /// Pressing the fit button still snaps to fit even if the user had
     /// zoomed — that's the button's job, and the only path that overrides
     /// the user's manual magnification.

@@ -90,8 +90,16 @@ final class AppKitScrollerCoordinator {
     }
 
     private func handleBoundsChange() {
-        guard let sv = scrollView,
-              lastLayout.isContinuous,
+        guard let sv = scrollView else { return }
+
+        // Magnification changes (pinch, double-click, programmatic) move the
+        // clip bounds, so this observer is where we learn about them across
+        // every layout. Push the live value into ViewerController so the
+        // toolbar's fit-mode highlight tracks the user's zoom in real time —
+        // the rest of this method only handles vertical-strip scroll work.
+        viewerController?.currentMagnification = sv.magnification
+
+        guard lastLayout.isContinuous,
               let stack = sv.documentView as? ImageStackView else { return }
         let visibleRect = sv.documentVisibleRect
 

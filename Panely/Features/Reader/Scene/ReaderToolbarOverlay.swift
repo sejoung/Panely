@@ -10,7 +10,7 @@ struct ReaderToolbarOverlay: View {
 
     var body: some View {
         PanelyToolbar(
-            state: viewModel.toolbarState,
+            state: viewModel.toolbarState(isAtFit: viewerController.isAtFit),
             actions: viewModel.toolbarActions(viewerController: viewerController)
         )
         .padding(PanelySpacing.md)

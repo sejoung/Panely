@@ -70,6 +70,53 @@ struct ViewerControllerTests {
         #expect(controller.baseMagnification == 1.0)
     }
 
+    /// `isAtFit` is what the toolbar reads to highlight (or not) the current
+    /// fit-mode button. Default-true so a fresh controller doesn't look like
+    /// the user has already zoomed.
+    @Test func isAtFitTrueByDefault() {
+        let controller = ViewerController()
+        #expect(controller.isAtFit)
+    }
+
+    /// After zooming in, the live magnification drifts off the fit baseline,
+    /// so `isAtFit` must drop. Drives the toolbar's fit-button un-highlight.
+    @Test func isAtFitBecomesFalseAfterZoomIn() {
+        let sv = makeScrollView()
+        sv.magnification = 1.0
+        let controller = ViewerController()
+        controller.attach(scrollView: sv)
+        controller.baseMagnification = 1.0
+
+        controller.zoomIn()
+        #expect(controller.isAtFit == false)
+    }
+
+    /// And after zooming out, same thing.
+    @Test func isAtFitBecomesFalseAfterZoomOut() {
+        let sv = makeScrollView()
+        sv.magnification = 1.0
+        let controller = ViewerController()
+        controller.attach(scrollView: sv)
+        controller.baseMagnification = 1.0
+
+        controller.zoomOut()
+        #expect(controller.isAtFit == false)
+    }
+
+    /// `resetZoom` snaps back to the fit baseline → `isAtFit` flips true.
+    @Test func resetZoomRestoresIsAtFit() {
+        let sv = makeScrollView()
+        sv.magnification = 3.0
+        let controller = ViewerController()
+        controller.attach(scrollView: sv)
+        controller.baseMagnification = 0.4
+        // currentMagnification reflects attach-time mag (3.0); we're off fit.
+        #expect(controller.isAtFit == false)
+
+        controller.resetZoom()
+        #expect(controller.isAtFit)
+    }
+
     private func makeScrollView() -> NSScrollView {
         let sv = NSScrollView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
         sv.allowsMagnification = true

@@ -295,5 +295,9 @@ struct AppKitImageScroller: NSViewRepresentable {
         }
         coordinator.baseMagnification = fit
         coordinator.viewerController?.baseMagnification = fit
+        // Keep the toolbar's fit-button highlight in sync. If we just reset
+        // to fit, mag == base → `isAtFit == true`. If we preserved the
+        // user's manual zoom, mag != base → highlight drops as expected.
+        coordinator.viewerController?.currentMagnification = scrollView.magnification
     }
 }

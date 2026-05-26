@@ -14,6 +14,11 @@ struct PanelyToolbarState: Equatable {
     var isBookFavorite = false
     var isPageBookmarked = false
     var thumbnailSidebarVisible = false
+    /// True when the scroll view's magnification matches the fit baseline.
+    /// Gates the fit-mode button highlight — once the user zooms in/out,
+    /// they're no longer "at" `fitMode` so no fit button should look
+    /// selected until they snap back (via the fit button or reset zoom).
+    var isAtFit = true
 }
 
 struct PanelyToolbarActions {
@@ -130,21 +135,21 @@ struct PanelyToolbar: View {
         Group {
             PanelyIconButton(
                 systemImage: "arrow.up.left.and.arrow.down.right",
-                isActive: state.fitMode == .fitScreen,
+                isActive: state.fitMode == .fitScreen && state.isAtFit,
                 action: { actions.onSetFitMode(.fitScreen) }
             )
             .help("Fit to Screen (⌘1)")
 
             PanelyIconButton(
                 systemImage: "arrow.left.and.right",
-                isActive: state.fitMode == .fitWidth,
+                isActive: state.fitMode == .fitWidth && state.isAtFit,
                 action: { actions.onSetFitMode(.fitWidth) }
             )
             .help("Fit Width (⌘2)")
 
             PanelyIconButton(
                 systemImage: "arrow.up.and.down",
-                isActive: state.fitMode == .fitHeight,
+                isActive: state.fitMode == .fitHeight && state.isAtFit,
                 action: { actions.onSetFitMode(.fitHeight) }
             )
             .help("Fit Height (⌘3)")
