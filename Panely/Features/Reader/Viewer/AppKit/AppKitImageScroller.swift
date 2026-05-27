@@ -81,6 +81,12 @@ struct AppKitImageScroller: NSViewRepresentable {
             let isAtBase = abs(scrollView.magnification - coordinator.baseMagnification) < 0.01
             let target = isAtBase ? coordinator.baseMagnification * 2 : coordinator.baseMagnification
             scrollView.setMagnification(target, centeredAt: localPoint)
+            // Sync explicitly. The bounds observer would catch this too, but
+            // every other zoom path (`ViewerController.zoomIn/zoomOut/resetZoom`,
+            // `applyFit`) updates `currentMagnification` inline; relying on the
+            // observer here would leave double-click as the only path that
+            // depends on observer timing for the toolbar's `isAtFit` highlight.
+            coordinator.viewerController?.currentMagnification = scrollView.magnification
         }
         return content
     }
