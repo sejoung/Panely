@@ -55,6 +55,10 @@ pages.
   - **Fit to screen** — entire page visible
   - **Fit to width** — fills viewport width
   - **Fit to height** — fills viewport height
+
+  The picker is **deselectable**: once you zoom or pan away from the fit
+  magnification it stops highlighting any mode, and re-tapping the active
+  mode snaps you straight back to fit (acts as "reset to fit")
 - **Vertical mode lazy windowing** — page dimensions are pre-fetched
   (header-only on folders) so the strip lays out immediately with gray
   placeholders, then real images stream in concurrently for the visible
@@ -81,8 +85,11 @@ pages.
   Loading / Building vertical strip) while big sources are processed,
   all on background threads
 - **Reload and source-change notice** — `⌘R` reloads the current book.
-  If the opened file changes on disk, Panely shows a small banner with
-  Reload / Dismiss actions instead of moving the reader unexpectedly
+  If the source changes on disk, Panely shows a small banner with
+  Reload / Dismiss actions instead of moving the reader unexpectedly. The
+  watcher covers archives (the file itself) **and open folders** — the
+  directory plus every page image in it — so adding, removing, or editing
+  pages in a folder you're reading surfaces the same prompt
 - **Image error placeholders** — an unreadable page stays visible as a
   labeled error tile, so one bad image doesn't collapse the spread/strip
 
@@ -126,6 +133,9 @@ pages.
 - **Sidebar tree** — folders and archives are visually disambiguated:
   `folder` vs `doc.zipper` icons, plus a faint `.cbz` / `.zip` suffix on
   archives for quick reading
+- **Reveal-active in the tree** — opening a book auto-expands its ancestor
+  folders so the current volume is always visible in the sidebar, and the
+  expansion follows along as you move between volumes
 - **Vertical-mode page navigation** — `← → Space` scroll to the previous /
   next image in the strip (working from the page currently centered in
   the viewport, not the last one keyboard-navigated)
@@ -388,7 +398,7 @@ Panely/
 │   ├── Diagnostics/
 │   │   ├── AppLog.swift                # swift-log facade + OSLog/file diagnostic backend
 │   │   └── DiagnosticLogStore.swift    # rolling recent-log.txt cache file
-│   ├── SourceChangeMonitor.swift       # DispatchSource-backed source file watcher
+│   ├── SourceChangeMonitor.swift       # DispatchSource-backed multi-URL file/folder watcher (session-guarded)
 │   └── Extensions/                     # shared Foundation helpers
 ├── DesignSystem/
 │   ├── Tokens/                         # Color / Spacing / Typography / Motion
@@ -415,13 +425,17 @@ Panely/
 │   │   │   ├── ReaderViewModel.swift           # session state + composition (~180 lines)
 │   │   │   ├── Extensions/                     # logic split by concern
 │   │   │   │   ├── ReaderViewModel+Navigation.swift   # page nav, Quick jump, chrome toggles
-│   │   │   │   ├── ReaderViewModel+Source.swift       # load pipeline + folder/archive scanners
+│   │   │   │   ├── ReaderViewModel+Source.swift       # load entry points + ReaderLoadIntent
+│   │   │   │   ├── ReaderViewModel+LoadPipeline.swift # multi-stage load() state machine + source-change watcher
+│   │   │   │   ├── ReaderViewModel+Cache.swift        # extraction-cache clear (File menu + Settings)
+│   │   │   │   ├── ReaderViewModel+Toolbar.swift      # PanelyToolbar state/actions bundle
 │   │   │   │   ├── ReaderViewModel+Volumes.swift      # sibling counters + volume cards
 │   │   │   │   ├── ReaderViewModel+ImageLoading.swift # facade over ReaderImageLoader
 │   │   │   │   └── ReaderViewModel+Bookmarks.swift    # favorites + page bookmarks integration
 │   │   │   └── Collaborators/                  # composed by ReaderViewModel; each single-responsibility
 │   │   │       ├── ReaderPreferences.swift     # KeyValueStoring-backed layout / fit / pins
 │   │   │       ├── ReaderPositionStore.swift   # debounced per-book page memory
+│   │   │       ├── FolderResolver.swift        # off-main folder/volume scanners (pure file-system walks)
 │   │   │       ├── ReaderImageLoader.swift     # cache + paged refresh + vertical lazy window + preload
 │   │   │       ├── ReaderImageLoadingSupport.swift # image memory cache + loading helpers
 │   │   │       ├── ReaderTempDirectory.swift   # zip-in-zip session extraction lifecycle
@@ -456,7 +470,7 @@ Panely/
 │   │   └── CacheMaintenance.swift      # clear-cache result and formatting helpers
 │   └── Library/
 │       ├── LibrarySidebar.swift        # pin button + extension badge + two-phase load
-│       ├── LibrarySidebarModel.swift   # sidebar presentation model
+│       ├── LibrarySidebarModel.swift   # sidebar presentation model + expand-ancestors-of-active
 │       ├── LibraryTreeLoader.swift     # injectable FileNode.loadTree wrapper
 │       ├── Model/
 │       │   ├── FileNode.swift          # iconName + fileExtension + parallel top-level scan

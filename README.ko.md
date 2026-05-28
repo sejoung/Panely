@@ -52,6 +52,10 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   - **화면에 맞춤** — 페이지 전체가 보이도록
   - **가로에 맞춤** — 뷰포트 가로에 맞춤
   - **세로에 맞춤** — 뷰포트 세로에 맞춤
+
+  픽커는 **선택 해제** 가능 — 줌이나 이동으로 맞춤 배율에서 벗어나면 어떤
+  모드도 강조 표시하지 않고, 현재 모드를 다시 탭하면 곧장 맞춤으로 되돌아감
+  ("맞춤으로 리셋" 동작)
 - **세로 모드 지연 윈도잉** — 페이지 크기를 미리 가져와서(폴더는 헤더만)
   회색 플레이스홀더로 즉시 레이아웃을 잡은 뒤, 보이는 범위의 실제 이미지를
   동시 로드하고 배치된 SwiftUI 패스로 업데이트 (이미지마다 재레이아웃 폭주 방지)
@@ -73,9 +77,11 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   동안 forward/backward 키 한 번이면 권을 이동
 - **진행 오버레이** — 큰 소스를 처리하는 동안 단계별 메시지
   (Opening / Extracting / Loading / Building vertical strip), 전부 백그라운드 스레드
-- **리로드와 파일 변경 알림** — `⌘R`로 현재 책을 다시 읽음. 열린 파일이
+- **리로드와 소스 변경 알림** — `⌘R`로 현재 책을 다시 읽음. 소스가
   디스크에서 바뀌면 읽던 위치를 갑자기 옮기지 않고 Reload / Dismiss
-  액션이 있는 작은 배너를 표시
+  액션이 있는 작은 배너를 표시. 감시 대상은 아카이브(파일 자체)뿐 아니라
+  **열린 폴더** — 디렉터리와 그 안의 모든 페이지 이미지 — 까지 포함하므로,
+  읽고 있는 폴더에 페이지를 추가·삭제·수정해도 같은 알림이 뜸
 - **이미지 오류 플레이스홀더** — 읽을 수 없는 페이지는 라벨이 있는 오류
   타일로 남겨 한 장의 깨진 이미지가 펼침/스트립 레이아웃을 무너뜨리지 않음
 
@@ -117,6 +123,8 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
 - **사이드바 트리** — 폴더와 아카이브가 시각적으로 구분됨:
   `folder` vs `doc.zipper` 아이콘, 아카이브엔 빠른 식별용으로 희미한
   `.cbz` / `.zip` 접미사
+- **트리에서 현재 책 표시** — 책을 열면 상위 폴더들이 자동으로 펼쳐져
+  현재 권이 항상 사이드바에 보이고, 권 사이를 이동하면 펼침 상태도 따라감
 - **세로 모드 페이지 네비게이션** — `← → Space`로 스트립에서 이전/다음
   이미지로 스크롤(키보드로 마지막 이동한 위치가 아니라 현재 뷰포트 중앙에
   있는 페이지 기준)
@@ -364,7 +372,7 @@ Panely/
 │   ├── Diagnostics/
 │   │   ├── AppLog.swift                # swift-log facade + OSLog/file 진단 backend
 │   │   └── DiagnosticLogStore.swift    # rolling recent-log.txt 캐시 파일
-│   ├── SourceChangeMonitor.swift       # DispatchSource 기반 소스 파일 감시
+│   ├── SourceChangeMonitor.swift       # DispatchSource 기반 다중 URL 파일/폴더 감시 (세션 가드)
 │   └── Extensions/                     # 공유 Foundation helper
 ├── DesignSystem/
 │   ├── Tokens/                         # Color / Spacing / Typography / Motion
@@ -391,13 +399,17 @@ Panely/
 │   │   │   ├── ReaderViewModel.swift           # 세션 상태 + 합성 (~180줄)
 │   │   │   ├── Extensions/                     # 관심사별 로직 분할
 │   │   │   │   ├── ReaderViewModel+Navigation.swift   # 페이지 네비, Quick jump, chrome 토글
-│   │   │   │   ├── ReaderViewModel+Source.swift       # 로드 파이프라인 + 폴더/아카이브 스캐너
+│   │   │   │   ├── ReaderViewModel+Source.swift       # 로드 진입점 + ReaderLoadIntent
+│   │   │   │   ├── ReaderViewModel+LoadPipeline.swift # 다단계 load() 상태 머신 + 소스 변경 감시
+│   │   │   │   ├── ReaderViewModel+Cache.swift        # 추출 캐시 비우기 (파일 메뉴 + 설정)
+│   │   │   │   ├── ReaderViewModel+Toolbar.swift      # PanelyToolbar 상태/액션 번들
 │   │   │   │   ├── ReaderViewModel+Volumes.swift      # 형제 권 카운터 + 볼륨 카드
 │   │   │   │   ├── ReaderViewModel+ImageLoading.swift # ReaderImageLoader 위 얇은 facade
 │   │   │   │   └── ReaderViewModel+Bookmarks.swift    # 즐겨찾기 + 페이지 북마크 연동
 │   │   │   └── Collaborators/                  # ReaderViewModel이 합성, 각각 단일 책임
 │   │   │       ├── ReaderPreferences.swift     # KeyValueStoring 기반 레이아웃 / 맞춤 / 고정
 │   │   │       ├── ReaderPositionStore.swift   # 디바운스된 책별 페이지 메모리
+│   │   │       ├── FolderResolver.swift        # 오프메인 폴더/권 스캐너 (순수 파일시스템 탐색)
 │   │   │       ├── ReaderImageLoader.swift     # 캐시 + 페이지 새로고침 + 세로 지연 윈도 + 프리로드
 │   │   │       ├── ReaderImageLoadingSupport.swift # 이미지 메모리 캐시 + 로딩 헬퍼
 │   │   │       ├── ReaderTempDirectory.swift   # zip-in-zip session 추출 라이프사이클
@@ -432,7 +444,7 @@ Panely/
 │   │   └── CacheMaintenance.swift      # 캐시 삭제 결과와 포맷팅 헬퍼
 │   └── Library/
 │       ├── LibrarySidebar.swift        # 고정 버튼 + 확장자 배지 + 2단계 로드
-│       ├── LibrarySidebarModel.swift   # 사이드바 표시 모델
+│       ├── LibrarySidebarModel.swift   # 사이드바 표시 모델 + 현재 책 상위 폴더 펼침
 │       ├── LibraryTreeLoader.swift     # 주입 가능한 FileNode.loadTree 래퍼
 │       ├── Model/
 │       │   ├── FileNode.swift          # iconName + fileExtension + 최상위 병렬 스캔
