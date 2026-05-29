@@ -79,7 +79,7 @@ struct DiagnosticsSettingsView: View {
                         .disabled(isExporting)
 
                         Button("Open Logs Folder") {
-                            DiagnosticReportExporter.openDiagnosticsFolder()
+                            DiagnosticReportAlerts.openDiagnosticsFolder()
                         }
                         .disabled(isExporting)
                     }
@@ -137,7 +137,7 @@ struct DiagnosticsSettingsView: View {
     }
 
     private func clearDiagnosticLogs() {
-        guard DiagnosticReportExporter.confirmClearLogs() else { return }
+        guard DiagnosticReportAlerts.confirmClearLogs() else { return }
         Task {
             let cleared = await DiagnosticLogStore.shared.clear()
             await refreshLogSize()

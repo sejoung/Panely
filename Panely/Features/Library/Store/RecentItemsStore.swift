@@ -56,18 +56,16 @@ final class RecentItemsStore {
     }
 
     func resolve(_ item: RecentItem) -> URL? {
-        guard let resolution = bookmarks.resolve(item.bookmarkData) else {
+        guard let result = bookmarks.resolveRefreshing(item.bookmarkData) else {
             return nil
         }
-        let url = resolution.url
-        if resolution.isStale,
-           let refreshed = bookmarks.refreshedData(for: url),
+        if let refreshed = result.refreshed,
            let idx = items.firstIndex(where: { $0.id == item.id }) {
-            items[idx].bookmarkData = refreshed
-            items[idx].path = url.standardizedFileURL.path
+            items[idx].bookmarkData = refreshed.data
+            items[idx].path = refreshed.path
             save()
         }
-        return url
+        return result.url
     }
 
     func remove(_ item: RecentItem) {

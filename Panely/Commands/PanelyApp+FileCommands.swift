@@ -52,23 +52,23 @@ extension PanelyApp {
                 Task {
                     do {
                         try await exporter.exportReport(to: destination)
-                        exporter.presentExportResult(destination: destination)
+                        DiagnosticReportAlerts.presentExportResult(destination: destination)
                     } catch {
-                        exporter.presentExportFailure(error, destination: destination)
+                        DiagnosticReportAlerts.presentExportFailure(error, destination: destination)
                     }
                 }
             }
 
             Button("Clear Diagnostic Logs") {
-                guard DiagnosticReportExporter.confirmClearLogs() else { return }
+                guard DiagnosticReportAlerts.confirmClearLogs() else { return }
                 Task {
                     let cleared = await DiagnosticLogStore.shared.clear()
-                    DiagnosticReportExporter.presentClearLogsResult(success: cleared)
+                    DiagnosticReportAlerts.presentClearLogsResult(success: cleared)
                 }
             }
 
             Button("Open Diagnostic Logs Folder") {
-                DiagnosticReportExporter.openDiagnosticsFolder()
+                DiagnosticReportAlerts.openDiagnosticsFolder()
             }
 
             Button("Clear Extraction Cache") {

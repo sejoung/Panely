@@ -7,6 +7,24 @@ nonisolated protocol SecurityScopedBookmarking: Sendable {
     func isDirectory(_ url: URL) -> Bool
 }
 
+extension SecurityScopedBookmarking {
+    /// Resolve `data` and, when the OS reports the bookmark stale, mint a fresh
+    /// one in place. Returns the resolved `url` plus, when a refresh happened,
+    /// the new bookmark data and standardized path for the caller to persist.
+    /// Returns `nil` only when the bookmark can't be resolved at all.
+    ///
+    /// Shared by `FavoritesStore` and `RecentItemsStore`, whose `resolve`
+    /// methods were otherwise byte-for-byte identical.
+    func resolveRefreshing(_ data: Data) -> (url: URL, refreshed: (data: Data, path: String)?)? {
+        guard let resolution = resolve(data) else { return nil }
+        let url = resolution.url
+        guard resolution.isStale, let newData = refreshedData(for: url) else {
+            return (url, nil)
+        }
+        return (url, (newData, url.standardizedFileURL.path))
+    }
+}
+
 nonisolated struct LiveSecurityScopedBookmarkResolver: SecurityScopedBookmarking {
     func data(for url: URL) throws -> Data {
         try SecurityScopedBookmark.data(for: url)

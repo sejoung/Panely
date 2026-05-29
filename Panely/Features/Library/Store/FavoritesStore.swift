@@ -65,18 +65,16 @@ final class FavoritesStore {
     }
 
     func resolve(_ favorite: FavoriteBook) -> URL? {
-        guard let resolution = bookmarks.resolve(favorite.bookmarkData) else {
+        guard let result = bookmarks.resolveRefreshing(favorite.bookmarkData) else {
             return nil
         }
-        let url = resolution.url
-        if resolution.isStale,
-           let refreshed = bookmarks.refreshedData(for: url),
+        if let refreshed = result.refreshed,
            let idx = favorites.firstIndex(where: { $0.id == favorite.id }) {
-            favorites[idx].bookmarkData = refreshed
-            favorites[idx].path = url.standardizedFileURL.path
+            favorites[idx].bookmarkData = refreshed.data
+            favorites[idx].path = refreshed.path
             save()
         }
-        return url
+        return result.url
     }
 
     func removeFavorite(_ favorite: FavoriteBook) {

@@ -3,6 +3,10 @@ import Foundation
 import UniformTypeIdentifiers
 import ZIPFoundation
 
+/// Orchestrates diagnostic-report export: pick a destination, build the
+/// snapshot (`DiagnosticSnapshotBuilder`), and write the zip
+/// (`DiagnosticReportWriter`). Presentation lives in `DiagnosticReportAlerts`;
+/// this type performs no UI of its own.
 @MainActor
 struct DiagnosticReportExporter {
     let viewModel: ReaderViewModel
@@ -37,7 +41,10 @@ struct DiagnosticReportExporter {
             "Export diagnostic report requested",
             metadata: ["destination": "\(DiagnosticRedactor.describe(destination))"]
         )
-        let snapshot = await makeSnapshot()
+        let snapshot = await DiagnosticSnapshotBuilder(
+            viewModel: viewModel,
+            cacheMaintenance: cacheMaintenance
+        ).makeSnapshot()
         try await Task.detached(priority: .utility) {
             try DiagnosticReportWriter.write(snapshot: snapshot, to: destination)
         }.value
@@ -48,21 +55,39 @@ struct DiagnosticReportExporter {
         )
     }
 
-    func presentExportResult(destination: URL) {
+    static func formattedBytes(_ bytes: UInt64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .binary
+        return formatter.string(fromByteCount: Int64(min(bytes, UInt64(Int64.max))))
+    }
+
+    private static let fileDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        return formatter
+    }()
+}
+
+/// All user-facing AppKit alerts for diagnostics actions. Kept apart from the
+/// exporter so report building stays free of presentation concerns (and so the
+/// export path can run without an `NSApp`).
+@MainActor
+enum DiagnosticReportAlerts {
+    static func presentExportResult(destination: URL) {
         let alert = NSAlert()
         alert.alertStyle = .informational
         alert.messageText = "Diagnostic Report Exported"
         alert.informativeText = "\(destination.lastPathComponent) was created."
         alert.addButton(withTitle: "Reveal in Finder")
         alert.addButton(withTitle: "OK")
-        Self.present(alert) { response in
+        present(alert) { response in
             if response == .alertFirstButtonReturn {
-                Self.revealInFinder(destination)
+                revealInFinder(destination)
             }
         }
     }
 
-    func presentExportFailure(_ error: Error, destination: URL) {
+    static func presentExportFailure(_ error: Error, destination: URL) {
         let message = DiagnosticRedactor.redactKnownPaths(
             in: error.localizedDescription,
             urls: [destination]
@@ -78,7 +103,7 @@ struct DiagnosticReportExporter {
         alert.messageText = "Diagnostic Report Export Failed"
         alert.informativeText = error.localizedDescription
         alert.addButton(withTitle: "OK")
-        Self.present(alert)
+        present(alert)
     }
 
     static func presentClearLogsResult(success: Bool) {
@@ -113,13 +138,35 @@ struct DiagnosticReportExporter {
         }
     }
 
-    static func formattedBytes(_ bytes: UInt64) -> String {
-        let formatter = ByteCountFormatter()
-        formatter.countStyle = .binary
-        return formatter.string(fromByteCount: Int64(min(bytes, UInt64(Int64.max))))
+    private static func present(
+        _ alert: NSAlert,
+        completion: ((NSApplication.ModalResponse) -> Void)? = nil
+    ) {
+        if let window = NSApp.keyWindow ?? NSApp.mainWindow {
+            alert.beginSheetModal(for: window) { response in
+                completion?(response)
+            }
+        } else {
+            let response = alert.runModal()
+            completion?(response)
+        }
     }
 
-    private func makeSnapshot() async -> DiagnosticReportSnapshot {
+    private static func revealInFinder(_ url: URL) {
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+}
+
+/// Gathers app / session / cache / reader / log state into a
+/// `DiagnosticReportSnapshot`. Pure data collection — no AppKit alerts — so it
+/// runs on the export path (and is exercised by the export test) without any
+/// presentation dependency.
+@MainActor
+private struct DiagnosticSnapshotBuilder {
+    let viewModel: ReaderViewModel
+    let cacheMaintenance: CacheMaintenance
+
+    func makeSnapshot() async -> DiagnosticReportSnapshot {
         let activeURL = viewModel.tempDir.url
         let cacheRoot = cacheMaintenance.cacheRoot()
         let cacheMaintenance = cacheMaintenance
@@ -145,9 +192,9 @@ struct DiagnosticReportExporter {
             cacheClearable: cacheMaintenance.formattedBytes(cacheSizes.clearable),
             cacheLimit: cacheMaintenance.formattedBytes(cacheMaintenance.cacheBudgetBytes),
             logLevel: DiagnosticLogConfiguration.currentLogLevel.displayName,
-            logFileSize: Self.formattedBytes(await DiagnosticLogStore.shared.logSizeBytes()),
-            logFileLimit: Self.formattedBytes(DiagnosticLogPolicy.maxLogBytes),
-            reportLogLimit: Self.formattedBytes(DiagnosticLogPolicy.reportLogBytes),
+            logFileSize: cacheMaintenance.formattedBytes(await DiagnosticLogStore.shared.logSizeBytes()),
+            logFileLimit: cacheMaintenance.formattedBytes(DiagnosticLogPolicy.maxLogBytes),
+            reportLogLimit: cacheMaintenance.formattedBytes(DiagnosticLogPolicy.reportLogBytes),
             settingsSummary: settingsSummary(),
             readerSummary: readerSummary(),
             lastErrorMessage: redactKnownPaths(in: viewModel.errorMessage ?? "None"),
@@ -199,30 +246,6 @@ struct DiagnosticReportExporter {
             cacheMaintenance.cacheRoot(),
         ])
     }
-
-    private static func present(
-        _ alert: NSAlert,
-        completion: ((NSApplication.ModalResponse) -> Void)? = nil
-    ) {
-        if let window = NSApp.keyWindow ?? NSApp.mainWindow {
-            alert.beginSheetModal(for: window) { response in
-                completion?(response)
-            }
-        } else {
-            let response = alert.runModal()
-            completion?(response)
-        }
-    }
-
-    private static func revealInFinder(_ url: URL) {
-        NSWorkspace.shared.activateFileViewerSelecting([url])
-    }
-
-    private static let fileDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyyMMdd-HHmmss"
-        return formatter
-    }()
 }
 
 private nonisolated struct DiagnosticReportSnapshot: Sendable {
