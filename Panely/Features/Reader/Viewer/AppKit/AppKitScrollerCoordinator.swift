@@ -15,9 +15,27 @@ final class AppKitScrollerCoordinator {
     var lastLayout: PageLayout = .single
     var lastPageIndex: Int = -1
     var lastVisibleRange: Range<Int> = 0..<0
-    var baseMagnification: CGFloat = 1.0
     var isProgrammaticallyScrolling: Bool = false
     var autoFitOnResize: Bool = true
+
+    /// Fit baseline magnification. The single stored copy lives on
+    /// `ViewerController` — which also needs it for `resetZoom` and the
+    /// toolbar's reactive `isAtFit` — so the coordinator reads and writes it
+    /// through there rather than keeping a second copy in sync by hand. The
+    /// private fallback is used only when no controller is attached (SwiftUI
+    /// previews / unit tests without a toolbar); production always has one, so
+    /// there is exactly one source of truth at runtime.
+    var baseMagnification: CGFloat {
+        get { viewerController?.baseMagnification ?? fallbackBaseMagnification }
+        set {
+            if let viewerController {
+                viewerController.baseMagnification = newValue
+            } else {
+                fallbackBaseMagnification = newValue
+            }
+        }
+    }
+    private var fallbackBaseMagnification: CGFloat = 1.0
 
     /// False until the first valid `applyFit` runs. The very first fit must
     /// snap to the computed magnification unconditionally — if it happened to

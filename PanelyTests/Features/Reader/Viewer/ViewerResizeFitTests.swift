@@ -603,6 +603,42 @@ struct ViewerResizeFitTests {
         #expect(abs(scrollView.magnification - 2.0) < 0.001)
     }
 
+    /// Single source of truth: with a controller attached, the coordinator's
+    /// `baseMagnification` is just a view onto the controller's — `applyFit`
+    /// writes once and both sides agree (no manually-mirrored second copy).
+    @Test func baseMagnificationIsBackedByViewerController() {
+        let scrollView = Self.makeScrollView(size: CGSize(width: 800, height: 600))
+        let doc = NSView(frame: NSRect(x: 0, y: 0, width: 1000, height: 1500))
+        scrollView.documentView = doc
+        scrollView.layoutSubtreeIfNeeded()
+
+        let coordinator = AppKitScrollerCoordinator()
+        let viewerController = ViewerController()
+        viewerController.attach(scrollView: scrollView)
+        coordinator.viewerController = viewerController
+
+        AppKitImageScroller.applyFit(
+            scrollView: scrollView,
+            coordinator: coordinator,
+            fitMode: .fitScreen,
+            force: true
+        )
+
+        let expectedFit = FitCalculator.magnification(
+            docSize: doc.frame.size,
+            viewport: scrollView.contentSize,
+            fitMode: .fitScreen
+        )
+        // Coordinator reads through the controller — one value, two accessors.
+        #expect(abs(coordinator.baseMagnification - expectedFit) < 0.001)
+        #expect(abs(viewerController.baseMagnification - expectedFit) < 0.001)
+        #expect(coordinator.baseMagnification == viewerController.baseMagnification)
+
+        // Writing through the coordinator lands on the controller.
+        coordinator.baseMagnification = 3.0
+        #expect(abs(viewerController.baseMagnification - 3.0) < 0.001)
+    }
+
     /// The extracted fit-reset policy, exercised directly (no live scroll view).
     @Test func shouldResetMagnificationPolicy() {
         // First fit / explicit force always reset.

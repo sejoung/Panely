@@ -287,8 +287,10 @@ struct AppKitImageScroller: NSViewRepresentable {
             scrollView.magnification = fit
         }
         coordinator.hasAppliedInitialFit = true
+        // Single write: `coordinator.baseMagnification` forwards to the
+        // ViewerController (the sole owner), which the toolbar observes and
+        // `resetZoom` reads — no manual mirroring between two stored copies.
         coordinator.baseMagnification = fit
-        coordinator.viewerController?.baseMagnification = fit
         // Keep the toolbar's fit-button highlight in sync. If we just reset
         // to fit, mag == base → `isAtFit == true`. If we preserved the
         // user's manual zoom, mag != base → highlight drops as expected.
