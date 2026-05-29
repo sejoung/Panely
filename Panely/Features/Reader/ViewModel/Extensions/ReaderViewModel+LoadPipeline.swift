@@ -418,17 +418,10 @@ extension ReaderViewModel {
         if tempDir.isActive,
            let root = tempDir.url,
            let openedSourceURL,
-           let relativePath = relativePath(from: root, to: currentSourceURL) {
+           let relativePath = root.relativeSubpath(to: currentSourceURL) {
             return (openedSourceURL, relativePath, nil)
         }
         return (currentSourceURL, nil, siblings.isEmpty ? nil : siblings)
-    }
-
-    private func relativePath(from root: URL, to url: URL) -> String? {
-        let rootPath = root.standardizedFileURL.path
-        let path = url.standardizedFileURL.path
-        guard path == rootPath || path.hasPrefix(rootPath + "/") else { return nil }
-        return String(path.dropFirst(rootPath.count + (path == rootPath ? 0 : 1)))
     }
 
     private func isSupportedArchive(_ url: URL) -> Bool {

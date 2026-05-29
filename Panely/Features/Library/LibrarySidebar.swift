@@ -48,11 +48,17 @@ struct LibrarySidebar: View {
         }
     }
 
+    /// True when there's nothing in any of the sidebar's non-tree sections
+    /// (favorites / page bookmarks / volumes).
+    private var hasSidebarExtras: Bool {
+        !favorites.isEmpty || !pageBookmarks.isEmpty || !volumes.isEmpty
+    }
+
     @ViewBuilder
     private var content: some View {
-        if rootURL == nil && favorites.isEmpty && pageBookmarks.isEmpty && volumes.isEmpty {
+        if rootURL == nil && !hasSidebarExtras {
             emptyState
-        } else if rootURL != nil && model.scanCompleted && model.nodes.isEmpty && favorites.isEmpty && pageBookmarks.isEmpty && volumes.isEmpty {
+        } else if rootURL != nil && model.scanCompleted && model.nodes.isEmpty && !hasSidebarExtras {
             accessPrompt
         } else {
             tree

@@ -44,23 +44,26 @@ final class ViewerController {
 
     func zoomIn() {
         guard let sv = scrollView else { return }
-        let target = min(sv.magnification * zoomStep, sv.maxMagnification)
-        let center = NSPoint(x: sv.documentVisibleRect.midX, y: sv.documentVisibleRect.midY)
-        sv.setMagnification(target, centeredAt: center)
-        currentMagnification = sv.magnification
+        setMagnification(min(sv.magnification * zoomStep, sv.maxMagnification), on: sv)
     }
 
     func zoomOut() {
         guard let sv = scrollView else { return }
-        let target = max(sv.magnification / zoomStep, sv.minMagnification)
-        let center = NSPoint(x: sv.documentVisibleRect.midX, y: sv.documentVisibleRect.midY)
-        sv.setMagnification(target, centeredAt: center)
-        currentMagnification = sv.magnification
+        setMagnification(max(sv.magnification / zoomStep, sv.minMagnification), on: sv)
     }
 
     func resetZoom() {
         guard let sv = scrollView else { return }
         sv.magnification = baseMagnification
+        currentMagnification = sv.magnification
+    }
+
+    /// Apply `target` centered on the current viewport and sync the observed
+    /// magnification. Shared by `zoomIn`/`zoomOut` (which differ only in how
+    /// `target` is computed).
+    private func setMagnification(_ target: CGFloat, on sv: NSScrollView) {
+        let center = NSPoint(x: sv.documentVisibleRect.midX, y: sv.documentVisibleRect.midY)
+        sv.setMagnification(target, centeredAt: center)
         currentMagnification = sv.magnification
     }
 }

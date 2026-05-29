@@ -75,8 +75,6 @@ final class ReaderLibraryScope {
     /// trigger a re-acquire.
     func contains(_ candidate: URL) -> Bool {
         guard let root = url else { return false }
-        let rootPath = root.standardizedFileURL.path
-        let target = candidate.standardizedFileURL.path
-        return target == rootPath || target.hasPrefix(rootPath + "/")
+        return root.isAncestor(of: candidate)
     }
 }

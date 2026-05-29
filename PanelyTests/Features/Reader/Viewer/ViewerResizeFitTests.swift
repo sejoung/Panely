@@ -603,6 +603,18 @@ struct ViewerResizeFitTests {
         #expect(abs(scrollView.magnification - 2.0) < 0.001)
     }
 
+    /// The extracted fit-reset policy, exercised directly (no live scroll view).
+    @Test func shouldResetMagnificationPolicy() {
+        // First fit / explicit force always reset.
+        #expect(AppKitImageScroller.shouldResetMagnification(force: false, hasAppliedInitialFit: false, autoFitOnResize: true, userHasZoomed: true))
+        #expect(AppKitImageScroller.shouldResetMagnification(force: true, hasAppliedInitialFit: true, autoFitOnResize: false, userHasZoomed: true))
+        // Locked view never resets after the initial fit.
+        #expect(AppKitImageScroller.shouldResetMagnification(force: false, hasAppliedInitialFit: true, autoFitOnResize: false, userHasZoomed: false) == false)
+        // Unlocked: reset only when the user hasn't manually zoomed.
+        #expect(AppKitImageScroller.shouldResetMagnification(force: false, hasAppliedInitialFit: true, autoFitOnResize: true, userHasZoomed: false))
+        #expect(AppKitImageScroller.shouldResetMagnification(force: false, hasAppliedInitialFit: true, autoFitOnResize: true, userHasZoomed: true) == false)
+    }
+
     private static func makeScrollView(size: CGSize) -> NSScrollView {
         let scrollView = NSScrollView(frame: NSRect(origin: .zero, size: size))
         scrollView.allowsMagnification = true

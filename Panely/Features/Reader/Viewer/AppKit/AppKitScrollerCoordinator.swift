@@ -53,26 +53,16 @@ final class AppKitScrollerCoordinator {
     /// SwiftUI is free to recreate the representable; without this, a leaked
     /// observer would double-fire on every resize.
     func attachFrameObserver(to scrollView: NSScrollView) {
-        if let frameObserver {
-            NotificationCenter.default.removeObserver(frameObserver)
-            self.frameObserver = nil
-        }
-        frameObserver = NotificationCenter.default.addObserver(
-            forName: NSView.frameDidChangeNotification,
-            object: scrollView,
-            queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self,
-                      let sv = self.scrollView,
-                      self.autoFitOnResize else { return }
-                AppKitImageScroller.applyFit(
-                    scrollView: sv,
-                    coordinator: self,
-                    fitMode: self.lastFitMode,
-                    force: false
-                )
-            }
+        reinstall(&frameObserver, name: NSView.frameDidChangeNotification, object: scrollView, queue: .main) { [weak self] in
+            guard let self,
+                  let sv = self.scrollView,
+                  self.autoFitOnResize else { return }
+            AppKitImageScroller.applyFit(
+                scrollView: sv,
+                coordinator: self,
+                fitMode: self.lastFitMode,
+                force: false
+            )
         }
     }
 
@@ -82,17 +72,29 @@ final class AppKitScrollerCoordinator {
     /// thread (always main here), keeping `lastPageIndex` fresh for the
     /// next button press.
     func attachBoundsObserver(to scrollView: NSScrollView) {
-        if let boundsObserver {
-            NotificationCenter.default.removeObserver(boundsObserver)
-            self.boundsObserver = nil
+        reinstall(&boundsObserver, name: NSView.boundsDidChangeNotification, object: scrollView.contentView, queue: nil) { [weak self] in
+            self?.handleBoundsChange()
         }
-        boundsObserver = NotificationCenter.default.addObserver(
-            forName: NSView.boundsDidChangeNotification,
-            object: scrollView.contentView,
-            queue: nil
-        ) { [weak self] _ in
+    }
+
+    /// Replace `token`'s observer: tear down any prior registration (so SwiftUI
+    /// recreating the representable can't double-register → double-fire), then
+    /// add a new main-actor observer. `handler` runs inside
+    /// `MainActor.assumeIsolated` — notifications for these views post on the
+    /// main thread, and `addObserver` is `nonisolated`.
+    private func reinstall(
+        _ token: inout NSObjectProtocol?,
+        name: NSNotification.Name,
+        object: Any?,
+        queue: OperationQueue?,
+        handler: @escaping @MainActor () -> Void
+    ) {
+        if let token {
+            NotificationCenter.default.removeObserver(token)
+        }
+        token = NotificationCenter.default.addObserver(forName: name, object: object, queue: queue) { _ in
             MainActor.assumeIsolated {
-                self?.handleBoundsChange()
+                handler()
             }
         }
     }

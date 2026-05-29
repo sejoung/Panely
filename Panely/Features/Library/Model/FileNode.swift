@@ -29,12 +29,7 @@ nonisolated struct FileNode: Identifiable, Hashable, Sendable {
         // Top-level scan parallelizes per-entry subtree builds. Each
         // subtree's recursion stays serial — that gives ~chunk-wide speedup
         // without exploding the task pool with N^depth concurrent tasks.
-        guard let contents = try? FileManager.default.contentsOfDirectory(
-            at: url,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles, .skipsPackageDescendants]
-        ) else { return [] }
-
+        let contents = directoryEntries(at: url)
         let chunkSize = max(2, min(8, ProcessInfo.processInfo.activeProcessorCount))
         var nodes: [FileNode] = []
 
@@ -58,7 +53,21 @@ nonisolated struct FileNode: Identifiable, Hashable, Sendable {
             nodes.append(contentsOf: chunkNodes)
         }
 
-        return nodes.sorted { NaturalSort.compare($0.name, $1.name) }
+        return sortedByName(nodes)
+    }
+
+    /// Shallow directory listing with the project's standard scan options
+    /// (skip hidden + package descendants). Returns `[]` on failure or empty.
+    private static func directoryEntries(at url: URL) -> [URL] {
+        (try? FileManager.default.contentsOfDirectory(
+            at: url,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        )) ?? []
+    }
+
+    private static func sortedByName(_ nodes: [FileNode]) -> [FileNode] {
+        nodes.sorted { NaturalSort.compare($0.name, $1.name) }
     }
 
     private static func processEntry(_ entry: URL, depth: Int, maxDepth: Int) -> FileNode? {
@@ -95,19 +104,9 @@ nonisolated struct FileNode: Identifiable, Hashable, Sendable {
     /// Serial subtree build used inside parallel top-level chunks.
     /// Avoids nested TaskGroup explosion (would be N^depth tasks).
     private static func buildTreeSerial(at url: URL, depth: Int, maxDepth: Int) -> [FileNode] {
-        guard let contents = try? FileManager.default.contentsOfDirectory(
-            at: url,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles, .skipsPackageDescendants]
-        ) else { return [] }
-
-        var nodes: [FileNode] = []
-        for entry in contents {
-            if let node = processEntry(entry, depth: depth, maxDepth: maxDepth) {
-                nodes.append(node)
-            }
+        let nodes = directoryEntries(at: url).compactMap {
+            processEntry($0, depth: depth, maxDepth: maxDepth)
         }
-
-        return nodes.sorted { NaturalSort.compare($0.name, $1.name) }
+        return sortedByName(nodes)
     }
 }

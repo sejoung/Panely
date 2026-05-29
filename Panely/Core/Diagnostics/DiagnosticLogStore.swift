@@ -21,7 +21,7 @@ actor DiagnosticLogStore {
 
     struct Entry: Sendable {
         let timestamp: String
-        let level: DiagnosticLevel
+        let level: DiagnosticLogLevel
         let category: DiagnosticCategory
         let message: String
     }
@@ -62,7 +62,7 @@ actor DiagnosticLogStore {
     }
 
     nonisolated static func record(
-        level: DiagnosticLevel,
+        level: DiagnosticLogLevel,
         category: DiagnosticCategory,
         message: String
     ) {
@@ -75,7 +75,7 @@ actor DiagnosticLogStore {
         shared.continuation.yield(entry)
     }
 
-    func record(level: DiagnosticLevel, category: DiagnosticCategory, message: String) {
+    func record(level: DiagnosticLogLevel, category: DiagnosticCategory, message: String) {
         append(Entry(timestamp: Self.timestamp(), level: level, category: category, message: message))
     }
 
@@ -151,7 +151,7 @@ actor DiagnosticLogStore {
     }
 
     private func append(_ entry: Entry) {
-        let line = "\(entry.timestamp) [\(entry.level.rawValue)] [\(entry.category.rawValue)] \(entry.message)\n"
+        let line = "\(entry.timestamp) [\(entry.level.wireName)] [\(entry.category.rawValue)] \(entry.message)\n"
         let url = logFileURL()
         do {
             try FileManager.default.createDirectory(

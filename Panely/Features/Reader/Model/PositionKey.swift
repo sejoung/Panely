@@ -26,24 +26,17 @@ nonisolated enum PositionKey {
 
         guard
             let opened = openedURL,
-            let temp = tempDir
+            let temp = tempDir,
+            // nil → source is outside the temp root; key on its own path.
+            let relative = temp.relativeSubpath(to: sourceURL)
         else {
             return sourcePath
         }
 
-        let tempPath = temp.standardizedFileURL.path
         let openedPath = opened.standardizedFileURL.path
-
-        if sourcePath == tempPath {
-            return openedPath
-        }
-
-        if sourcePath.hasPrefix(tempPath + "/") {
-            let relative = String(sourcePath.dropFirst(tempPath.count + 1))
-            return openedPath + "#" + relative
-        }
-
-        return sourcePath
+        // "" → source *is* the temp root (a single extracted volume); otherwise
+        // append the inner path so sibling volumes get distinct keys.
+        return relative.isEmpty ? openedPath : openedPath + "#" + relative
     }
 
     /// Best-effort secondary key derived from `(filesystem-id, file-id)`.
@@ -81,21 +74,18 @@ nonisolated enum PositionKey {
             return fileIdentity(for: sourceURL)
         }
 
-        let sourcePath = sourceURL.standardizedFileURL.path
-        let tempPath = tempDir.standardizedFileURL.path
-
-        if sourcePath == tempPath {
-            return fileIdentity(for: openedURL)
-        }
-
-        guard sourcePath.hasPrefix(tempPath + "/") else {
+        // nil → source is outside the temp root; key on its own identity so
+        // sibling books never share the fallback slot.
+        guard let relative = tempDir.relativeSubpath(to: sourceURL) else {
             return fileIdentity(for: sourceURL)
         }
-
+        // "" → source is the temp root itself.
+        if relative.isEmpty {
+            return fileIdentity(for: openedURL)
+        }
         guard let openedIdentity = fileIdentity(for: openedURL) else {
             return nil
         }
-        let relative = String(sourcePath.dropFirst(tempPath.count + 1))
         return openedIdentity + "#" + relative
     }
 }

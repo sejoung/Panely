@@ -126,14 +126,12 @@ extension ReaderViewModel {
         guard tempDir.isActive,
               let tempRoot = tempDir.url,
               let current = currentSourceURL,
-              tempRoot.isAncestor(of: current),
-              openedSourceURL != nil else { return nil }
-
-        let rootPath = tempRoot.standardizedFileURL.path
-        let currentPath = current.standardizedFileURL.path
-        guard currentPath != rootPath,
-              currentPath.hasPrefix(rootPath + "/") else { return nil }
-        return String(currentPath.dropFirst(rootPath.count + 1))
+              openedSourceURL != nil,
+              // Non-empty relative path: current must be strictly *under* the
+              // temp root (an exact match has no inner path).
+              let relative = tempRoot.relativeSubpath(to: current),
+              !relative.isEmpty else { return nil }
+        return relative
     }
 
 }

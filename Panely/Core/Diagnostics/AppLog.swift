@@ -13,16 +13,6 @@ nonisolated enum DiagnosticCategory: String, Sendable, CaseIterable {
     case diagnostics
 }
 
-nonisolated enum DiagnosticLevel: String, Sendable {
-    case trace = "TRACE"
-    case debug = "DEBUG"
-    case info = "INFO"
-    case notice = "NOTICE"
-    case warning = "WARNING"
-    case error = "ERROR"
-    case critical = "CRITICAL"
-}
-
 nonisolated enum DiagnosticLogLevel: String, CaseIterable, Identifiable, Sendable {
     case trace
     case debug
@@ -33,6 +23,10 @@ nonisolated enum DiagnosticLogLevel: String, CaseIterable, Identifiable, Sendabl
     case critical
 
     var id: String { rawValue }
+
+    /// Uppercase token written into the file log line (`[INFO]`, `[ERROR]`…).
+    /// Distinct from `rawValue` (lowercase), which is the persistence key.
+    var wireName: String { rawValue.uppercased() }
 
     var displayName: String {
         switch self {
@@ -388,7 +382,7 @@ private nonisolated struct PanelyLogHandler: LogHandler {
         let renderedMessage = Self.render(message: "\(event.message)", metadata: mergedMetadata)
         writeToOSLog(level: event.level, message: renderedMessage)
         DiagnosticLogStore.record(
-            level: DiagnosticLevel(event.level),
+            level: DiagnosticLogLevel(event.level),
             category: category,
             message: renderedMessage
         )
@@ -428,7 +422,7 @@ private nonisolated struct PanelyLogHandler: LogHandler {
     }
 }
 
-private extension DiagnosticLevel {
+private extension DiagnosticLogLevel {
     nonisolated init(_ level: Logging.Logger.Level) {
         switch level {
         case .trace:

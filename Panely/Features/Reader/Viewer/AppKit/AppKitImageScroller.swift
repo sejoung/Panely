@@ -260,18 +260,7 @@ struct AppKitImageScroller: NSViewRepresentable {
         force: Bool
     ) {
         guard let content = scrollView.documentView else { return }
-        // For vertical (continuous) strips, fitting against the entire stack
-        // height collapses everything to a sliver. Use the first image as
-        // the reference instead so fit-screen means "first page visible"
-        // and fit-width means "first page fills viewport width".
-        let docSize: CGSize
-        if let stack = content as? ImageStackView,
-           stack.axis == .vertical,
-           let firstFrame = stack.frame(forPageAt: 0) {
-            docSize = firstFrame.size
-        } else {
-            docSize = content.frame.size
-        }
+        let docSize = fitReferenceSize(for: content)
         // contentSize is the physical viewport (magnification-invariant);
         // using contentView.bounds.size here would feed back into itself
         // because it scales inversely with magnification, causing toggled
@@ -287,21 +276,12 @@ struct AppKitImageScroller: NSViewRepresentable {
         )
 
         let userHasZoomed = abs(scrollView.magnification - coordinator.baseMagnification) > 0.001
-
-        // Force (identity / fitMode change) always wins — those are explicit
-        // user actions or fundamental content changes. Otherwise the lock
-        // (autoFitOnResize=false) preserves the current magnification even
-        // when the user hasn't manually zoomed yet — that's the whole point
-        // of locking the view size.
-        let shouldReset: Bool
-        if force || !coordinator.hasAppliedInitialFit {
-            // First valid fit always snaps — see `hasAppliedInitialFit`.
-            shouldReset = true
-        } else if !coordinator.autoFitOnResize {
-            shouldReset = false
-        } else {
-            shouldReset = !userHasZoomed
-        }
+        let shouldReset = shouldResetMagnification(
+            force: force,
+            hasAppliedInitialFit: coordinator.hasAppliedInitialFit,
+            autoFitOnResize: coordinator.autoFitOnResize,
+            userHasZoomed: userHasZoomed
+        )
 
         if shouldReset {
             scrollView.magnification = fit
@@ -313,5 +293,35 @@ struct AppKitImageScroller: NSViewRepresentable {
         // to fit, mag == base → `isAtFit == true`. If we preserved the
         // user's manual zoom, mag != base → highlight drops as expected.
         coordinator.viewerController?.currentMagnification = scrollView.magnification
+    }
+
+    /// Pure fit-reset policy — extracted so it's unit-testable without a live
+    /// `NSScrollView` (mirrors `shouldForceFitReset`). The first valid fit and
+    /// an explicit `force` always reset; a locked view (`autoFitOnResize ==
+    /// false`) never does; otherwise reset only when the user hasn't manually
+    /// zoomed away from the fit baseline.
+    static func shouldResetMagnification(
+        force: Bool,
+        hasAppliedInitialFit: Bool,
+        autoFitOnResize: Bool,
+        userHasZoomed: Bool
+    ) -> Bool {
+        if force || !hasAppliedInitialFit { return true }
+        if !autoFitOnResize { return false }
+        return !userHasZoomed
+    }
+
+    /// The document size fit should be computed against. For vertical
+    /// (continuous) strips, fitting the entire stack height collapses
+    /// everything to a sliver, so fit against the first page instead —
+    /// fit-screen means "first page visible", fit-width means "first page
+    /// fills the viewport width".
+    private static func fitReferenceSize(for content: NSView) -> CGSize {
+        if let stack = content as? ImageStackView,
+           stack.axis == .vertical,
+           let firstFrame = stack.frame(forPageAt: 0) {
+            return firstFrame.size
+        }
+        return content.frame.size
     }
 }

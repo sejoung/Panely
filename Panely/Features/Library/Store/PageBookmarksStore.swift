@@ -100,23 +100,24 @@ final class PageBookmarksStore {
         } else {
             pageBookmarksByBook[key] = sorted
         }
-        // Cap total book entries. When over the limit, drop the entries with
-        // the oldest most-recent bookmark first — those are the "least
-        // recently touched" books in the store.
-        if pageBookmarksByBook.count > Self.maxBookEntries {
-            let recencyByKey: [(String, Date)] = pageBookmarksByBook.map { entry in
-                let mostRecent = entry.value.map(\.createdAt).max() ?? .distantPast
-                return (entry.key, mostRecent)
-            }
-            let overflow = pageBookmarksByBook.count - Self.maxBookEntries
-            let toDrop = recencyByKey
-                .sorted { $0.1 < $1.1 }
-                .prefix(overflow)
-            for (k, _) in toDrop {
-                pageBookmarksByBook.removeValue(forKey: k)
-            }
-        }
+        pruneToBookEntryCap()
         save()
+    }
+
+    /// Cap the number of distinct books tracked. When over the limit, drop the
+    /// entries whose most-recent bookmark is oldest — i.e. the least recently
+    /// touched books.
+    private func pruneToBookEntryCap() {
+        guard pageBookmarksByBook.count > Self.maxBookEntries else { return }
+        let overflow = pageBookmarksByBook.count - Self.maxBookEntries
+        let staleKeys = pageBookmarksByBook
+            .map { (key: $0.key, mostRecent: $0.value.map(\.createdAt).max() ?? .distantPast) }
+            .sorted { $0.mostRecent < $1.mostRecent }
+            .prefix(overflow)
+            .map { $0.key }
+        for key in staleKeys {
+            pageBookmarksByBook.removeValue(forKey: key)
+        }
     }
 
     // MARK: - Persistence

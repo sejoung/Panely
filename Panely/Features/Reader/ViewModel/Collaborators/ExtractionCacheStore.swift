@@ -201,20 +201,13 @@ nonisolated enum ExtractionCacheStore {
     }
 
     private static func cacheEntryContaining(_ activeURL: URL?, in root: URL) -> URL? {
-        guard let activeURL else { return nil }
-        let root = root.standardizedFileURL
-        let active = activeURL.standardizedFileURL
-        guard root.isAncestor(of: active) else { return nil }
-
-        let rootPath = root.path
-        let activePath = active.path
-        guard activePath != rootPath,
-              activePath.hasPrefix(rootPath + "/") else { return nil }
-
-        let relative = String(activePath.dropFirst(rootPath.count + 1))
-        guard let entryName = relative.split(separator: "/", maxSplits: 1).first else {
-            return nil
-        }
+        guard let activeURL,
+              // Non-empty: the active URL must be strictly under the cache root
+              // (the root itself is not a cache entry).
+              let relative = root.relativeSubpath(to: activeURL),
+              !relative.isEmpty,
+              let entryName = relative.split(separator: "/", maxSplits: 1).first
+        else { return nil }
         return root.appendingPathComponent(String(entryName), isDirectory: true)
     }
 
