@@ -72,6 +72,7 @@ struct ReaderScene: View {
         .animation(PanelyMotion.uiReveal, value: viewModel.sourceChangedOnDisk)
         .animation(PanelyMotion.uiReveal, value: viewModel.errorMessage)
         .frame(minWidth: 800, minHeight: 600)
+        .onDisappear { cancelSidebarDismiss() }
     }
 
     /// Pinned toolbar overrides hover-driven auto-hide.

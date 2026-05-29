@@ -139,9 +139,11 @@ struct DiagnosticsSettingsView: View {
     private func clearDiagnosticLogs() {
         guard DiagnosticReportExporter.confirmClearLogs() else { return }
         Task {
-            await DiagnosticLogStore.shared.clear()
+            let cleared = await DiagnosticLogStore.shared.clear()
             await refreshLogSize()
-            exportMessage = "Diagnostic logs cleared."
+            exportMessage = cleared
+                ? "Diagnostic logs cleared."
+                : "Could not clear diagnostic logs."
         }
     }
 

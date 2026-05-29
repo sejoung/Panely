@@ -275,6 +275,40 @@ struct ReaderTempDirectoryTests {
         #expect(cache.cacheSizeBytes(in: root, excluding: activeFile) == 0)
     }
 
+    /// `enforceBudget(excluding:)` must never evict the cache entry for the
+    /// book that's currently open — even when it is the oldest (LRU) entry
+    /// that would otherwise be the first deleted.
+    @Test func enforceBudgetKeepsExcludedActiveEntryEvenWhenOldest() throws {
+        let root = try makeIsolatedCacheRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let active = root.appendingPathComponent("active", isDirectory: true)
+        let other = root.appendingPathComponent("other", isDirectory: true)
+        try writeCacheEntry(active, byteCount: 1_500_000)
+        try writeCacheEntry(other, byteCount: 1_500_000)
+
+        // Make the ACTIVE entry the oldest so plain LRU would evict it first.
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(-7200)],
+            ofItemAtPath: active.path
+        )
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date()],
+            ofItemAtPath: other.path
+        )
+
+        let activeFile = active.appendingPathComponent("blob")
+        ExtractionCacheStore.enforceBudget(
+            limit: 1_000_000,
+            excluding: activeFile,
+            in: root
+        )
+
+        // Active survives despite being oldest; the other (newer) is evicted.
+        #expect(FileManager.default.fileExists(atPath: active.path))
+        #expect(FileManager.default.fileExists(atPath: other.path) == false)
+    }
+
     // MARK: - cleanupStaleEntries (session dirs only)
 
     @Test func cleanupStaleEntriesRemovesOldSessionDirsAndKeepsFresh() throws {

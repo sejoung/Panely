@@ -8,9 +8,14 @@ nonisolated protocol ExtractionCacheManaging: Sendable {
     func cacheKey(for url: URL) -> String?
     func cachedEntry(forKey key: String) -> URL?
     func makeCachedCandidate(forKey key: String) -> URL
-    func enforceBudget()
+    func enforceBudget(excluding activeURL: URL?)
     func cacheSizeBytes(in root: URL, excluding activeURL: URL?) -> UInt64
     func clearCache(in root: URL, excluding activeURL: URL?) -> UInt64
+}
+
+extension ExtractionCacheManaging {
+    /// Convenience for the no-active-book case (e.g. startup cleanup).
+    func enforceBudget() { enforceBudget(excluding: nil) }
 }
 
 nonisolated struct LiveExtractionCacheManager: ExtractionCacheManaging {
@@ -36,8 +41,8 @@ nonisolated struct LiveExtractionCacheManager: ExtractionCacheManaging {
         ExtractionCacheStore.makeCachedCandidate(forKey: key)
     }
 
-    func enforceBudget() {
-        ExtractionCacheStore.enforceBudget()
+    func enforceBudget(excluding activeURL: URL?) {
+        ExtractionCacheStore.enforceBudget(excluding: activeURL)
     }
 
     func cacheSizeBytes(in root: URL, excluding activeURL: URL?) -> UInt64 {
@@ -90,8 +95,11 @@ nonisolated enum ExtractionCacheStore {
         return url
     }
 
-    static func enforceBudget(limit: UInt64 = cacheBudgetBytes) {
-        let root = cacheRoot()
+    static func enforceBudget(
+        limit: UInt64 = cacheBudgetBytes,
+        excluding activeURL: URL? = nil,
+        in root: URL = cacheRoot()
+    ) {
         guard let entries = try? FileManager.default.contentsOfDirectory(
             at: root,
             includingPropertiesForKeys: [.contentModificationDateKey],
@@ -113,10 +121,15 @@ nonisolated enum ExtractionCacheStore {
         let total = measured.reduce(UInt64(0)) { saturatedAdd($0, $1.size) }
         guard total > limit else { return }
 
+        // Never evict the cache entry for the book that's currently open —
+        // deleting files out from under an in-progress read would break it.
+        let excluded = cacheEntryContaining(activeURL, in: root)?.standardizedFileURL
+
         var remaining = total
         var removedAny = false
         for entry in measured.sorted(by: { $0.mtime < $1.mtime }) {
             if remaining <= limit { break }
+            if entry.url.standardizedFileURL == excluded { continue }
             if (try? FileManager.default.removeItem(at: entry.url)) != nil {
                 removedAny = true
             }
@@ -215,6 +228,10 @@ nonisolated enum ExtractionCacheStore {
 
         var total: UInt64 = 0
         for case let entry as URL in enumerator {
+            // Cooperative cancellation: when run inside a cancellable scan
+            // task (StorageSettingsView), abandon the walk early instead of
+            // grinding through a huge cache the caller no longer cares about.
+            if Task.isCancelled { break }
             let values = try? entry.resourceValues(forKeys: [
                 .totalFileAllocatedSizeKey,
                 .fileSizeKey,

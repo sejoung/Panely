@@ -2,7 +2,7 @@ import Foundation
 import Logging
 import OSLog
 
-nonisolated enum DiagnosticCategory: String, Sendable {
+nonisolated enum DiagnosticCategory: String, Sendable, CaseIterable {
     case app
     case reader
     case load
@@ -264,7 +264,24 @@ nonisolated enum AppLog {
         )
     }
 
+    /// One `Logger` (and therefore one `OSLog`/`PanelyLogHandler`) per
+    /// category, built once. Previously every `AppLog.x(...)` call constructed
+    /// a fresh `Logger` + `OSLog` — a real allocation on hot paths like page
+    /// turns and scrolling. The handler reads the log level dynamically, so
+    /// caching does not freeze runtime level changes.
+    private static let loggers: [DiagnosticCategory: Logging.Logger] = {
+        var dict: [DiagnosticCategory: Logging.Logger] = [:]
+        for category in DiagnosticCategory.allCases {
+            dict[category] = makeLogger(for: category)
+        }
+        return dict
+    }()
+
     private static func logger(for category: DiagnosticCategory) -> Logging.Logger {
+        loggers[category] ?? makeLogger(for: category)
+    }
+
+    private static func makeLogger(for category: DiagnosticCategory) -> Logging.Logger {
         Logging.Logger(label: "\(subsystem).\(category.rawValue)") { label, metadataProvider in
             PanelyLogHandler(
                 label: label,
@@ -323,7 +340,16 @@ private nonisolated struct PanelyLogHandler: LogHandler {
 
     var metadata: Logging.Logger.Metadata = [:]
     var metadataProvider: Logging.Logger.MetadataProvider?
-    var logLevel: Logging.Logger.Level
+
+    /// Read live from configuration rather than cached at init. The handler is
+    /// now long-lived (one per category, see `AppLog.loggers`), so a cached
+    /// level would make the Diagnostics settings' level picker a no-op. The
+    /// setter is ignored — the level is centrally owned by
+    /// `DiagnosticLogConfiguration`.
+    var logLevel: Logging.Logger.Level {
+        get { DiagnosticLogConfiguration.currentLogLevel.loggerLevel }
+        set { _ = newValue }
+    }
 
     init(
         label: String,
@@ -336,7 +362,6 @@ private nonisolated struct PanelyLogHandler: LogHandler {
         self.category = category
         self.metadataProvider = metadataProvider
         self.osLog = OSLog(subsystem: subsystem, category: category.rawValue)
-        self.logLevel = DiagnosticLogConfiguration.currentLogLevel.loggerLevel
     }
 
     subscript(metadataKey metadataKey: String) -> Logging.Logger.Metadata.Value? {

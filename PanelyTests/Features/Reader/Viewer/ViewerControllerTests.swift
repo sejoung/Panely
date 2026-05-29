@@ -117,6 +117,40 @@ struct ViewerControllerTests {
         #expect(controller.isAtFit)
     }
 
+    /// Re-attaching the *same* scroll view must not re-seed
+    /// `currentMagnification`. `updateNSView` calls `attach` on every SwiftUI
+    /// tick; re-seeding would clobber a value the coordinator just pushed
+    /// mid-gesture and drop the toolbar's fit-mode highlight.
+    @Test func reAttachingSameScrollViewDoesNotReseedCurrentMagnification() {
+        let sv = makeScrollView()
+        sv.magnification = 1.0
+        let controller = ViewerController()
+        controller.attach(scrollView: sv)
+        #expect(abs(controller.currentMagnification - 1.0) < 0.001)
+
+        // Simulate a live gesture pushing a new value through the coordinator.
+        controller.currentMagnification = 4.2
+
+        // A redundant attach (same scroll view) must leave it untouched.
+        controller.attach(scrollView: sv)
+        #expect(abs(controller.currentMagnification - 4.2) < 0.001)
+    }
+
+    /// Attaching a *different* scroll view does re-seed — that's a genuine
+    /// new binding (e.g. SwiftUI recreated the NSView).
+    @Test func attachingDifferentScrollViewReseedsCurrentMagnification() {
+        let first = makeScrollView()
+        first.magnification = 1.0
+        let controller = ViewerController()
+        controller.attach(scrollView: first)
+        controller.currentMagnification = 4.2
+
+        let second = makeScrollView()
+        second.magnification = 0.5
+        controller.attach(scrollView: second)
+        #expect(abs(controller.currentMagnification - 0.5) < 0.001)
+    }
+
     private func makeScrollView() -> NSScrollView {
         let sv = NSScrollView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
         sv.allowsMagnification = true

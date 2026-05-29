@@ -62,8 +62,8 @@ extension PanelyApp {
             Button("Clear Diagnostic Logs") {
                 guard DiagnosticReportExporter.confirmClearLogs() else { return }
                 Task {
-                    await DiagnosticLogStore.shared.clear()
-                    DiagnosticReportExporter.presentClearLogsResult()
+                    let cleared = await DiagnosticLogStore.shared.clear()
+                    DiagnosticReportExporter.presentClearLogsResult(success: cleared)
                 }
             }
 

@@ -12,6 +12,7 @@ struct StorageSettingsView: View {
     @State private var isRefreshing = false
     @State private var isClearing = false
     @State private var refreshGeneration = 0
+    @State private var scanTask: Task<(total: UInt64, clearable: UInt64), Never>?
 
     init(
         viewModel: ReaderViewModel,
@@ -75,6 +76,7 @@ struct StorageSettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: .panelyExtractionCacheDidChange)) { _ in
             Task { await refreshCacheSize() }
         }
+        .onDisappear { scanTask?.cancel() }
     }
 
     @ViewBuilder
@@ -95,9 +97,15 @@ struct StorageSettingsView: View {
         let activeURL = viewModel.tempDir.url
         let cacheMaintenance = cacheMaintenance
         let cacheRoot = cacheRoot
-        let sizes = await Task.detached(priority: .utility) {
+        // Cancel any in-flight scan so a burst of cache-change notifications
+        // doesn't pile up overlapping full-directory walks. The walk checks
+        // `Task.isCancelled` cooperatively, so the cancel actually stops it.
+        scanTask?.cancel()
+        let task = Task.detached(priority: .utility) {
             cacheMaintenance.cacheSizes(in: cacheRoot, excluding: activeURL)
-        }.value
+        }
+        scanTask = task
+        let sizes = await task.value
         guard !Task.isCancelled, generation == refreshGeneration else {
             return
         }

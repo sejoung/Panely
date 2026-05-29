@@ -76,13 +76,14 @@ final class TestExtractionCacheManager: ExtractionCacheManaging, @unchecked Send
         return url
     }
 
-    func enforceBudget() {
+    func enforceBudget(excluding activeURL: URL?) {
         guard let entries = try? FileManager.default.contentsOfDirectory(
             at: root,
             includingPropertiesForKeys: [.contentModificationDateKey],
             options: [.skipsHiddenFiles]
         ) else { return }
 
+        let excluded = activeURL?.standardizedFileURL
         var measured: [(url: URL, modified: Date, size: UInt64)] = []
         for entry in entries {
             let modified = (try? entry.resourceValues(forKeys: [.contentModificationDateKey]))?
@@ -93,6 +94,7 @@ final class TestExtractionCacheManager: ExtractionCacheManaging, @unchecked Send
         var remaining = measured.reduce(UInt64(0)) { $0 &+ $1.size }
         for entry in measured.sorted(by: { $0.modified < $1.modified }) {
             if remaining <= cacheBudgetBytes { break }
+            if entry.url.standardizedFileURL == excluded { continue }
             try? FileManager.default.removeItem(at: entry.url)
             remaining = remaining > entry.size ? remaining - entry.size : 0
         }

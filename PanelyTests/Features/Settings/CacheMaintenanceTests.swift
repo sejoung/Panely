@@ -87,7 +87,7 @@ private nonisolated struct FakeExtractionCacheManager: ExtractionCacheManaging {
     func makeCachedCandidate(forKey key: String) -> URL {
         root.appendingPathComponent(key, isDirectory: true)
     }
-    func enforceBudget() {}
+    func enforceBudget(excluding activeURL: URL?) {}
     func cacheSizeBytes(in root: URL, excluding activeURL: URL?) -> UInt64 {
         activeURL == nil ? total : clearable
     }

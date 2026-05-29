@@ -151,7 +151,11 @@ nonisolated enum CBZLoader {
                 .fileSizeKey,
             ])
             let size = UInt64(values?.totalFileAllocatedSize ?? values?.fileSize ?? 0)
-            if size > limit || total > limit - size {
+            // Overflow-safe and order-independent: `limit - total` would
+            // underflow (wrap huge) if a single entry's `size` pushed the
+            // running total past `limit`, so compute the headroom defensively.
+            let remaining = limit >= total ? limit - total : 0
+            if size > remaining {
                 // Clean up partial extraction so the caller's temp dir
                 // doesn't leak. extractAll/load already removes on error.
                 try? fm.removeItem(at: directory)

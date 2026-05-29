@@ -32,6 +32,12 @@ final class ViewerController {
     private let zoomStep: CGFloat = 1.25
 
     func attach(scrollView: NSScrollView) {
+        // Idempotent: `AppKitImageScroller.updateNSView` re-invokes this on
+        // every SwiftUI tick. Re-seeding `currentMagnification` from the raw
+        // scroll view each time would clobber a value the coordinator just
+        // pushed mid-gesture (dropping the toolbar's fit highlight). Only
+        // (re)seed when the underlying scroll view actually changes.
+        guard self.scrollView !== scrollView else { return }
         self.scrollView = scrollView
         currentMagnification = scrollView.magnification
     }

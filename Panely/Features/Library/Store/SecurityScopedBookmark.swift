@@ -53,7 +53,14 @@ nonisolated enum SecurityScopedBookmark {
     }
 
     static func refreshedData(for url: URL) -> Data? {
-        try? data(for: url)
+        // Creating a `.withSecurityScope` bookmark requires the URL to have
+        // active security-scoped access. Callers resolve stale bookmarks
+        // before the library scope is acquired, so bracket access here —
+        // otherwise `data(for:)` silently fails and the stale bookmark is
+        // never refreshed.
+        let didStart = url.startAccessingSecurityScopedResource()
+        defer { if didStart { url.stopAccessingSecurityScopedResource() } }
+        return try? data(for: url)
     }
 
     static func isDirectory(_ url: URL) -> Bool {

@@ -32,6 +32,12 @@ struct HotEdgeReveal: View {
                 }
             }
         }
+        .onDisappear {
+            // Cancel any pending reveal so `onReveal` can't fire after the
+            // view is gone (e.g. window closed mid-hover-delay).
+            hoverTask?.cancel()
+            hoverTask = nil
+        }
         .animation(.easeInOut(duration: 0.15), value: hovering)
     }
 }

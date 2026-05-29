@@ -31,6 +31,16 @@ final class ReaderImageLoader {
     private var preloadTask: Task<Void, Never>?
     private var lazyLoadTask: Task<Void, Never>?
 
+    /// Bumped on every `refresh()`/`reset()`. Async decode work captures the
+    /// generation it started under and re-checks it after each `await` before
+    /// mutating `currentImages`/`loadedPageIndices` or surfacing an error —
+    /// without this, a slow decode for a book the user just navigated away
+    /// from would write stale pages into the now-current book or flash a
+    /// "Failed to load" error onto it. (`Task.isCancelled` only covers the
+    /// `lazyLoadTask` path; the initial `ensureWindowLoaded` and the paged
+    /// spread are awaited directly and aren't cancellable.)
+    private var generation: Int = 0
+
     // Snapshot of the most recent refresh() inputs. Preload reads from these
     // since it runs after refresh() returns; cancellation on the next refresh
     // takes care of stale snapshots.
@@ -48,6 +58,7 @@ final class ReaderImageLoader {
         preloadTask = nil
         lazyLoadTask?.cancel()
         lazyLoadTask = nil
+        generation &+= 1
         currentImages = []
         pageDimensions = []
         loadedPageIndices.removeAll()
@@ -80,9 +91,12 @@ final class ReaderImageLoader {
         isCancelled: @MainActor @escaping () -> Bool,
         onError: @MainActor @escaping (String) -> Void
     ) async {
-        // Cancel any in-flight lazy-load from a previous source/layout.
+        // Cancel any in-flight lazy-load from a previous source/layout and
+        // invalidate any decode work still running for the previous book.
         lazyLoadTask?.cancel()
         lazyLoadTask = nil
+        generation &+= 1
+        let generation = self.generation
         loadedPageIndices.removeAll()
 
         lastSource = source
@@ -91,9 +105,9 @@ final class ReaderImageLoader {
         lastNavigationStep = navigationStep
 
         if layout.isContinuous {
-            await refreshVerticalLazily(source: source, currentPageIndex: currentPageIndex, isCancelled: isCancelled, onError: onError)
+            await refreshVerticalLazily(source: source, currentPageIndex: currentPageIndex, generation: generation, isCancelled: isCancelled, onError: onError)
         } else {
-            await refreshPaged(source: source, currentPageIndex: currentPageIndex, navigationStep: navigationStep, onError: onError)
+            await refreshPaged(source: source, currentPageIndex: currentPageIndex, navigationStep: navigationStep, generation: generation, onError: onError)
         }
     }
 
@@ -101,6 +115,7 @@ final class ReaderImageLoader {
         source: ComicSource,
         currentPageIndex: Int,
         navigationStep: Int,
+        generation: Int,
         onError: @MainActor @escaping (String) -> Void
     ) async {
         let pages = visiblePages(source: source, currentPageIndex: currentPageIndex, navigationStep: navigationStep)
@@ -110,7 +125,11 @@ final class ReaderImageLoader {
             return
         }
 
-        currentImages = await decodeSpreadInParallel(pages, onError: onError)
+        let images = await decodeSpreadInParallel(pages, generation: generation, onError: onError)
+        // A newer refresh() may have started while the spread decoded — don't
+        // stomp its images with this stale book's pages.
+        guard generation == self.generation else { return }
+        currentImages = images
         schedulePreload()
     }
 
@@ -122,12 +141,13 @@ final class ReaderImageLoader {
     /// into a sequential loop without measuring the regression.
     private func decodeSpreadInParallel(
         _ pages: [ComicPage],
+        generation: Int,
         onError: @MainActor @escaping (String) -> Void
     ) async -> [NSImage] {
         await withTaskGroup(of: (Int, NSImage?).self, returning: [NSImage].self) { group in
             for (i, page) in pages.enumerated() {
                 group.addTask { [self] in
-                    let image = await self.loadVisibleImage(page, onError: onError)
+                    let image = await self.loadVisibleImage(page, generation: generation, onError: onError)
                     return (i, image)
                 }
             }
@@ -148,6 +168,7 @@ final class ReaderImageLoader {
     private func refreshVerticalLazily(
         source: ComicSource,
         currentPageIndex: Int,
+        generation: Int,
         isCancelled: @MainActor @escaping () -> Bool,
         onError: @MainActor @escaping (String) -> Void
     ) async {
@@ -181,8 +202,9 @@ final class ReaderImageLoader {
                     dims[i] = size
                 }
             }
-            if isCancelled() { return }
+            if isCancelled() || generation != self.generation { return }
         }
+        guard generation == self.generation else { return }
         pageDimensions = dims
 
         // 2. Placeholders give ImageStackView the right frame for every slot.
@@ -191,7 +213,7 @@ final class ReaderImageLoader {
         currentImages = dims.map { Self.makePlaceholder(size: $0) }
 
         // 3. Load the window around the restored page index.
-        await ensureWindowLoaded(around: currentPageIndex, source: source, onError: onError)
+        await ensureWindowLoaded(around: currentPageIndex, source: source, generation: generation, onError: onError)
     }
 
     // MARK: - Visible-range driven updates
@@ -217,9 +239,10 @@ final class ReaderImageLoader {
         let needed = window.loadIndices(forVisibleRange: range, excluding: loadedPageIndices)
         guard !needed.isEmpty else { return }
 
+        let generation = self.generation
         lazyLoadTask?.cancel()
         lazyLoadTask = Task { [weak self] in
-            await self?.loadPagesBatched(needed, source: source, onError: onError)
+            await self?.loadPagesBatched(needed, source: source, generation: generation, onError: onError)
         }
     }
 
@@ -255,6 +278,7 @@ final class ReaderImageLoader {
     private func loadPagesBatched(
         _ indices: [Int],
         source: ComicSource,
+        generation: Int,
         onError: @MainActor @escaping (String) -> Void
     ) async {
         guard !indices.isEmpty else { return }
@@ -265,7 +289,7 @@ final class ReaderImageLoader {
         // page at once would saturate the pool with no real benefit (cores
         // are bounded anyway) while still costing per-task overhead.
         for chunkStart in stride(from: 0, to: indices.count, by: maxConcurrent) {
-            if Task.isCancelled { return }
+            if Task.isCancelled || generation != self.generation { return }
             let chunkEnd = min(chunkStart + maxConcurrent, indices.count)
             await withTaskGroup(of: (Int, NSImage?).self) { group in
                 for i in chunkStart..<chunkEnd {
@@ -274,12 +298,14 @@ final class ReaderImageLoader {
                           source.pages.indices.contains(pageIndex) else { continue }
                     let page = source.pages[pageIndex]
                     group.addTask {
-                        let image = await self.loadVisibleImage(page, onError: onError)
+                        let image = await self.loadVisibleImage(page, generation: generation, onError: onError)
                         return (pageIndex, image)
                     }
                 }
                 for await (pageIndex, image) in group {
-                    if Task.isCancelled { return }
+                    // A newer refresh() invalidated this book — don't mark its
+                    // pages "loaded" against the now-current book's state.
+                    if Task.isCancelled || generation != self.generation { return }
                     if let image {
                         loaded.append((pageIndex, image))
                         loadedPageIndices.insert(pageIndex)
@@ -288,7 +314,7 @@ final class ReaderImageLoader {
             }
         }
 
-        guard !Task.isCancelled, !loaded.isEmpty else { return }
+        guard !Task.isCancelled, generation == self.generation, !loaded.isEmpty else { return }
         // Take a fresh snapshot — concurrent evictions or other lazy loads
         // may have mutated currentImages during the awaits above. Merge our
         // new pages into the latest state and write once.
@@ -306,13 +332,14 @@ final class ReaderImageLoader {
     private func ensureWindowLoaded(
         around index: Int,
         source: ComicSource,
+        generation: Int,
         onError: @MainActor @escaping (String) -> Void
     ) async {
         let needed = ReaderVerticalImageWindow(pageCount: source.pageCount)
             .initialIndices(around: index, excluding: loadedPageIndices)
         guard !needed.isEmpty else { return }
 
-        await loadPagesBatched(needed, source: source, onError: onError)
+        await loadPagesBatched(needed, source: source, generation: generation, onError: onError)
     }
 
     // MARK: - Cache helpers
@@ -329,7 +356,7 @@ final class ReaderImageLoader {
         ReaderImageMemoryCache.estimatedBitmapCost(of: image)
     }
 
-    private func loadVisibleImage(_ page: ComicPage, onError: @MainActor @escaping (String) -> Void) async -> NSImage? {
+    private func loadVisibleImage(_ page: ComicPage, generation: Int, onError: @MainActor @escaping (String) -> Void) async -> NSImage? {
         if let cached = cachedImage(for: page) {
             return cached
         }
@@ -338,7 +365,12 @@ final class ReaderImageLoader {
             cacheImage(image, for: page)
             return image
         } catch {
-            onError("Failed to load \(page.displayName)")
+            // Only surface the error if this decode still belongs to the
+            // current book — otherwise a failure from a book the user just
+            // left would flash onto the now-current one.
+            if generation == self.generation {
+                onError("Failed to load \(page.displayName)")
+            }
             let fallbackSize = (try? await ImageLoader.dimensions(for: page))
                 ?? CGSize(width: 1000, height: 1500)
             return ReaderImagePlaceholder.makeError(size: fallbackSize, title: page.displayName)

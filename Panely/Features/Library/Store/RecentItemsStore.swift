@@ -20,7 +20,8 @@ final class RecentItemsStore {
     }
 
     func record(_ url: URL, title: String) {
-        if let existingIndex = items.firstIndex(where: { $0.path == url.path }) {
+        let path = url.standardizedFileURL.path
+        if let existingIndex = items.firstIndex(where: { $0.path == path }) {
             var existing = items.remove(at: existingIndex)
             existing.openedAt = Date()
             existing.title = title
@@ -36,7 +37,7 @@ final class RecentItemsStore {
         do {
             let item = RecentItem(
                 id: UUID(),
-                path: url.path,
+                path: path,
                 title: title,
                 openedAt: Date(),
                 bookmarkData: try bookmarks.data(for: url),
@@ -63,7 +64,7 @@ final class RecentItemsStore {
            let refreshed = bookmarks.refreshedData(for: url),
            let idx = items.firstIndex(where: { $0.id == item.id }) {
             items[idx].bookmarkData = refreshed
-            items[idx].path = url.path
+            items[idx].path = url.standardizedFileURL.path
             save()
         }
         return url

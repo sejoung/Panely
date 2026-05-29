@@ -254,7 +254,9 @@ extension ReaderViewModel {
             )
             if key != nil {
                 Task.detached(priority: .background) {
-                    extractionCache.enforceBudget()
+                    // Exclude the just-extracted cache dir for the book we're
+                    // about to read so the budget sweep can't evict it.
+                    extractionCache.enforceBudget(excluding: candidate)
                 }
             }
             return candidate

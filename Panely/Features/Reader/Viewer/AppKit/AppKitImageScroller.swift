@@ -79,7 +79,13 @@ struct AppKitImageScroller: NSViewRepresentable {
         content.onDoubleClick = { [weak scrollView] localPoint in
             guard let scrollView else { return }
             let isAtBase = abs(scrollView.magnification - coordinator.baseMagnification) < 0.01
-            let target = isAtBase ? coordinator.baseMagnification * 2 : coordinator.baseMagnification
+            // Clamp the zoom-in target so a small image with a large fit base
+            // doesn't request a magnification past the scroll view's ceiling
+            // (setMagnification clamps anyway, but clamping here keeps the
+            // toggle predictable and the synced value below honest).
+            let target = isAtBase
+                ? min(coordinator.baseMagnification * 2, scrollView.maxMagnification)
+                : coordinator.baseMagnification
             scrollView.setMagnification(target, centeredAt: localPoint)
             // Sync explicitly. The bounds observer would catch this too, but
             // every other zoom path (`ViewerController.zoomIn/zoomOut/resetZoom`,
@@ -288,7 +294,8 @@ struct AppKitImageScroller: NSViewRepresentable {
         // when the user hasn't manually zoomed yet — that's the whole point
         // of locking the view size.
         let shouldReset: Bool
-        if force {
+        if force || !coordinator.hasAppliedInitialFit {
+            // First valid fit always snaps — see `hasAppliedInitialFit`.
             shouldReset = true
         } else if !coordinator.autoFitOnResize {
             shouldReset = false
@@ -299,6 +306,7 @@ struct AppKitImageScroller: NSViewRepresentable {
         if shouldReset {
             scrollView.magnification = fit
         }
+        coordinator.hasAppliedInitialFit = true
         coordinator.baseMagnification = fit
         coordinator.viewerController?.baseMagnification = fit
         // Keep the toolbar's fit-button highlight in sync. If we just reset

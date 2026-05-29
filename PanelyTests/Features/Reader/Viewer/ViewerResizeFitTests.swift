@@ -540,6 +540,69 @@ struct ViewerResizeFitTests {
         #expect(weakCoordinator == nil)
     }
 
+    /// Regression: the very first `applyFit` must snap to the computed fit
+    /// even when called with `force: false` (the production first-render path,
+    /// since a new book reports only `identityChanged`). Previously, if the
+    /// scroll view's magnification happened to differ from the coordinator's
+    /// default `baseMagnification` at that moment, `userHasZoomed` read true
+    /// and the fit was suppressed — leaving the page un-fitted.
+    @Test func firstApplyFitSnapsEvenWithoutForce() {
+        let scrollView = Self.makeScrollView(size: CGSize(width: 800, height: 600))
+        let doc = NSView(frame: NSRect(x: 0, y: 0, width: 1000, height: 1500))
+        scrollView.documentView = doc
+        scrollView.layoutSubtreeIfNeeded()
+
+        // Simulate a transient magnification that differs from the fresh
+        // coordinator's baseMagnification (1.0) — the spurious "userHasZoomed".
+        scrollView.magnification = 5.0
+
+        let coordinator = AppKitScrollerCoordinator()
+        #expect(coordinator.hasAppliedInitialFit == false)
+
+        AppKitImageScroller.applyFit(
+            scrollView: scrollView,
+            coordinator: coordinator,
+            fitMode: .fitScreen,
+            force: false
+        )
+
+        let expectedFit = FitCalculator.magnification(
+            docSize: doc.frame.size,
+            viewport: scrollView.contentSize,
+            fitMode: .fitScreen
+        )
+        #expect(abs(scrollView.magnification - expectedFit) < 0.001)
+        #expect(coordinator.hasAppliedInitialFit)
+    }
+
+    /// The initial-fit override is one-shot: after the first fit, a manual
+    /// zoom is preserved across subsequent non-force applies (it must not keep
+    /// force-snapping every page).
+    @Test func initialFitOverrideIsOneShot() {
+        let scrollView = Self.makeScrollView(size: CGSize(width: 800, height: 600))
+        let doc = NSView(frame: NSRect(x: 0, y: 0, width: 1000, height: 1500))
+        scrollView.documentView = doc
+        scrollView.layoutSubtreeIfNeeded()
+
+        let coordinator = AppKitScrollerCoordinator()
+        AppKitImageScroller.applyFit(
+            scrollView: scrollView,
+            coordinator: coordinator,
+            fitMode: .fitScreen,
+            force: false
+        )
+
+        // User zooms; a later non-force apply (page flip) must keep their zoom.
+        scrollView.magnification = 2.0
+        AppKitImageScroller.applyFit(
+            scrollView: scrollView,
+            coordinator: coordinator,
+            fitMode: .fitScreen,
+            force: false
+        )
+        #expect(abs(scrollView.magnification - 2.0) < 0.001)
+    }
+
     private static func makeScrollView(size: CGSize) -> NSScrollView {
         let scrollView = NSScrollView(frame: NSRect(origin: .zero, size: size))
         scrollView.allowsMagnification = true

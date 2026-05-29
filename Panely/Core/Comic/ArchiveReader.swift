@@ -24,9 +24,18 @@ actor ArchiveReader {
     }
 
     func entryPaths() -> [String] {
-        archive.compactMap { entry in
-            entry.type == .file ? entry.path : nil
+        // Dedupe by path: `archive[path]` resolves to the *first* matching
+        // entry, so two entries sharing a path would otherwise produce two
+        // pages that both read the first entry's bytes. Collapsing to one
+        // path per unique name keeps page → bytes addressing unambiguous.
+        var seen = Set<String>()
+        var paths: [String] = []
+        for entry in archive where entry.type == .file {
+            if seen.insert(entry.path).inserted {
+                paths.append(entry.path)
+            }
         }
+        return paths
     }
 
     func loadData(at path: String) throws -> Data {

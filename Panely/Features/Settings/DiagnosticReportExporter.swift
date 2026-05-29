@@ -81,11 +81,17 @@ struct DiagnosticReportExporter {
         Self.present(alert)
     }
 
-    static func presentClearLogsResult() {
+    static func presentClearLogsResult(success: Bool) {
         let alert = NSAlert()
-        alert.alertStyle = .informational
-        alert.messageText = "Diagnostic Logs Cleared"
-        alert.informativeText = "Recent file logs were removed."
+        if success {
+            alert.alertStyle = .informational
+            alert.messageText = "Diagnostic Logs Cleared"
+            alert.informativeText = "Recent file logs were removed."
+        } else {
+            alert.alertStyle = .warning
+            alert.messageText = "Could Not Clear Diagnostic Logs"
+            alert.informativeText = "The recent file log could not be removed. Please try again."
+        }
         alert.addButton(withTitle: "OK")
         present(alert)
     }

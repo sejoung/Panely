@@ -19,6 +19,14 @@ final class AppKitScrollerCoordinator {
     var isProgrammaticallyScrolling: Bool = false
     var autoFitOnResize: Bool = true
 
+    /// False until the first valid `applyFit` runs. The very first fit must
+    /// snap to the computed magnification unconditionally — if it happened to
+    /// run while `scrollView.magnification` was at a transient default that
+    /// differs from `baseMagnification`, the `userHasZoomed` heuristic would
+    /// spuriously read `true` and suppress the fit, leaving the page rendered
+    /// at the wrong (or zero) magnification.
+    var hasAppliedInitialFit: Bool = false
+
     weak var scrollView: NSScrollView?
     weak var viewerController: ViewerController?
 

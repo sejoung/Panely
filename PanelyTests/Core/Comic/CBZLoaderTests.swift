@@ -126,4 +126,29 @@ struct CBZLoaderIntegrationTests {
         }
         #expect(!FileManager.default.fileExists(atPath: dest.path))
     }
+
+    /// A single entry larger than the whole budget must be rejected. This
+    /// exercises the size-cap's overflow-safe headroom check (`limit - total`
+    /// would underflow when one entry alone exceeds the limit).
+    @Test func extractAllRejectsSingleEntryExceedingLimit() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+
+        let src = try Fixture.makeTempDir()
+        try Data(repeating: 0, count: 2_000_000)
+            .write(to: src.appendingPathComponent("big.jpg"))
+        let zipURL = workDir.appendingPathComponent("book.cbz")
+        try Fixture.zipDirectory(src, to: zipURL)
+        try? FileManager.default.removeItem(at: src)
+
+        let dest = workDir.appendingPathComponent("extracted-single", isDirectory: true)
+        await #expect(throws: CBZLoader.LoadError.self) {
+            try await CBZLoader.extractAll(
+                from: zipURL,
+                to: dest,
+                maxExtractedBytes: 1_000_000
+            )
+        }
+        #expect(!FileManager.default.fileExists(atPath: dest.path))
+    }
 }
