@@ -419,6 +419,7 @@ Panely/
 │   ├── SourceChangeMonitor.swift       # DispatchSource-backed multi-URL file/folder watcher (session-guarded)
 │   ├── LibraryDirectoryWatcher.swift   # FSEvents recursive watch on the library root → auto-refresh the sidebar tree
 │   ├── Debouncer.swift                 # shared trailing-debounce helper (position / progress saves)
+│   ├── FilePicking.swift               # NSOpenPanel seam (injected) → open / folder-access flows stay testable
 │   └── Extensions/                     # shared Foundation helpers
 ├── DesignSystem/
 │   ├── Tokens/                         # Color / Spacing / Typography / Motion

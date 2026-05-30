@@ -78,19 +78,18 @@ extension ReaderViewModel {
     // MARK: - Opening new sources
 
     func openSource() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.prompt = "Open"
-
         var types: [UTType] = [.folder, .zip]
         if let cbz = UTType(filenameExtension: "cbz") {
             types.append(cbz)
         }
-        panel.allowedContentTypes = types
+        let request = FilePickerRequest(
+            canChooseFiles: true,
+            canChooseDirectories: true,
+            allowedContentTypes: types,
+            prompt: "Open"
+        )
 
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let url = filePicker.pickURL(request) else { return }
         AppLog.info(
             .load,
             "Open panel selected",
@@ -151,17 +150,15 @@ extension ReaderViewModel {
     }
 
     func requestFolderAccess() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.prompt = "Select"
-        panel.message = "Select a folder to browse books from."
-        if let parent = currentSourceURL?.deletingLastPathComponent() {
-            panel.directoryURL = parent
-        }
+        let request = FilePickerRequest(
+            canChooseFiles: false,
+            canChooseDirectories: true,
+            prompt: "Select",
+            message: "Select a folder to browse books from.",
+            directoryURL: currentSourceURL?.deletingLastPathComponent()
+        )
 
-        guard panel.runModal() == .OK, let folderURL = panel.url else { return }
+        guard let folderURL = filePicker.pickURL(request) else { return }
         AppLog.info(
             .library,
             "Folder access granted",

@@ -47,6 +47,7 @@ final class ReaderViewModel {
     let pageBookmarks: PageBookmarksStore
     let makeSourceChangeMonitor: @MainActor () -> any SourceChangeMonitoring
     let makeLibraryDirectoryWatcher: @MainActor () -> any LibraryDirectoryWatching
+    let filePicker: any FilePicking
 
     // MARK: - Source state
 
@@ -197,6 +198,7 @@ final class ReaderViewModel {
         self.pageBookmarks = PageBookmarksStore(defaults: dependencies.keyValueStore)
         self.makeSourceChangeMonitor = dependencies.sourceChangeMonitorFactory
         self.makeLibraryDirectoryWatcher = dependencies.libraryDirectoryWatcherFactory
+        self.filePicker = dependencies.filePickerFactory()
 
         observeAppTermination()
 

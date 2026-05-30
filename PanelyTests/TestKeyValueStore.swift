@@ -214,6 +214,21 @@ final class TestLibraryDirectoryWatcher: LibraryDirectoryWatching {
 }
 
 @MainActor
+final class TestFilePicker: FilePicking {
+    var urlToReturn: URL?
+    private(set) var lastRequest: FilePickerRequest?
+
+    nonisolated init(urlToReturn: URL? = nil) {
+        self.urlToReturn = urlToReturn
+    }
+
+    func pickURL(_ request: FilePickerRequest) -> URL? {
+        lastRequest = request
+        return urlToReturn
+    }
+}
+
+@MainActor
 func makeTestDependencies(
     keyValueStore: InMemoryKeyValueStore = InMemoryKeyValueStore(),
     extractionCache: any ExtractionCacheManaging = TestExtractionCacheManager(),
@@ -221,7 +236,8 @@ func makeTestDependencies(
     libraryTreeLoader: any LibraryTreeLoading = TestLibraryTreeLoader(),
     systemSettings: any SystemSettingsReading = TestSystemSettings(),
     sourceChangeMonitorFactory: @MainActor @escaping () -> any SourceChangeMonitoring = { TestSourceChangeMonitor() },
-    libraryDirectoryWatcherFactory: @MainActor @escaping () -> any LibraryDirectoryWatching = { TestLibraryDirectoryWatcher() }
+    libraryDirectoryWatcherFactory: @MainActor @escaping () -> any LibraryDirectoryWatching = { TestLibraryDirectoryWatcher() },
+    filePicker: any FilePicking = TestFilePicker()
 ) -> AppDependencies {
     AppDependencies(
         extractionCache: extractionCache,
@@ -231,6 +247,7 @@ func makeTestDependencies(
         systemSettings: systemSettings,
         sourceChangeMonitorFactory: sourceChangeMonitorFactory,
         libraryDirectoryWatcherFactory: libraryDirectoryWatcherFactory,
+        filePickerFactory: { filePicker },
         makeReaderPreferences: { ReaderPreferences(defaults: keyValueStore) },
         makeReaderPositions: { ReaderPositionStore(defaults: keyValueStore) },
         makeReadingProgress: { ReadingProgressStore(defaults: keyValueStore) },
