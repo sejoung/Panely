@@ -55,6 +55,7 @@ struct SidebarHost: View {
                 viewModel.dismissSidebarOverlay()
             },
             onTogglePin: { viewModel.toggleSidebarPin() },
+            onRefresh: { viewModel.refreshLibraryTree() },
             onRequestFolderAccess: { viewModel.requestFolderAccess() }
         )
     }

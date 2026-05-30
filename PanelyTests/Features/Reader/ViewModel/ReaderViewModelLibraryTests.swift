@@ -8,6 +8,19 @@ import Foundation
 @MainActor
 struct ReaderViewModelLibraryTests {
 
+    // MARK: - refreshLibraryTree
+
+    @Test func refreshLibraryTreeChangesRefreshToken() {
+        let vm = makeTestViewModel()
+        let before = vm.libraryRefreshToken
+
+        vm.refreshLibraryTree()
+
+        // The sidebar's `.task(id:)` keys off this token, so a new value is
+        // what forces a re-scan that picks up files added on disk.
+        #expect(vm.libraryRefreshToken != before)
+    }
+
     // MARK: - sidebarVolumes
 
     @Test func sidebarVolumesIsEmptyForFolderSeriesWithoutTempDir() {

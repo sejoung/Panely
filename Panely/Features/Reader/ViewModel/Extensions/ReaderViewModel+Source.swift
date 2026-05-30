@@ -182,6 +182,15 @@ extension ReaderViewModel {
         }
     }
 
+    /// Force a re-scan of the library file tree. Bumping the token changes
+    /// the sidebar's `.task(id:)` key, which re-runs `LibrarySidebarModel.reload`
+    /// and picks up files added/removed on disk since the last scan. There's
+    /// no directory watcher, so this is the manual path users trigger from the
+    /// sidebar's refresh button.
+    func refreshLibraryTree() {
+        libraryRefreshToken = UUID()
+    }
+
     func displayTitle(for url: URL) -> String {
         url.deletingPathExtension().lastPathComponent
     }

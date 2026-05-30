@@ -12,6 +12,7 @@ struct LibrarySidebarActions {
     var onSelectVolume: (URL) -> Void = { _ in }
     var onOpen: () -> Void = {}
     var onTogglePin: () -> Void = {}
+    var onRefresh: () -> Void = {}
     var onRequestFolderAccess: () -> Void = {}
 }
 
@@ -77,6 +78,13 @@ struct LibrarySidebar: View {
                 .foregroundStyle(PanelyColor.textPrimary)
                 .lineLimit(1)
             Spacer(minLength: 0)
+            PanelyIconButton(
+                systemImage: "arrow.clockwise",
+                accessibilityTitle: "Refresh File Tree",
+                action: actions.onRefresh
+            )
+            .help("Refresh File Tree")
+            .disabled(rootURL == nil)
             PanelyIconButton(
                 systemImage: pinned ? "pin.fill" : "pin",
                 isActive: pinned,
