@@ -80,6 +80,42 @@ struct ReaderImageLoaderTests {
         #expect(errors == ["Failed to load bad.jpg"])
     }
 
+    @Test func verticalRefreshTracksFailedPageSeparatelyFromLoaded() async throws {
+        let root = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let good0 = root.appendingPathComponent("0.png")
+        let bad = root.appendingPathComponent("1.png")
+        let good2 = root.appendingPathComponent("2.png")
+        try Fixture.makePNG(width: 10, height: 10).write(to: good0)
+        try Data("not an image".utf8).write(to: bad)
+        try Fixture.makePNG(width: 10, height: 10).write(to: good2)
+
+        let loader = ReaderImageLoader()
+        var errors: [String] = []
+        await loader.refresh(
+            source: ComicSource(title: "Strip", pages: [
+                ComicPage(source: .file(good0), displayName: "0.png"),
+                ComicPage(source: .file(bad), displayName: "1.png"),
+                ComicPage(source: .file(good2), displayName: "2.png"),
+            ]),
+            layout: .vertical,
+            currentPageIndex: 0,
+            navigationStep: 1,
+            isCancelled: { false },
+            onError: { errors.append($0) }
+        )
+
+        // The decoded pages are "loaded"; the broken one is tracked as
+        // "failed" — NOT loaded — so it stays eligible to retry when it
+        // scrolls back into the window instead of sticking forever.
+        #expect(loader.loadedPageIndices == [0, 2])
+        #expect(loader.failedPageIndices == [1])
+        #expect(errors == ["Failed to load 1.png"])
+        // The failed slot still shows the error placeholder, not a void.
+        #expect(loader.currentImages.count == 3)
+    }
+
     // MARK: - estimatedBitmapCost
 
     @Test func bitmapCostUsesPixelDimensionsForBitmapReps() throws {
@@ -115,6 +151,39 @@ struct ReaderImageLoaderTests {
         let placeholder = ReaderImageLoader.makePlaceholder(size: size)
         let cost = ReaderImageLoader.estimatedBitmapCost(of: placeholder)
         #expect(cost == Int(size.width * size.height * 4))
+    }
+
+    // MARK: - Cache cost limit (RAM-scaled, clamped)
+
+    @Test func costLimitClampsUpForLowMemoryHosts() {
+        // 512 MB host → 512/16 = 32 MB target, below the floor → clamps up.
+        let limit = ReaderImageMemoryCache.costLimit(physicalMemory: 512 * 1024 * 1024)
+        #expect(limit == Int(ReaderImageMemoryCache.minCostLimit))
+    }
+
+    @Test func costLimitClampsDownForHighMemoryHosts() {
+        // 256 GB host → 16 GB target, above the ceiling → clamps down.
+        let limit = ReaderImageMemoryCache.costLimit(physicalMemory: 256 * 1024 * 1024 * 1024)
+        #expect(limit == Int(ReaderImageMemoryCache.maxCostLimit))
+    }
+
+    @Test func costLimitScalesLinearlyBetweenBounds() {
+        // 8 GB host → 8/16 = 512 MB, inside [150 MB, 1 GB] → returned as-is.
+        let eightGB: UInt64 = 8 * 1024 * 1024 * 1024
+        let limit = ReaderImageMemoryCache.costLimit(physicalMemory: eightGB)
+        #expect(limit == Int(eightGB / 16))
+        #expect(UInt64(limit) >= ReaderImageMemoryCache.minCostLimit)
+        #expect(UInt64(limit) <= ReaderImageMemoryCache.maxCostLimit)
+    }
+
+    @Test func costLimitHonorsExactBoundaries() {
+        // target == floor exactly (2.4 GB / 16 = 150 MB) and ceiling exactly
+        // (16 GB / 16 = 1 GB) must pass through without over-clamping.
+        let atFloor = ReaderImageMemoryCache.costLimit(physicalMemory: ReaderImageMemoryCache.minCostLimit * 16)
+        #expect(atFloor == Int(ReaderImageMemoryCache.minCostLimit))
+
+        let atCeiling = ReaderImageMemoryCache.costLimit(physicalMemory: ReaderImageMemoryCache.maxCostLimit * 16)
+        #expect(atCeiling == Int(ReaderImageMemoryCache.maxCostLimit))
     }
 
     // MARK: - Placeholders + concurrency cap

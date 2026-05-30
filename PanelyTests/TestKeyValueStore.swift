@@ -16,6 +16,10 @@ final class InMemoryKeyValueStore: KeyValueStoring, @unchecked Sendable {
         storage[key] as? [String: Any]
     }
 
+    func array(forKey key: String) -> [Any]? {
+        storage[key] as? [Any]
+    }
+
     func dictionaryRepresentation() -> [String: Any] {
         storage
     }

@@ -25,6 +25,14 @@ final class ReaderImageLoader {
 
     private(set) var loadedPageIndices: Set<Int> = []
 
+    /// Pages whose decode failed and are currently showing an error
+    /// placeholder. Tracked separately from `loadedPageIndices` so they're
+    /// excluded from re-decode while still visible (no retry storm) but are
+    /// cleared the moment they scroll out of the keep window — a transient
+    /// failure (e.g. an external-drive hiccup) then retries on the next
+    /// scroll-back instead of sticking until the next full `refresh()`.
+    private(set) var failedPageIndices: Set<Int> = []
+
     // MARK: - Cache + async state
 
     private let imageCache = ReaderImageMemoryCache()
@@ -62,6 +70,7 @@ final class ReaderImageLoader {
         currentImages = []
         pageDimensions = []
         loadedPageIndices.removeAll()
+        failedPageIndices.removeAll()
     }
 
     /// Clear images before a layout rebuild. The caller is responsible for
@@ -98,6 +107,7 @@ final class ReaderImageLoader {
         generation &+= 1
         let generation = self.generation
         loadedPageIndices.removeAll()
+        failedPageIndices.removeAll()
 
         lastSource = source
         lastLayout = layout
@@ -144,19 +154,22 @@ final class ReaderImageLoader {
         generation: Int,
         onError: @MainActor @escaping (String) -> Void
     ) async -> [NSImage] {
-        await withTaskGroup(of: (Int, NSImage?).self, returning: [NSImage].self) { group in
+        await withTaskGroup(of: (Int, LoadedImage).self, returning: [NSImage].self) { group in
             for (i, page) in pages.enumerated() {
                 group.addTask { [self] in
                     let image = await self.loadVisibleImage(page, generation: generation, onError: onError)
                     return (i, image)
                 }
             }
-            var slots: [(Int, NSImage?)] = []
+            var slots: [(Int, LoadedImage)] = []
             for await result in group {
                 slots.append(result)
             }
             slots.sort { $0.0 < $1.0 }
-            return slots.compactMap { $0.1 }
+            // Paged mode re-decodes the spread on every refresh, so a failed
+            // page just shows its error placeholder here — no loaded/failed
+            // bookkeeping (that's a vertical-mode concern).
+            return slots.map { $0.1.display }
         }
     }
 
@@ -236,7 +249,10 @@ final class ReaderImageLoader {
         let window = ReaderVerticalImageWindow(pageCount: source.pageCount)
         evictPagesOutsideKeepWindow(visibleRange: range, window: window)
 
-        let needed = window.loadIndices(forVisibleRange: range, excluding: loadedPageIndices)
+        let needed = window.loadIndices(
+            forVisibleRange: range,
+            excluding: loadedPageIndices.union(failedPageIndices)
+        )
         guard !needed.isEmpty else { return }
 
         let generation = self.generation
@@ -254,8 +270,15 @@ final class ReaderImageLoader {
         visibleRange: Range<Int>,
         window: ReaderVerticalImageWindow
     ) {
-        guard !pageDimensions.isEmpty, !loadedPageIndices.isEmpty else { return }
+        guard !pageDimensions.isEmpty,
+              !(loadedPageIndices.isEmpty && failedPageIndices.isEmpty) else { return }
         let keepRange = window.keepRange(forVisibleRange: visibleRange, loadedImageCount: currentImages.count)
+
+        // Pages that failed and have now scrolled out of the keep window
+        // become retry-eligible again — re-entering the window re-queues them
+        // via `setVisibleRange`. Their error placeholder stays on screen until
+        // the retry succeeds (no flash back to gray).
+        failedPageIndices = failedPageIndices.filter { keepRange.contains($0) }
 
         var newImages = currentImages
         var evicted: [Int] = []
@@ -291,7 +314,7 @@ final class ReaderImageLoader {
         for chunkStart in stride(from: 0, to: indices.count, by: maxConcurrent) {
             if Task.isCancelled || generation != self.generation { return }
             let chunkEnd = min(chunkStart + maxConcurrent, indices.count)
-            await withTaskGroup(of: (Int, NSImage?).self) { group in
+            await withTaskGroup(of: (Int, LoadedImage).self) { group in
                 for i in chunkStart..<chunkEnd {
                     let pageIndex = indices[i]
                     guard !loadedPageIndices.contains(pageIndex),
@@ -302,12 +325,16 @@ final class ReaderImageLoader {
                         return (pageIndex, image)
                     }
                 }
-                for await (pageIndex, image) in group {
+                for await (pageIndex, result) in group {
                     // A newer refresh() invalidated this book — don't mark its
                     // pages "loaded" against the now-current book's state.
                     if Task.isCancelled || generation != self.generation { return }
-                    if let image {
-                        loaded.append((pageIndex, image))
+                    // Show the image either way; record success vs failure so a
+                    // failed page can retry on scroll-back (see failedPageIndices).
+                    loaded.append((pageIndex, result.display))
+                    if result.isFailure {
+                        failedPageIndices.insert(pageIndex)
+                    } else {
                         loadedPageIndices.insert(pageIndex)
                     }
                 }
@@ -336,7 +363,7 @@ final class ReaderImageLoader {
         onError: @MainActor @escaping (String) -> Void
     ) async {
         let needed = ReaderVerticalImageWindow(pageCount: source.pageCount)
-            .initialIndices(around: index, excluding: loadedPageIndices)
+            .initialIndices(around: index, excluding: loadedPageIndices.union(failedPageIndices))
         guard !needed.isEmpty else { return }
 
         await loadPagesBatched(needed, source: source, generation: generation, onError: onError)
@@ -356,14 +383,34 @@ final class ReaderImageLoader {
         ReaderImageMemoryCache.estimatedBitmapCost(of: image)
     }
 
-    private func loadVisibleImage(_ page: ComicPage, generation: Int, onError: @MainActor @escaping (String) -> Void) async -> NSImage? {
+    /// Outcome of a single page decode. Always carries an image to display
+    /// (a failure produces a visible error placeholder) but distinguishes
+    /// success from failure so the vertical lazy-load path can record them on
+    /// separate sets — see `failedPageIndices`.
+    private enum LoadedImage {
+        case image(NSImage)
+        case failure(NSImage)
+
+        var display: NSImage {
+            switch self {
+            case .image(let image), .failure(let image): return image
+            }
+        }
+
+        var isFailure: Bool {
+            if case .failure = self { return true }
+            return false
+        }
+    }
+
+    private func loadVisibleImage(_ page: ComicPage, generation: Int, onError: @MainActor @escaping (String) -> Void) async -> LoadedImage {
         if let cached = cachedImage(for: page) {
-            return cached
+            return .image(cached)
         }
         do {
             let image = try await ImageLoader.load(page)
             cacheImage(image, for: page)
-            return image
+            return .image(image)
         } catch {
             // Only surface the error if this decode still belongs to the
             // current book — otherwise a failure from a book the user just
@@ -373,7 +420,7 @@ final class ReaderImageLoader {
             }
             let fallbackSize = (try? await ImageLoader.dimensions(for: page))
                 ?? CGSize(width: 1000, height: 1500)
-            return ReaderImagePlaceholder.makeError(size: fallbackSize, title: page.displayName)
+            return .failure(ReaderImagePlaceholder.makeError(size: fallbackSize, title: page.displayName))
         }
     }
 

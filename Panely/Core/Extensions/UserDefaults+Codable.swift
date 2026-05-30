@@ -3,6 +3,7 @@ import Foundation
 nonisolated protocol KeyValueStoring {
     func data(forKey key: String) -> Data?
     func dictionary(forKey key: String) -> [String: Any]?
+    func array(forKey key: String) -> [Any]?
     func dictionaryRepresentation() -> [String: Any]
     func set(_ value: Any?, forKey key: String)
     func removeObject(forKey key: String)
@@ -21,6 +22,10 @@ nonisolated struct LiveKeyValueStore: KeyValueStoring, @unchecked Sendable {
 
     func dictionary(forKey key: String) -> [String: Any]? {
         defaults.dictionary(forKey: key)
+    }
+
+    func array(forKey key: String) -> [Any]? {
+        defaults.array(forKey: key)
     }
 
     func dictionaryRepresentation() -> [String: Any] {

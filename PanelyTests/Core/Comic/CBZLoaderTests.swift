@@ -1,8 +1,35 @@
 import Testing
 import Foundation
+import ZIPFoundation
 @testable import Panely
 
 struct CBZLoaderIntegrationTests {
+
+    /// A malicious archive whose entry path escapes the extraction root via
+    /// `../` must never write outside the destination directory. ZIPFoundation
+    /// rejects path-traversal entries on extract; this locks that guarantee in
+    /// so a future dependency bump or refactor can't silently regress it.
+    @Test func extractAllDoesNotEscapeDestinationViaPathTraversal() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+
+        // Payload we'll try to smuggle out as a sibling of the extraction root.
+        let payload = workDir.appendingPathComponent("payload.png")
+        try Fixture.makePNG(width: 4, height: 4).write(to: payload)
+
+        let archiveURL = workDir.appendingPathComponent("evil.cbz")
+        let archive = try Archive(url: archiveURL, accessMode: .create)
+        try archive.addEntry(with: "../escaped.png", fileURL: payload)
+
+        let dest = workDir.appendingPathComponent("extracted", isDirectory: true)
+        // May throw (traversal rejected) or contain it silently — either way
+        // the escaped file must not materialize beside the extraction root.
+        _ = try? await CBZLoader.extractAll(from: archiveURL, to: dest)
+
+        let escapedSibling = workDir.appendingPathComponent("escaped.png")
+        #expect(!FileManager.default.fileExists(atPath: escapedSibling.path))
+    }
+
     @Test func hasNestedArchivesFalseForFlatArchive() async throws {
         let workDir = try Fixture.makeTempDir()
         defer { try? FileManager.default.removeItem(at: workDir) }

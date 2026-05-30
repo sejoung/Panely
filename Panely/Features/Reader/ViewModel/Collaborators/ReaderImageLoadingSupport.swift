@@ -6,9 +6,29 @@ final class ReaderImageMemoryCache {
     private let cache: NSCache<NSString, NSImage> = {
         let cache = NSCache<NSString, NSImage>()
         cache.countLimit = 100
-        cache.totalCostLimit = 150 * 1024 * 1024
+        cache.totalCostLimit = ReaderImageMemoryCache.costLimit()
         return cache
     }()
+
+    static let minCostLimit: UInt64 = 150 * 1024 * 1024
+    static let maxCostLimit: UInt64 = 1024 * 1024 * 1024
+
+    /// Image-memory budget scaled to the host's RAM. A fixed cap thrashed on
+    /// high-res scan series (a single 2000×3000 page ≈ 24 MB, so a 150 MB cap
+    /// held only ~6 pages — tighter than preload + spread want), while a
+    /// large fixed cap would over-commit on small machines. ~1/16 of physical
+    /// memory, clamped to [150 MB, 1 GB].
+    static func costLimit() -> Int {
+        costLimit(physicalMemory: ProcessInfo.processInfo.physicalMemory)
+    }
+
+    /// Pure clamp policy, split out so the boundaries are unit-testable
+    /// without depending on the host's actual RAM.
+    static func costLimit(physicalMemory: UInt64) -> Int {
+        let target = physicalMemory / 16
+        let clamped = min(max(target, minCostLimit), maxCostLimit)
+        return Int(clamped)
+    }
 
     func image(for page: ComicPage) -> NSImage? {
         cache.object(forKey: page.id as NSString)

@@ -121,22 +121,62 @@ struct ReaderPositionStoreTests {
         #expect(fixture.store.restoredIndex(forKey: bookB, fileIdentityKey: nil) == 88)
     }
 
+    // MARK: - Entry cap / eviction
+
+    @Test func evictsLeastRecentlyWrittenKeysBeyondCap() {
+        let cap = 5
+        let fixture = makeIsolatedStore(maxEntries: cap)
+
+        // Fill exactly to the cap, oldest-written first.
+        for i in 0..<cap {
+            fixture.store.flushImmediately(forKey: "book-\(i)", fileIdentityKey: nil, pageIndex: i)
+        }
+        #expect(fixture.store.cache?.count == cap)
+
+        // Re-touch the oldest so it's now most-recently-used, then overflow.
+        fixture.store.flushImmediately(forKey: "book-0", fileIdentityKey: nil, pageIndex: 999)
+        fixture.store.flushImmediately(forKey: "overflow", fileIdentityKey: nil, pageIndex: 1)
+
+        let dict = try! #require(fixture.store.cache)
+        #expect(dict.count == cap)            // cap is held
+        #expect(dict["overflow"] == 1)        // newest entry survives
+        #expect(dict["book-0"] == 999)        // recently re-touched entry survives
+        #expect(dict["book-1"] == nil)        // least-recently-used was evicted
+    }
+
+    @Test func evictionSurvivesRelaunchViaPersistedOrder() {
+        let cap = 3
+        let fixture = makeIsolatedStore(maxEntries: cap)
+        fixture.store.flushImmediately(forKey: "a", fileIdentityKey: nil, pageIndex: 1)
+        fixture.store.flushImmediately(forKey: "b", fileIdentityKey: nil, pageIndex: 2)
+        fixture.store.flushImmediately(forKey: "c", fileIdentityKey: nil, pageIndex: 3)
+
+        // A fresh store reads the persisted dict + order, then overflows. The
+        // MRU order must come back from defaults so "a" (oldest) is evicted.
+        let reloaded = fixture.reloadedStore(maxEntries: cap)
+        reloaded.flushImmediately(forKey: "d", fileIdentityKey: nil, pageIndex: 4)
+
+        #expect(reloaded.restoredIndex(forKey: "a", fileIdentityKey: nil) == 0)  // evicted
+        #expect(reloaded.restoredIndex(forKey: "d", fileIdentityKey: nil) == 4)
+        #expect(reloaded.cache?.count == cap)
+    }
+
     private struct IsolatedStore {
         let store: ReaderPositionStore
         let defaults: InMemoryKeyValueStore
         let positionsKey: String
 
         @MainActor
-        func reloadedStore() -> ReaderPositionStore {
-            ReaderPositionStore(defaults: defaults, positionsKey: positionsKey)
+        func reloadedStore(maxEntries: Int = ReaderPositionStore.maxEntries) -> ReaderPositionStore {
+            ReaderPositionStore(defaults: defaults, positionsKey: positionsKey, maxEntries: maxEntries)
         }
     }
 
-    private func makeIsolatedStore() -> IsolatedStore {
+    private func makeIsolatedStore(maxEntries: Int = ReaderPositionStore.maxEntries) -> IsolatedStore {
         let defaults = InMemoryKeyValueStore()
         let positionsKey = "positions-\(UUID().uuidString)"
         return IsolatedStore(
-            store: ReaderPositionStore(defaults: defaults, positionsKey: positionsKey),
+            store: ReaderPositionStore(defaults: defaults, positionsKey: positionsKey, maxEntries: maxEntries),
             defaults: defaults,
             positionsKey: positionsKey
         )

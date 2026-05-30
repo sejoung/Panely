@@ -9,21 +9,38 @@ import Foundation
 final class ReaderPositionStore {
     nonisolated static let positionsKey = "panely.positions"
 
+    /// Cap on tracked position entries. Each is tiny (a key string plus an
+    /// Int), but without a cap the dict grows by one or two entries for every
+    /// unique book ever opened and is never trimmed — over a long reading
+    /// history that bloats every `UserDefaults` round-trip. When exceeded,
+    /// the least-recently-written keys are evicted using a persisted MRU
+    /// order list so a book the user still reads keeps its position even
+    /// across launches. ~4000 entries ≈ a couple hundred KB.
+    nonisolated static let maxEntries = 4000
+
     /// In-memory mirror of the positions dict. Module-internal (not private)
     /// so tests can assert the lazy-hydration invariant — production code
     /// must go through `savePosition` / `restoredIndex` to keep the dict and
     /// the UserDefaults write paired.
     var cache: [String: Int]?
+    /// MRU order mirror (most-recently-written key first). Persisted under
+    /// `orderKey` so eviction survives relaunch.
+    private var orderCache: [String]?
     private var pendingSaveTask: Task<Void, Never>?
     private let defaults: any KeyValueStoring
     private let positionsKey: String
+    private let orderKey: String
+    private let maxEntries: Int
 
     init(
         defaults: any KeyValueStoring = LiveKeyValueStore(),
-        positionsKey: String = ReaderPositionStore.positionsKey
+        positionsKey: String = ReaderPositionStore.positionsKey,
+        maxEntries: Int = ReaderPositionStore.maxEntries
     ) {
         self.defaults = defaults
         self.positionsKey = positionsKey
+        self.orderKey = positionsKey + ".order"
+        self.maxEntries = maxEntries
     }
 
     /// Schedule a debounced write. Rapid repeat calls coalesce into a single
@@ -96,12 +113,41 @@ final class ReaderPositionStore {
 
     private func writeNow(key: String, fileIdentityKey: String?, pageIndex: Int) {
         var dict = loaded()
+        var order = loadedOrder(dict: dict)
+
         dict[key] = pageIndex
         if let fid = fileIdentityKey {
             dict[fid] = pageIndex
         }
+
+        // Promote the touched keys to the front (most-recently-used).
+        let touched = [key, fileIdentityKey].compactMap { $0 }
+        order.removeAll { touched.contains($0) }
+        order.insert(contentsOf: touched, at: 0)
+
+        evictIfNeeded(dict: &dict, order: &order)
+
         cache = dict
+        orderCache = order
         defaults.set(dict, forKey: positionsKey)
+        defaults.set(order, forKey: orderKey)
+    }
+
+    /// Drop least-recently-written entries until the dict is back under the
+    /// cap. `order` is MRU-first, so the eviction candidates are at its tail.
+    private func evictIfNeeded(dict: inout [String: Int], order: inout [String]) {
+        guard dict.count > maxEntries else { return }
+        while dict.count > maxEntries, let stale = order.popLast() {
+            dict.removeValue(forKey: stale)
+        }
+        // Defensive: if the order list somehow under-counts the dict (it
+        // shouldn't — `loadedOrder` seeds every dict key), drop arbitrary
+        // extras so the cap is always honored.
+        if dict.count > maxEntries {
+            for extra in dict.keys.shuffled().prefix(dict.count - maxEntries) {
+                dict.removeValue(forKey: extra)
+            }
+        }
     }
 
     /// Lazy hydration. First call pays one UserDefaults syscall; subsequent
@@ -112,5 +158,22 @@ final class ReaderPositionStore {
         let loaded = defaults.dictionary(forKey: positionsKey) as? [String: Int] ?? [:]
         cache = loaded
         return loaded
+    }
+
+    /// MRU order, reconciled against `dict`: any dict key without a recorded
+    /// position in the order list (entries that predate order tracking, or a
+    /// direct defaults write) is appended so it's still an eviction candidate
+    /// but ranks below anything explicitly touched; stale order entries no
+    /// longer in the dict are dropped.
+    private func loadedOrder(dict: [String: Int]) -> [String] {
+        var order = orderCache ?? (defaults.array(forKey: orderKey) as? [String] ?? [])
+        let known = Set(order)
+        let missing = dict.keys.filter { !known.contains($0) }
+        if !missing.isEmpty {
+            order.append(contentsOf: missing)
+        }
+        order.removeAll { dict[$0] == nil }
+        orderCache = order
+        return order
     }
 }

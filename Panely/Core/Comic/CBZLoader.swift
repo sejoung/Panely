@@ -71,12 +71,18 @@ nonisolated enum CBZLoader {
                     withIntermediateDirectories: true
                 )
                 try fm.unzipItem(at: url, to: destination)
-                try ensureSizeUnderLimit(at: destination, limit: limit)
+                // Running cumulative byte count, threaded through the nested
+                // descent so each step only sums the bytes it just added
+                // instead of re-walking the whole growing tree (O(n) overall
+                // rather than O(n²) on archives with many nested archives).
+                var totalBytes = directorySize(at: destination)
+                try checkLimit(totalBytes, limit: limit, cleanup: destination)
                 try extractNestedArchives(
                     in: destination,
                     root: destination,
                     depth: 0,
-                    maxExtractedBytes: limit
+                    maxExtractedBytes: limit,
+                    totalBytes: &totalBytes
                 )
             } catch {
                 try? fm.removeItem(at: destination)
@@ -91,7 +97,8 @@ nonisolated enum CBZLoader {
         in directory: URL,
         root: URL,
         depth: Int,
-        maxExtractedBytes limit: UInt64
+        maxExtractedBytes limit: UInt64,
+        totalBytes: inout UInt64
     ) throws {
         guard depth < maxNestingDepth else { return }
 
@@ -109,7 +116,8 @@ nonisolated enum CBZLoader {
                     in: entry,
                     root: root,
                     depth: depth + 1,
-                    maxExtractedBytes: limit
+                    maxExtractedBytes: limit,
+                    totalBytes: &totalBytes
                 )
                 continue
             }
@@ -118,50 +126,60 @@ nonisolated enum CBZLoader {
             guard supportedExtensions.contains(ext) else { continue }
 
             let destDir = entry.deletingPathExtension()
+            let archiveBytes = fileSize(at: entry)
             try FileManager.default.createDirectory(at: destDir, withIntermediateDirectories: true)
             try FileManager.default.unzipItem(at: entry, to: destDir)
             try FileManager.default.removeItem(at: entry)
-            try ensureSizeUnderLimit(at: root, limit: limit)
+            // Net change to the running total: drop the now-removed archive
+            // file, add the bytes it expanded into. Only the new folder is
+            // walked — never the whole root.
+            totalBytes = totalBytes >= archiveBytes ? totalBytes - archiveBytes : 0
+            totalBytes &+= directorySize(at: destDir)
+            try checkLimit(totalBytes, limit: limit, cleanup: root)
             try extractNestedArchives(
                 in: destDir,
                 root: root,
                 depth: depth + 1,
-                maxExtractedBytes: limit
+                maxExtractedBytes: limit,
+                totalBytes: &totalBytes
             )
         }
     }
 
-    /// Walk the just-extracted tree once and abort if the cumulative file
-    /// size crosses `maxExtractedBytes`. ZIPFoundation has no streaming
-    /// callback for this in `unzipItem`, so we check post-hoc — fine for
-    /// the safety-net role (catches the pathological case; legitimate
-    /// large archives are still allowed up to the cap).
-    private static func ensureSizeUnderLimit(at directory: URL, limit: UInt64) throws {
-        let fm = FileManager.default
-        guard let enumerator = fm.enumerator(
+    /// Abort (and clean up) if the cumulative extracted byte count has crossed
+    /// `maxExtractedBytes`. ZIPFoundation has no streaming size callback in
+    /// `unzipItem`, so this is checked after each extraction step — fine for
+    /// the safety-net role (catches zip-bombs; legitimate large archives are
+    /// still allowed up to the cap).
+    private static func checkLimit(_ total: UInt64, limit: UInt64, cleanup: URL) throws {
+        guard total > limit else { return }
+        // Clean up partial extraction so the caller's temp dir doesn't leak.
+        // extractAll/load already removes on error too.
+        try? FileManager.default.removeItem(at: cleanup)
+        throw LoadError.extractedSizeExceeded(limit: limit)
+    }
+
+    /// Sum the on-disk size of every file under `directory`. Overflow-safe
+    /// (`&+`); missing/unreadable sizes count as 0.
+    private static func directorySize(at directory: URL) -> UInt64 {
+        guard let enumerator = FileManager.default.enumerator(
             at: directory,
             includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .fileSizeKey],
             options: [.skipsHiddenFiles]
-        ) else { return }
+        ) else { return 0 }
 
         var total: UInt64 = 0
         for case let url as URL in enumerator {
-            let values = try? url.resourceValues(forKeys: [
-                .totalFileAllocatedSizeKey,
-                .fileSizeKey,
-            ])
-            let size = UInt64(values?.totalFileAllocatedSize ?? values?.fileSize ?? 0)
-            // Overflow-safe and order-independent: `limit - total` would
-            // underflow (wrap huge) if a single entry's `size` pushed the
-            // running total past `limit`, so compute the headroom defensively.
-            let remaining = limit >= total ? limit - total : 0
-            if size > remaining {
-                // Clean up partial extraction so the caller's temp dir
-                // doesn't leak. extractAll/load already removes on error.
-                try? fm.removeItem(at: directory)
-                throw LoadError.extractedSizeExceeded(limit: limit)
-            }
-            total += size
+            total &+= fileSize(at: url)
         }
+        return total
+    }
+
+    private static func fileSize(at url: URL) -> UInt64 {
+        let values = try? url.resourceValues(forKeys: [
+            .totalFileAllocatedSizeKey,
+            .fileSizeKey,
+        ])
+        return UInt64(values?.totalFileAllocatedSize ?? values?.fileSize ?? 0)
     }
 }
