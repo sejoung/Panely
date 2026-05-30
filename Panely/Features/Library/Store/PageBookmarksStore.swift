@@ -108,15 +108,8 @@ final class PageBookmarksStore {
     /// entries whose most-recent bookmark is oldest — i.e. the least recently
     /// touched books.
     private func pruneToBookEntryCap() {
-        guard pageBookmarksByBook.count > Self.maxBookEntries else { return }
-        let overflow = pageBookmarksByBook.count - Self.maxBookEntries
-        let staleKeys = pageBookmarksByBook
-            .map { (key: $0.key, mostRecent: $0.value.map(\.createdAt).max() ?? .distantPast) }
-            .sorted { $0.mostRecent < $1.mostRecent }
-            .prefix(overflow)
-            .map { $0.key }
-        for key in staleKeys {
-            pageBookmarksByBook.removeValue(forKey: key)
+        pageBookmarksByBook.capByRecency(to: Self.maxBookEntries) {
+            $0.map(\.createdAt).max() ?? .distantPast
         }
     }
 

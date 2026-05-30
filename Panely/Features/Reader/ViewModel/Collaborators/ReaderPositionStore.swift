@@ -26,7 +26,7 @@ final class ReaderPositionStore {
     /// MRU order mirror (most-recently-written key first). Persisted under
     /// `orderKey` so eviction survives relaunch.
     private var orderCache: [String]?
-    private var pendingSaveTask: Task<Void, Never>?
+    private let saveDebouncer = Debouncer()
     private let defaults: any KeyValueStoring
     private let positionsKey: String
     private let orderKey: String
@@ -48,10 +48,7 @@ final class ReaderPositionStore {
     /// (when available) is mirrored alongside the primary key so external-
     /// drive mount-path drifts ("/Volumes/X" → "/Volumes/X 1") still recover.
     func savePosition(forKey key: String, fileIdentityKey: String?, pageIndex: Int) {
-        pendingSaveTask?.cancel()
-        pendingSaveTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled else { return }
+        saveDebouncer.schedule { [weak self] in
             self?.writeNow(key: key, fileIdentityKey: fileIdentityKey, pageIndex: pageIndex)
         }
     }
@@ -59,8 +56,7 @@ final class ReaderPositionStore {
     /// Synchronous flush. Used by the app-terminate observer and by the
     /// debounced path after its sleep expires.
     func flushImmediately(forKey key: String, fileIdentityKey: String?, pageIndex: Int) {
-        pendingSaveTask?.cancel()
-        pendingSaveTask = nil
+        saveDebouncer.cancel()
         writeNow(key: key, fileIdentityKey: fileIdentityKey, pageIndex: pageIndex)
     }
 

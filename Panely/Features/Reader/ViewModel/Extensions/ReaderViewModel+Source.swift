@@ -298,42 +298,37 @@ extension ReaderViewModel {
     /// `currentPageIndex` didSet, so this fires once per page change — even
     /// during 60 Hz vertical scroll the store coalesces into a single write.
     func savePosition() {
-        guard let url = currentSourceURL else { return }
-        positions.savePosition(
-            for: url,
-            opened: openedSourceURL,
-            tempRoot: tempDir.url,
-            pageIndex: currentPageIndex
-        )
-        guard totalPages > 0 else { return }
-        readingProgress.record(
-            for: url,
-            opened: openedSourceURL,
-            tempRoot: tempDir.url,
-            page: currentPageIndex,
-            total: totalPages,
-            finished: currentPageIndex + navigationStep >= totalPages
-        )
+        persistPosition(immediate: false)
     }
 
     /// Synchronous flush used by the app-terminate observer.
     func flushPositionImmediately() {
+        persistPosition(immediate: true)
+    }
+
+    /// Writes the current page to both the position store (exact restore) and
+    /// the reading-progress store (badges / Continue Reading). `immediate`
+    /// picks the synchronous flush over the debounced save — the only thing
+    /// that differs between the two entry points above.
+    private func persistPosition(immediate: Bool) {
         guard let url = currentSourceURL else { return }
-        positions.flushImmediately(
-            for: url,
-            opened: openedSourceURL,
-            tempRoot: tempDir.url,
-            pageIndex: currentPageIndex
-        )
+        let opened = openedSourceURL
+        let tempRoot = tempDir.url
+        let page = currentPageIndex
+
+        if immediate {
+            positions.flushImmediately(for: url, opened: opened, tempRoot: tempRoot, pageIndex: page)
+        } else {
+            positions.savePosition(for: url, opened: opened, tempRoot: tempRoot, pageIndex: page)
+        }
+
         guard totalPages > 0 else { return }
-        readingProgress.flushImmediately(
-            for: url,
-            opened: openedSourceURL,
-            tempRoot: tempDir.url,
-            page: currentPageIndex,
-            total: totalPages,
-            finished: currentPageIndex + navigationStep >= totalPages
-        )
+        let finished = page + navigationStep >= totalPages
+        if immediate {
+            readingProgress.flushImmediately(for: url, opened: opened, tempRoot: tempRoot, page: page, total: totalPages, finished: finished)
+        } else {
+            readingProgress.record(for: url, opened: opened, tempRoot: tempRoot, page: page, total: totalPages, finished: finished)
+        }
     }
 
     func restoredIndex(for url: URL) -> Int {

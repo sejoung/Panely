@@ -388,6 +388,7 @@ Panely/
 │   │   └── DiagnosticLogStore.swift    # rolling recent-log.txt 캐시 파일
 │   ├── SourceChangeMonitor.swift       # DispatchSource 기반 다중 URL 파일/폴더 감시 (세션 가드)
 │   ├── LibraryDirectoryWatcher.swift   # 라이브러리 루트 재귀 FSEvents 감시 → 사이드바 트리 자동 갱신
+│   ├── Debouncer.swift                 # 공용 트레일링 디바운스 헬퍼 (위치/진행도 저장)
 │   └── Extensions/                     # 공유 Foundation helper
 ├── DesignSystem/
 │   ├── Tokens/                         # Color / Spacing / Typography / Motion

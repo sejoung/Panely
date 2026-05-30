@@ -418,6 +418,7 @@ Panely/
 │   │   └── DiagnosticLogStore.swift    # rolling recent-log.txt cache file
 │   ├── SourceChangeMonitor.swift       # DispatchSource-backed multi-URL file/folder watcher (session-guarded)
 │   ├── LibraryDirectoryWatcher.swift   # FSEvents recursive watch on the library root → auto-refresh the sidebar tree
+│   ├── Debouncer.swift                 # shared trailing-debounce helper (position / progress saves)
 │   └── Extensions/                     # shared Foundation helpers
 ├── DesignSystem/
 │   ├── Tokens/                         # Color / Spacing / Typography / Motion

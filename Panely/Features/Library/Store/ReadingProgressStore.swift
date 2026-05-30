@@ -19,7 +19,7 @@ final class ReadingProgressStore {
     /// as soon as progress changes.
     private(set) var entries: [String: ReadingProgress] = [:]
 
-    private var pendingSaveTask: Task<Void, Never>?
+    private let saveDebouncer = Debouncer()
     private let defaults: any KeyValueStoring
     private let storeKey: String
     private let maxEntries: Int
@@ -59,17 +59,13 @@ final class ReadingProgressStore {
     /// Debounced write. Rapid repeat calls coalesce into one round-trip after
     /// ~300 ms of quiet (matches `ReaderPositionStore`).
     func record(forKey key: String, fileIdentityKey: String?, page: Int, total: Int, finished: Bool) {
-        pendingSaveTask?.cancel()
-        pendingSaveTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled else { return }
+        saveDebouncer.schedule { [weak self] in
             self?.writeNow(key: key, fileIdentityKey: fileIdentityKey, page: page, total: total, finished: finished)
         }
     }
 
     func flushImmediately(forKey key: String, fileIdentityKey: String?, page: Int, total: Int, finished: Bool) {
-        pendingSaveTask?.cancel()
-        pendingSaveTask = nil
+        saveDebouncer.cancel()
         writeNow(key: key, fileIdentityKey: fileIdentityKey, page: page, total: total, finished: finished)
     }
 
@@ -99,14 +95,6 @@ final class ReadingProgressStore {
 
     /// Drop the least-recently-updated entries until back under the cap.
     private func evictIfNeeded(_ dict: inout [String: ReadingProgress]) {
-        guard dict.count > maxEntries else { return }
-        let overflow = dict.count - maxEntries
-        let stale = dict
-            .sorted { $0.value.updatedAt < $1.value.updatedAt }
-            .prefix(overflow)
-            .map(\.key)
-        for key in stale {
-            dict.removeValue(forKey: key)
-        }
+        dict.capByRecency(to: maxEntries) { $0.updatedAt }
     }
 }
