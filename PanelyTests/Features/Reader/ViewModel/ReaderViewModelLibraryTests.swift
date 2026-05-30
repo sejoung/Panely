@@ -79,6 +79,54 @@ struct ReaderViewModelLibraryTests {
         #expect(watcher?.watchedRoot?.standardizedFileURL == dir.standardizedFileURL)
     }
 
+    // MARK: - Last library root (auto-restore)
+
+    @Test func establishingLibraryRootPersistsItForNextLaunch() throws {
+        let vm = makeTestViewModel()
+        let dir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        vm.explicitLibraryRootURL = dir
+        vm.libraryScope.url = dir
+
+        vm.syncLibraryWatcher()
+
+        // Settling on a scoped library directory records it for restore.
+        #expect(vm.lastLibraryRoot.restore()?.standardizedFileURL.path == dir.standardizedFileURL.path)
+    }
+
+    @Test func restoreSkipsWhenABookIsAlreadyOpen() {
+        let vm = makeTestViewModel()
+        vm.lastLibraryRoot.save(URL(fileURLWithPath: "/lib", isDirectory: true))
+        // Launched with a file (or already loaded one): don't override it.
+        vm.currentSourceURL = URL(fileURLWithPath: "/lib/book.cbz")
+
+        vm.restoreLastLibraryRootIfNeeded()
+
+        #expect(vm.explicitLibraryRootURL == nil)
+    }
+
+    @Test func restoreDoesNothingWhenNothingPersisted() {
+        let vm = makeTestViewModel()
+
+        vm.restoreLastLibraryRootIfNeeded()
+
+        #expect(vm.explicitLibraryRootURL == nil)
+        #expect(vm.libraryDirectoryWatcher == nil)
+    }
+
+    @Test func restoreBailsWhenLibraryScopeCannotBeAcquired() {
+        // The persisted folder is gone, so even though a URL is produced the
+        // security-scope grant fails. Restore must leave the app with no root
+        // (and no watcher) rather than half-applying a dead library.
+        let vm = makeTestViewModel()
+        vm.lastLibraryRoot.save(URL(fileURLWithPath: "/nonexistent-\(UUID())", isDirectory: true))
+
+        vm.restoreLastLibraryRootIfNeeded()
+
+        #expect(vm.explicitLibraryRootURL == nil)
+        #expect(vm.libraryDirectoryWatcher == nil)
+    }
+
     @Test func stopLibraryWatcherTearsDownAndClears() throws {
         let vm = makeTestViewModel()
         let dir = try Fixture.makeTempDir()

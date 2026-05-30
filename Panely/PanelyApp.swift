@@ -19,6 +19,11 @@ struct PanelyApp: App {
                 // would require duplicating every token and is not on the
                 // roadmap; see README.
                 .preferredColorScheme(.dark)
+                .task {
+                    // Reopen the last browsed library folder on cold launch.
+                    // No-op if launched with a file (onOpenURL) or mid-load.
+                    viewModel.restoreLastLibraryRootIfNeeded()
+                }
                 .onOpenURL { url in
                     AppLog.info(
                         .app,

@@ -156,6 +156,10 @@ pages.
 - **Volume navigation** between sibling books in the same folder
 - **Recent items** — persistent across launches via security-scoped bookmarks,
   shown with the same icon scheme
+- **Reopens last library on launch** — the folder you were browsing is
+  restored automatically (security-scoped bookmark), so a cold start lands
+  in your library instead of an empty sidebar. Launching with a file (Open
+  With) takes precedence and skips the restore
 - **Folder access grant** — when a single file is opened and siblings aren't
   visible, the sidebar offers a one-click prompt to pick the enclosing folder
 - **Window controls** — with the title bar hidden, the top 28 px strip still
@@ -497,7 +501,8 @@ Panely/
 │       │   ├── FavoritesStore.swift            # starred books (security-scoped, stale auto-refresh)
 │       │   ├── PageBookmarksStore.swift        # per-book pages with per-book + total caps
 │       │   ├── RecentItemsStore.swift          # bookmark dedup on repeat opens
-│       │   └── ReadingProgressStore.swift      # per-book progress (debounced, recency-capped) → badges + Continue Reading
+│       │   ├── ReadingProgressStore.swift      # per-book progress (debounced, recency-capped) → badges + Continue Reading
+│       │   └── LastLibraryRootStore.swift       # security-scoped bookmark of the last library root → reopen on launch
 │       └── Rows/                       # sidebar row views (one struct per file)
 │           ├── FileNodeRow.swift
 │           ├── FavoriteRow.swift

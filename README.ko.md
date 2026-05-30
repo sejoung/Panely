@@ -141,6 +141,10 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
 - 같은 폴더의 형제 책 간 **볼륨 네비게이션**
 - **최근 항목** — security-scoped bookmark로 실행 간 유지, 동일한
   아이콘 스킴으로 표시
+- **실행 시 마지막 라이브러리 자동 복원** — 마지막에 보던 폴더를
+  자동으로 다시 열어(security-scoped bookmark) 콜드 스타트가 빈 사이드바가
+  아니라 내 라이브러리에서 시작됨. 파일로 실행(Open With)한 경우엔 그쪽이
+  우선이라 복원을 건너뜀
 - **폴더 접근 허용** — 단일 파일을 열었고 형제 책들이 안 보일 때,
   사이드바에서 상위 폴더를 고를 수 있는 원클릭 프롬프트 제공
 - **창 컨트롤** — 타이틀바가 숨겨진 상태에서도 상단 28 px 스트립에서
@@ -467,7 +471,8 @@ Panely/
 │       │   ├── FavoritesStore.swift            # 즐겨찾은 책 (security-scoped, stale 자동 갱신)
 │       │   ├── PageBookmarksStore.swift        # 책당 + 총 책 상한이 적용된 페이지 북마크
 │       │   ├── RecentItemsStore.swift          # 재열기 시 북마크 중복 제거
-│       │   └── ReadingProgressStore.swift      # 책당 진행도 (디바운스, 최근성 상한) → 배지 + 이어보기
+│       │   ├── ReadingProgressStore.swift      # 책당 진행도 (디바운스, 최근성 상한) → 배지 + 이어보기
+│       │   └── LastLibraryRootStore.swift       # 마지막 라이브러리 루트 security-scoped 북마크 → 실행 시 복원
 │       └── Rows/                       # 사이드바 row 뷰 (파일당 struct 하나)
 │           ├── FileNodeRow.swift
 │           ├── FavoriteRow.swift

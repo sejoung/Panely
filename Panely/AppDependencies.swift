@@ -16,6 +16,7 @@ nonisolated struct AppDependencies {
     let makeReaderPreferences: @MainActor () -> ReaderPreferences
     let makeReaderPositions: @MainActor () -> ReaderPositionStore
     let makeReadingProgress: @MainActor () -> ReadingProgressStore
+    let makeLastLibraryRoot: @MainActor () -> LastLibraryRootStore
     let makeReaderTempDirectory: @MainActor () -> ReaderTempDirectory
 
     static let live: AppDependencies = {
@@ -32,6 +33,7 @@ nonisolated struct AppDependencies {
             makeReaderPreferences: { ReaderPreferences(defaults: keyValueStore) },
             makeReaderPositions: { ReaderPositionStore(defaults: keyValueStore) },
             makeReadingProgress: { ReadingProgressStore(defaults: keyValueStore) },
+            makeLastLibraryRoot: { LastLibraryRootStore(defaults: keyValueStore) },
             makeReaderTempDirectory: { ReaderTempDirectory(extractionCache: extractionCache) }
         )
     }()

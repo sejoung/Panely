@@ -234,6 +234,7 @@ func makeTestDependencies(
         makeReaderPreferences: { ReaderPreferences(defaults: keyValueStore) },
         makeReaderPositions: { ReaderPositionStore(defaults: keyValueStore) },
         makeReadingProgress: { ReadingProgressStore(defaults: keyValueStore) },
+        makeLastLibraryRoot: { LastLibraryRootStore(bookmarks: bookmarkResolver, defaults: keyValueStore) },
         makeReaderTempDirectory: { ReaderTempDirectory(extractionCache: extractionCache) }
     )
 }

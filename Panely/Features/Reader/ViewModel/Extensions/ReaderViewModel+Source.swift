@@ -218,6 +218,36 @@ extension ReaderViewModel {
         watcher.startWatching(root: root) { [weak self] in
             self?.refreshLibraryTree()
         }
+
+        // Remember this root so the next launch reopens it instead of starting
+        // empty. Runs here because this is the one place a readable, scoped
+        // library directory settles (open, folder-pick, and launch-restore all
+        // funnel through here).
+        lastLibraryRoot.save(root)
+    }
+
+    /// On a cold launch with nothing opened, reopen the last browsed library
+    /// folder so the user doesn't have to pick it every session. Never clobbers
+    /// a file the app was launched with (Open With / `onOpenURL`) or an
+    /// in-flight load — those set a source/loading flag the guards bail on.
+    func restoreLastLibraryRootIfNeeded() {
+        guard libraryRootURL == nil,
+              currentSourceURL == nil,
+              pendingSourceURL == nil,
+              openedSourceURL == nil,
+              !isLoading,
+              let url = lastLibraryRoot.restore(),
+              libraryScope.acquire(url)
+        else { return }
+
+        explicitLibraryRootURL = url
+        libraryRefreshToken = UUID()
+        syncLibraryWatcher()
+        AppLog.info(
+            .library,
+            "Restored last library root",
+            metadata: ["source": "\(DiagnosticRedactor.describe(url))"]
+        )
     }
 
     func stopLibraryWatcher() {
