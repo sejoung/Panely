@@ -13,6 +13,7 @@ struct LibrarySidebarActions {
     var onOpen: () -> Void = {}
     var onTogglePin: () -> Void = {}
     var onRefresh: () -> Void = {}
+    var onContinueReading: () -> Void = {}
     var onRequestFolderAccess: () -> Void = {}
 }
 
@@ -26,6 +27,9 @@ struct LibrarySidebar: View {
     let volumes: [URL]
     let libraryTreeLoader: any LibraryTreeLoading
     let currentPageIndex: Int
+    var readingBadge: (URL) -> ReadingBadge? = { _ in nil }
+    var continueReadingTitle: String? = nil
+    var continueReadingFraction: Double = 0
     let actions: LibrarySidebarActions
 
     @State private var model = LibrarySidebarModel()
@@ -102,6 +106,7 @@ struct LibrarySidebar: View {
         // redundant evaluations across Volumes + Files sections.
         let activeStdURL = activeURL?.standardizedFileURL
         return List {
+            continueReadingSection()
             volumesSection(activeStdURL: activeStdURL)
             favoritesSection(activeStdURL: activeStdURL)
             bookmarksSection
@@ -112,6 +117,31 @@ struct LibrarySidebar: View {
     }
 
     @ViewBuilder
+    private func continueReadingSection() -> some View {
+        if let title = continueReadingTitle {
+            Section(header: sectionHeader("Continue Reading", systemImage: "book.fill")) {
+                Button(action: actions.onContinueReading) {
+                    HStack(spacing: PanelySpacing.sm) {
+                        Image(systemName: "book.fill")
+                            .foregroundStyle(PanelyColor.accentPrimary)
+                            .frame(width: 16)
+                        Text(title)
+                            .font(PanelyTypography.body)
+                            .foregroundStyle(PanelyColor.textPrimary)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                        ReadingBadgeView(badge: .inProgress(fraction: continueReadingFraction))
+                    }
+                    .contentShape(Rectangle())
+                    .padding(.vertical, 2)
+                }
+                .buttonStyle(.plain)
+                .listRowBackground(Color.clear)
+            }
+        }
+    }
+
+    @ViewBuilder
     private func volumesSection(activeStdURL: URL?) -> some View {
         if volumes.count > 1 {
             Section(header: sectionHeader("Volumes", systemImage: "books.vertical.fill")) {
@@ -119,6 +149,7 @@ struct LibrarySidebar: View {
                     VolumeRow(
                         url: url,
                         isActive: activeStdURL == url.standardizedFileURL,
+                        badge: readingBadge(url),
                         onTap: { actions.onSelectVolume(url) }
                     )
                     .listRowBackground(Color.clear)
@@ -170,6 +201,7 @@ struct LibrarySidebar: View {
                         node: node,
                         activeStdURL: activeStdURL,
                         expandedNodeIDs: $model.expandedNodeIDs,
+                        readingBadge: readingBadge,
                         onSelect: actions.onSelect
                     )
                     .listRowBackground(Color.clear)
@@ -252,6 +284,7 @@ private struct FileTreeNodeRow: View {
     let node: FileNode
     let activeStdURL: URL?
     @Binding var expandedNodeIDs: Set<URL>
+    let readingBadge: (URL) -> ReadingBadge?
     let onSelect: (URL) -> Void
 
     var body: some View {
@@ -262,6 +295,7 @@ private struct FileTreeNodeRow: View {
                         node: child,
                         activeStdURL: activeStdURL,
                         expandedNodeIDs: $expandedNodeIDs,
+                        readingBadge: readingBadge,
                         onSelect: onSelect
                     )
                 }
@@ -277,6 +311,7 @@ private struct FileTreeNodeRow: View {
         FileNodeRow(
             node: node,
             isActive: activeStdURL == node.url.standardizedFileURL,
+            badge: readingBadge(node.url),
             onTap: { onSelect(node.url) }
         )
     }

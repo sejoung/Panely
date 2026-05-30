@@ -3,6 +3,7 @@ import SwiftUI
 struct FileNodeRow: View {
     let node: FileNode
     let isActive: Bool
+    var badge: ReadingBadge? = nil
     let onTap: () -> Void
 
     var body: some View {
@@ -21,6 +22,9 @@ struct FileNodeRow: View {
                         .foregroundStyle(PanelyColor.textSecondary.opacity(0.6))
                 }
                 Spacer(minLength: 0)
+                if let badge {
+                    ReadingBadgeView(badge: badge)
+                }
             }
             .contentShape(Rectangle())
             .padding(.vertical, 2)

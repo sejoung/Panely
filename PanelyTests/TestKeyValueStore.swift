@@ -233,6 +233,7 @@ func makeTestDependencies(
         libraryDirectoryWatcherFactory: libraryDirectoryWatcherFactory,
         makeReaderPreferences: { ReaderPreferences(defaults: keyValueStore) },
         makeReaderPositions: { ReaderPositionStore(defaults: keyValueStore) },
+        makeReadingProgress: { ReadingProgressStore(defaults: keyValueStore) },
         makeReaderTempDirectory: { ReaderTempDirectory(extractionCache: extractionCache) }
     )
 }

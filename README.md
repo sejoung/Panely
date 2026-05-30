@@ -143,6 +143,13 @@ pages.
   open. A **refresh button** in the sidebar header forces a re-scan on
   demand: the fallback for network volumes, where FSEvents can't deliver
   change events
+- **Reading progress** — each tracked book shows a sidebar badge: a progress
+  ring while in progress, a check once finished, computed from a persisted
+  `{page, total, finished}` record (separate from the exact-restore position
+  store). A **Continue Reading** row at the top jumps straight back into the
+  most recently read in-progress book. Progress accrues from the moment a
+  book is opened, so it fills in as you read — books last opened before this
+  shipped show a generic "reading" mark until reopened
 - **Vertical-mode page navigation** — `← → Space` scroll to the previous /
   next image in the strip (working from the page currently centered in
   the viewport, not the last one keyboard-navigated)
@@ -484,11 +491,13 @@ Panely/
 │       │   ├── FileNode.swift          # iconName + fileExtension + parallel top-level scan
 │       │   ├── RecentItem.swift        # security-scoped recent entry
 │       │   ├── FavoriteBook.swift      # persistent favorite (security-scoped bookmark)
-│       │   └── PageBookmark.swift      # persistent per-page bookmark
+│       │   ├── PageBookmark.swift      # persistent per-page bookmark
+│       │   └── ReadingProgress.swift   # persisted {page,total,finished} + ReadingBadge
 │       ├── Store/
 │       │   ├── FavoritesStore.swift            # starred books (security-scoped, stale auto-refresh)
 │       │   ├── PageBookmarksStore.swift        # per-book pages with per-book + total caps
-│       │   └── RecentItemsStore.swift          # bookmark dedup on repeat opens
+│       │   ├── RecentItemsStore.swift          # bookmark dedup on repeat opens
+│       │   └── ReadingProgressStore.swift      # per-book progress (debounced, recency-capped) → badges + Continue Reading
 │       └── Rows/                       # sidebar row views (one struct per file)
 │           ├── FileNodeRow.swift
 │           ├── FavoriteRow.swift

@@ -3,14 +3,16 @@ import SwiftUI
 struct VolumeRow: View {
     let url: URL
     let isActive: Bool
+    let badge: ReadingBadge?
     let onTap: () -> Void
 
     private let iconName: String
     private let displayName: String
 
-    init(url: URL, isActive: Bool, onTap: @escaping () -> Void) {
+    init(url: URL, isActive: Bool, badge: ReadingBadge? = nil, onTap: @escaping () -> Void) {
         self.url = url
         self.isActive = isActive
+        self.badge = badge
         self.onTap = onTap
         // Resolve `isDirectory` once at init instead of on every body
         // evaluation (the previous shape called the resourceValues stat
@@ -31,6 +33,9 @@ struct VolumeRow: View {
                     .foregroundStyle(isActive ? PanelyColor.accentPrimary : PanelyColor.textPrimary)
                     .lineLimit(1)
                 Spacer(minLength: 0)
+                if let badge {
+                    ReadingBadgeView(badge: badge)
+                }
             }
             .contentShape(Rectangle())
             .padding(.vertical, 2)

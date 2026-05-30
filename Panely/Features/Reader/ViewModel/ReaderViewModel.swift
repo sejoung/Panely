@@ -36,6 +36,7 @@ final class ReaderViewModel {
 
     let preferences: ReaderPreferences
     let positions: ReaderPositionStore
+    let readingProgress: ReadingProgressStore
     let imageLoader = ReaderImageLoader()
     let tempDir: ReaderTempDirectory
     let libraryScope = ReaderLibraryScope()
@@ -181,6 +182,7 @@ final class ReaderViewModel {
         self.dependencies = dependencies
         self.preferences = dependencies.makeReaderPreferences()
         self.positions = dependencies.makeReaderPositions()
+        self.readingProgress = dependencies.makeReadingProgress()
         self.tempDir = dependencies.makeReaderTempDirectory()
         self.recentItems = RecentItemsStore(
             bookmarks: dependencies.bookmarkResolver,

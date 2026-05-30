@@ -130,6 +130,11 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   합쳐서 갱신). 갱신은 제자리 diff라 트리가 비거나 접히지 않고 펼쳐둔 폴더도
   유지됨. 사이드바 헤더의 **새로고침 버튼**으로 즉시 재스캔 가능 — FSEvents가
   변경 이벤트를 못 받는 네트워크 볼륨용 폴백
+- **읽기 진행도** — 추적된 책마다 사이드바에 배지 표시: 읽는 중엔 진행 링,
+  완독하면 체크. 영속 `{page, total, finished}` 기록(정확 복원용 위치 저장소와
+  별개)에서 계산. 최상단의 **이어보기** 한 줄로 가장 최근에 읽던 미완독 책으로
+  바로 복귀. 진행도는 책을 여는 순간부터 쌓이므로 읽을수록 채워짐 — 이 기능
+  출시 전에 마지막으로 연 책은 다시 열기 전까지 일반 "읽는 중" 표시만 보임
 - **세로 모드 페이지 네비게이션** — `← → Space`로 스트립에서 이전/다음
   이미지로 스크롤(키보드로 마지막 이동한 위치가 아니라 현재 뷰포트 중앙에
   있는 페이지 기준)
@@ -456,11 +461,13 @@ Panely/
 │       │   ├── FileNode.swift          # iconName + fileExtension + 최상위 병렬 스캔
 │       │   ├── RecentItem.swift        # security-scoped 최근 항목
 │       │   ├── FavoriteBook.swift      # 영속 즐겨찾기 (security-scoped bookmark)
-│       │   └── PageBookmark.swift      # 영속 페이지 북마크
+│       │   ├── PageBookmark.swift      # 영속 페이지 북마크
+│       │   └── ReadingProgress.swift   # 영속 {page,total,finished} + ReadingBadge
 │       ├── Store/
 │       │   ├── FavoritesStore.swift            # 즐겨찾은 책 (security-scoped, stale 자동 갱신)
 │       │   ├── PageBookmarksStore.swift        # 책당 + 총 책 상한이 적용된 페이지 북마크
-│       │   └── RecentItemsStore.swift          # 재열기 시 북마크 중복 제거
+│       │   ├── RecentItemsStore.swift          # 재열기 시 북마크 중복 제거
+│       │   └── ReadingProgressStore.swift      # 책당 진행도 (디바운스, 최근성 상한) → 배지 + 이어보기
 │       └── Rows/                       # 사이드바 row 뷰 (파일당 struct 하나)
 │           ├── FileNodeRow.swift
 │           ├── FavoriteRow.swift

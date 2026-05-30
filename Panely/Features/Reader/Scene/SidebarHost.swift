@@ -9,7 +9,8 @@ struct SidebarHost: View {
     let requestFocus: () -> Void
 
     var body: some View {
-        LibrarySidebar(
+        let suggestion = viewModel.continueReadingSuggestion
+        return LibrarySidebar(
             rootURL: viewModel.libraryRootURL,
             activeURL: viewModel.sidebarActiveURL,
             refreshToken: viewModel.libraryRefreshToken,
@@ -19,6 +20,9 @@ struct SidebarHost: View {
             volumes: viewModel.sidebarVolumes,
             libraryTreeLoader: viewModel.dependencies.libraryTreeLoader,
             currentPageIndex: viewModel.currentPageIndex,
+            readingBadge: { viewModel.readingBadge(for: $0) },
+            continueReadingTitle: suggestion?.title,
+            continueReadingFraction: suggestion?.fraction ?? 0,
             actions: sidebarActions
         )
     }
@@ -56,6 +60,12 @@ struct SidebarHost: View {
             },
             onTogglePin: { viewModel.toggleSidebarPin() },
             onRefresh: { viewModel.refreshLibraryTree() },
+            onContinueReading: {
+                guard let suggestion = viewModel.continueReadingSuggestion else { return }
+                viewModel.openContinueReading(suggestion)
+                viewModel.dismissSidebarOverlay()
+                requestFocus()
+            },
             onRequestFolderAccess: { viewModel.requestFolderAccess() }
         )
     }

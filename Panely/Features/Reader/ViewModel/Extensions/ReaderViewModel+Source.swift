@@ -275,6 +275,15 @@ extension ReaderViewModel {
             tempRoot: tempDir.url,
             pageIndex: currentPageIndex
         )
+        guard totalPages > 0 else { return }
+        readingProgress.record(
+            for: url,
+            opened: openedSourceURL,
+            tempRoot: tempDir.url,
+            page: currentPageIndex,
+            total: totalPages,
+            finished: currentPageIndex + navigationStep >= totalPages
+        )
     }
 
     /// Synchronous flush used by the app-terminate observer.
@@ -285,6 +294,15 @@ extension ReaderViewModel {
             opened: openedSourceURL,
             tempRoot: tempDir.url,
             pageIndex: currentPageIndex
+        )
+        guard totalPages > 0 else { return }
+        readingProgress.flushImmediately(
+            for: url,
+            opened: openedSourceURL,
+            tempRoot: tempDir.url,
+            page: currentPageIndex,
+            total: totalPages,
+            finished: currentPageIndex + navigationStep >= totalPages
         )
     }
 

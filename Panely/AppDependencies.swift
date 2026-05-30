@@ -15,6 +15,7 @@ nonisolated struct AppDependencies {
     // collaborators all see the same persistence layer.
     let makeReaderPreferences: @MainActor () -> ReaderPreferences
     let makeReaderPositions: @MainActor () -> ReaderPositionStore
+    let makeReadingProgress: @MainActor () -> ReadingProgressStore
     let makeReaderTempDirectory: @MainActor () -> ReaderTempDirectory
 
     static let live: AppDependencies = {
@@ -30,6 +31,7 @@ nonisolated struct AppDependencies {
             libraryDirectoryWatcherFactory: { LiveLibraryDirectoryWatcher() },
             makeReaderPreferences: { ReaderPreferences(defaults: keyValueStore) },
             makeReaderPositions: { ReaderPositionStore(defaults: keyValueStore) },
+            makeReadingProgress: { ReadingProgressStore(defaults: keyValueStore) },
             makeReaderTempDirectory: { ReaderTempDirectory(extractionCache: extractionCache) }
         )
     }()
