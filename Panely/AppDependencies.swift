@@ -7,6 +7,7 @@ nonisolated struct AppDependencies {
     let keyValueStore: any KeyValueStoring
     let systemSettings: any SystemSettingsReading
     let sourceChangeMonitorFactory: @MainActor () -> any SourceChangeMonitoring
+    let libraryDirectoryWatcherFactory: @MainActor () -> any LibraryDirectoryWatching
 
     // Reader collaborators are surfaced as factories so tests can swap in
     // doubles without subclassing `ReaderViewModel`. The live implementations
@@ -26,6 +27,7 @@ nonisolated struct AppDependencies {
             keyValueStore: keyValueStore,
             systemSettings: LiveSystemSettings(keyValueStore: keyValueStore),
             sourceChangeMonitorFactory: { SourceChangeMonitor() },
+            libraryDirectoryWatcherFactory: { LiveLibraryDirectoryWatcher() },
             makeReaderPreferences: { ReaderPreferences(defaults: keyValueStore) },
             makeReaderPositions: { ReaderPositionStore(defaults: keyValueStore) },
             makeReaderTempDirectory: { ReaderTempDirectory(extractionCache: extractionCache) }

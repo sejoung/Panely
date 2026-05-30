@@ -190,13 +190,38 @@ final class TestSourceChangeMonitor: SourceChangeMonitoring {
 }
 
 @MainActor
+final class TestLibraryDirectoryWatcher: LibraryDirectoryWatching {
+    private(set) var watchedRoot: URL?
+    private(set) var stopCount = 0
+    private var onChange: (@MainActor () -> Void)?
+
+    func startWatching(root: URL, onChange: @MainActor @escaping () -> Void) {
+        watchedRoot = root
+        self.onChange = onChange
+    }
+
+    func stopWatching() {
+        watchedRoot = nil
+        onChange = nil
+        stopCount += 1
+    }
+
+    /// Simulate an on-disk change so tests can drive the auto-refresh path
+    /// without a real FSEvents stream.
+    func triggerChange() {
+        onChange?()
+    }
+}
+
+@MainActor
 func makeTestDependencies(
     keyValueStore: InMemoryKeyValueStore = InMemoryKeyValueStore(),
     extractionCache: any ExtractionCacheManaging = TestExtractionCacheManager(),
     bookmarkResolver: any SecurityScopedBookmarking = TestSecurityScopedBookmarkResolver(),
     libraryTreeLoader: any LibraryTreeLoading = TestLibraryTreeLoader(),
     systemSettings: any SystemSettingsReading = TestSystemSettings(),
-    sourceChangeMonitorFactory: @MainActor @escaping () -> any SourceChangeMonitoring = { TestSourceChangeMonitor() }
+    sourceChangeMonitorFactory: @MainActor @escaping () -> any SourceChangeMonitoring = { TestSourceChangeMonitor() },
+    libraryDirectoryWatcherFactory: @MainActor @escaping () -> any LibraryDirectoryWatching = { TestLibraryDirectoryWatcher() }
 ) -> AppDependencies {
     AppDependencies(
         extractionCache: extractionCache,
@@ -205,6 +230,7 @@ func makeTestDependencies(
         keyValueStore: keyValueStore,
         systemSettings: systemSettings,
         sourceChangeMonitorFactory: sourceChangeMonitorFactory,
+        libraryDirectoryWatcherFactory: libraryDirectoryWatcherFactory,
         makeReaderPreferences: { ReaderPreferences(defaults: keyValueStore) },
         makeReaderPositions: { ReaderPositionStore(defaults: keyValueStore) },
         makeReaderTempDirectory: { ReaderTempDirectory(extractionCache: extractionCache) }

@@ -44,6 +44,7 @@ final class ReaderViewModel {
     let favorites: FavoritesStore
     let pageBookmarks: PageBookmarksStore
     let makeSourceChangeMonitor: @MainActor () -> any SourceChangeMonitoring
+    let makeLibraryDirectoryWatcher: @MainActor () -> any LibraryDirectoryWatching
 
     // MARK: - Source state
 
@@ -68,6 +69,13 @@ final class ReaderViewModel {
     var sourceChangedOnDisk: Bool = false
     var sourceChangeMessage: String?
     var sourceChangeMonitor: (any SourceChangeMonitoring)?
+
+    /// Recursive watcher on the current library root. Bumps `libraryRefreshToken`
+    /// when files appear/disappear on disk so the sidebar tree auto-refreshes.
+    /// `watchedLibraryRootURL` records what it's currently pointed at so
+    /// `syncLibraryWatcher()` can skip redundant restarts.
+    var libraryDirectoryWatcher: (any LibraryDirectoryWatching)?
+    var watchedLibraryRootURL: URL?
 
     /// One-press cue for advancing to the previous volume from page 0.
     /// Set by `goBackward()` (either when arriving at 0 from a higher page,
@@ -184,6 +192,7 @@ final class ReaderViewModel {
         )
         self.pageBookmarks = PageBookmarksStore(defaults: dependencies.keyValueStore)
         self.makeSourceChangeMonitor = dependencies.sourceChangeMonitorFactory
+        self.makeLibraryDirectoryWatcher = dependencies.libraryDirectoryWatcherFactory
 
         observeAppTermination()
 

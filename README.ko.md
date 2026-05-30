@@ -125,6 +125,11 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   `.cbz` / `.zip` 접미사
 - **트리에서 현재 책 표시** — 책을 열면 상위 폴더들이 자동으로 펼쳐져
   현재 권이 항상 사이드바에 보이고, 권 사이를 이동하면 펼침 상태도 따라감
+- **실시간 파일 트리** — 라이브러리 루트 아래에서 파일이 추가/삭제/이름변경
+  되면 사이드바가 자동으로 다시 스캔(재귀 FSEvents 감시, 대량 복사도 한 번으로
+  합쳐서 갱신). 갱신은 제자리 diff라 트리가 비거나 접히지 않고 펼쳐둔 폴더도
+  유지됨. 사이드바 헤더의 **새로고침 버튼**으로 즉시 재스캔 가능 — FSEvents가
+  변경 이벤트를 못 받는 네트워크 볼륨용 폴백
 - **세로 모드 페이지 네비게이션** — `← → Space`로 스트립에서 이전/다음
   이미지로 스크롤(키보드로 마지막 이동한 위치가 아니라 현재 뷰포트 중앙에
   있는 페이지 기준)
@@ -373,6 +378,7 @@ Panely/
 │   │   ├── AppLog.swift                # swift-log facade + OSLog/file 진단 backend
 │   │   └── DiagnosticLogStore.swift    # rolling recent-log.txt 캐시 파일
 │   ├── SourceChangeMonitor.swift       # DispatchSource 기반 다중 URL 파일/폴더 감시 (세션 가드)
+│   ├── LibraryDirectoryWatcher.swift   # 라이브러리 루트 재귀 FSEvents 감시 → 사이드바 트리 자동 갱신
 │   └── Extensions/                     # 공유 Foundation helper
 ├── DesignSystem/
 │   ├── Tokens/                         # Color / Spacing / Typography / Motion
@@ -622,7 +628,9 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북�
 - **`NSCache` 기반 이미지 캐시** — 페이지별 디코드된 `NSImage`를 메모리
   압박 시 자동 eviction. `countLimit = 100`로 vertical lazy window의
   `±lazyKeepBuffer` 페이지가 cost 여유에도 LRU eviction 당하는 문제를
-  해소. 실제 예산은 `totalCostLimit ≈ 150 MB`이며, bitmap rep의
+  해소. 실제 예산인 `totalCostLimit`은 호스트 RAM에 비례(~1/16,
+  `[150 MB, 1 GB]`로 클램프)해서 고해상도 스캔 시리즈가 큰 머신에선 고정
+  상한에 thrash하지 않고 작은 머신에선 보수적으로 동작. bitmap rep의
   `pixelsWide × pixelsHigh × (bitsPerSample × samplesPerPixel / 8)`로
   per-entry cost를 계산해 Retina backing 이나 16-bit/HDR 스캔이
   과소평가되지 않음. 프리로드는 페이지 모드에서 현재 페이지 ±2 주변으로
@@ -640,11 +648,12 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북�
   `KeyValueStoring.loadCodable(_:forKey:)` / `saveCodable(_:forKey:)`를
   공유해 JSON 인/디코드 보일러플레이트를 한 곳에 둠
   (`LiveKeyValueStore`는 `UserDefaults` 기반).
-- **CBZ 추출 안전 상한** — `CBZLoader.maxExtractedBytes = 5 GB`. `extractAll`
-  완료 후(그리고 각 중첩 추출 후) 디렉터리 트리를 한 번 walk하여
-  누적 크기가 상한을 넘으면 `LoadError.extractedSizeExceeded`를 throw
-  하고 부분 추출물을 정리 — zip-bomb / 비정상 중첩 아카이브로부터
-  디스크 보호.
+- **CBZ 추출 안전 상한** — `CBZLoader.maxExtractedBytes = 5 GB`. 최상위
+  `unzipItem`이 누적 바이트 합계를 시드(destination 1회 walk)하고, 각 중첩
+  추출은 방금 펼친 폴더의 바이트만 더하고 대체된 아카이브 크기는 빼므로
+  전체를 한 번만 합산(O(n), 중첩마다 트리 재walk 안 함). 누적 합계가 상한을
+  넘으면 `LoadError.extractedSizeExceeded`를 throw하고 부분 추출물을 정리 —
+  zip-bomb / 비정상 중첩 아카이브로부터 디스크 보호.
 - **앱 시작 시 임시 디렉터리 청소** — `ReaderTempDirectory.cleanupStaleEntries`는
   mtime이 10분 이상 지난 session `panely-<uuid>` 디렉터리만 정리. 첫 실행
   중 진행 중인 추출 디렉터리가 동시에 삭제되는 경쟁 방지.

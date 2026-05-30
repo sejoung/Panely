@@ -136,6 +136,13 @@ pages.
 - **Reveal-active in the tree** — opening a book auto-expands its ancestor
   folders so the current volume is always visible in the sidebar, and the
   expansion follows along as you move between volumes
+- **Live file tree** — the sidebar re-scans automatically when files are
+  added, removed, or renamed under the library root (a recursive FSEvents
+  watch, coalesced so a bulk copy refreshes once). The refresh is diffed in
+  place — the tree never blanks or collapses, and expanded folders stay
+  open. A **refresh button** in the sidebar header forces a re-scan on
+  demand: the fallback for network volumes, where FSEvents can't deliver
+  change events
 - **Vertical-mode page navigation** — `← → Space` scroll to the previous /
   next image in the strip (working from the page currently centered in
   the viewport, not the last one keyboard-navigated)
@@ -399,6 +406,7 @@ Panely/
 │   │   ├── AppLog.swift                # swift-log facade + OSLog/file diagnostic backend
 │   │   └── DiagnosticLogStore.swift    # rolling recent-log.txt cache file
 │   ├── SourceChangeMonitor.swift       # DispatchSource-backed multi-URL file/folder watcher (session-guarded)
+│   ├── LibraryDirectoryWatcher.swift   # FSEvents recursive watch on the library root → auto-refresh the sidebar tree
 │   └── Extensions/                     # shared Foundation helpers
 ├── DesignSystem/
 │   ├── Tokens/                         # Color / Spacing / Typography / Motion
@@ -659,7 +667,9 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   automatic memory-pressure eviction. `countLimit = 100` is intentionally
   loose so vertical lazy windows (`lazyWindowRadius + lazyKeepBuffer` ≈
   25 pinned pages) aren't truncated by LRU eviction while still under
-  the real budget — `totalCostLimit ≈ 150 MB`. Per-entry cost uses the
+  the real budget — `totalCostLimit` scales to host RAM (~1/16, clamped to
+  `[150 MB, 1 GB]`) so high-res scan series don't thrash a fixed cap on big
+  machines while small machines stay conservative. Per-entry cost uses the
   bitmap rep's `pixelsWide × pixelsHigh × (bitsPerSample × samplesPerPixel / 8)`
   so Retina backing and 16-bit/HDR scans aren't under-priced. Preload
   runs a cancellable `Task` around the current page ±2 in paged modes;
@@ -678,12 +688,14 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   staleness check. All three stores share JSON encode/decode through
   `KeyValueStoring.loadCodable(_:forKey:)` / `saveCodable(_:forKey:)` in
   `Core/Extensions/` (`LiveKeyValueStore` is backed by `UserDefaults`).
-- **CBZ extraction size cap** — `CBZLoader.maxExtractedBytes = 5 GB`.
-  After each `unzipItem` (top-level and nested), the destination is
-  walked once to sum file sizes; if the cumulative total crosses the
-  limit, `LoadError.extractedSizeExceeded` is thrown and partial
-  extraction is cleaned up. Protects against zip-bombs and pathological
-  nested archives that slip past `maxNestingDepth`.
+- **CBZ extraction size cap** — `CBZLoader.maxExtractedBytes = 5 GB`. The
+  top-level `unzipItem` seeds a running byte total (one walk of the
+  destination); each nested extraction then adds only the bytes of the
+  folder it just expanded and subtracts the archive it replaced, so the
+  tree is summed once overall (O(n), not re-walked per nested archive). If
+  the running total crosses the limit, `LoadError.extractedSizeExceeded` is
+  thrown and partial extraction is cleaned up. Protects against zip-bombs
+  and pathological nested archives that slip past `maxNestingDepth`.
 - **Startup temp-dir cleanup** — `ReaderTempDirectory.cleanupStaleEntries`
   only removes session `panely-<uuid>` directories whose
   `contentModificationDate` is more than 10 minutes old, so a concurrent

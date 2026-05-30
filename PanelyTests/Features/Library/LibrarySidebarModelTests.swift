@@ -96,6 +96,84 @@ struct LibrarySidebarModelTests {
         await loader.finish()
         await task.value
     }
+
+    // MARK: - Same-root refresh (no flash) vs root switch
+
+    @Test func sameRootRefreshSkipsShallowPassAndKeepsNodes() async {
+        let root = URL(fileURLWithPath: "/lib", isDirectory: true)
+        let deep = [node("a.cbz", under: root), node("b.cbz", under: root)]
+        let loader = StubTreeLoader(shallow: deep, deep: deep)
+        let model = LibrarySidebarModel()
+
+        await model.reload(rootURL: root, loader: loader)
+        #expect(loader.loadCount == 2)        // new root: shallow + deep
+        #expect(model.nodes.count == 2)
+
+        await model.reload(rootURL: root, loader: loader)
+        // Same-root refresh runs the deep scan only — no shallow pass — so the
+        // populated tree is never swapped to a collapsed depth-1 version (the
+        // flash this change removes).
+        #expect(loader.loadCount == 3)
+        #expect(model.nodes.count == 2)
+    }
+
+    @Test func sameRootRefreshPicksUpNewFile() async {
+        let root = URL(fileURLWithPath: "/lib", isDirectory: true)
+        let loader = StubTreeLoader(
+            shallow: [node("a.cbz", under: root)],
+            deep: [node("a.cbz", under: root)]
+        )
+        let model = LibrarySidebarModel()
+        await model.reload(rootURL: root, loader: loader)
+        #expect(model.nodes.map(\.name) == ["a"])
+
+        // New file lands on disk; the next refresh surfaces it.
+        loader.deep = [node("a.cbz", under: root), node("b.cbz", under: root)]
+        await model.reload(rootURL: root, loader: loader)
+        #expect(model.nodes.map(\.name) == ["a", "b"])
+    }
+
+    @Test func rootSwitchStillReplacesTree() async {
+        let rootA = URL(fileURLWithPath: "/libA", isDirectory: true)
+        let loaderA = StubTreeLoader(
+            shallow: [node("a.cbz", under: rootA)],
+            deep: [node("a.cbz", under: rootA)]
+        )
+        let model = LibrarySidebarModel()
+        await model.reload(rootURL: rootA, loader: loaderA)
+        #expect(model.nodes.map(\.name) == ["a"])
+
+        let rootB = URL(fileURLWithPath: "/libB", isDirectory: true)
+        let loaderB = StubTreeLoader(
+            shallow: [node("z.cbz", under: rootB)],
+            deep: [node("z.cbz", under: rootB)]
+        )
+        await model.reload(rootURL: rootB, loader: loaderB)
+
+        #expect(model.nodes.map(\.name) == ["z"])
+        #expect(loaderB.loadCount == 2)       // switch keeps fast shallow-first repaint
+    }
+
+    private func node(_ fileName: String, under root: URL) -> FileNode {
+        let url = root.appendingPathComponent(fileName)
+        return FileNode(id: url, url: url, name: (fileName as NSString).deletingPathExtension, kind: .archive, children: nil)
+    }
+}
+
+private final class StubTreeLoader: LibraryTreeLoading, @unchecked Sendable {
+    var shallow: [FileNode]
+    var deep: [FileNode]
+    private(set) var loadCount = 0
+
+    init(shallow: [FileNode], deep: [FileNode]) {
+        self.shallow = shallow
+        self.deep = deep
+    }
+
+    func loadTree(from url: URL, maxDepth: Int) async -> [FileNode] {
+        loadCount += 1
+        return maxDepth <= 1 ? shallow : deep
+    }
 }
 
 private nonisolated struct FakeLibraryTreeLoader: LibraryTreeLoading {

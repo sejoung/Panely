@@ -21,6 +21,80 @@ struct ReaderViewModelLibraryTests {
         #expect(vm.libraryRefreshToken != before)
     }
 
+    // MARK: - syncLibraryWatcher (auto-refresh)
+
+    @Test func syncLibraryWatcherWatchesScopedLibraryRoot() throws {
+        let vm = makeTestViewModel()
+        let dir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        vm.explicitLibraryRootURL = dir
+        vm.libraryScope.url = dir
+
+        vm.syncLibraryWatcher()
+
+        let watcher = vm.libraryDirectoryWatcher as? TestLibraryDirectoryWatcher
+        #expect(watcher?.watchedRoot?.standardizedFileURL == dir.standardizedFileURL)
+    }
+
+    @Test func directoryChangeRefreshesTree() throws {
+        let vm = makeTestViewModel()
+        let dir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        vm.explicitLibraryRootURL = dir
+        vm.libraryScope.url = dir
+        vm.syncLibraryWatcher()
+
+        let before = vm.libraryRefreshToken
+        (vm.libraryDirectoryWatcher as? TestLibraryDirectoryWatcher)?.triggerChange()
+
+        // Watcher callback funnels into the same token bump the manual button uses.
+        #expect(vm.libraryRefreshToken != before)
+    }
+
+    @Test func syncLibraryWatcherSkipsRootWithoutScopeAccess() throws {
+        let vm = makeTestViewModel()
+        let dir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        // Root set but no security scope acquired → can't read it → don't watch
+        // (mirrors single-file opens whose derived root is an unreadable parent).
+        vm.explicitLibraryRootURL = dir
+
+        vm.syncLibraryWatcher()
+
+        #expect(vm.libraryDirectoryWatcher == nil)
+    }
+
+    @Test func syncLibraryWatcherSkipsRedundantRestartForSameRoot() throws {
+        let vm = makeTestViewModel()
+        let dir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        vm.explicitLibraryRootURL = dir
+        vm.libraryScope.url = dir
+        vm.syncLibraryWatcher()
+        let watcher = vm.libraryDirectoryWatcher as? TestLibraryDirectoryWatcher
+
+        vm.syncLibraryWatcher()  // same root → no teardown/restart
+
+        #expect(watcher?.stopCount == 0)
+        #expect(watcher?.watchedRoot?.standardizedFileURL == dir.standardizedFileURL)
+    }
+
+    @Test func stopLibraryWatcherTearsDownAndClears() throws {
+        let vm = makeTestViewModel()
+        let dir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        vm.explicitLibraryRootURL = dir
+        vm.libraryScope.url = dir
+        vm.syncLibraryWatcher()
+        let watcher = vm.libraryDirectoryWatcher as? TestLibraryDirectoryWatcher
+
+        vm.stopLibraryWatcher()
+
+        #expect(watcher?.stopCount == 1)
+        #expect(vm.libraryDirectoryWatcher == nil)
+        #expect(vm.watchedLibraryRootURL == nil)
+    }
+
     // MARK: - sidebarVolumes
 
     @Test func sidebarVolumesIsEmptyForFolderSeriesWithoutTempDir() {

@@ -108,6 +108,9 @@ extension ReaderViewModel {
                 epoch: myEpoch
             )
             guard didApply else { return }
+            // Library root has settled — point the directory watcher at it so
+            // files added on disk refresh the sidebar tree automatically.
+            syncLibraryWatcher()
             errorMessage = loaded.isEmpty ? "No images found" : nil
             AppLog.info(
                 .load,
@@ -380,6 +383,7 @@ extension ReaderViewModel {
         siblings = []
         sourceChangeMonitor?.stopWatching()
         sourceChangeMonitor = nil
+        stopLibraryWatcher()
         clearSourceChangeNotice()
     }
 

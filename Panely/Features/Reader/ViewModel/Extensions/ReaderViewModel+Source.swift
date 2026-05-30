@@ -179,16 +179,51 @@ extension ReaderViewModel {
                 siblings = volumes.isEmpty ? [current] : volumes
             }
             libraryRefreshToken = UUID()
+            syncLibraryWatcher()
         }
     }
 
     /// Force a re-scan of the library file tree. Bumping the token changes
     /// the sidebar's `.task(id:)` key, which re-runs `LibrarySidebarModel.reload`
-    /// and picks up files added/removed on disk since the last scan. There's
-    /// no directory watcher, so this is the manual path users trigger from the
-    /// sidebar's refresh button.
+    /// and picks up files added/removed on disk since the last scan. Driven
+    /// both by the sidebar's manual refresh button and by `syncLibraryWatcher`'s
+    /// on-disk change callback.
     func refreshLibraryTree() {
         libraryRefreshToken = UUID()
+    }
+
+    /// (Re)point the recursive directory watcher at the current library root.
+    /// No-op when the root is unchanged. Only watches a root we hold
+    /// directory-level access to (the security-scoped folder); single-file
+    /// opens — whose derived root is an unreadable parent — are skipped, since
+    /// the tree shows the access prompt there anyway and FSEvents on an
+    /// unreadable path would just fail.
+    func syncLibraryWatcher() {
+        let root = libraryRootURL
+        guard watchedLibraryRootURL?.standardizedFileURL != root?.standardizedFileURL else { return }
+
+        libraryDirectoryWatcher?.stopWatching()
+
+        guard let root,
+              isDirectory(root),
+              libraryScope.contains(root) else {
+            libraryDirectoryWatcher = nil
+            watchedLibraryRootURL = nil
+            return
+        }
+
+        let watcher = libraryDirectoryWatcher ?? makeLibraryDirectoryWatcher()
+        libraryDirectoryWatcher = watcher
+        watchedLibraryRootURL = root
+        watcher.startWatching(root: root) { [weak self] in
+            self?.refreshLibraryTree()
+        }
+    }
+
+    func stopLibraryWatcher() {
+        libraryDirectoryWatcher?.stopWatching()
+        libraryDirectoryWatcher = nil
+        watchedLibraryRootURL = nil
     }
 
     func displayTitle(for url: URL) -> String {
