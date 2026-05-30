@@ -7,6 +7,13 @@ import AppKit
 @MainActor
 @Observable
 final class ViewerController {
+    /// Tolerance for "is the magnification at the fit baseline?" comparisons.
+    /// Float fit math never lands exactly on the baseline, so equality is
+    /// checked within this epsilon. Shared with `AppKitImageScroller` so the
+    /// toolbar's `isAtFit` highlight and the fit-reset decision use one
+    /// threshold rather than scattered literals.
+    static let fitTolerance: CGFloat = 0.001
+
     private weak var scrollView: NSScrollView?
 
     /// Magnification corresponding to the current fit mode (fit-screen or
@@ -26,7 +33,7 @@ final class ViewerController {
     /// the fit-mode button highlight — picking a fit mode then zooming in
     /// should drop the highlight, since the user is no longer "at fit."
     var isAtFit: Bool {
-        abs(currentMagnification - baseMagnification) < 0.001
+        abs(currentMagnification - baseMagnification) < Self.fitTolerance
     }
 
     private let zoomStep: CGFloat = 1.25

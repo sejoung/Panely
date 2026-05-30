@@ -18,6 +18,12 @@ struct AppKitImageScroller: NSViewRepresentable {
     var autoFitOnResize: Bool = true
     var viewerController: ViewerController? = nil
 
+    /// Looser than `ViewerController.fitTolerance` (10×) on purpose: a tiny
+    /// stray manual zoom should still count as "at base" so the first
+    /// double-click zooms in, rather than snapping back to an
+    /// imperceptibly-different fit magnification.
+    static let doubleClickBaseTolerance: CGFloat = 0.01
+
     func makeCoordinator() -> AppKitScrollerCoordinator {
         AppKitScrollerCoordinator()
     }
@@ -78,7 +84,7 @@ struct AppKitImageScroller: NSViewRepresentable {
         let content = ImageStackView()
         content.onDoubleClick = { [weak scrollView] localPoint in
             guard let scrollView else { return }
-            let isAtBase = abs(scrollView.magnification - coordinator.baseMagnification) < 0.01
+            let isAtBase = abs(scrollView.magnification - coordinator.baseMagnification) < AppKitImageScroller.doubleClickBaseTolerance
             // Clamp the zoom-in target so a small image with a large fit base
             // doesn't request a magnification past the scroll view's ceiling
             // (setMagnification clamps anyway, but clamping here keeps the
@@ -275,7 +281,7 @@ struct AppKitImageScroller: NSViewRepresentable {
             fitMode: fitMode
         )
 
-        let userHasZoomed = abs(scrollView.magnification - coordinator.baseMagnification) > 0.001
+        let userHasZoomed = abs(scrollView.magnification - coordinator.baseMagnification) > ViewerController.fitTolerance
         let shouldReset = shouldResetMagnification(
             force: force,
             hasAppliedInitialFit: coordinator.hasAppliedInitialFit,
