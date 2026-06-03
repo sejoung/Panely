@@ -16,6 +16,11 @@ struct FileNodeRow: View {
                     .font(PanelyTypography.body)
                     .foregroundStyle(isActive ? PanelyColor.accentPrimary : PanelyColor.textPrimary)
                     .lineLimit(1)
+                    // Volume numbers live at the end of the name, so tail
+                    // truncation hides exactly the part that distinguishes
+                    // "… Vol.03" from "… Vol.13". Middle truncation keeps both
+                    // ends visible.
+                    .truncationMode(.middle)
                 if let ext = node.fileExtension {
                     Text(".\(ext)")
                         .font(PanelyTypography.caption)
@@ -28,7 +33,14 @@ struct FileNodeRow: View {
             }
             .contentShape(Rectangle())
             .padding(.vertical, 2)
+            // Full name on hover, for when even middle truncation isn't enough.
+            .help(fullName)
         }
         .buttonStyle(.plain)
+    }
+
+    private var fullName: String {
+        guard let ext = node.fileExtension else { return node.name }
+        return "\(node.name).\(ext)"
     }
 }

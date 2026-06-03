@@ -32,6 +32,9 @@ struct VolumeRow: View {
                     .font(PanelyTypography.body)
                     .foregroundStyle(isActive ? PanelyColor.accentPrimary : PanelyColor.textPrimary)
                     .lineLimit(1)
+                    // Keep the trailing volume number visible — tail truncation
+                    // would clip exactly the digits that tell volumes apart.
+                    .truncationMode(.middle)
                 Spacer(minLength: 0)
                 if let badge {
                     ReadingBadgeView(badge: badge)
@@ -39,6 +42,8 @@ struct VolumeRow: View {
             }
             .contentShape(Rectangle())
             .padding(.vertical, 2)
+            // Full filename (with extension) on hover.
+            .help(url.lastPathComponent)
         }
         .buttonStyle(.plain)
     }
