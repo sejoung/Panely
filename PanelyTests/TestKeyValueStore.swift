@@ -237,6 +237,7 @@ func makeTestDependencies(
     systemSettings: any SystemSettingsReading = TestSystemSettings(),
     sourceChangeMonitorFactory: @MainActor @escaping () -> any SourceChangeMonitoring = { TestSourceChangeMonitor() },
     libraryDirectoryWatcherFactory: @MainActor @escaping () -> any LibraryDirectoryWatching = { TestLibraryDirectoryWatcher() },
+    libraryAutoRefreshEnabled: Bool = true,
     filePicker: any FilePicking = TestFilePicker()
 ) -> AppDependencies {
     AppDependencies(
@@ -247,6 +248,7 @@ func makeTestDependencies(
         systemSettings: systemSettings,
         sourceChangeMonitorFactory: sourceChangeMonitorFactory,
         libraryDirectoryWatcherFactory: libraryDirectoryWatcherFactory,
+        libraryAutoRefreshEnabled: libraryAutoRefreshEnabled,
         filePickerFactory: { filePicker },
         makeReaderPreferences: { ReaderPreferences(defaults: keyValueStore) },
         makeReaderPositions: { ReaderPositionStore(defaults: keyValueStore) },

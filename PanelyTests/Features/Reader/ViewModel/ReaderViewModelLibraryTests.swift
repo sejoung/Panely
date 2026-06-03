@@ -56,6 +56,23 @@ struct ReaderViewModelLibraryTests {
         #expect(vm.libraryRefreshToken != before)
     }
 
+    @Test func autoRefreshDisabledStartsNoWatcherButStillPersistsRoot() throws {
+        // Production config: FSEvents auto-refresh off. No watcher is started
+        // (so it can't storm re-scans), but the last-library-root is still
+        // persisted for next-launch restore, and the manual refresh button
+        // remains functional.
+        let vm = ReaderViewModel(dependencies: makeTestDependencies(libraryAutoRefreshEnabled: false))
+        let dir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        vm.explicitLibraryRootURL = dir
+        vm.libraryScope.url = dir
+
+        vm.syncLibraryWatcher()
+
+        #expect(vm.libraryDirectoryWatcher == nil)
+        #expect(vm.lastLibraryRoot.restore()?.standardizedFileURL.path == dir.standardizedFileURL.path)
+    }
+
     @Test func syncLibraryWatcherSkipsRootWithoutScopeAccess() throws {
         let vm = makeTestViewModel()
         let dir = try Fixture.makeTempDir()

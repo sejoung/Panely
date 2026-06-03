@@ -8,6 +8,12 @@ nonisolated struct AppDependencies {
     let systemSettings: any SystemSettingsReading
     let sourceChangeMonitorFactory: @MainActor () -> any SourceChangeMonitoring
     let libraryDirectoryWatcherFactory: @MainActor () -> any LibraryDirectoryWatching
+    /// Master switch for FSEvents-driven sidebar auto-refresh. Disabled in
+    /// production: on some real libraries (large / cloud-synced roots) the
+    /// watcher could storm tree re-scans and hang the app. The manual refresh
+    /// button covers refresh until this is re-enabled with the debounce
+    /// verified on a Release build.
+    let libraryAutoRefreshEnabled: Bool
     let filePickerFactory: @MainActor () -> any FilePicking
 
     // Reader collaborators are surfaced as factories so tests can swap in
@@ -31,6 +37,7 @@ nonisolated struct AppDependencies {
             systemSettings: LiveSystemSettings(keyValueStore: keyValueStore),
             sourceChangeMonitorFactory: { SourceChangeMonitor() },
             libraryDirectoryWatcherFactory: { LiveLibraryDirectoryWatcher() },
+            libraryAutoRefreshEnabled: false,
             filePickerFactory: { LiveFilePicker() },
             makeReaderPreferences: { ReaderPreferences(defaults: keyValueStore) },
             makeReaderPositions: { ReaderPositionStore(defaults: keyValueStore) },

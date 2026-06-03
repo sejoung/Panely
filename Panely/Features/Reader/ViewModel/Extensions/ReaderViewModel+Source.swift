@@ -200,18 +200,31 @@ extension ReaderViewModel {
         guard watchedLibraryRootURL?.standardizedFileURL != root?.standardizedFileURL else { return }
 
         libraryDirectoryWatcher?.stopWatching()
+        libraryDirectoryWatcher = nil
 
         guard let root,
               isDirectory(root),
               libraryScope.contains(root) else {
-            libraryDirectoryWatcher = nil
             watchedLibraryRootURL = nil
             return
         }
 
-        let watcher = libraryDirectoryWatcher ?? makeLibraryDirectoryWatcher()
-        libraryDirectoryWatcher = watcher
         watchedLibraryRootURL = root
+
+        // Remember this root so the next launch reopens it instead of starting
+        // empty. Runs here because this is the one place a readable, scoped
+        // library directory settles (open, folder-pick, and launch-restore all
+        // funnel through here). Independent of the auto-refresh watcher below.
+        lastLibraryRoot.save(root)
+
+        // FSEvents auto-refresh is gated off in production (a busy / cloud-synced
+        // root could storm tree re-scans and hang the app). The sidebar's manual
+        // refresh button covers refresh until this is re-enabled with the
+        // debounce verified on Release.
+        guard libraryAutoRefreshEnabled else { return }
+
+        let watcher = makeLibraryDirectoryWatcher()
+        libraryDirectoryWatcher = watcher
         watcher.startWatching(root: root) { [weak self] in
             // Debounce: only refresh once the folder goes quiet, so a busy /
             // cloud-synced root can't storm full tree re-scans.
@@ -219,12 +232,6 @@ extension ReaderViewModel {
                 self?.refreshLibraryTree()
             }
         }
-
-        // Remember this root so the next launch reopens it instead of starting
-        // empty. Runs here because this is the one place a readable, scoped
-        // library directory settles (open, folder-pick, and launch-restore all
-        // funnel through here).
-        lastLibraryRoot.save(root)
     }
 
     /// On a cold launch with nothing opened, reopen the last browsed library

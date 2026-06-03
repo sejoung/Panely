@@ -136,13 +136,12 @@ pages.
 - **Reveal-active in the tree** — opening a book auto-expands its ancestor
   folders so the current volume is always visible in the sidebar, and the
   expansion follows along as you move between volumes
-- **Live file tree** — the sidebar re-scans automatically when files are
-  added, removed, or renamed under the library root (a recursive FSEvents
-  watch, coalesced so a bulk copy refreshes once). The refresh is diffed in
-  place — the tree never blanks or collapses, and expanded folders stay
-  open. A **refresh button** in the sidebar header forces a re-scan on
-  demand: the fallback for network volumes, where FSEvents can't deliver
-  change events
+- **File tree refresh** — a **refresh button** in the sidebar header re-scans
+  the library on demand; the refresh is diffed in place, so the tree never
+  blanks or collapses and expanded folders stay open. (FSEvents-driven
+  *automatic* refresh exists behind a flag but is currently disabled — it
+  could storm re-scans on large/cloud-synced roots — so refresh is manual for
+  now.)
 - **Reading progress** — each tracked book shows a sidebar badge: a progress
   ring while in progress, a check once finished, computed from a persisted
   `{page, total, finished}` record (separate from the exact-restore position
