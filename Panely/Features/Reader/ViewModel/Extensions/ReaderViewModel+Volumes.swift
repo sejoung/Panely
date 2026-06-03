@@ -59,6 +59,7 @@ extension ReaderViewModel {
             "Next volume requested",
             metadata: ["target": "\(DiagnosticRedactor.describe(target))"]
         )
+        recordVolumeRecent(target)
         Task {
             await load(
                 url: target,
@@ -77,7 +78,19 @@ extension ReaderViewModel {
             "Previous volume requested",
             metadata: ["target": "\(DiagnosticRedactor.describe(target))"]
         )
+        recordVolumeRecent(target)
         Task { await load(url: target, knownSiblings: preservedSiblings, intent: .previousVolume) }
+    }
+
+    /// Volume navigation opens a sibling book, so it should land in Recents
+    /// just like a tree click or Open… — that's what keeps the "Continue
+    /// Reading" suggestion (and the Recents menu) tracking a read-by-volume
+    /// session. Skipped for zip-in-zip: those volumes live in the temp
+    /// extraction dir, whose bookmark wouldn't resolve next launch, and the
+    /// outer archive is already the recent entry.
+    private func recordVolumeRecent(_ url: URL) {
+        guard !tempDir.isActive else { return }
+        recentItems.record(url, title: displayTitle(for: url))
     }
 
     // MARK: - End-of-volume card

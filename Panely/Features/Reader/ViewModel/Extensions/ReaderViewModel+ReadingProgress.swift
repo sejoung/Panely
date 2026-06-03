@@ -27,22 +27,24 @@ extension ReaderViewModel {
         let item: RecentItem
     }
 
-    /// The most-recently-read book that's still in progress (not finished, not
-    /// the one currently open), drawn from recents so it stays openable via
-    /// its security-scoped bookmark. `nil` when nothing qualifies.
+    /// The most-recently-read book that isn't finished, drawn from recents so
+    /// it stays openable via its security-scoped bookmark. `nil` when nothing
+    /// qualifies.
+    ///
+    /// Deliberately *includes* the book currently open: opening or flipping to
+    /// a book bumps its `updatedAt`, so it surfaces here with live progress and
+    /// the row tracks what you're actually reading. On a cold launch (nothing
+    /// open) it resolves to whatever you read last — the primary use case.
     var continueReadingSuggestion: ContinueReadingSuggestion? {
-        let openedPath = openedSourceURL?.standardizedFileURL.path
         var best: ContinueReadingSuggestion?
         var bestUpdatedAt = Date.distantPast
 
         for item in recentItems.items {
             let url = URL(fileURLWithPath: item.path)
-            if url.standardizedFileURL.path == openedPath { continue }
             let keys = PositionKey.keys(for: url, opened: nil, tempRoot: nil)
             guard let progress = readingProgress.progress(forKey: keys.primary, fileIdentityKey: keys.fileIdentity),
                   !progress.finished,
-                  progress.total > 0,
-                  progress.page > 0
+                  progress.total > 0
             else { continue }
 
             if progress.updatedAt > bestUpdatedAt {
