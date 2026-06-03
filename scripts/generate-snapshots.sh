@@ -35,6 +35,7 @@ EXPECTED_SNAPSHOTS=(
   "11-slider-quickjump.png"
   "12-storage-cache.png"
   "13-diagnostics-settings.png"
+  "14-toolbar-spread-offset.png"
 )
 
 cd "$PROJECT_ROOT"

@@ -157,6 +157,7 @@ enum SnapshotSampleContent {
         sidebarPinned: Bool = false,
         toolbarPinned: Bool = true,
         thumbnailSidebarVisible: Bool = false,
+        coverAlone: Bool = false,
         pageIndex: Int = 0,
         pageCount: Int = 24,
         library: LibraryFixture? = nil
@@ -168,6 +169,7 @@ enum SnapshotSampleContent {
         vm.preferences.sidebarMode.pinned = sidebarPinned
         vm.preferences.toolbarPinned = toolbarPinned
         vm.preferences.thumbnailSidebarVisible = thumbnailSidebarVisible
+        vm.preferences.doublePageCoverAlone = coverAlone
 
         vm.source = mockSource(pageCount: pageCount)
         if let library {

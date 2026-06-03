@@ -107,6 +107,26 @@ struct SnapshotGalleryTests {
         )
     }
 
+    @Test func toolbarSpreadOffset() async throws {
+        // Double-page with the standalone-cover offset enabled, so the manual
+        // shows the (double-mode-only) offset toggle in its active state.
+        let vm = SnapshotSampleContent.loadedViewModel(
+            layout: .double,
+            fitMode: .fitWidth,
+            sidebarPinned: true,
+            coverAlone: true
+        )
+        let viewer = ViewerController()
+        try await render(
+            ReaderToolbarOverlay(shown: true)
+                .environment(vm)
+                .environment(viewer)
+                .padding(PanelySpacing.md),
+            size: SnapshotRenderer.toolbarSize,
+            named: "14-toolbar-spread-offset.png"
+        )
+    }
+
     // MARK: - Overlays
 
     @Test func endOfVolumeCard() async throws {

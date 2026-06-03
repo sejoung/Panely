@@ -129,11 +129,16 @@ struct LibrarySidebar: View {
                             .font(PanelyTypography.body)
                             .foregroundStyle(PanelyColor.textPrimary)
                             .lineLimit(1)
+                            // Match the file tree: keep the trailing volume
+                            // number visible instead of clipping it with a
+                            // tail ellipsis.
+                            .truncationMode(.middle)
                         Spacer(minLength: 0)
                         ReadingBadgeView(badge: .inProgress(fraction: continueReadingFraction))
                     }
                     .contentShape(Rectangle())
                     .padding(.vertical, 2)
+                    .help(title)
                 }
                 .buttonStyle(.plain)
                 .listRowBackground(Color.clear)

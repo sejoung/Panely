@@ -16,10 +16,13 @@ struct FavoriteRow: View {
                     .font(PanelyTypography.body)
                     .foregroundStyle(isActive ? PanelyColor.accentPrimary : PanelyColor.textPrimary)
                     .lineLimit(1)
+                    // Keep the trailing volume number visible (see FileNodeRow).
+                    .truncationMode(.middle)
                 Spacer(minLength: 0)
             }
             .contentShape(Rectangle())
             .padding(.vertical, 2)
+            .help(favorite.title)
         }
         .buttonStyle(.plain)
         .contextMenu {

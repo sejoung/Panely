@@ -67,6 +67,17 @@ Two pages side by side, matching the physical book experience. Both
 pages decode in parallel so spread refreshes feel snappy. Combined with
 RTL reading direction (below), this is the natural manga setup.
 
+**Standalone-cover offset.** Most scans put a lone cover on page 1, with
+the true facing spreads starting at pages 2–3. By default the viewer
+pairs (1,2) (3,4)…, which splits every real spread across two viewer
+spreads — so the whole book looks shifted by one page. Toggle the
+**offset button** (the book-pages icon, shown only in double-page mode)
+to stand the cover alone and pair from there instead: 1 | (2,3) (4,5)….
+The setting is remembered across launches; leave it off for books whose
+spreads already line up.
+
+![Double-page standalone-cover offset toggle](screenshots/14-toolbar-spread-offset.png)
+
 ### Vertical scroll (`⌘⇧3`)
 
 ![Vertical scroll (webtoon) layout](screenshots/03-hero-vertical-strip.png)
@@ -93,7 +104,7 @@ top-to-bottom, so the direction toggle disables itself in vertical mode.
 Left to right, the toolbar groups are:
 
 1. **Chrome** — Open file (`⌘O`), pin library (`⌃⌘S`), pin toolbar (`⌃⌘T`)
-2. **Layout** — Single / Double / Vertical, plus reading direction toggle
+2. **Layout** — Single / Double / Vertical, reading direction toggle, and (in double-page mode) the standalone-cover offset toggle
 3. **Fit & Zoom** — Fit screen / width / height (`⌘1` / `⌘2` / `⌘3`), zoom in/out (`⌘+` / `⌘−`), view-size lock (`⌘L`)
 4. **Bookmarks** — Favorite book (`⌘⇧D`), bookmark page (`⌘D`), toggle thumbnail sidebar (`⌃⌘P`)
 5. **Navigation** (right edge) — Previous/next volume (`⌘[` / `⌘]`), previous/next page (`←` / `→`)
