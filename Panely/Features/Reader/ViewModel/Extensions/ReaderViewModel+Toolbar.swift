@@ -25,6 +25,7 @@ extension ReaderViewModel {
             isBookFavorite: isCurrentBookFavorite,
             isPageBookmarked: isCurrentPageBookmarked,
             thumbnailSidebarVisible: thumbnailSidebarVisible,
+            doublePageCoverAlone: doublePageCoverAlone,
             isAtFit: isAtFit
         )
     }
@@ -61,7 +62,8 @@ extension ReaderViewModel {
             onNextVolume: { [self] in nextVolume() },
             onToggleFavorite: { [self] in toggleFavoriteForCurrentBook() },
             onTogglePageBookmark: { [self] in toggleCurrentPageBookmark() },
-            onToggleThumbnailSidebar: { [self] in toggleThumbnailSidebar() }
+            onToggleThumbnailSidebar: { [self] in toggleThumbnailSidebar() },
+            onToggleDoublePageCoverAlone: { [self] in toggleDoublePageCoverAlone() }
         )
     }
 }

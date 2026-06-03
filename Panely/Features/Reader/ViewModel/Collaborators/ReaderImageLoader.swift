@@ -97,6 +97,7 @@ final class ReaderImageLoader {
         layout: PageLayout,
         currentPageIndex: Int,
         navigationStep: Int,
+        coverAlone: Bool = false,
         isCancelled: @MainActor @escaping () -> Bool,
         onError: @MainActor @escaping (String) -> Void
     ) async {
@@ -117,7 +118,7 @@ final class ReaderImageLoader {
         if layout.isContinuous {
             await refreshVerticalLazily(source: source, currentPageIndex: currentPageIndex, generation: generation, isCancelled: isCancelled, onError: onError)
         } else {
-            await refreshPaged(source: source, currentPageIndex: currentPageIndex, navigationStep: navigationStep, generation: generation, onError: onError)
+            await refreshPaged(source: source, currentPageIndex: currentPageIndex, navigationStep: navigationStep, coverAlone: coverAlone, generation: generation, onError: onError)
         }
     }
 
@@ -125,10 +126,11 @@ final class ReaderImageLoader {
         source: ComicSource,
         currentPageIndex: Int,
         navigationStep: Int,
+        coverAlone: Bool,
         generation: Int,
         onError: @MainActor @escaping (String) -> Void
     ) async {
-        let pages = visiblePages(source: source, currentPageIndex: currentPageIndex, navigationStep: navigationStep)
+        let pages = visiblePages(source: source, currentPageIndex: currentPageIndex, navigationStep: navigationStep, coverAlone: coverAlone)
         pageDimensions = []
         guard !pages.isEmpty else {
             currentImages = []
@@ -468,11 +470,15 @@ final class ReaderImageLoader {
 
     // MARK: - Visible-page span (for paged refresh)
 
-    private func visiblePages(source: ComicSource, currentPageIndex: Int, navigationStep: Int) -> [ComicPage] {
-        let start = currentPageIndex
-        guard source.pages.indices.contains(start) else { return [] }
-        let end = min(start + navigationStep, source.pageCount)
-        return Array(source.pages[start..<end])
+    private func visiblePages(source: ComicSource, currentPageIndex: Int, navigationStep: Int, coverAlone: Bool) -> [ComicPage] {
+        let range = SpreadCalculator.spread(
+            containing: currentPageIndex,
+            pageCount: source.pageCount,
+            step: navigationStep,
+            coverAlone: coverAlone
+        )
+        guard !range.isEmpty, source.pages.indices.contains(range.lowerBound) else { return [] }
+        return Array(source.pages[range])
     }
 
     // MARK: - Placeholders + concurrency limit

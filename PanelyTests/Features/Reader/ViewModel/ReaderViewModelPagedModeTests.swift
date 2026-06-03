@@ -124,6 +124,62 @@ struct ReaderViewModelPagedModeTests {
         #expect(vm.effectiveDirection == .leftToRight)
     }
 
+    // MARK: standalone-cover spread offset
+
+    @Test func coverAloneShowsLoneCoverThenPairs() {
+        let vm = makeViewModel(pageCount: 10)
+        vm.layout = .double
+        vm.doublePageCoverAlone = true
+
+        vm.currentPageIndex = 0
+        #expect(vm.visiblePages.map(\.displayName) == ["p0.png"])
+
+        vm.currentPageIndex = 1
+        #expect(vm.visiblePages.map(\.displayName) == ["p1.png", "p2.png"])
+    }
+
+    @Test func coverAloneNavigationStepsAcrossTheOffset() {
+        let vm = makeViewModel(pageCount: 10)
+        vm.layout = .double
+        vm.doublePageCoverAlone = true
+        vm.currentPageIndex = 0
+
+        vm.next()
+        #expect(vm.currentPageIndex == 1)
+        vm.next()
+        #expect(vm.currentPageIndex == 3)
+        vm.previous()
+        #expect(vm.currentPageIndex == 1)
+        vm.previous()
+        #expect(vm.currentPageIndex == 0)
+    }
+
+    @Test func togglingCoverAloneRealignsCurrentSpread() {
+        let vm = makeViewModel(pageCount: 10)
+        vm.layout = .double
+        vm.currentPageIndex = 2 // default pairing: spread (2,3)
+
+        vm.toggleDoublePageCoverAlone()
+
+        #expect(vm.doublePageCoverAlone)
+        // Under the offset, index 2 belongs to spread (1,2) → start 1.
+        #expect(vm.currentPageIndex == 1)
+        #expect(vm.visiblePages.map(\.displayName) == ["p1.png", "p2.png"])
+    }
+
+    @Test func coverAloneOffsetIgnoredOutsideDoubleLayout() {
+        let vm = makeViewModel(pageCount: 10)
+        vm.doublePageCoverAlone = true
+
+        vm.layout = .single
+        #expect(!vm.spreadCoverAlone)
+        vm.currentPageIndex = 0
+        #expect(vm.visiblePages.map(\.displayName) == ["p0.png"])
+
+        vm.layout = .double
+        #expect(vm.spreadCoverAlone)
+    }
+
     // MARK: helpers
 
     private func makeViewModel(pageCount: Int) -> ReaderViewModel {

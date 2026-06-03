@@ -14,6 +14,9 @@ struct PanelyToolbarState: Equatable {
     var isBookFavorite = false
     var isPageBookmarked = false
     var thumbnailSidebarVisible = false
+    /// Double-page standalone-cover offset (see `SpreadCalculator`). Drives the
+    /// offset toggle's active state; the button itself is shown only in double.
+    var doublePageCoverAlone = false
     /// True when the scroll view's magnification matches the fit baseline.
     /// Gates the fit-mode button highlight — once the user zooms in/out,
     /// they're no longer "at" `fitMode` so no fit button should look
@@ -38,6 +41,7 @@ struct PanelyToolbarActions {
     var onToggleFavorite: () -> Void = {}
     var onTogglePageBookmark: () -> Void = {}
     var onToggleThumbnailSidebar: () -> Void = {}
+    var onToggleDoublePageCoverAlone: () -> Void = {}
 }
 
 /// The floating reader toolbar. Presentation-only — every action is a
@@ -125,6 +129,18 @@ struct PanelyToolbar: View {
             )
             .disabled(state.layout.isContinuous)
             .help(directionHelp)
+
+            // Standalone-cover spread offset — only meaningful (and only
+            // shown) in double-page mode. Realigns pairing so a lone cover
+            // doesn't push every facing spread one page out of step.
+            if state.layout == .double {
+                PanelyIconButton(
+                    systemImage: "book.pages",
+                    isActive: state.doublePageCoverAlone,
+                    action: actions.onToggleDoublePageCoverAlone
+                )
+                .help("Offset spread (standalone cover)")
+            }
         }
     }
 

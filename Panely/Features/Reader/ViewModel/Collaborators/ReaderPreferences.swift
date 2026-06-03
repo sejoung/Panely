@@ -22,6 +22,7 @@ final class ReaderPreferences {
     static let autoFitOnResizeKey = "panely.autoFitOnResize"
     static let toolbarPinnedKey = "panely.toolbarPinned"
     static let thumbnailSidebarVisibleKey = "panely.thumbnailSidebarVisible"
+    static let doublePageCoverAloneKey = "panely.doublePageCoverAlone"
 
     private let defaults: any KeyValueStoring
 
@@ -67,6 +68,16 @@ final class ReaderPreferences {
         }
     }
 
+    /// Double-page only: when true, page 0 is shown alone so facing spreads
+    /// pair as 0 | (1,2) (3,4)… instead of (0,1) (2,3)…. Off by default to
+    /// preserve the historical pairing; users flip it when a book's standalone
+    /// cover makes every spread look shifted by one. See `SpreadCalculator`.
+    var doublePageCoverAlone: Bool = false {
+        didSet {
+            defaults.set(doublePageCoverAlone, forKey: Self.doublePageCoverAloneKey)
+        }
+    }
+
     init(defaults: any KeyValueStoring = LiveKeyValueStore()) {
         self.defaults = defaults
 
@@ -103,6 +114,9 @@ final class ReaderPreferences {
         }
         if let value = storedDefaults[Self.thumbnailSidebarVisibleKey] as? Bool {
             thumbnailSidebarVisible = value
+        }
+        if let value = storedDefaults[Self.doublePageCoverAloneKey] as? Bool {
+            doublePageCoverAlone = value
         }
     }
 }

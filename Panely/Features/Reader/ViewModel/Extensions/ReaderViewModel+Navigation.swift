@@ -11,17 +11,28 @@ extension ReaderViewModel {
         if layout.isContinuous {
             return source.pages
         }
-        let start = currentPageIndex
-        guard source.pages.indices.contains(start) else { return [] }
-        let end = min(start + navigationStep, source.pageCount)
-        return Array(source.pages[start..<end])
+        let range = currentSpread
+        guard !range.isEmpty, source.pages.indices.contains(range.lowerBound) else { return [] }
+        return Array(source.pages[range])
+    }
+
+    /// Page-index range of the spread currently on screen. The single source
+    /// of truth for the visible span in paged layouts (see `SpreadCalculator`).
+    var currentSpread: Range<Int> {
+        SpreadCalculator.spread(
+            containing: currentPageIndex,
+            pageCount: source.pageCount,
+            step: navigationStep,
+            coverAlone: spreadCoverAlone
+        )
     }
 
     var pageCounterLabel: String {
         guard !source.isEmpty else { return "" }
         let count = totalPages
-        let first = currentPageIndex + 1
-        let last = min(currentPageIndex + navigationStep, count)
+        let range = currentSpread
+        let first = range.lowerBound + 1
+        let last = range.upperBound
         return first == last ? "\(first) / \(count)" : "\(first)-\(last) / \(count)"
     }
 
@@ -34,14 +45,18 @@ extension ReaderViewModel {
     /// `currentPageNumber` outside double-page mode.
     var currentPageRangeEndNumber: Int {
         guard !source.isEmpty else { return 0 }
-        return min(currentPageIndex + navigationStep, totalPages)
+        return currentSpread.upperBound
     }
 
     // MARK: - Page navigation
 
     func next() {
-        let target = currentPageIndex + navigationStep
-        guard target < source.pageCount else { return }
+        guard let target = SpreadCalculator.nextStart(
+            from: currentPageIndex,
+            pageCount: source.pageCount,
+            step: navigationStep,
+            coverAlone: spreadCoverAlone
+        ) else { return }
         currentPageIndex = target
         scheduleRefreshIfPaged()
     }
@@ -84,8 +99,12 @@ extension ReaderViewModel {
             return
         }
 
-        let target = currentPageIndex - navigationStep
-        let willLandOnZero = target <= 0
+        let willLandOnZero = (SpreadCalculator.previousStart(
+            from: currentPageIndex,
+            pageCount: source.pageCount,
+            step: navigationStep,
+            coverAlone: spreadCoverAlone
+        ) ?? 0) == 0
         previous()
         // `previous()` triggers the didSet that resets the cue. If we just
         // landed on page 0 with a prev sibling, re-arm so the user's next
@@ -96,8 +115,14 @@ extension ReaderViewModel {
     }
 
     func previous() {
-        let target = currentPageIndex - navigationStep
-        guard target >= 0 else {
+        guard let target = SpreadCalculator.previousStart(
+            from: currentPageIndex,
+            pageCount: source.pageCount,
+            step: navigationStep,
+            coverAlone: spreadCoverAlone
+        ) else {
+            // Already in the first spread; snap to 0 only if we somehow sit
+            // mid-spread (e.g., a stale index from a layout switch).
             guard currentPageIndex > 0 else { return }
             currentPageIndex = 0
             scheduleRefreshIfPaged()
@@ -108,11 +133,15 @@ extension ReaderViewModel {
     }
 
     func jump(to index: Int) {
-        let step = navigationStep
-        let snapped = (index / step) * step
-        let clamped = min(max(snapped, 0), max(0, source.pageCount - 1))
-        guard clamped != currentPageIndex else { return }
-        currentPageIndex = clamped
+        guard source.pageCount > 0 else { return }
+        let snapped = SpreadCalculator.spread(
+            containing: index,
+            pageCount: source.pageCount,
+            step: navigationStep,
+            coverAlone: spreadCoverAlone
+        ).lowerBound
+        guard snapped != currentPageIndex else { return }
+        currentPageIndex = snapped
         scheduleRefreshIfPaged()
     }
 
@@ -175,6 +204,27 @@ extension ReaderViewModel {
 
     func toggleAutoFitOnResize() {
         autoFitOnResize.toggle()
+    }
+
+    /// Flip the standalone-cover spread offset. Re-aligns the current page to
+    /// the new spread boundary and re-decodes so the pairing changes on screen
+    /// immediately. A no-op visually outside double-page mode (the preference
+    /// still persists for when the user returns to double).
+    func toggleDoublePageCoverAlone() {
+        doublePageCoverAlone.toggle()
+        guard layout == .double else { return }
+        let aligned = SpreadCalculator.spread(
+            containing: currentPageIndex,
+            pageCount: source.pageCount,
+            step: navigationStep,
+            coverAlone: spreadCoverAlone
+        ).lowerBound
+        if aligned != currentPageIndex {
+            currentPageIndex = aligned
+        }
+        // Refresh even when the index is unchanged — the pairing (and thus the
+        // visible spread) still differs under the new offset.
+        scheduleRefreshIfPaged()
     }
 
     func toggleSidebarPin() {

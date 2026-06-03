@@ -332,7 +332,12 @@ extension ReaderViewModel {
         }
 
         guard totalPages > 0 else { return }
-        let finished = page + navigationStep >= totalPages
+        let finished = SpreadCalculator.nextStart(
+            from: page,
+            pageCount: totalPages,
+            step: navigationStep,
+            coverAlone: spreadCoverAlone
+        ) == nil
         if immediate {
             readingProgress.flushImmediately(for: url, opened: opened, tempRoot: tempRoot, page: page, total: totalPages, finished: finished)
         } else {
@@ -347,15 +352,15 @@ extension ReaderViewModel {
     func clampedRestoredIndex(for url: URL, pageCount: Int) -> Int {
         guard pageCount > 0 else { return 0 }
         let restored = restoredIndex(for: url)
-        let step = navigationStep
-        let snapped = (restored / step) * step
-        // Highest valid step-aligned start: for 100-page double-page mode,
-        // that's index 98 (spread 99–100). The previous formula clamped to
-        // `pageCount - 1` (=99), which then rounded back down via the step
-        // snap and stranded the reader one spread short of where they left
-        // off. Use the last step-aligned index instead so the final spread
-        // is reachable.
-        let maxAligned = max(0, ((pageCount - 1) / step) * step)
-        return min(max(snapped, 0), maxAligned)
+        // Snap the restored page to its spread's start under the current layout
+        // and offset. `SpreadCalculator` clamps out-of-range indices to the
+        // final spread, so the last spread stays reachable (no off-by-one snap
+        // back to the previous spread).
+        return SpreadCalculator.spread(
+            containing: restored,
+            pageCount: pageCount,
+            step: navigationStep,
+            coverAlone: spreadCoverAlone
+        ).lowerBound
     }
 }

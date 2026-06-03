@@ -153,6 +153,14 @@ final class ReaderViewModel {
         set { preferences.thumbnailSidebarVisible = newValue }
     }
 
+    /// User preference for standalone-cover spread pairing. Persisted; the
+    /// re-align-and-refresh side effects live in `toggleDoublePageCoverAlone()`
+    /// (this plain forwarder is what the toolbar reads for its active state).
+    var doublePageCoverAlone: Bool {
+        get { preferences.doublePageCoverAlone }
+        set { preferences.doublePageCoverAlone = newValue }
+    }
+
     var sidebarMode: SidebarMode {
         get { preferences.sidebarMode }
         set { preferences.sidebarMode = newValue }
@@ -187,6 +195,11 @@ final class ReaderViewModel {
     var totalPages: Int { source.pageCount }
     var hasSource: Bool { !source.isEmpty }
     var navigationStep: Int { layout.navigationStep }
+
+    /// Whether the standalone-cover offset is *currently in effect* — only in
+    /// double-page mode. All spread math (`SpreadCalculator`) takes this, so
+    /// single/vertical layouts are unaffected by the preference.
+    var spreadCoverAlone: Bool { layout == .double && doublePageCoverAlone }
 
     // MARK: - Init
 

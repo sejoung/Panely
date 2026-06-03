@@ -102,7 +102,12 @@ extension ReaderViewModel {
     var isAtLastPage: Bool {
         let count = source.pageCount
         guard count > 0 else { return false }
-        return currentPageIndex + navigationStep >= count
+        return SpreadCalculator.nextStart(
+            from: currentPageIndex,
+            pageCount: count,
+            step: navigationStep,
+            coverAlone: spreadCoverAlone
+        ) == nil
     }
 
     /// Drives the end-of-volume card. Visible only when there's a next sibling

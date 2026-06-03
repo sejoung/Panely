@@ -14,8 +14,14 @@ extension ReaderViewModel {
         // Only invoked from the `layout` forwarding setter on actual changes
         // (the setter diffs old vs. new before calling here), so no init-time
         // hydration guard is needed.
-        let step = navigationStep
-        currentPageIndex = (currentPageIndex / step) * step
+        // Re-align to a spread boundary under the *new* layout (and its offset)
+        // so switching single→double never lands mid-spread.
+        currentPageIndex = SpreadCalculator.spread(
+            containing: currentPageIndex,
+            pageCount: source.pageCount,
+            step: navigationStep,
+            coverAlone: spreadCoverAlone
+        ).lowerBound
 
         imageLoader.prepareForLayoutRebuild()
 
@@ -45,6 +51,7 @@ extension ReaderViewModel {
             layout: layout,
             currentPageIndex: currentPageIndex,
             navigationStep: navigationStep,
+            coverAlone: spreadCoverAlone,
             isCancelled: { [weak self] in
                 guard let self else { return true }
                 return self.loadEpoch != epochAtStart
