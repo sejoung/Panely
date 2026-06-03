@@ -240,7 +240,8 @@ extension ReaderViewModel {
     /// a file the app was launched with (Open With / `onOpenURL`) or an
     /// in-flight load — those set a source/loading flag the guards bail on.
     func restoreLastLibraryRootIfNeeded() {
-        guard libraryRootURL == nil,
+        guard reopenLastFolderOnLaunch,
+              libraryRootURL == nil,
               currentSourceURL == nil,
               pendingSourceURL == nil,
               openedSourceURL == nil,

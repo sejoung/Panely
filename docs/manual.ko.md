@@ -180,6 +180,23 @@ LRU 정리). 따라서 같은 아카이브를 다시 열 때는 즉시 표시됩
 
 ---
 
+## 라이브러리 설정
+
+![실행 시 다시 열기 토글과 잊기 컨트롤이 있는 Library 설정](screenshots/15-library-settings.png)
+
+**File → Settings…**(또는 **Panely → Settings…**)의 **Library** 탭에서
+Panely가 라이브러리 폴더를 기억하는 방식을 제어합니다.
+
+- **Reopen last folder on launch** — 기본 켜짐: 콜드 런치 시 마지막으로
+  열람한 폴더를 다시 엽니다(매번 폴더를 고를 필요 없음). 끄면 항상 빈
+  상태로 시작합니다. 저장된 폴더는 유지되므로 다시 켜면 이어집니다.
+- **Last opened** — 실행 시 다시 열릴 폴더. 마우스를 올리면 전체 경로가
+  보입니다.
+- **Forget Now** — 저장된 폴더를 즉시 삭제합니다. 일회성이라 다음에 폴더를
+  열면 다시 기억됩니다.
+
+---
+
 ## 저장 공간과 캐시
 
 ![추출 캐시 컨트롤이 있는 Storage 설정](screenshots/12-storage-cache.png)

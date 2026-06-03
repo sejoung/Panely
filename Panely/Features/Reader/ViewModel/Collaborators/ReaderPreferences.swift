@@ -23,6 +23,7 @@ final class ReaderPreferences {
     static let toolbarPinnedKey = "panely.toolbarPinned"
     static let thumbnailSidebarVisibleKey = "panely.thumbnailSidebarVisible"
     static let doublePageCoverAloneKey = "panely.doublePageCoverAlone"
+    static let reopenLastFolderOnLaunchKey = "panely.reopenLastFolderOnLaunch"
 
     private let defaults: any KeyValueStoring
 
@@ -78,6 +79,15 @@ final class ReaderPreferences {
         }
     }
 
+    /// Whether a cold launch reopens the last browsed library folder. On by
+    /// default (the convenience the folder bookmark exists for); users turn it
+    /// off to always start empty. See `ReaderViewModel.restoreLastLibraryRootIfNeeded`.
+    var reopenLastFolderOnLaunch: Bool = true {
+        didSet {
+            defaults.set(reopenLastFolderOnLaunch, forKey: Self.reopenLastFolderOnLaunchKey)
+        }
+    }
+
     init(defaults: any KeyValueStoring = LiveKeyValueStore()) {
         self.defaults = defaults
 
@@ -117,6 +127,9 @@ final class ReaderPreferences {
         }
         if let value = storedDefaults[Self.doublePageCoverAloneKey] as? Bool {
             doublePageCoverAlone = value
+        }
+        if let value = storedDefaults[Self.reopenLastFolderOnLaunchKey] as? Bool {
+            reopenLastFolderOnLaunch = value
         }
     }
 }

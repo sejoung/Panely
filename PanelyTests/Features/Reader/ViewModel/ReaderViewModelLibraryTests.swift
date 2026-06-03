@@ -149,6 +149,43 @@ struct ReaderViewModelLibraryTests {
         #expect(vm.libraryDirectoryWatcher == nil)
     }
 
+    @Test func reopenLastFolderOnLaunchDefaultsTrueAndPersists() {
+        let store = InMemoryKeyValueStore()
+        let vm = ReaderViewModel(dependencies: makeTestDependencies(keyValueStore: store))
+        #expect(vm.reopenLastFolderOnLaunch == true)
+
+        vm.reopenLastFolderOnLaunch = false
+
+        // A fresh viewmodel over the same store reads the persisted choice.
+        let reloaded = ReaderViewModel(dependencies: makeTestDependencies(keyValueStore: store))
+        #expect(reloaded.reopenLastFolderOnLaunch == false)
+    }
+
+    @Test func restoreSkippedWhenReopenOnLaunchDisabled() {
+        let vm = makeTestViewModel()
+        vm.lastLibraryRoot.save(URL(fileURLWithPath: "/lib", isDirectory: true))
+        vm.reopenLastFolderOnLaunch = false
+
+        vm.restoreLastLibraryRootIfNeeded()
+
+        #expect(vm.explicitLibraryRootURL == nil)
+        #expect(vm.libraryDirectoryWatcher == nil)
+    }
+
+    @Test func forgetLastLibraryRootClearsSavedFolder() {
+        let vm = makeTestViewModel()
+        let dir = URL(fileURLWithPath: "/lib", isDirectory: true)
+        vm.lastLibraryRoot.save(dir)
+        #expect(vm.hasRememberedLibraryRoot)
+        #expect(vm.rememberedLibraryRoot?.standardizedFileURL.path == dir.standardizedFileURL.path)
+
+        vm.forgetLastLibraryRoot()
+
+        #expect(!vm.hasRememberedLibraryRoot)
+        #expect(vm.rememberedLibraryRoot == nil)
+        #expect(vm.lastLibraryRoot.restore() == nil)
+    }
+
     @Test func stopLibraryWatcherTearsDownAndClears() throws {
         let vm = makeTestViewModel()
         let dir = try Fixture.makeTempDir()

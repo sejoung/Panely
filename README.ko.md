@@ -148,7 +148,9 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
 - **실행 시 마지막 라이브러리 자동 복원** — 마지막에 보던 폴더를
   자동으로 다시 열어(security-scoped bookmark) 콜드 스타트가 빈 사이드바가
   아니라 내 라이브러리에서 시작됨. 파일로 실행(Open With)한 경우엔 그쪽이
-  우선이라 복원을 건너뜀
+  우선이라 복원을 건너뜀. **Settings → Library** 탭에 **실행 시 마지막 폴더
+  다시 열기** 토글(기본 켜짐), 기억된 경로, 일회성 **Forget Now**(저장 폴더
+  삭제)가 있음
 - **폴더 접근 허용** — 단일 파일을 열었고 형제 책들이 안 보일 때,
   사이드바에서 상위 폴더를 고를 수 있는 원클릭 프롬프트 제공
 - **창 컨트롤** — 타이틀바가 숨겨진 상태에서도 상단 28 px 스트립에서
@@ -527,7 +529,7 @@ PanelyTests/                            # 소스 트리를 미러링
 docs/
 ├── manual.md                           # 영문 사용 설명서 (스크린샷 둘러보기)
 ├── manual.ko.md                        # 한글 사용 설명서
-├── screenshots/                        # SnapshotGalleryTests가 생성하는 14개 PNG
+├── screenshots/                        # SnapshotGalleryTests가 생성하는 15개 PNG
 ├── panely_design_system_mac_os.md
 └── icon/panely-icon-stacked.svg
 

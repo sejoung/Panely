@@ -36,6 +36,20 @@ final class LastLibraryRootStore {
         defaults.removeObject(forKey: key)
     }
 
+    /// True when a root bookmark is persisted, without resolving it — a cheap
+    /// key check for gating the settings "Forget" affordance.
+    var hasSavedRoot: Bool {
+        defaults.data(forKey: key) != nil
+    }
+
+    /// Resolve the persisted root for display only: no stale-bookmark refresh
+    /// write, no security scope started. `nil` when nothing is stored or it no
+    /// longer resolves. Use `restore()` (not this) for the actual launch reopen.
+    func peek() -> URL? {
+        guard let data = defaults.data(forKey: key) else { return nil }
+        return bookmarks.resolve(data)?.url
+    }
+
     /// Resolve the persisted root, refreshing a stale bookmark in place. Returns
     /// the URL — the caller starts its security scope — or `nil` when nothing is
     /// stored / it can no longer be resolved (folder deleted, drive ejected).

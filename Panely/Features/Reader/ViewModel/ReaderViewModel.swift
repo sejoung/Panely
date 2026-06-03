@@ -161,6 +161,28 @@ final class ReaderViewModel {
         set { preferences.doublePageCoverAlone = newValue }
     }
 
+    /// Whether a cold launch reopens the last browsed library folder. Settings
+    /// binds to this; `restoreLastLibraryRootIfNeeded()` honors it.
+    var reopenLastFolderOnLaunch: Bool {
+        get { preferences.reopenLastFolderOnLaunch }
+        set { preferences.reopenLastFolderOnLaunch = newValue }
+    }
+
+    /// The folder a cold launch would reopen, resolved read-only for display in
+    /// Settings (`nil` when nothing is remembered or it no longer resolves).
+    var rememberedLibraryRoot: URL? { lastLibraryRoot.peek() }
+
+    /// True when a last-folder bookmark is stored — gates the "Forget" action.
+    var hasRememberedLibraryRoot: Bool { lastLibraryRoot.hasSavedRoot }
+
+    /// Drop the saved last-folder bookmark so the next cold launch starts empty.
+    /// One-shot: opening another folder will remember it again. Independent of
+    /// `reopenLastFolderOnLaunch` (which governs the behavior, not the data).
+    func forgetLastLibraryRoot() {
+        lastLibraryRoot.clear()
+        AppLog.info(.library, "Forgot last library root")
+    }
+
     var sidebarMode: SidebarMode {
         get { preferences.sidebarMode }
         set { preferences.sidebarMode = newValue }

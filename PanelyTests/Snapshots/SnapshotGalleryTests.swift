@@ -209,6 +209,27 @@ struct SnapshotGalleryTests {
         )
     }
 
+    @Test func librarySettings() async throws {
+        let vm = SnapshotSampleContent.emptyViewModel()
+        // Seed a remembered folder so the shot shows the populated state —
+        // the toggle, the "Last opened" path, and the Forget button. The
+        // snapshot viewmodel uses the test bookmark resolver, so save/peek
+        // round-trip without a real security scope.
+        vm.lastLibraryRoot.save(
+            FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Comics/Sample Library", isDirectory: true)
+        )
+
+        try await render(
+            ZStack {
+                PanelyColor.bgPrimary
+                LibrarySettingsView(viewModel: vm)
+            },
+            size: SnapshotRenderer.settingsSize,
+            named: "15-library-settings.png"
+        )
+    }
+
     @Test func diagnosticsSettings() async throws {
         let vm = SnapshotSampleContent.loadedViewModel()
         vm.errorMessage = "Failed to open nested archive."

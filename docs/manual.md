@@ -184,6 +184,24 @@ so reopening the same archive is instant on subsequent launches.
 
 ---
 
+## Library settings
+
+![Library settings: reopen-on-launch toggle and Forget control](screenshots/15-library-settings.png)
+
+Open **File → Settings…** (or **Panely → Settings…**) and choose the
+**Library** tab to control how Panely remembers your library folder.
+
+- **Reopen last folder on launch** — on by default: a cold launch reopens
+  the last folder you browsed, so you don't have to pick it every session.
+  Turn it off to always start empty. The saved folder is kept, so
+  re-enabling picks up where you left off.
+- **Last opened** — the folder a launch would reopen. Hover for the full
+  path.
+- **Forget Now** — drops the saved folder immediately. One-shot: the next
+  folder you open is remembered again.
+
+---
+
 ## Storage and cache
 
 ![Storage settings with extraction cache controls](screenshots/12-storage-cache.png)

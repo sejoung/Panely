@@ -6,6 +6,11 @@ struct SettingsView: View {
 
     var body: some View {
         TabView {
+            LibrarySettingsView(viewModel: viewModel)
+                .tabItem {
+                    Label("Library", systemImage: "books.vertical")
+                }
+
             StorageSettingsView(viewModel: viewModel)
                 .tabItem {
                     Label("Storage", systemImage: "internaldrive")
