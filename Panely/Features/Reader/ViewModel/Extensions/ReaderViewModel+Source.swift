@@ -217,10 +217,11 @@ extension ReaderViewModel {
         // funnel through here). Independent of the auto-refresh watcher below.
         lastLibraryRoot.save(root)
 
-        // FSEvents auto-refresh is gated off in production (a busy / cloud-synced
-        // root could storm tree re-scans and hang the app). The sidebar's manual
-        // refresh button covers refresh until this is re-enabled with the
-        // debounce verified on Release.
+        // FSEvents auto-refresh, behind a flag so tests and previews can opt out.
+        // The 1.5s debounce below keeps a busy / cloud-synced root from storming
+        // full tree re-scans. (This was briefly disabled while chasing a Release
+        // freeze that turned out to be an unrelated SwiftUI update loop in the
+        // viewer's fit application — see AppKitImageScroller.applyFit.)
         guard libraryAutoRefreshEnabled else { return }
 
         let watcher = makeLibraryDirectoryWatcher()

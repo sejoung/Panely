@@ -293,14 +293,26 @@ struct AppKitImageScroller: NSViewRepresentable {
             scrollView.magnification = fit
         }
         coordinator.hasAppliedInitialFit = true
-        // Single write: `coordinator.baseMagnification` forwards to the
-        // ViewerController (the sole owner), which the toolbar observes and
-        // `resetZoom` reads — no manual mirroring between two stored copies.
-        coordinator.baseMagnification = fit
-        // Keep the toolbar's fit-button highlight in sync. If we just reset
-        // to fit, mag == base → `isAtFit == true`. If we preserved the
-        // user's manual zoom, mag != base → highlight drops as expected.
-        coordinator.viewerController?.currentMagnification = scrollView.magnification
+        // `baseMagnification`/`currentMagnification` forward to the @Observable
+        // ViewerController (the sole owner — the toolbar observes them via
+        // `isAtFit`, `resetZoom` reads them). The Observation framework
+        // invalidates on *every* write, with no old==new check. Because
+        // `applyFit` runs from `updateNSView`, an unconditional write here
+        // re-invalidates the toolbar, which re-runs `updateNSView`, which calls
+        // `applyFit` again → an infinite SwiftUI update loop pinning the main
+        // thread. (Latent until a book settles at a stable fit so `applyFit`
+        // keeps re-writing identical values; catastrophic on a large library
+        // where each toolbar render does per-sibling filesystem work.) Writing
+        // only on an actual change breaks the cycle — a real user zoom still
+        // changes `scrollView.magnification`, so the highlight stays in sync.
+        if coordinator.baseMagnification != fit {
+            coordinator.baseMagnification = fit
+        }
+        let magnification = scrollView.magnification
+        if let viewerController = coordinator.viewerController,
+           viewerController.currentMagnification != magnification {
+            viewerController.currentMagnification = magnification
+        }
     }
 
     /// Pure fit-reset policy — extracted so it's unit-testable without a live

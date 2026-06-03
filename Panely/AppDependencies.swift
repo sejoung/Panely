@@ -37,7 +37,7 @@ nonisolated struct AppDependencies {
             systemSettings: LiveSystemSettings(keyValueStore: keyValueStore),
             sourceChangeMonitorFactory: { SourceChangeMonitor() },
             libraryDirectoryWatcherFactory: { LiveLibraryDirectoryWatcher() },
-            libraryAutoRefreshEnabled: false,
+            libraryAutoRefreshEnabled: true,
             filePickerFactory: { LiveFilePicker() },
             makeReaderPreferences: { ReaderPreferences(defaults: keyValueStore) },
             makeReaderPositions: { ReaderPositionStore(defaults: keyValueStore) },
