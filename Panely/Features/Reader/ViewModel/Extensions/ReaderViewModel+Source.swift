@@ -213,7 +213,11 @@ extension ReaderViewModel {
         libraryDirectoryWatcher = watcher
         watchedLibraryRootURL = root
         watcher.startWatching(root: root) { [weak self] in
-            self?.refreshLibraryTree()
+            // Debounce: only refresh once the folder goes quiet, so a busy /
+            // cloud-synced root can't storm full tree re-scans.
+            self?.libraryRefreshDebouncer.schedule {
+                self?.refreshLibraryTree()
+            }
         }
 
         // Remember this root so the next launch reopens it instead of starting

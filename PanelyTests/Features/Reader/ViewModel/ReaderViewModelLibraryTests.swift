@@ -36,7 +36,7 @@ struct ReaderViewModelLibraryTests {
         #expect(watcher?.watchedRoot?.standardizedFileURL == dir.standardizedFileURL)
     }
 
-    @Test func directoryChangeRefreshesTree() throws {
+    @Test func directoryChangeRefreshesTreeAfterDebounceQuiet() async throws {
         let vm = makeTestViewModel()
         let dir = try Fixture.makeTempDir()
         defer { try? FileManager.default.removeItem(at: dir) }
@@ -47,7 +47,12 @@ struct ReaderViewModelLibraryTests {
         let before = vm.libraryRefreshToken
         (vm.libraryDirectoryWatcher as? TestLibraryDirectoryWatcher)?.triggerChange()
 
-        // Watcher callback funnels into the same token bump the manual button uses.
+        // Debounced: a single event does NOT refresh immediately (that's what
+        // prevents a busy/cloud root from storming re-scans).
+        #expect(vm.libraryRefreshToken == before)
+
+        // After the folder stays quiet past the debounce window, it refreshes once.
+        try await Task.sleep(for: .milliseconds(1700))
         #expect(vm.libraryRefreshToken != before)
     }
 

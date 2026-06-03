@@ -80,6 +80,15 @@ final class ReaderViewModel {
     var libraryDirectoryWatcher: (any LibraryDirectoryWatching)?
     var watchedLibraryRootURL: URL?
 
+    /// Coalesces FSEvents-driven tree refreshes. The delay is intentionally
+    /// **longer than the FSEvents stream latency** so a busy or cloud-synced
+    /// library root (whose daemon writes continuously) keeps resetting the
+    /// timer and never fires — breaking the refresh→rescan→event feedback that
+    /// otherwise pegs the main thread. A folder that settles gets one refresh.
+    /// The manual refresh button bypasses this and calls `refreshLibraryTree`
+    /// directly.
+    let libraryRefreshDebouncer = Debouncer(delay: .milliseconds(1500))
+
     /// One-press cue for advancing to the previous volume from page 0.
     /// Set by `goBackward()` (either when arriving at 0 from a higher page,
     /// or on an explicit backward press at 0). Cleared by any page change
