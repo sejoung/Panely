@@ -178,4 +178,98 @@ struct CBZLoaderIntegrationTests {
         }
         #expect(!FileManager.default.fileExists(atPath: dest.path))
     }
+
+    /// The recursive nested-archive extractor must stop at `maxNestingDepth`
+    /// (3). Unbounded nesting is a zip-bomb vector, so an archive nested past
+    /// the cap is left on disk *unextracted* rather than recursed into.
+    @Test func extractAllStopsRecursingPastMaxNestingDepth() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+
+        // Build an archive whose sole contents are `items`, returning its URL.
+        func makeArchive(named name: String, containing items: [URL]) throws -> URL {
+            let src = try Fixture.makeTempDir()
+            defer { try? FileManager.default.removeItem(at: src) }
+            for item in items {
+                try FileManager.default.copyItem(
+                    at: item,
+                    to: src.appendingPathComponent(item.lastPathComponent)
+                )
+            }
+            let zipURL = workDir.appendingPathComponent(name)
+            try Fixture.zipDirectory(src, to: zipURL)
+            return zipURL
+        }
+
+        // Wrap a payload four archives deep:
+        // outer.cbz > A.cbz > B.cbz > C.cbz > D.cbz > page.png
+        let payloadDir = try Fixture.makeTempDir()
+        let page = payloadDir.appendingPathComponent("page.png")
+        try Fixture.makePNG(width: 4, height: 4).write(to: page)
+
+        let d = try makeArchive(named: "D.cbz", containing: [page])
+        let c = try makeArchive(named: "C.cbz", containing: [d])
+        let b = try makeArchive(named: "B.cbz", containing: [c])
+        let a = try makeArchive(named: "A.cbz", containing: [b])
+        let outer = try makeArchive(named: "outer.cbz", containing: [a])
+
+        let dest = workDir.appendingPathComponent("extracted-depth", isDirectory: true)
+        try await CBZLoader.extractAll(from: outer, to: dest)
+
+        // A (depth 0), B (1) and C (2) unpack; D sits at depth 3 where the
+        // guard fires, so D.cbz remains an un-extracted archive file.
+        let residual = dest.appendingPathComponent("A/B/C/D.cbz")
+        #expect(
+            FileManager.default.fileExists(atPath: residual.path),
+            "archive past the nesting cap must be left unextracted"
+        )
+
+        // ...and its contents must NOT have been unpacked.
+        var isDir: ObjCBool = false
+        let tooDeep = dest.appendingPathComponent("A/B/C/D")
+        let unpacked = FileManager.default.fileExists(atPath: tooDeep.path, isDirectory: &isDir)
+            && isDir.boolValue
+        #expect(unpacked == false, "extractor must not recurse past maxNestingDepth")
+    }
+
+    /// A symlink entry whose target escapes the destination must not be
+    /// materialized, and a file entry that tries to write *through* such a
+    /// symlink must not land outside the extraction root. ZIPFoundation
+    /// rejects uncontained symlinks by default; this locks that in so a
+    /// dependency bump (or accidentally passing `allowUncontainedSymlinks`)
+    /// can't silently regress it.
+    @Test func extractAllDoesNotEscapeViaSymlinkEntry() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+
+        // A directory OUTSIDE the extraction root — what the malicious symlink
+        // points at.
+        let outside = workDir.appendingPathComponent("outside", isDirectory: true)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+
+        // On-disk symlink → `outside` (absolute). `addEntry` detects the
+        // symlink type and stores it as a symlink entry.
+        let linkOnDisk = workDir.appendingPathComponent("evil-link")
+        try FileManager.default.createSymbolicLink(at: linkOnDisk, withDestinationURL: outside)
+
+        let payload = workDir.appendingPathComponent("payload.png")
+        try Fixture.makePNG(width: 4, height: 4).write(to: payload)
+
+        let archiveURL = workDir.appendingPathComponent("evil.cbz")
+        let archive = try Archive(url: archiveURL, accessMode: .create)
+        // Symlink entry first so it's processed before the write-through entry.
+        try archive.addEntry(with: "evil-link", fileURL: linkOnDisk)
+        try archive.addEntry(with: "evil-link/escaped.png", fileURL: payload)
+
+        let dest = workDir.appendingPathComponent("extracted-symlink", isDirectory: true)
+        // May throw (uncontained symlink rejected) or be contained silently —
+        // either way the payload must never escape into `outside`.
+        _ = try? await CBZLoader.extractAll(from: archiveURL, to: dest)
+
+        let escaped = outside.appendingPathComponent("escaped.png")
+        #expect(
+            FileManager.default.fileExists(atPath: escaped.path) == false,
+            "file must not be written outside the destination via a symlink entry"
+        )
+    }
 }
