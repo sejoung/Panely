@@ -366,6 +366,9 @@ extension ReaderViewModel {
         if let resolvedSiblings {
             siblings = resolvedSiblings
         }
+        // Restore this series' remembered direction/layout/fitMode before the
+        // page index is computed, so the spread snap uses the final layout.
+        applySeriesPreferences()
         currentPageIndex = restorePosition
             ? clampedRestoredIndex(for: targetURL, pageCount: loaded.pageCount)
             : 0

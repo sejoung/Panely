@@ -304,6 +304,43 @@ extension ReaderViewModel {
         positions.primaryKey(for: url, opened: openedSourceURL, tempRoot: tempDir.url)
     }
 
+    /// Identifier for the series the currently-open book belongs to (parent
+    /// folder, or the opened archive for zip-in-zip), or `nil` when nothing is
+    /// open. Drives the per-series scope: zoom carry-over within a series and
+    /// the persisted direction/layout/fitMode memory. Empty string when there
+    /// is no source so the viewer's `seriesIdentity` prop has a stable value.
+    var seriesIdentity: String {
+        ReaderSeriesIdentity.make(
+            for: currentSourceURL,
+            opened: openedSourceURL,
+            tempRoot: tempDir.url
+        ) ?? ""
+    }
+
+    /// Restore the current series' remembered direction/layout/fitMode (if it
+    /// has any) onto the global preferences, so opening a book reads the way
+    /// that series was last read. Writes `preferences.*` *directly* — not via
+    /// the write-through setters — so restoring never re-stamps the series
+    /// store. A series with no saved override (first time opened) leaves the
+    /// global default untouched, making it that series' starting point.
+    ///
+    /// Call after `currentSourceURL` is set (so `seriesIdentity` resolves) and
+    /// before the restored page index is computed (so the spread snap uses the
+    /// final layout).
+    func applySeriesPreferences() {
+        let id = seriesIdentity
+        guard !id.isEmpty else { return }
+        if let direction = seriesPreferences.direction(forSeries: id) {
+            preferences.direction = direction
+        }
+        if let layout = seriesPreferences.layout(forSeries: id) {
+            preferences.layout = layout
+        }
+        if let fitMode = seriesPreferences.fitMode(forSeries: id) {
+            preferences.fitMode = fitMode
+        }
+    }
+
     /// Schedule a debounced save for the current page. Called from the
     /// `currentPageIndex` didSet, so this fires once per page change — even
     /// during 60 Hz vertical scroll the store coalesces into a single write.

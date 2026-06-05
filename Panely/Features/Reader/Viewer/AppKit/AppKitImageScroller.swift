@@ -13,6 +13,11 @@ struct AppKitImageScroller: NSViewRepresentable {
     let layout: PageLayout
     let pageIndex: Int
     let identity: String
+    /// Series the current book belongs to. When `identity` (the book) changes
+    /// but `seriesIdentity` stays the same, the user moved between sibling
+    /// volumes of one series — that's when the manual zoom carries over (see
+    /// `captureZoomCarryOverIfBookChanged`). A different series resets to fit.
+    var seriesIdentity: String = ""
     var onPageIndexChanged: (Int) -> Void = { _ in }
     var onVisibleRangeChanged: (Range<Int>) -> Void = { _ in }
     var autoFitOnResize: Bool = true
@@ -52,10 +57,14 @@ struct AppKitImageScroller: NSViewRepresentable {
         refreshCoordinatorBindings(context.coordinator, scrollView: scrollView)
         let contentStructureChanged = updateContentImages(content)
 
+        // Read the outgoing series before recordPropChange commits the new one,
+        // so the carry-over can stash where we left it.
+        let previousSeriesIdentity = context.coordinator.lastSeriesIdentity
         let diff = recordPropChange(
             into: context.coordinator,
             contentStructureChanged: contentStructureChanged
         )
+        captureZoomCarryOverIfBookChanged(scrollView: scrollView, coordinator: context.coordinator, diff: diff, previousSeriesIdentity: previousSeriesIdentity)
         applyFitIfNeeded(scrollView: scrollView, coordinator: context.coordinator, diff: diff)
         syncScrollPositionIfNeeded(scrollView: scrollView, content: content, coordinator: context.coordinator)
         kickInitialVisibleRangeIfVertical(scrollView: scrollView, content: content, coordinator: context.coordinator)
@@ -192,9 +201,69 @@ struct AppKitImageScroller: NSViewRepresentable {
             pageChanged: coordinator.lastPageIndex != pageIndex
         )
         coordinator.lastIdentity = identity
+        coordinator.lastSeriesIdentity = seriesIdentity
         coordinator.lastFitMode = fitMode
         coordinator.lastLayout = layout
         return diff
+    }
+
+    /// On a book switch, decide how the user's manual zoom carries into the
+    /// next book and stash it as `pendingZoomFactor` for `applyFit` to consume
+    /// once the new strip has a valid size. Read at this moment so
+    /// `scrollView.magnification` / `baseMagnification` still reflect the
+    /// *previous* book (the new fit hasn't been applied yet):
+    /// - different series, or the user was at fit → factor 1.0 (snap to the new
+    ///   book's fit; a clean slate when jumping series)
+    /// - same series with an escaped zoom → carry the fit-relative ratio so the
+    ///   page keeps the same on-screen scale across sibling volumes
+    /// Skipped entirely when auto-fit is locked off — the user has taken manual
+    /// control, so the existing preserve-absolute path is left untouched.
+    private func captureZoomCarryOverIfBookChanged(scrollView: PanelyScrollView, coordinator: AppKitScrollerCoordinator, diff: PropDiff, previousSeriesIdentity: String) {
+        guard diff.identityChanged, coordinator.autoFitOnResize else { return }
+        coordinator.pendingZoomFactor = Self.resolveSeriesZoom(
+            previousSeriesID: previousSeriesIdentity,
+            newSeriesID: seriesIdentity,
+            baseMagnification: coordinator.baseMagnification,
+            magnification: scrollView.magnification,
+            memory: &coordinator.sessionZoomBySeriesID
+        )
+    }
+
+    /// Pure carry-over policy — extracted so it's unit-testable without a live
+    /// scroll view (mirrors `shouldResetMagnification`). Called at a book
+    /// switch with the *previous* book's fit baseline and live magnification:
+    ///
+    /// 1. Record where we left the previous series — its escaped fit-relative
+    ///    zoom (`magnification / baseFit`), or clear it if the user was at fit,
+    ///    so returning later restores that exact state.
+    /// 2. Pick the factor for the next book:
+    ///    - same series → keep the current zoom (carry across sibling volumes)
+    ///    - different series → restore that series' remembered zoom from session
+    ///      memory, or 1.0 (snap to fit) if it has none.
+    ///
+    /// A factor of 1.0 means "the new book's own fit". `memory` is mutated in
+    /// place (the coordinator's session map).
+    static func resolveSeriesZoom(
+        previousSeriesID: String,
+        newSeriesID: String,
+        baseMagnification: CGFloat,
+        magnification: CGFloat,
+        memory: inout [String: CGFloat]
+    ) -> CGFloat {
+        let escapedFactor: CGFloat? = (baseMagnification > 0
+            && abs(magnification - baseMagnification) > ViewerController.fitTolerance)
+            ? magnification / baseMagnification
+            : nil
+
+        if !previousSeriesID.isEmpty {
+            // nil (at fit) clears the slot so a later return lands at fit.
+            memory[previousSeriesID] = escapedFactor
+        }
+
+        if previousSeriesID == newSeriesID {
+            return escapedFactor ?? 1.0
+        }
+        return memory[newSeriesID] ?? 1.0
     }
 
     private func applyFitIfNeeded(scrollView: PanelyScrollView, coordinator: AppKitScrollerCoordinator, diff: PropDiff) {
@@ -280,6 +349,28 @@ struct AppKitImageScroller: NSViewRepresentable {
             viewport: viewport,
             fitMode: fitMode
         )
+
+        // One-shot zoom carry-over from a book switch (set by
+        // `captureZoomCarryOverIfBookChanged`). Apply `factor × fit` and adopt
+        // the new book's fit as the baseline, so reset/double-click land
+        // correctly. Consumed here — the first fit with a valid doc size after
+        // the switch — so the staged vertical rebuild's empty-strip ticks
+        // (which bail at the size guard above) don't swallow it.
+        if let factor = coordinator.pendingZoomFactor {
+            coordinator.pendingZoomFactor = nil
+            let target = min(max(fit * factor, scrollView.minMagnification), scrollView.maxMagnification)
+            scrollView.magnification = target
+            coordinator.hasAppliedInitialFit = true
+            if coordinator.baseMagnification != fit {
+                coordinator.baseMagnification = fit
+            }
+            let magnification = scrollView.magnification
+            if let viewerController = coordinator.viewerController,
+               viewerController.currentMagnification != magnification {
+                viewerController.currentMagnification = magnification
+            }
+            return
+        }
 
         let userHasZoomed = abs(scrollView.magnification - coordinator.baseMagnification) > ViewerController.fitTolerance
         let shouldReset = shouldResetMagnification(

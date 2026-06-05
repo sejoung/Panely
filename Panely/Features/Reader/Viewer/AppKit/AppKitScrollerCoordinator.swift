@@ -11,6 +11,7 @@ import AppKit
 @MainActor
 final class AppKitScrollerCoordinator {
     var lastIdentity: String = ""
+    var lastSeriesIdentity: String = ""
     var lastFitMode: FitMode = .fitScreen
     var lastLayout: PageLayout = .single
     var lastPageIndex: Int = -1
@@ -44,6 +45,24 @@ final class AppKitScrollerCoordinator {
     /// spuriously read `true` and suppress the fit, leaving the page rendered
     /// at the wrong (or zero) magnification.
     var hasAppliedInitialFit: Bool = false
+
+    /// One-shot fit-relative zoom to apply on the next valid fit after a book
+    /// switch. Captured when the book (`identity`) changes — `nil` outside that
+    /// window. `applyFit` consumes it: `magnification = factor × newFit`, so a
+    /// value of 1.0 means "snap to the new book's fit" and e.g. 2.0 means
+    /// "keep showing it at twice the fit, like the previous book". Held until
+    /// the first fit with a valid document size (the empty-strip ticks during
+    /// a vertical rebuild early-return before consuming it), which is why it's
+    /// a stored one-shot rather than gated on the transient `identityChanged`.
+    var pendingZoomFactor: CGFloat?
+
+    /// Session memory of each series' last manual zoom, as a fit-relative
+    /// factor. Lets leaving a series and returning (within the same session)
+    /// restore that series' zoom, while a series you left at fit — or never
+    /// zoomed — comes back at fit. Lives on the coordinator, which now persists
+    /// across book switches (the viewer stays mounted), and is intentionally
+    /// not persisted to disk: zoom carry-over is session-scoped.
+    var sessionZoomBySeriesID: [String: CGFloat] = [:]
 
     weak var scrollView: NSScrollView?
     weak var viewerController: ViewerController?

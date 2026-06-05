@@ -7,7 +7,14 @@ struct ViewerContainer: View {
     var fitMode: FitMode = .fitScreen
     var layout: PageLayout = .single
     var pageIndex: Int = 0
+    /// True while a book is open (even mid-load when `images` is briefly empty).
+    /// Keeps the AppKit scroller — and its coordinator's live zoom/scroll state
+    /// — mounted across book switches instead of tearing it down every time the
+    /// strip empties. Without this, switching books recreated the scroll view
+    /// and discarded the magnification, breaking zoom carry-over.
+    var hasSource: Bool = false
     var identity: String = ""
+    var seriesIdentity: String = ""
     var onPageIndexChanged: (Int) -> Void = { _ in }
     var onVisibleRangeChanged: (Range<Int>) -> Void = { _ in }
     var autoFitOnResize: Bool = true
@@ -18,7 +25,7 @@ struct ViewerContainer: View {
             PanelyColor.bgPrimary
                 .ignoresSafeArea()
 
-            if images.isEmpty {
+            if images.isEmpty && !hasSource {
                 emptyState
             } else {
                 AppKitImageScroller(
@@ -28,6 +35,7 @@ struct ViewerContainer: View {
                     layout: layout,
                     pageIndex: pageIndex,
                     identity: identity,
+                    seriesIdentity: seriesIdentity,
                     onPageIndexChanged: onPageIndexChanged,
                     onVisibleRangeChanged: onVisibleRangeChanged,
                     autoFitOnResize: autoFitOnResize,

@@ -45,6 +45,10 @@ final class ReaderViewModel {
     let recentItems: RecentItemsStore
     let favorites: FavoritesStore
     let pageBookmarks: PageBookmarksStore
+    /// Per-series override of direction/layout/fitMode. The effective value the
+    /// reader uses is `seriesPreferences ?? preferences` (global) — applied on
+    /// load via `applySeriesPreferences`, written through on every change.
+    let seriesPreferences: ReaderSeriesPreferencesStore
     let makeSourceChangeMonitor: @MainActor () -> any SourceChangeMonitoring
     let makeLibraryDirectoryWatcher: @MainActor () -> any LibraryDirectoryWatching
     let libraryAutoRefreshEnabled: Bool
@@ -117,11 +121,20 @@ final class ReaderViewModel {
     // The `layout` setter additionally triggers `handleLayoutChange` so an
     // image refresh and page-index snap happen on the same call.
 
+    // The direction/layout/fitMode setters write through to BOTH the global
+    // default (`preferences`, the fallback for unseen series) and the current
+    // series' override (`seriesPreferences`), so the value is remembered per
+    // series while the global default also tracks the user's latest choice.
+    // The series write no-ops when no book is open (empty `seriesIdentity`).
+    // Load-time restore sets `preferences.*` directly (not through these
+    // setters) so applying a series' remembered value never writes it back.
+
     var layout: PageLayout {
         get { preferences.layout }
         set {
             let oldValue = preferences.layout
             preferences.layout = newValue
+            seriesPreferences.setLayout(newValue, forSeries: seriesIdentity)
             if oldValue != newValue {
                 handleLayoutChange(from: oldValue)
             }
@@ -130,12 +143,18 @@ final class ReaderViewModel {
 
     var direction: ReadingDirection {
         get { preferences.direction }
-        set { preferences.direction = newValue }
+        set {
+            preferences.direction = newValue
+            seriesPreferences.setDirection(newValue, forSeries: seriesIdentity)
+        }
     }
 
     var fitMode: FitMode {
         get { preferences.fitMode }
-        set { preferences.fitMode = newValue }
+        set {
+            preferences.fitMode = newValue
+            seriesPreferences.setFitMode(newValue, forSeries: seriesIdentity)
+        }
     }
 
     var autoFitOnResize: Bool {
@@ -241,6 +260,7 @@ final class ReaderViewModel {
             defaults: dependencies.keyValueStore
         )
         self.pageBookmarks = PageBookmarksStore(defaults: dependencies.keyValueStore)
+        self.seriesPreferences = ReaderSeriesPreferencesStore(defaults: dependencies.keyValueStore)
         self.makeSourceChangeMonitor = dependencies.sourceChangeMonitorFactory
         self.makeLibraryDirectoryWatcher = dependencies.libraryDirectoryWatcherFactory
         self.libraryAutoRefreshEnabled = dependencies.libraryAutoRefreshEnabled
