@@ -158,6 +158,10 @@ extension ReaderViewModel {
         loadEpoch &+= 1
         isLoading = true
         loadingMessage = "Opening…"
+        // Drop the outgoing book's strip now (while isLoading guards against a
+        // scroll-driven position overwrite) so the new book's restored-position
+        // scroll-sync doesn't run against the previous book's stale frames.
+        imageLoader.prepareForBookSwitch()
         return loadEpoch
     }
 

@@ -32,6 +32,11 @@ struct ReaderViewModelVerticalModeTests {
         let vm = makeViewModel(pageCount: 10)
         vm.layout = .vertical
         vm.currentPageIndex = 0
+        // Entering vertical flips isLoading on (handleLayoutChange shows the
+        // "Building vertical strip…" overlay) and scroll-driven page updates
+        // are deferred until the rebuild finishes. Simulate load completion so
+        // this exercises the normal post-load scrolling path.
+        vm.isLoading = false
 
         vm.setCurrentPageFromScroll(7)
         #expect(vm.currentPageIndex == 7)
@@ -41,6 +46,7 @@ struct ReaderViewModelVerticalModeTests {
         let vm = makeViewModel(pageCount: 10)
         vm.layout = .vertical
         vm.currentPageIndex = 4
+        vm.isLoading = false // reach the bounds guard (see update test above)
 
         vm.setCurrentPageFromScroll(99)
         #expect(vm.currentPageIndex == 4)
@@ -53,6 +59,7 @@ struct ReaderViewModelVerticalModeTests {
         let vm = makeViewModel(pageCount: 10)
         vm.layout = .vertical
         vm.currentPageIndex = 5
+        vm.isLoading = false // reach the idempotency guard (see update test above)
 
         vm.setCurrentPageFromScroll(5)
         #expect(vm.currentPageIndex == 5)

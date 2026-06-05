@@ -79,6 +79,20 @@ final class ReaderImageLoader {
         currentImages = []
     }
 
+    /// Drop the previous book's strip before a new `load(url:)` starts.
+    /// Without this the old images (and their `ImageStackView` frames) stay
+    /// on screen through the new book's up-front dimension fetch. During that
+    /// window the restored-position scroll-sync runs against the *stale* strip
+    /// and marks the page as shown, so when the real strip is built the sync
+    /// is suppressed (`lastPageIndex == pageIndex`) and the viewer is left
+    /// scrolled to a frame that no longer exists — a black gap. Clearing here
+    /// makes the switch behave like a first load (empty strip → no premature
+    /// scroll). `refresh(...)` repopulates immediately after.
+    func prepareForBookSwitch() {
+        currentImages = []
+        pageDimensions = []
+    }
+
     /// Cancel any pending preload — called when a new `load(url:)` begins so
     /// background decodes for the previous book don't waste CPU.
     func cancelPreload() {

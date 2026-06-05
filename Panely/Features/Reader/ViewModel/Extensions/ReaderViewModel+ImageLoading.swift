@@ -80,6 +80,15 @@ extension ReaderViewModel {
     /// around the center page.
     func setCurrentPageFromScroll(_ index: Int) {
         guard layout.isContinuous else { return }
+        // A load/layout-rebuild transiently empties and rebuilds the vertical
+        // strip; the resulting bounds change emits a scroll-driven index
+        // (usually 0, since an empty strip reports page 0) *before* the
+        // restored position is applied. Honoring it here would fire the
+        // `currentPageIndex` didSet → `savePosition()` and overwrite the
+        // book's saved continue-reading position with 0. Ignore scroll-driven
+        // updates while loading; the programmatic restore scroll is separately
+        // suppressed via the coordinator's `isProgrammaticallyScrolling` flag.
+        guard !isLoading else { return }
         guard source.pages.indices.contains(index) else { return }
         guard index != currentPageIndex else { return }
         currentPageIndex = index
