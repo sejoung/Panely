@@ -159,6 +159,21 @@ The card is intent-gated — it doesn't auto-appear on every fresh open
 at page 0, so opening Volume 2 cold doesn't badger you about Volume 1.
 Only an explicit backward signal surfaces it.
 
+### Per-series memory
+
+Layout, reading direction, and fit mode are remembered **per series** — a
+series being the folder its volumes live in (or the archive itself for
+zip-in-zip). Read one series right-to-left double-page and another as a
+vertical webtoon, and each reopens the way you left it. Changing a setting
+also updates the global default, which becomes the starting point for any
+series you open for the first time.
+
+Manual **zoom** carries the same way, for the current session: it stays as
+you move between sibling volumes, each series remembers its zoom until you
+quit, and jumping to a different series snaps the new book back to its fit
+(returning to the earlier series restores its zoom). Sidebar pin, toolbar
+pin, and the view-size lock stay global across every book.
+
 ---
 
 ## Loading states

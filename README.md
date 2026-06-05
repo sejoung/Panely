@@ -78,6 +78,10 @@ pages.
 - **Auto-refit on viewport resize** (when unlocked) — when the window or
   sidebar size changes, the image snaps to the new fit. Manual zoom is
   preserved by default
+- **Zoom carries within a series** — manual zoom is kept as you move between
+  sibling volumes, and each series remembers its zoom for the session
+  (cleared on quit). Jumping to a different series snaps the new book to its
+  own fit; returning later restores that series' zoom
 - **Auto-centering** — image stays centered when the viewport is larger
 - **Preload ±2 pages** in paged modes so the next flip is instant
 - **Series continuous reading** — when the last page of a volume is
@@ -179,9 +183,13 @@ pages.
   survives temp-directory extractions. A secondary key derived from the
   volume + file resource identifier recovers the saved position even
   when an external drive's mount path changes
-- **Layout + direction + fit mode + sidebar pin + toolbar pin + auto-fit
-  lock** all persisted (the legacy `panely.sidebarVisible` key auto-migrates
-  to the new pin flag)
+- **Per-series reading settings** — layout, reading direction, and fit mode
+  are remembered per series (a volume's folder, or the archive itself for
+  zip-in-zip), so a manga series stays RTL while a webtoon series stays
+  vertical. Changing one writes through to both that series and the global
+  default used for series you open for the first time. Sidebar pin, toolbar
+  pin, and the auto-fit lock stay global (the legacy `panely.sidebarVisible`
+  key auto-migrates to the new pin flag)
 - **Bookmark / favorite safety** — page-bookmark cap (500 per book) +
   total-entry cap (200 books) keeps the store comfortably under the
   `UserDefaults` ~4 MB practical limit, preventing wholesale loss on
