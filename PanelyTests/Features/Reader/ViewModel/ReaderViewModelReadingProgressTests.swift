@@ -95,6 +95,24 @@ struct ReaderViewModelReadingProgressTests {
         #expect(vm.continueReadingSuggestion?.title == "Vol02")
     }
 
+    @Test func continueReadingFindsZipInZipInnerVolumeProgress() {
+        let vm = makeTestViewModel()
+        let outer = URL(fileURLWithPath: "/lib/Series.cbz")
+        vm.recentItems.record(outer, title: "Series")
+        vm.readingProgress.flushImmediately(
+            forKey: outer.standardizedFileURL.path + "#Vol02",
+            fileIdentityKey: nil,
+            page: 6,
+            total: 20,
+            finished: false
+        )
+
+        let suggestion = vm.continueReadingSuggestion
+        #expect(suggestion?.title == "Series · Vol02")
+        #expect(suggestion?.fraction == 0.35)
+        #expect(suggestion?.innerPath == "Vol02")
+    }
+
     // MARK: - Volume navigation feeds Recents (so Continue Reading tracks it)
 
     @Test func nextVolumeRecordsTargetInRecents() {

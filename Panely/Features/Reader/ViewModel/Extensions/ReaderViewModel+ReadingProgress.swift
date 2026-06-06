@@ -25,6 +25,7 @@ extension ReaderViewModel {
         let title: String
         let fraction: Double
         let item: RecentItem
+        let innerPath: String?
     }
 
     /// The most-recently-read book that isn't finished, drawn from recents so
@@ -42,18 +43,30 @@ extension ReaderViewModel {
         for item in recentItems.items {
             let url = URL(fileURLWithPath: item.path)
             let keys = PositionKey.keys(for: url, opened: nil, tempRoot: nil)
-            guard let progress = readingProgress.progress(forKey: keys.primary, fileIdentityKey: keys.fileIdentity),
-                  !progress.finished,
-                  progress.total > 0
-            else { continue }
+            var candidates: [(key: String, innerPath: String?, progress: ReadingProgress)] = []
+            if let progress = readingProgress.progress(forKey: keys.primary, fileIdentityKey: keys.fileIdentity) {
+                candidates.append((keys.primary, nil, progress))
+            }
 
-            if progress.updatedAt > bestUpdatedAt {
-                bestUpdatedAt = progress.updatedAt
+            let nestedPrefix = keys.primary + "#"
+            for (key, progress) in readingProgress.entries where key.hasPrefix(nestedPrefix) {
+                let innerPath = String(key.dropFirst(nestedPrefix.count))
+                guard !innerPath.isEmpty else { continue }
+                candidates.append((key, innerPath, progress))
+            }
+
+            for candidate in candidates where !candidate.progress.finished && candidate.progress.total > 0 {
+                guard candidate.progress.updatedAt > bestUpdatedAt else { continue }
+                bestUpdatedAt = candidate.progress.updatedAt
+                let title = candidate.innerPath.map {
+                    "\(item.title) · \(displayTitle(for: URL(fileURLWithPath: $0)))"
+                } ?? item.title
                 best = ContinueReadingSuggestion(
-                    id: keys.primary,
-                    title: item.title,
-                    fraction: progress.fraction,
-                    item: item
+                    id: candidate.key,
+                    title: title,
+                    fraction: candidate.progress.fraction,
+                    item: item,
+                    innerPath: candidate.innerPath
                 )
             }
         }
@@ -62,6 +75,7 @@ extension ReaderViewModel {
 
     func openContinueReading(_ suggestion: ContinueReadingSuggestion) {
         guard let url = recentItems.resolve(suggestion.item) else { return }
-        openURL(url)
+        recentItems.record(url, title: displayTitle(for: url))
+        Task { await load(url: url, intent: .favorite(innerPath: suggestion.innerPath)) }
     }
 }
