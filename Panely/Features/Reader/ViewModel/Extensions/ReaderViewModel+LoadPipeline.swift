@@ -44,6 +44,7 @@ extension ReaderViewModel {
         )
         let myEpoch = startLoad()
         pendingSourceURL = url
+        let preservesExistingLibraryContext = libraryRootURLIfItContains(url) != nil
         let preservedLibraryRootURL = intent.preservesLibraryRoot
             ? libraryRootURLIfItContains(url)
             : nil
@@ -54,7 +55,10 @@ extension ReaderViewModel {
             }
         }
 
-        prepareScope(for: url, preservedLibraryRootURL: preservedLibraryRootURL)
+        let didAcquireScopeForLoad = prepareScope(
+            for: url,
+            preservedLibraryRootURL: preservedLibraryRootURL
+        )
 
         var targetURL = url
         var siblingsToUse = knownSiblings
@@ -92,7 +96,10 @@ extension ReaderViewModel {
                     "Folder resolved empty",
                     metadata: ["source": "\(DiagnosticRedactor.describe(targetURL))"]
                 )
-                clearLoadedSource(message: "Folder is empty or has no supported content")
+                clearLoadedSource(
+                    message: "Folder is empty or has no supported content",
+                    preserveLibraryContext: preservesExistingLibraryContext
+                )
                 return
             }
 
@@ -136,8 +143,13 @@ extension ReaderViewModel {
                     "source": "\(DiagnosticRedactor.describe(url))",
                 ]
             )
-            clearLoadedSource(message: error.localizedDescription)
-            libraryScope.release()
+            clearLoadedSource(
+                message: error.localizedDescription,
+                preserveLibraryContext: preservesExistingLibraryContext
+            )
+            if didAcquireScopeForLoad {
+                libraryScope.release()
+            }
         }
     }
 
@@ -165,12 +177,14 @@ extension ReaderViewModel {
         return loadEpoch
     }
 
-    private func prepareScope(for url: URL, preservedLibraryRootURL: URL?) {
+    @discardableResult
+    private func prepareScope(for url: URL, preservedLibraryRootURL: URL?) -> Bool {
         if !isInsideCurrentTree(url) {
             tempDir.cleanup()
-            libraryScope.acquire(url)
+            let didAcquire = libraryScope.acquire(url)
             explicitLibraryRootURL = preservedLibraryRootURL
             openedSourceURL = url
+            return didAcquire
         } else if tempDir.isActive && !tempDir.contains(url) {
             // Inside the library scope but outside the active temp dir —
             // user is switching to a different book (or re-opening the
@@ -184,6 +198,7 @@ extension ReaderViewModel {
             }
             openedSourceURL = url
         }
+        return false
     }
 
     private func resolveArchiveTarget(for url: URL, epoch: Int) async throws -> URL? {
@@ -376,7 +391,7 @@ extension ReaderViewModel {
         return true
     }
 
-    func clearLoadedSource(message: String) {
+    func clearLoadedSource(message: String, preserveLibraryContext: Bool = false) {
         let redactedMessage = DiagnosticRedactor.redactKnownPaths(
             in: message,
             urls: [currentSourceURL, openedSourceURL, libraryRootURL, tempDir.url]
@@ -390,7 +405,9 @@ extension ReaderViewModel {
         siblings = []
         sourceChangeMonitor?.stopWatching()
         sourceChangeMonitor = nil
-        stopLibraryWatcher()
+        if !preserveLibraryContext {
+            stopLibraryWatcher()
+        }
         clearSourceChangeNotice()
     }
 

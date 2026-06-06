@@ -36,7 +36,15 @@ struct ReaderViewModelOpenSourceTests {
     @Test func requestFolderAccessSetsLibraryRoot() {
         let folder = URL(fileURLWithPath: "/lib", isDirectory: true)
         let picker = TestFilePicker(urlToReturn: folder)
-        let vm = ReaderViewModel(dependencies: makeTestDependencies(filePicker: picker))
+        let scope = ReaderLibraryScope(
+            accessor: TestSecurityScopedResourceAccessor(shouldStart: true)
+        )
+        let vm = ReaderViewModel(
+            dependencies: makeTestDependencies(
+                filePicker: picker,
+                readerLibraryScopeFactory: { scope }
+            )
+        )
 
         vm.requestFolderAccess()
 
@@ -45,6 +53,26 @@ struct ReaderViewModelOpenSourceTests {
         #expect(picker.lastRequest?.canChooseDirectories == true)
         // …and the picked folder becomes the explicit library root.
         #expect(vm.explicitLibraryRootURL?.standardizedFileURL.path == folder.standardizedFileURL.path)
+    }
+
+    @Test func requestFolderAccessDoesNotMutateStateWhenScopeFails() {
+        let folder = URL(fileURLWithPath: "/lib", isDirectory: true)
+        let picker = TestFilePicker(urlToReturn: folder)
+        let scope = ReaderLibraryScope(
+            accessor: TestSecurityScopedResourceAccessor(shouldStart: false)
+        )
+        let vm = ReaderViewModel(
+            dependencies: makeTestDependencies(
+                filePicker: picker,
+                readerLibraryScopeFactory: { scope }
+            )
+        )
+
+        vm.requestFolderAccess()
+
+        #expect(vm.explicitLibraryRootURL == nil)
+        #expect(vm.recentItems.items.isEmpty)
+        #expect(vm.errorMessage == "Could not access selected folder.")
     }
 
     @Test func requestFolderAccessDoesNothingWhenCancelled() {

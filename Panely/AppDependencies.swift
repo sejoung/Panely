@@ -8,11 +8,9 @@ nonisolated struct AppDependencies {
     let systemSettings: any SystemSettingsReading
     let sourceChangeMonitorFactory: @MainActor () -> any SourceChangeMonitoring
     let libraryDirectoryWatcherFactory: @MainActor () -> any LibraryDirectoryWatching
-    /// Master switch for FSEvents-driven sidebar auto-refresh. Disabled in
-    /// production: on some real libraries (large / cloud-synced roots) the
-    /// watcher could storm tree re-scans and hang the app. The manual refresh
-    /// button covers refresh until this is re-enabled with the debounce
-    /// verified on a Release build.
+    /// Master switch for FSEvents-driven sidebar auto-refresh. Enabled in
+    /// production after the tree refresh path was debounced and verified on
+    /// Release builds; tests and previews can still disable it.
     let libraryAutoRefreshEnabled: Bool
     let filePickerFactory: @MainActor () -> any FilePicking
 
@@ -25,6 +23,7 @@ nonisolated struct AppDependencies {
     let makeReadingProgress: @MainActor () -> ReadingProgressStore
     let makeLastLibraryRoot: @MainActor () -> LastLibraryRootStore
     let makeReaderTempDirectory: @MainActor () -> ReaderTempDirectory
+    let makeReaderLibraryScope: @MainActor () -> ReaderLibraryScope
 
     static let live: AppDependencies = {
         let keyValueStore = LiveKeyValueStore()
@@ -43,7 +42,8 @@ nonisolated struct AppDependencies {
             makeReaderPositions: { ReaderPositionStore(defaults: keyValueStore) },
             makeReadingProgress: { ReadingProgressStore(defaults: keyValueStore) },
             makeLastLibraryRoot: { LastLibraryRootStore(defaults: keyValueStore) },
-            makeReaderTempDirectory: { ReaderTempDirectory(extractionCache: extractionCache) }
+            makeReaderTempDirectory: { ReaderTempDirectory(extractionCache: extractionCache) },
+            makeReaderLibraryScope: { ReaderLibraryScope() }
         )
     }()
 }

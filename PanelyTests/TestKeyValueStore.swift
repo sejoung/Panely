@@ -228,6 +228,16 @@ final class TestFilePicker: FilePicking {
     }
 }
 
+nonisolated struct TestSecurityScopedResourceAccessor: SecurityScopedResourceAccessing {
+    var shouldStart = true
+
+    func startAccessing(_ url: URL) -> Bool {
+        shouldStart
+    }
+
+    func stopAccessing(_ url: URL) {}
+}
+
 @MainActor
 func makeTestDependencies(
     keyValueStore: InMemoryKeyValueStore = InMemoryKeyValueStore(),
@@ -238,7 +248,8 @@ func makeTestDependencies(
     sourceChangeMonitorFactory: @MainActor @escaping () -> any SourceChangeMonitoring = { TestSourceChangeMonitor() },
     libraryDirectoryWatcherFactory: @MainActor @escaping () -> any LibraryDirectoryWatching = { TestLibraryDirectoryWatcher() },
     libraryAutoRefreshEnabled: Bool = true,
-    filePicker: any FilePicking = TestFilePicker()
+    filePicker: any FilePicking = TestFilePicker(),
+    readerLibraryScopeFactory: @MainActor @escaping () -> ReaderLibraryScope = { ReaderLibraryScope() }
 ) -> AppDependencies {
     AppDependencies(
         extractionCache: extractionCache,
@@ -254,7 +265,8 @@ func makeTestDependencies(
         makeReaderPositions: { ReaderPositionStore(defaults: keyValueStore) },
         makeReadingProgress: { ReadingProgressStore(defaults: keyValueStore) },
         makeLastLibraryRoot: { LastLibraryRootStore(bookmarks: bookmarkResolver, defaults: keyValueStore) },
-        makeReaderTempDirectory: { ReaderTempDirectory(extractionCache: extractionCache) }
+        makeReaderTempDirectory: { ReaderTempDirectory(extractionCache: extractionCache) },
+        makeReaderLibraryScope: readerLibraryScopeFactory
     )
 }
 

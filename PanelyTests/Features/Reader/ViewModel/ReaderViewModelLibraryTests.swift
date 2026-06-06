@@ -598,6 +598,37 @@ struct ReaderViewModelLibraryTests {
         #expect(vm.errorMessage?.hasPrefix("Failed to extract archive:") == true)
     }
 
+    @Test func failedLoadInsideLibraryPreservesLibraryScopeAndWatcher() async throws {
+        let library = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: library) }
+
+        let brokenBook = library.appendingPathComponent("Broken.cbz")
+        try Data("not a zip".utf8).write(to: brokenBook)
+
+        let watcher = TestLibraryDirectoryWatcher()
+        let scope = ReaderLibraryScope(
+            accessor: TestSecurityScopedResourceAccessor(shouldStart: true)
+        )
+        let vm = ReaderViewModel(
+            dependencies: makeTestDependencies(
+                libraryDirectoryWatcherFactory: { watcher },
+                readerLibraryScopeFactory: { scope }
+            )
+        )
+        vm.explicitLibraryRootURL = library
+        #expect(vm.libraryScope.acquire(library))
+        vm.syncLibraryWatcher()
+
+        await vm.load(url: brokenBook)
+
+        #expect(vm.source.isEmpty)
+        #expect(vm.currentSourceURL == nil)
+        #expect(vm.errorMessage != nil)
+        #expect(vm.libraryScope.url?.standardizedFileURL == library.standardizedFileURL)
+        #expect(vm.libraryRootURL?.standardizedFileURL == library.standardizedFileURL)
+        #expect(watcher.watchedRoot?.standardizedFileURL == library.standardizedFileURL)
+    }
+
     @Test func preferredInnerPathCannotEscapeExtractionRoot() async throws {
         let workDir = try Fixture.makeTempDir()
         defer { try? FileManager.default.removeItem(at: workDir) }

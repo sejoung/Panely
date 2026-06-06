@@ -165,7 +165,15 @@ extension ReaderViewModel {
             metadata: ["source": "\(DiagnosticRedactor.describe(folderURL))"]
         )
 
-        libraryScope.acquire(folderURL)
+        guard libraryScope.acquire(folderURL) else {
+            errorMessage = "Could not access selected folder."
+            AppLog.error(
+                .library,
+                "Folder access failed",
+                metadata: ["source": "\(DiagnosticRedactor.describe(folderURL))"]
+            )
+            return
+        }
 
         recentItems.record(folderURL, title: displayTitle(for: folderURL))
         explicitLibraryRootURL = folderURL
