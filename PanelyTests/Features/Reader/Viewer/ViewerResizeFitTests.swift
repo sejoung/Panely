@@ -118,36 +118,21 @@ struct ViewerResizeFitTests {
     /// Pressing the fit-mode button is the one path that *must* override the
     /// user's manual zoom — the button literally exists to "apply this fit."
     @Test func fitModeChangeForcesFitReset() {
-        #expect(AppKitImageScroller.shouldForceFitReset(
-            identityChanged: false,
-            fitModeChanged: true,
-            layoutChanged: false,
-            contentStructureChanged: false
-        ))
+        #expect(AppKitImageScroller.shouldForceFitReset(fitModeChanged: true))
     }
 
     /// Opening a new book must NOT override the user's chosen magnification.
     /// If they were reading at 2×, the next book opens at 2×. The non-force
     /// path snaps to the new book's fit only when the user hasn't zoomed.
     @Test func identityChangeAloneDoesNotForceFitReset() {
-        #expect(AppKitImageScroller.shouldForceFitReset(
-            identityChanged: true,
-            fitModeChanged: false,
-            layoutChanged: false,
-            contentStructureChanged: false
-        ) == false)
+        #expect(AppKitImageScroller.shouldForceFitReset(fitModeChanged: false) == false)
     }
 
     /// Switching layout (single ↔ double ↔ vertical) is the user moving the
     /// view, not asking for a fresh fit. If they want fit, they press the
     /// fit button.
     @Test func layoutChangeAloneDoesNotForceFitReset() {
-        #expect(AppKitImageScroller.shouldForceFitReset(
-            identityChanged: false,
-            fitModeChanged: false,
-            layoutChanged: true,
-            contentStructureChanged: false
-        ) == false)
+        #expect(AppKitImageScroller.shouldForceFitReset(fitModeChanged: false) == false)
     }
 
     /// Regression: page-flip in paged mode always reports
@@ -155,12 +140,7 @@ struct ViewerResizeFitTests {
     /// must not force a refit either — covered for completeness alongside
     /// identity / layout changes.
     @Test func contentStructureChangeAloneDoesNotForceFitReset() {
-        #expect(AppKitImageScroller.shouldForceFitReset(
-            identityChanged: false,
-            fitModeChanged: false,
-            layoutChanged: false,
-            contentStructureChanged: true
-        ) == false)
+        #expect(AppKitImageScroller.shouldForceFitReset(fitModeChanged: false) == false)
     }
 
     /// End-to-end behavior at the `applyFit` level: zoom to 2× on the first

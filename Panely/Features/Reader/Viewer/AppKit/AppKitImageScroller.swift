@@ -159,28 +159,17 @@ struct AppKitImageScroller: NSViewRepresentable {
         /// magnification).
         var forceFitReset: Bool {
             AppKitImageScroller.shouldForceFitReset(
-                identityChanged: identityChanged,
-                fitModeChanged: fitModeChanged,
-                layoutChanged: layoutChanged,
-                contentStructureChanged: contentStructureChanged
+                fitModeChanged: fitModeChanged
             )
         }
     }
 
-    static func shouldForceFitReset(
-        identityChanged: Bool,
-        fitModeChanged: Bool,
-        layoutChanged: Bool,
-        contentStructureChanged: Bool
-    ) -> Bool {
+    static func shouldForceFitReset(fitModeChanged: Bool) -> Bool {
         // Only the fit-mode button forces a re-fit. That button's literal
         // job is "apply this fit now," so it has to win. Everything else
         // (new book, layout swap, page flip, viewport resize) defers to the
         // non-force path: if the user manually zoomed, their magnification
         // is preserved; if they didn't, magnification follows the new fit.
-        _ = identityChanged
-        _ = layoutChanged
-        _ = contentStructureChanged
         return fitModeChanged
     }
 

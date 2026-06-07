@@ -18,6 +18,10 @@ import UniformTypeIdentifiers
 /// - `ReaderViewModel+LoadPipeline` — the `load(url:)` state machine.
 /// - `ReaderViewModel+Navigation` — page stepping, chrome toggles, jumps.
 /// - `ReaderViewModel+ImageLoading` — thin facade over `imageLoader`.
+/// - `ReaderViewModel+Volumes` — sibling-volume counters and prev/next volume
+///   prompts/actions.
+/// - `ReaderViewModel+ReadingProgress` — sidebar badges and Continue Reading
+///   suggestion/opening.
 /// - `ReaderViewModel+Bookmarks` — favorites + per-page bookmarks.
 /// - `ReaderViewModel+Toolbar` — toolbar state/actions wiring.
 /// - `ReaderViewModel+Cache` — extraction-cache management.
