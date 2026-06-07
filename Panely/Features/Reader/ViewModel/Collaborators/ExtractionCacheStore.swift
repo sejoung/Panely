@@ -115,7 +115,7 @@ nonisolated enum ExtractionCacheStore {
         let measured: [Entry] = entries.map { url in
             let mtime = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
                 .contentModificationDate ?? .distantPast
-            return Entry(url: url, mtime: mtime, size: directorySize(at: url))
+            return Entry(url: url, mtime: mtime, size: measuredDirectorySize(at: url, in: root))
         }
 
         let total = measured.reduce(UInt64(0)) { saturatedAdd($0, $1.size) }
@@ -131,10 +131,12 @@ nonisolated enum ExtractionCacheStore {
             if remaining <= limit { break }
             if entry.url.standardizedFileURL == excluded { continue }
             if (try? FileManager.default.removeItem(at: entry.url)) != nil {
+                removeCachedSize(for: entry.url, in: root)
                 removedAny = true
             }
             remaining = remaining > entry.size ? remaining - entry.size : 0
         }
+        removeSizeCacheRootIfEmpty(in: root)
         if removedAny {
             NotificationCenter.default.post(name: .panelyExtractionCacheDidChange, object: nil)
         }
@@ -154,7 +156,7 @@ nonisolated enum ExtractionCacheStore {
         let excluded = cacheEntryContaining(activeURL, in: root)?.standardizedFileURL
         return entries.reduce(UInt64(0)) { total, entry in
             if entry.standardizedFileURL == excluded { return total }
-            return saturatedAdd(total, directorySize(at: entry))
+            return saturatedAdd(total, measuredDirectorySize(at: entry, in: root))
         }
     }
 
@@ -173,11 +175,13 @@ nonisolated enum ExtractionCacheStore {
         let excluded = cacheEntryContaining(activeURL, in: root)?.standardizedFileURL
         var removed: UInt64 = 0
         for entry in entries where entry.standardizedFileURL != excluded {
-            let size = directorySize(at: entry)
+            let size = measuredDirectorySize(at: entry, in: root)
             if (try? fm.removeItem(at: entry)) != nil {
+                removeCachedSize(for: entry, in: root)
                 removed = saturatedAdd(removed, size)
             }
         }
+        removeSizeCacheRootIfEmpty(in: root)
         if removed > 0 {
             NotificationCenter.default.post(name: .panelyExtractionCacheDidChange, object: nil)
         }
@@ -209,6 +213,67 @@ nonisolated enum ExtractionCacheStore {
               let entryName = relative.split(separator: "/", maxSplits: 1).first
         else { return nil }
         return root.appendingPathComponent(String(entryName), isDirectory: true)
+    }
+
+    private static func measuredDirectorySize(at entry: URL, in root: URL) -> UInt64 {
+        if let cached = cachedDirectorySize(at: entry, in: root) {
+            return cached
+        }
+        let size = directorySize(at: entry)
+        writeCachedSize(size, for: entry, in: root)
+        return size
+    }
+
+    private static func cachedDirectorySize(at entry: URL, in root: URL) -> UInt64? {
+        guard let cached = try? String(contentsOf: sizeCacheURL(for: entry, in: root), encoding: .utf8)
+        else { return nil }
+
+        let parts = cached.split(separator: "\n", maxSplits: 1).map(String.init)
+        guard parts.count == 2,
+              let cachedMtime = TimeInterval(parts[0]),
+              let cachedSize = UInt64(parts[1]),
+              let currentMtime = entryModificationTime(entry)
+        else { return nil }
+
+        return abs(cachedMtime - currentMtime) < 0.001 ? cachedSize : nil
+    }
+
+    private static func writeCachedSize(_ size: UInt64, for entry: URL, in root: URL) {
+        guard let mtime = entryModificationTime(entry) else { return }
+        let cacheRoot = sizeCacheRoot(in: root)
+        try? FileManager.default.createDirectory(at: cacheRoot, withIntermediateDirectories: true)
+        try? "\(mtime)\n\(size)".write(
+            to: sizeCacheURL(for: entry, in: root),
+            atomically: true,
+            encoding: .utf8
+        )
+    }
+
+    private static func removeCachedSize(for entry: URL, in root: URL) {
+        try? FileManager.default.removeItem(at: sizeCacheURL(for: entry, in: root))
+    }
+
+    private static func removeSizeCacheRootIfEmpty(in root: URL) {
+        let cacheRoot = sizeCacheRoot(in: root)
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: cacheRoot,
+            includingPropertiesForKeys: nil
+        ), contents.isEmpty else { return }
+        try? FileManager.default.removeItem(at: cacheRoot)
+    }
+
+    private static func entryModificationTime(_ entry: URL) -> TimeInterval? {
+        (try? entry.resourceValues(forKeys: [.contentModificationDateKey]))?
+            .contentModificationDate?
+            .timeIntervalSinceReferenceDate
+    }
+
+    private static func sizeCacheURL(for entry: URL, in root: URL) -> URL {
+        sizeCacheRoot(in: root).appendingPathComponent(entry.lastPathComponent + ".size")
+    }
+
+    private static func sizeCacheRoot(in root: URL) -> URL {
+        root.appendingPathComponent(".panely-size-cache", isDirectory: true)
     }
 
     private static func directorySize(at url: URL) -> UInt64 {

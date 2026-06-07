@@ -100,8 +100,9 @@ final class ImageStackView: NSView {
             height: visibleRect.height + 2 * bufferHeight
         )
 
+        let candidateRange = pageIndexRange(visibleIn: expandedRect)
         var nowVisible: Set<Int> = []
-        for (index, frame) in pageFrames.enumerated() where frame.intersects(expandedRect) {
+        for index in candidateRange where pageFrames[index].intersects(expandedRect) {
             nowVisible.insert(index)
         }
 
@@ -128,12 +129,7 @@ final class ImageStackView: NSView {
     func pageIndex(forViewportY y: CGFloat) -> Int {
         guard !pageFrames.isEmpty else { return 0 }
         if y < pageFrames[0].minY { return 0 }
-        for (i, frame) in pageFrames.enumerated() {
-            if y >= frame.minY && y < frame.maxY {
-                return i
-            }
-        }
-        return pageFrames.count - 1
+        return pageIndex(atOrBeforeY: y)
     }
 
     /// Half-open range of page indices whose frames intersect `rect`.
@@ -146,6 +142,22 @@ final class ImageStackView: NSView {
         let lower = max(0, min(topIndex, bottomIndex))
         let upper = min(pageFrames.count, max(topIndex, bottomIndex) + 1)
         return lower..<upper
+    }
+
+    private func pageIndex(atOrBeforeY y: CGFloat) -> Int {
+        var lower = 0
+        var upper = pageFrames.count
+
+        while lower < upper {
+            let mid = lower + (upper - lower) / 2
+            if pageFrames[mid].minY <= y {
+                lower = mid + 1
+            } else {
+                upper = mid
+            }
+        }
+
+        return max(0, min(pageFrames.count - 1, lower - 1))
     }
 
     private func layoutFramesHorizontally() {

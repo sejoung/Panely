@@ -434,6 +434,14 @@ extension ReaderViewModel {
             guard case .file(let url) = page.source else { return nil }
             return url
         }
+
+        // Watching each page file creates one file descriptor and one
+        // DispatchSource per page. Keep exact per-file change detection for
+        // ordinary folders, but cap large sources so a webtoon folder doesn't
+        // allocate hundreds or thousands of watchers.
+        guard pageFiles.count <= Self.maxPageFileWatchCount else {
+            return existingURLs([targetURL])
+        }
         return existingURLs([targetURL] + pageFiles)
     }
 

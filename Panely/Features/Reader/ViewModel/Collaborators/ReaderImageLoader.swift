@@ -358,14 +358,13 @@ final class ReaderImageLoader {
         }
 
         guard !Task.isCancelled, generation == self.generation, !loaded.isEmpty else { return }
-        // Take a fresh snapshot — concurrent evictions or other lazy loads
-        // may have mutated currentImages during the awaits above. Merge our
-        // new pages into the latest state and write once.
-        var newImages = currentImages
-        for (i, image) in loaded where i < newImages.count {
-            newImages[i] = image
+        // Mutate the backing buffer in place. This avoids copying a thousands-
+        // long placeholder array every time a small lazy-load batch completes.
+        currentImages.withUnsafeMutableBufferPointer { buffer in
+            for (i, image) in loaded where i < buffer.count {
+                buffer[i] = image
+            }
         }
-        currentImages = newImages
     }
 
     /// Load real images for pages in `[index - radius ... index + radius]`

@@ -289,6 +289,25 @@ struct ReaderViewModelLibraryTests {
         ]))
     }
 
+    @Test func largeFolderLoadCapsSourceChangeMonitorURLs() async throws {
+        let root = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: root) }
+        for index in 0..<(ReaderViewModel.maxPageFileWatchCount + 1) {
+            let page = root.appendingPathComponent(String(format: "%03d.png", index))
+            try Fixture.makePNG(width: 10, height: 10).write(to: page)
+        }
+
+        let monitor = TestSourceChangeMonitor()
+        let vm = ReaderViewModel(
+            dependencies: makeTestDependencies(sourceChangeMonitorFactory: { monitor })
+        )
+
+        await vm.load(url: root)
+
+        #expect(monitor.watchedURL?.standardizedFileURL == root.standardizedFileURL)
+        #expect(monitor.watchedURLs.map(\.standardizedFileURL) == [root.standardizedFileURL])
+    }
+
     @Test func sourceChangeMonitorMarksAndNextLoadClearsNotice() async throws {
         let first = try Fixture.makeTempDir()
         let second = try Fixture.makeTempDir()

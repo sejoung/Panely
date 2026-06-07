@@ -66,6 +66,13 @@ nonisolated enum CBZLoader {
         try await Task.detached(priority: .userInitiated) {
             let fm = FileManager.default
             do {
+                try checkDeclaredArchiveSize(
+                    of: url,
+                    currentTotal: 0,
+                    replacingArchiveBytes: 0,
+                    limit: limit,
+                    cleanup: destination
+                )
                 try fm.createDirectory(
                     at: destination,
                     withIntermediateDirectories: true
@@ -127,6 +134,13 @@ nonisolated enum CBZLoader {
 
             let destDir = entry.deletingPathExtension()
             let archiveBytes = fileSize(at: entry)
+            try checkDeclaredArchiveSize(
+                of: entry,
+                currentTotal: totalBytes,
+                replacingArchiveBytes: archiveBytes,
+                limit: limit,
+                cleanup: root
+            )
             try FileManager.default.createDirectory(at: destDir, withIntermediateDirectories: true)
             try FileManager.default.unzipItem(at: entry, to: destDir)
             try FileManager.default.removeItem(at: entry)
@@ -147,16 +161,33 @@ nonisolated enum CBZLoader {
     }
 
     /// Abort (and clean up) if the cumulative extracted byte count has crossed
-    /// `maxExtractedBytes`. ZIPFoundation has no streaming size callback in
-    /// `unzipItem`, so this is checked after each extraction step — fine for
-    /// the safety-net role (catches zip-bombs; legitimate large archives are
-    /// still allowed up to the cap).
+    /// `maxExtractedBytes`.
     private static func checkLimit(_ total: UInt64, limit: UInt64, cleanup: URL) throws {
         guard total > limit else { return }
         // Clean up partial extraction so the caller's temp dir doesn't leak.
         // extractAll/load already removes on error too.
         try? FileManager.default.removeItem(at: cleanup)
         throw LoadError.extractedSizeExceeded(limit: limit)
+    }
+
+    private static func checkDeclaredArchiveSize(
+        of archiveURL: URL,
+        currentTotal: UInt64,
+        replacingArchiveBytes: UInt64,
+        limit: UInt64,
+        cleanup: URL
+    ) throws {
+        let base = currentTotal >= replacingArchiveBytes ? currentTotal - replacingArchiveBytes : 0
+        let declared = try declaredUncompressedSize(of: archiveURL)
+        try checkLimit(saturatedAdd(base, declared), limit: limit, cleanup: cleanup)
+    }
+
+    private static func declaredUncompressedSize(of archiveURL: URL) throws -> UInt64 {
+        let archive = try Archive(url: archiveURL, accessMode: .read)
+        return archive.reduce(UInt64(0)) { total, entry in
+            guard entry.type != .directory else { return total }
+            return saturatedAdd(total, entry.uncompressedSize)
+        }
     }
 
     /// Sum the on-disk size of every file under `directory`. Overflow-safe
@@ -181,5 +212,10 @@ nonisolated enum CBZLoader {
             .fileSizeKey,
         ])
         return UInt64(values?.totalFileAllocatedSize ?? values?.fileSize ?? 0)
+    }
+
+    private static func saturatedAdd(_ lhs: UInt64, _ rhs: UInt64) -> UInt64 {
+        let (sum, overflow) = lhs.addingReportingOverflow(rhs)
+        return overflow ? UInt64.max : sum
     }
 }

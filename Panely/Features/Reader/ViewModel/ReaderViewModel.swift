@@ -36,6 +36,8 @@ import UniformTypeIdentifiers
 @Observable
 @MainActor
 final class ReaderViewModel {
+    static let maxPageFileWatchCount = 128
+
     // MARK: - Collaborators
 
     let preferences: ReaderPreferences
