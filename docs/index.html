@@ -104,6 +104,36 @@
     background: #353a44;
     color: var(--text-primary);
   }
+  .hero-version {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 18px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  .version-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    background: rgba(10, 132, 255, 0.12);
+    border: 1px solid rgba(10, 132, 255, 0.35);
+    border-radius: 999px;
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 12px;
+  }
+  .version-pill::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #30d158;
+  }
+  .hero-version a { font-weight: 600; }
   .hero-meta {
     font-size: 13px;
     color: var(--text-secondary);
@@ -330,6 +360,11 @@
         View on GitHub
       </a>
     </div>
+    <p class="hero-version" id="latest-release" hidden>
+      <span class="version-pill" id="latest-version"></span>
+      <span class="version-date" id="latest-date"></span>
+      <a id="latest-notes" href="https://github.com/sejoung/Panely/releases/latest">Release notes →</a>
+    </p>
     <p class="hero-meta">Requires macOS 14 (Sonoma) or later · Apache 2.0</p>
   </div>
 </header>
@@ -497,6 +532,36 @@
     <p>Apache License 2.0 · Built with Swift &amp; AppKit</p>
   </div>
 </footer>
+
+<script>
+  // Show the latest published release so visitors can tell at a glance whether
+  // they're on the current build. Fetched live from the GitHub API so the page
+  // never goes stale; on any failure the block just stays hidden and the
+  // Download button (which always points at /releases/latest) still works.
+  (function () {
+    fetch("https://api.github.com/repos/sejoung/Panely/releases/latest", {
+      headers: { Accept: "application/vnd.github+json" }
+    })
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function (rel) {
+        var tag = rel.tag_name;
+        if (!tag) return;
+        document.getElementById("latest-version").textContent = "Latest: " + tag;
+        if (rel.published_at) {
+          var d = new Date(rel.published_at);
+          document.getElementById("latest-date").textContent =
+            "released " + d.toLocaleDateString(undefined, {
+              year: "numeric", month: "short", day: "numeric"
+            });
+        }
+        if (rel.html_url) {
+          document.getElementById("latest-notes").href = rel.html_url;
+        }
+        document.getElementById("latest-release").hidden = false;
+      })
+      .catch(function () { /* keep the block hidden on rate-limit / offline */ });
+  })();
+</script>
 
 </body>
 </html>
