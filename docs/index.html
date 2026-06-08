@@ -224,12 +224,12 @@
   .shortcut .label { color: var(--text-secondary); }
 
   /* Finder help */
-  .finder-help {
+  .guide {
     background: var(--bg-secondary);
     border-top: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
   }
-  .finder-help-card {
+  .guide-card {
     max-width: 720px;
     margin: 0 auto;
     padding: 28px;
@@ -237,20 +237,20 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
   }
-  .finder-help-steps {
+  .guide-steps {
     list-style: none;
     counter-reset: step;
     padding: 0;
     margin: 0;
   }
-  .finder-help-steps > li {
+  .guide-steps > li {
     counter-increment: step;
     margin-bottom: 18px;
     padding-left: 36px;
     position: relative;
   }
-  .finder-help-steps > li:last-child { margin-bottom: 0; }
-  .finder-help-steps > li::before {
+  .guide-steps > li:last-child { margin-bottom: 0; }
+  .guide-steps > li::before {
     content: counter(step);
     position: absolute;
     left: 0;
@@ -266,13 +266,14 @@
     font-size: 12px;
     font-weight: 600;
   }
-  .finder-help-steps .step-label {
+  .guide-steps .step-label {
     display: block;
     font-size: 14px;
     color: var(--text-primary);
     margin-bottom: 8px;
   }
-  .finder-help-steps pre {
+  .guide-steps pre,
+  .guide-note pre {
     background: var(--bg-tertiary);
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -283,23 +284,29 @@
     color: var(--text-primary);
     -webkit-overflow-scrolling: touch;
   }
-  .finder-help-steps code,
-  .finder-help-note code {
+  .guide-steps code,
+  .guide-note code {
     font-family: "SF Mono", ui-monospace, monospace;
   }
-  .finder-help-note {
+  .guide-note {
     margin-top: 22px;
     padding-top: 18px;
     border-top: 1px solid var(--border);
     color: var(--text-secondary);
     font-size: 13px;
   }
-  .finder-help-note code {
+  .guide-note code {
     background: var(--bg-tertiary);
     padding: 1px 6px;
     border-radius: 4px;
     font-size: 12px;
   }
+  .guide-note pre code {
+    background: none;
+    padding: 0;
+    border-radius: 0;
+  }
+  .guide-note p { margin-bottom: 12px; }
 
   /* Requirements */
   .requirements {
@@ -443,28 +450,45 @@
   </div>
 </section>
 
-<section class="finder-help">
+<section class="guide">
   <div class="container">
     <div class="section-head">
-      <h2>Finder integration not showing?</h2>
-      <p>Refresh the system caches if the menu entry is missing or duplicated.</p>
+      <h2>&ldquo;Panely can&rsquo;t be opened&rdquo;?</h2>
+      <p>Panely is open source but not notarized by Apple, so Gatekeeper warns on first launch. It&rsquo;s safe to open — here&rsquo;s how.</p>
     </div>
-    <div class="finder-help-card">
-      <ol class="finder-help-steps">
+    <div class="guide-card">
+      <ol class="guide-steps">
         <li>
-          <span class="step-label">Find every installed copy</span>
-          <pre><code>mdfind "kMDItemCFBundleIdentifier == 'io.github.sejoung.Panely'"</code></pre>
+          <span class="step-label">Drag <strong>Panely.app</strong> into your <strong>/Applications</strong> folder.</span>
         </li>
         <li>
-          <span class="step-label">Trash any stale copies, then rebuild the LaunchServices database</span>
-          <pre><code>/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister -kill -r -domain local -domain system -domain user</code></pre>
+          <span class="step-label">Right-click (or Control-click) <strong>Panely.app</strong> and choose <strong>Open</strong>. Unlike a double-click, this gives you an <strong>Open</strong> button that launches it.</span>
         </li>
         <li>
-          <span class="step-label">Restart Finder to pick up the refreshed registrations</span>
-          <pre><code>killall -KILL Finder</code></pre>
+          <span class="step-label">If macOS still blocks it, open <strong>System Settings → Privacy &amp; Security</strong>, scroll to the Security section, and click <strong>Open Anyway</strong> next to the Panely notice.</span>
         </li>
       </ol>
-      <p class="finder-help-note">Tip: keep a single Release build in <code>/Applications</code> — LaunchServices deprioritizes Debug builds in DerivedData.</p>
+      <div class="guide-note">
+        <p>Prefer the terminal? Remove the quarantine flag after moving Panely to <code>/Applications</code>:</p>
+        <pre><code>xattr -dr com.apple.quarantine /Applications/Panely.app</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="feedback">
+  <div class="container">
+    <div class="section-head">
+      <h2>Feedback is welcome</h2>
+      <p>If you find any issues or have feature requests, please open an issue on GitHub.</p>
+    </div>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="https://github.com/sejoung/Panely/issues/new">
+        Open an issue
+      </a>
+      <a class="btn btn-secondary" href="https://github.com/sejoung/Panely/issues">
+        Browse issues
+      </a>
     </div>
   </div>
 </section>
