@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panely — User Manual</title>
+<meta name="description" content="Panely user manual: a visual walkthrough of the reader interface, layouts, toolbar, navigation, and settings.">
+<link rel="icon" type="image/svg+xml" href="icon/panely-icon-stacked.svg">
+<style>
+  :root {
+    --bg-primary: #0F1115;
+    --bg-secondary: #1C1F26;
+    --bg-tertiary: #2A2E36;
+    --text-primary: #E6EAF2;
+    --text-secondary: #AAB2C0;
+    --accent: #0A84FF;
+    --accent-hover: #2a94ff;
+    --border: rgba(255, 255, 255, 0.08);
+    --radius: 10px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { max-width: 820px; margin: 0 auto; padding: 0 24px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { color: var(--accent-hover); }
+
+  /* Top bar */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: rgba(15, 17, 21, 0.82);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar-inner {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .topbar-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 15px;
+  }
+  .topbar-brand img { width: 24px; height: 24px; }
+  .topbar-brand:hover { color: var(--text-primary); }
+  .lang-toggle {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .lang-toggle button {
+    background: transparent;
+    color: var(--text-secondary);
+    border: none;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .lang-toggle button.active {
+    background: var(--accent);
+    color: white;
+  }
+  .lang-toggle button:not(.active):hover { color: var(--text-primary); }
+
+  /* Markdown content */
+  .doc { padding: 48px 0 96px; }
+  .doc > p:first-child[align="right"],
+  .doc .lang-row { display: none; } /* in-markdown lang switcher — replaced by top bar */
+
+  .doc h1 {
+    font-size: 40px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 8px 0 20px;
+  }
+  .doc h2 {
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 56px 0 16px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+  .doc h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 32px 0 12px;
+  }
+  .doc p { margin: 14px 0; color: var(--text-primary); }
+  .doc ul, .doc ol { margin: 14px 0 14px 24px; }
+  .doc li { margin: 6px 0; }
+  .doc li::marker { color: var(--text-secondary); }
+  .doc strong { color: var(--text-primary); font-weight: 600; }
+  .doc hr { display: none; } /* sections are separated by the h2 top border */
+
+  .doc img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 20px auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  }
+
+  .doc code {
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size: 0.88em;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    padding: 1px 6px;
+    border-radius: 5px;
+    color: var(--text-primary);
+  }
+  .doc pre {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    overflow-x: auto;
+    margin: 16px 0;
+  }
+  .doc pre code { background: none; border: none; padding: 0; }
+
+  .doc table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 18px 0;
+    font-size: 14px;
+  }
+  .doc th, .doc td {
+    text-align: left;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .doc th { color: var(--text-secondary); font-weight: 600; }
+  .doc tbody tr:hover { background: var(--bg-secondary); }
+
+  .doc blockquote {
+    margin: 16px 0;
+    padding: 4px 16px;
+    border-left: 3px solid var(--accent);
+    color: var(--text-secondary);
+  }
+
+  .doc-loading {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 80px 0;
+    font-size: 14px;
+  }
+
+  footer {
+    padding: 40px 0;
+    text-align: center;
+    border-top: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 13px;
+  }
+  footer .links {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 640px) {
+    .doc { padding: 32px 0 64px; }
+    .doc h1 { font-size: 32px; }
+    .doc h2 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="topbar-brand" href="index.html">
+      <img src="icon/panely-icon-stacked.svg" alt="">
+      <span>Panely</span>
+    </a>
+    <div class="lang-toggle" role="group" aria-label="Manual language">
+      <button type="button" data-lang="en">EN</button>
+      <button type="button" data-lang="ko">한국어</button>
+    </div>
+  </div>
+</div>
+
+<main class="container">
+  <article id="doc" class="doc">
+    <div class="doc-loading">Loading manual…</div>
+  </article>
+</main>
+
+<footer>
+  <div class="container">
+    <div class="links">
+      <a href="index.html">Home</a>
+      <a href="https://github.com/sejoung/Panely">GitHub</a>
+      <a href="https://github.com/sejoung/Panely/releases">Releases</a>
+      <a href="https://github.com/sejoung/Panely/blob/main/LICENSE">License</a>
+    </div>
+    <p>Apache License 2.0 · Built with Swift &amp; AppKit</p>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+<script>
+  var REPO_BLOB = "https://github.com/sejoung/Panely/blob/main/";
+  var SOURCES = { en: "manual.md", ko: "manual.ko.md" };
+
+  function currentLang() {
+    var p = new URLSearchParams(location.search).get("lang");
+    return p === "ko" ? "ko" : "en";
+  }
+
+  function rewrite(container, lang) {
+    // Drop the in-markdown language switcher line (first paragraph with manual links).
+    container.querySelectorAll("p").forEach(function (p) {
+      var a = p.querySelector('a[href$="manual.md"], a[href$="manual.ko.md"]');
+      if (a && p.textContent.replace(/\s/g, "").length < 24) p.remove();
+    });
+    // Point README links (one level up, outside Pages) at the GitHub blob view.
+    container.querySelectorAll('a[href^="../"]').forEach(function (a) {
+      a.setAttribute("href", REPO_BLOB + a.getAttribute("href").replace(/^\.\.\//, ""));
+      a.setAttribute("target", "_blank");
+      a.setAttribute("rel", "noopener");
+    });
+    container.querySelectorAll("img").forEach(function (img) {
+      img.setAttribute("loading", "lazy");
+    });
+    document.documentElement.lang = lang;
+    document.title = lang === "ko" ? "Panely — 사용 설명서" : "Panely — User Manual";
+  }
+
+  function setActive(lang) {
+    document.querySelectorAll(".lang-toggle button").forEach(function (b) {
+      b.classList.toggle("active", b.dataset.lang === lang);
+    });
+  }
+
+  function load(lang) {
+    var doc = document.getElementById("doc");
+    setActive(lang);
+    fetch(SOURCES[lang], { cache: "no-cache" })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.status);
+        return r.text();
+      })
+      .then(function (md) {
+        doc.innerHTML = marked.parse(md);
+        rewrite(doc, lang);
+      })
+      .catch(function () {
+        doc.innerHTML =
+          '<div class="doc-loading">Couldn\'t load the manual. ' +
+          'Read it on <a href="' + REPO_BLOB + SOURCES[lang] + '">GitHub</a> instead.</div>';
+      });
+  }
+
+  document.querySelectorAll(".lang-toggle button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var lang = b.dataset.lang;
+      var url = new URL(location.href);
+      url.searchParams.set("lang", lang);
+      history.replaceState(null, "", url);
+      load(lang);
+    });
+  });
+
+  load(currentLang());
+</script>
+
+</body>
+</html>

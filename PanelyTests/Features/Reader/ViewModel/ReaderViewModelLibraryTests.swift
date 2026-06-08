@@ -52,7 +52,10 @@ struct ReaderViewModelLibraryTests {
         #expect(vm.libraryRefreshToken == before)
 
         // After the folder stays quiet past the debounce window, it refreshes once.
-        try await Task.sleep(for: .milliseconds(1700))
+        // The debounce is 1500ms; wait well past it (1000ms slack) so CI scheduling
+        // jitter and Task.sleep overshoot can't race the assertion — a 200ms margin
+        // here was flaky on loaded runners.
+        try await Task.sleep(for: .milliseconds(2500))
         #expect(vm.libraryRefreshToken != before)
     }
 
