@@ -202,7 +202,31 @@ pages.
 - **macOS 14** (Sonoma) or later
 - **Xcode 16** or later (for building from source)
 
-## Getting Started
+## Installing a release
+
+Grab the latest `Panely-x.y.z.zip` from the
+[Releases page](https://github.com/sejoung/Panely/releases/latest) and unzip it.
+
+Panely is open source but **not notarized by Apple** (no paid Developer ID),
+so Gatekeeper warns on first launch — *"Panely can't be opened because Apple
+cannot check it for malicious software."* It's safe to open; you just have to
+tell macOS to allow it once:
+
+1. Drag **Panely.app** into your **/Applications** folder.
+2. **Right-click** (or Control-click) **Panely.app** and choose **Open**.
+   Unlike a double-click, this dialog has an **Open** button that launches it.
+3. If macOS still blocks it, open **System Settings → Privacy & Security**,
+   scroll to the Security section, and click **Open Anyway** next to the
+   Panely notice.
+
+Prefer the terminal? Remove the quarantine flag after moving Panely to
+`/Applications`:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Panely.app
+```
+
+## Building from source
 
 ```bash
 git clone https://github.com/sejoung/Panely.git
@@ -293,7 +317,7 @@ xcodebuild test \
   CODE_SIGN_IDENTITY="-"
 ```
 
-**340 tests across 56 suites** cover:
+**496 tests across 69 suites** cover:
 
 `SnapshotGalleryTests` is discovered in normal runs but gated off unless
 `scripts/generate-snapshots.sh` enables snapshot generation, so the default
@@ -546,7 +570,7 @@ PanelyTests/                            # mirrors the source tree
 ├── Snapshots/                          # docs/screenshots/ generator (skipped in CI)
 │   ├── SnapshotRenderer.swift          # NSHostingView + offscreen window → PNG
 │   ├── SnapshotSampleContent.swift     # placeholder pages + LibraryFixture
-│   └── SnapshotGalleryTests.swift      # 13 manual scenarios
+│   └── SnapshotGalleryTests.swift      # 15 manual scenarios
 ├── Core/Comic/                         # CBZLoader, FolderLoader, ImageLoader{Load,Dimensions},
 │                                       # ComicModel, LoaderExtension, NaturalSort
 ├── Features/Library/                   # FavoritesStore, PageBookmarksStore, RecentItem,

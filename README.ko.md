@@ -180,7 +180,30 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
 - **macOS 14** (Sonoma) 이상
 - **Xcode 16** 이상 (소스 빌드 시)
 
-## 시작하기
+## 릴리스 설치
+
+[Releases 페이지](https://github.com/sejoung/Panely/releases/latest)에서 최신
+`Panely-x.y.z.zip`을 내려받아 압축을 풉니다.
+
+Panely는 오픈 소스이지만 **Apple 노타라이즈가 되어 있지 않습니다**(유료 개발자
+등록을 하지 않음). 그래서 첫 실행 시 Gatekeeper가 *"Panely을(를) 열 수 없습니다.
+Apple이 악성 소프트웨어를 검사할 수 없기 때문입니다."* 라고 경고합니다. 안전하게
+열 수 있으며, 한 번만 macOS에 실행을 허용해 주면 됩니다:
+
+1. **Panely.app**을 **/Applications** 폴더로 드래그합니다.
+2. **Panely.app**을 **우클릭**(또는 Control-클릭)하고 **열기**를 선택합니다.
+   더블클릭과 달리 이 대화상자에는 앱을 실행하는 **열기** 버튼이 있습니다.
+3. 그래도 macOS가 막으면 **시스템 설정 → 개인정보 보호 및 보안**을 열고 보안
+   섹션까지 스크롤한 뒤 Panely 알림 옆의 **확인 없이 열기**를 클릭합니다.
+
+터미널을 선호한다면, Panely를 `/Applications`로 옮긴 뒤 격리(quarantine) 플래그를
+제거하세요:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Panely.app
+```
+
+## 소스에서 빌드
 
 ```bash
 git clone https://github.com/sejoung/Panely.git
@@ -268,7 +291,7 @@ xcodebuild test \
   CODE_SIGN_IDENTITY="-"
 ```
 
-**56 스위트에 걸친 340개 테스트**가 다음을 커버:
+**69 스위트에 걸친 496개 테스트**가 다음을 커버:
 
 `SnapshotGalleryTests`는 기본 테스트에서 발견은 되지만
 `scripts/generate-snapshots.sh`가 스냅샷 생성을 활성화할 때만 실행됩니다.
@@ -512,7 +535,7 @@ PanelyTests/                            # 소스 트리를 미러링
 ├── Snapshots/                          # docs/screenshots/ 생성기 (CI에서 skip)
 │   ├── SnapshotRenderer.swift          # NSHostingView + offscreen window → PNG
 │   ├── SnapshotSampleContent.swift     # placeholder 페이지 + LibraryFixture
-│   └── SnapshotGalleryTests.swift      # 13개 매뉴얼 시나리오
+│   └── SnapshotGalleryTests.swift      # 15개 매뉴얼 시나리오
 ├── Core/Comic/                         # CBZLoader, FolderLoader, ImageLoader{Load,Dimensions},
 │                                       # ComicModel, LoaderExtension, NaturalSort
 ├── Features/Library/                   # FavoritesStore, PageBookmarksStore, RecentItem,
