@@ -18,6 +18,8 @@ struct ViewerContainer: View {
     var onPageIndexChanged: (Int) -> Void = { _ in }
     var onVisibleRangeChanged: (Range<Int>) -> Void = { _ in }
     var autoFitOnResize: Bool = true
+    var wheelPageTurn: Bool = true
+    var onWheelPageTurn: (PageTurnDirection) -> Void = { _ in }
     var viewerController: ViewerController? = nil
 
     var body: some View {
@@ -39,6 +41,8 @@ struct ViewerContainer: View {
                     onPageIndexChanged: onPageIndexChanged,
                     onVisibleRangeChanged: onVisibleRangeChanged,
                     autoFitOnResize: autoFitOnResize,
+                    wheelPageTurn: wheelPageTurn,
+                    onWheelPageTurn: onWheelPageTurn,
                     viewerController: viewerController
                 )
             }

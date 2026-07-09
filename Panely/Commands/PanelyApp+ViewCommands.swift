@@ -87,6 +87,10 @@ extension PanelyApp {
                 viewModel.toggleAutoFitOnResize()
             }
             .keyboardShortcut("l", modifiers: .command)
+
+            Button(viewModel.wheelPageTurn ? "Disable Scroll Page Turning" : "Enable Scroll Page Turning") {
+                viewModel.toggleWheelPageTurn()
+            }
         }
     }
 }

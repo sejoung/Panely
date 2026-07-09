@@ -130,6 +130,20 @@ bottom edge to bring it back, or pin both via `⌃⌘T`.
 For larger jumps the **Go to Page…** prompt (`⌘G`) takes a number from
 1 to the page count and clamps silently on out-of-range input.
 
+### Scroll to turn pages
+
+In the paged layouts (single and double), a plain scroll — mouse wheel
+or trackpad — turns the page: scroll down for the next page, up for the
+previous one. When the page is zoomed past the viewport, scrolling pans
+it first; the turn only happens on a fresh scroll that starts with the
+page already pinned at its top or bottom edge, so overshooting a tall
+page never flips it by accident. Trackpad swipes turn exactly one page
+each — leftover inertia is ignored. Vertical-scroll layout is
+unaffected: there, scrolling is how you read.
+
+Prefer scrolling to only ever pan? Turn it off via
+**View → Disable Scroll Page Turning**.
+
 ---
 
 ## Volume continuity

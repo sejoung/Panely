@@ -206,6 +206,10 @@ extension ReaderViewModel {
         autoFitOnResize.toggle()
     }
 
+    func toggleWheelPageTurn() {
+        wheelPageTurn.toggle()
+    }
+
     /// Flip the standalone-cover spread offset. Re-aligns the current page to
     /// the new spread boundary and re-decodes so the pairing changes on screen
     /// immediately. A no-op visually outside double-page mode (the preference

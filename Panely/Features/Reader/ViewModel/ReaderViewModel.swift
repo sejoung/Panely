@@ -193,6 +193,13 @@ final class ReaderViewModel {
         set { preferences.reopenLastFolderOnLaunch = newValue }
     }
 
+    /// Paged layouts: plain scroll turns the page at the content edge. The
+    /// View menu toggles it; `ViewerArea` feeds it into the AppKit scroller.
+    var wheelPageTurn: Bool {
+        get { preferences.wheelPageTurn }
+        set { preferences.wheelPageTurn = newValue }
+    }
+
     /// The folder a cold launch would reopen, resolved read-only for display in
     /// Settings (`nil` when nothing is remembered or it no longer resolves).
     var rememberedLibraryRoot: URL? { lastLibraryRoot.peek() }

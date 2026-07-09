@@ -21,6 +21,10 @@ struct AppKitImageScroller: NSViewRepresentable {
     var onPageIndexChanged: (Int) -> Void = { _ in }
     var onVisibleRangeChanged: (Range<Int>) -> Void = { _ in }
     var autoFitOnResize: Bool = true
+    /// User preference: plain scroll turns pages in paged layouts. Combined
+    /// with the layout below — continuous mode never intercepts scrolling.
+    var wheelPageTurn: Bool = true
+    var onWheelPageTurn: (PageTurnDirection) -> Void = { _ in }
     var viewerController: ViewerController? = nil
 
     /// Looser than `ViewerController.fitTolerance` (10×) on purpose: a tiny
@@ -122,6 +126,10 @@ struct AppKitImageScroller: NSViewRepresentable {
         coordinator.onVisibleRangeChanged = onVisibleRangeChanged
         coordinator.autoFitOnResize = autoFitOnResize
         coordinator.viewerController = viewerController
+        // Continuous mode always wins: there, scrolling is the reading
+        // gesture itself and must reach the scroll view untouched.
+        scrollView.wheelPageTurnEnabled = wheelPageTurn && !layout.isContinuous
+        scrollView.onPageTurn = onWheelPageTurn
         viewerController?.attach(scrollView: scrollView)
     }
 

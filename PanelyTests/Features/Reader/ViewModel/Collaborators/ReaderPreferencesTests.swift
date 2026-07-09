@@ -19,6 +19,7 @@ struct ReaderPreferencesTests {
         #expect(prefs.toolbarPinned == false)
         #expect(prefs.thumbnailSidebarVisible == false)
         #expect(prefs.sidebarMode.pinned == true)
+        #expect(prefs.wheelPageTurn == true)
     }
 
     @Test func initHydratesEachPropertyFromStore() {
@@ -30,6 +31,7 @@ struct ReaderPreferencesTests {
             ReaderPreferences.toolbarPinnedKey: true,
             ReaderPreferences.thumbnailSidebarVisibleKey: true,
             ReaderPreferences.sidebarPinnedKey: true,
+            ReaderPreferences.wheelPageTurnKey: false,
         ])
 
         let prefs = ReaderPreferences(defaults: defaults)
@@ -41,6 +43,7 @@ struct ReaderPreferencesTests {
         #expect(prefs.toolbarPinned == true)
         #expect(prefs.thumbnailSidebarVisible == true)
         #expect(prefs.sidebarMode.pinned == true)
+        #expect(prefs.wheelPageTurn == false)
     }
 
     @Test func initIgnoresInvalidRawValuesAndKeepsDefaults() {
@@ -93,6 +96,7 @@ struct ReaderPreferencesTests {
         prefs.toolbarPinned = true
         prefs.thumbnailSidebarVisible = true
         prefs.sidebarMode.pinned = true
+        prefs.wheelPageTurn = false
 
         // A second instance reads back everything from persistence — proves the
         // didSet actually rounded-tripped, not just landed in the live
@@ -105,6 +109,7 @@ struct ReaderPreferencesTests {
         #expect(reloaded.toolbarPinned == true)
         #expect(reloaded.thumbnailSidebarVisible == true)
         #expect(reloaded.sidebarMode.pinned == true)
+        #expect(reloaded.wheelPageTurn == false)
     }
 
     @Test func sidebarTogglePinPersistsBothDirections() {

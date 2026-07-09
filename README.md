@@ -303,6 +303,7 @@ Terminal) and move the result straight to `/Applications`.
 | Hover left edge | Reveal sidebar as overlay (auto-hide mode) |
 | `ESC` | Dismiss sidebar overlay (when unpinned) |
 | Double-click on image | Toggle 1× ↔ 2× zoom |
+| Scroll wheel / trackpad scroll | Paged layouts: turn the page once it can't pan further (down = next, up = previous; one page per trackpad swipe). Toggle via View → Disable Scroll Page Turning |
 | Trackpad pinch | Zoom in / out |
 | Drag top 28 px strip | Move window |
 | Double-click top 28 px strip | Zoom / minimize window (per system preference) |
@@ -317,7 +318,7 @@ xcodebuild test \
   CODE_SIGN_IDENTITY="-"
 ```
 
-**496 tests across 69 suites** cover:
+**519 tests across 71 suites** cover:
 
 `SnapshotGalleryTests` is discovered in normal runs but gated off unless
 `scripts/generate-snapshots.sh` enables snapshot generation, so the default

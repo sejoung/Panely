@@ -29,6 +29,15 @@ struct ViewerArea: View {
                 onPageIndexChanged: { idx in viewModel.setCurrentPageFromScroll(idx) },
                 onVisibleRangeChanged: { range in viewModel.setVisibleRange(range) },
                 autoFitOnResize: viewModel.autoFitOnResize,
+                wheelPageTurn: viewModel.wheelPageTurn,
+                // Same semantic actions as the arrow keys, so wheel turns
+                // honor RTL and the end-of-volume / prev-volume cards.
+                onWheelPageTurn: { direction in
+                    switch direction {
+                    case .forward: viewModel.advanceForward()
+                    case .backward: viewModel.goBackward()
+                    }
+                },
                 viewerController: viewerController
             )
             .overlay(alignment: .top) {

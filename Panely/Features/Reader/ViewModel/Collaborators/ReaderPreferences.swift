@@ -24,6 +24,7 @@ final class ReaderPreferences {
     static let thumbnailSidebarVisibleKey = "panely.thumbnailSidebarVisible"
     static let doublePageCoverAloneKey = "panely.doublePageCoverAlone"
     static let reopenLastFolderOnLaunchKey = "panely.reopenLastFolderOnLaunch"
+    static let wheelPageTurnKey = "panely.wheelPageTurn"
 
     private let defaults: any KeyValueStoring
 
@@ -88,6 +89,18 @@ final class ReaderPreferences {
         }
     }
 
+    /// Paged layouts only: when true, a plain scroll (wheel or trackpad)
+    /// turns the page once the current page has no more room to pan — scroll
+    /// down = next, up = previous (see `WheelPageTurnEngine`). Never applies
+    /// to the continuous/vertical layout, where scrolling is reading. On by
+    /// default (the comic-reader convention); toggled from the View menu by
+    /// users who want scrolling to only ever pan.
+    var wheelPageTurn: Bool = true {
+        didSet {
+            defaults.set(wheelPageTurn, forKey: Self.wheelPageTurnKey)
+        }
+    }
+
     init(defaults: any KeyValueStoring = LiveKeyValueStore()) {
         self.defaults = defaults
 
@@ -130,6 +143,9 @@ final class ReaderPreferences {
         }
         if let value = storedDefaults[Self.reopenLastFolderOnLaunchKey] as? Bool {
             reopenLastFolderOnLaunch = value
+        }
+        if let value = storedDefaults[Self.wheelPageTurnKey] as? Bool {
+            wheelPageTurn = value
         }
     }
 }
