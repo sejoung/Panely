@@ -143,7 +143,14 @@ struct ReaderViewModelLibraryTests {
         // The persisted folder is gone, so even though a URL is produced the
         // security-scope grant fails. Restore must leave the app with no root
         // (and no watcher) rather than half-applying a dead library.
-        let vm = makeTestViewModel()
+        let scope = ReaderLibraryScope(
+            accessor: TestSecurityScopedResourceAccessor(shouldStart: false)
+        )
+        let vm = ReaderViewModel(
+            dependencies: makeTestDependencies(
+                readerLibraryScopeFactory: { scope }
+            )
+        )
         vm.lastLibraryRoot.save(URL(fileURLWithPath: "/nonexistent-\(UUID())", isDirectory: true))
 
         vm.restoreLastLibraryRootIfNeeded()
@@ -741,6 +748,47 @@ struct ReaderViewModelLibraryTests {
             vm.currentSourceURL?.standardizedFileURL
                 == extractionRoot.appendingPathComponent("Vol01", isDirectory: true).standardizedFileURL
         )
+    }
+
+    @Test func missingContinueReadingInnerVolumeDoesNotOpenDifferentVolume() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+
+        let innerSource = try Fixture.makeTempDir()
+        try Fixture.makePNG(width: 10, height: 10)
+            .write(to: innerSource.appendingPathComponent("page.png"))
+        let innerArchive = workDir.appendingPathComponent("Vol01.cbz")
+        try Fixture.zipDirectory(innerSource, to: innerArchive)
+        try? FileManager.default.removeItem(at: innerSource)
+
+        let outerSource = try Fixture.makeTempDir()
+        try FileManager.default.moveItem(
+            at: innerArchive,
+            to: outerSource.appendingPathComponent("Vol01.cbz")
+        )
+        let outerArchive = workDir.appendingPathComponent("series.cbz")
+        try Fixture.zipDirectory(outerSource, to: outerArchive)
+        try? FileManager.default.removeItem(at: outerSource)
+
+        let missingKey = outerArchive.standardizedFileURL.path + "#Vol02"
+        let vm = makeTestViewModel()
+        vm.readingProgress.flushImmediately(
+            forKey: missingKey,
+            fileIdentityKey: nil,
+            page: 4,
+            total: 10,
+            finished: false
+        )
+
+        await vm.load(
+            url: outerArchive,
+            intent: .continueReading(relativePath: "Vol02")
+        )
+
+        #expect(vm.currentSourceURL == nil)
+        #expect(vm.source.isEmpty)
+        #expect(vm.errorMessage == "The saved book is no longer available in this source.")
+        #expect(vm.readingProgress.progress(forKey: missingKey, fileIdentityKey: nil) == nil)
     }
 
     // MARK: - hasMultipleVolumes

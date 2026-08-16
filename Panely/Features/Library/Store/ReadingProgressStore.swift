@@ -49,9 +49,90 @@ final class ReadingProgressStore {
         return nil
     }
 
+    /// Continue Reading cares about the freshest alias. A moved file may have
+    /// an older path record and a newer file-identity record until migration
+    /// reconciles them.
+    func mostRecentProgress(forKey key: String, fileIdentityKey: String?) -> ReadingProgress? {
+        [entries[key], fileIdentityKey.flatMap { entries[$0] }]
+            .compactMap { $0 }
+            .max { $0.updatedAt < $1.updatedAt }
+    }
+
     func progress(for sourceURL: URL, opened openedURL: URL?, tempRoot: URL?) -> ReadingProgress? {
         let keys = PositionKey.keys(for: sourceURL, opened: openedURL, tempRoot: tempRoot)
         return progress(forKey: keys.primary, fileIdentityKey: keys.fileIdentity)
+    }
+
+    func remove(forKey key: String, fileIdentityKey: String?) {
+        saveDebouncer.cancel()
+        var dict = entries
+        dict.removeValue(forKey: key)
+        if let fileIdentityKey { dict.removeValue(forKey: fileIdentityKey) }
+        guard dict != entries else { return }
+        entries = dict
+        defaults.saveCodable(dict, forKey: storeKey)
+    }
+
+    /// Explicitly forget every progress record addressable through a recent
+    /// source. Used only by the user's "Remove from list" action; automatic
+    /// availability checks never destroy history for temporarily-offline
+    /// removable volumes.
+    func removeEntries(forSourcePath sourcePath: String) {
+        saveDebouncer.cancel()
+        let filtered = entries.filter { key, _ in
+            PositionKey.replacingSourcePath(in: key, from: sourcePath, to: "") == nil
+        }
+        guard filtered.count != entries.count else { return }
+        entries = filtered
+        defaults.saveCodable(filtered, forKey: storeKey)
+    }
+
+    func migrateSourcePath(from oldPath: String, to newPath: String) {
+        guard oldPath != newPath else { return }
+        saveDebouncer.cancel()
+        var migrated = entries
+        var changed = false
+        for (key, progress) in entries {
+            guard let newKey = PositionKey.replacingSourcePath(
+                in: key,
+                from: oldPath,
+                to: newPath
+            ) else { continue }
+            migrated.removeValue(forKey: key)
+            if let existing = migrated[newKey], existing.updatedAt > progress.updatedAt {
+                // Keep the freshest side when old and new paths both exist.
+            } else {
+                migrated[newKey] = progress
+            }
+            changed = true
+        }
+        guard changed else { return }
+        entries = migrated
+        defaults.saveCodable(migrated, forKey: storeKey)
+    }
+
+    /// Completion is sticky so moving back from the final page does not make a
+    /// finished book reappear in Continue Reading. An explicit restart calls
+    /// this method to begin a fresh read.
+    func resetCompletion(
+        forKey key: String,
+        fileIdentityKey: String?,
+        page: Int,
+        total: Int
+    ) {
+        saveDebouncer.cancel()
+        var dict = entries
+        let progress = ReadingProgress(
+            page: page,
+            total: total,
+            finished: false,
+            updatedAt: clock()
+        )
+        dict[key] = progress
+        if let fileIdentityKey { dict[fileIdentityKey] = progress }
+        evictIfNeeded(&dict)
+        entries = dict
+        defaults.saveCodable(dict, forKey: storeKey)
     }
 
     // MARK: - Recording
@@ -83,7 +164,19 @@ final class ReadingProgressStore {
 
     private func writeNow(key: String, fileIdentityKey: String?, page: Int, total: Int, finished: Bool) {
         var dict = entries
-        let progress = ReadingProgress(page: page, total: total, finished: finished, updatedAt: clock())
+        let existing = dict[key] ?? fileIdentityKey.flatMap { dict[$0] }
+        // Preserve completion while the underlying page count is unchanged.
+        // If the book is replaced with a different-length edition, recompute
+        // from its new end rather than carrying a stale completion forever.
+        let effectiveFinished = existing?.total == total
+            ? (existing?.finished == true || finished)
+            : finished
+        let progress = ReadingProgress(
+            page: page,
+            total: total,
+            finished: effectiveFinished,
+            updatedAt: clock()
+        )
         dict[key] = progress
         if let fid = fileIdentityKey {
             dict[fid] = progress

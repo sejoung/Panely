@@ -130,6 +130,19 @@ extension ReaderViewModel {
     /// Restart the current volume from page 1. Used by the card's secondary
     /// action so users can re-read without picking from the slider.
     func restartCurrentVolume() {
+        if let currentSourceURL, totalPages > 0 {
+            let keys = PositionKey.keys(
+                for: currentSourceURL,
+                opened: openedSourceURL,
+                tempRoot: tempDir.url
+            )
+            readingProgress.resetCompletion(
+                forKey: keys.primary,
+                fileIdentityKey: keys.fileIdentity,
+                page: 0,
+                total: totalPages
+            )
+        }
         jump(toPageNumber: 1)
     }
 

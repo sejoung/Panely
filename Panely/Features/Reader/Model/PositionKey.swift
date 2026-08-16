@@ -59,6 +59,22 @@ nonisolated enum PositionKey {
         return "fid:\(vol.description)/\(fid.description)"
     }
 
+    /// Re-key a path-based entry after a security-scoped bookmark resolves to
+    /// a moved/renamed source. Handles the source itself, zip-in-zip keys
+    /// (`source#inner`) and books below a remembered container directory
+    /// (`source/child`). File-identity aliases deliberately do not match.
+    static func replacingSourcePath(
+        in key: String,
+        from oldPath: String,
+        to newPath: String
+    ) -> String? {
+        if key == oldPath { return newPath }
+        for separator in ["#", "/"] where key.hasPrefix(oldPath + separator) {
+            return newPath + String(key.dropFirst(oldPath.count))
+        }
+        return nil
+    }
+
     /// Secondary key for mount-path drift recovery. Temp-backed volumes use
     /// the opened archive's identity plus the inner path because extraction
     /// paths and extracted file identities are not stable. Normal files and

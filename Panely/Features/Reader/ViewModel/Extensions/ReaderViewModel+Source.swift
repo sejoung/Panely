@@ -6,12 +6,29 @@ enum ReaderLoadIntent: Equatable {
     case open
     case librarySelection
     case favorite(innerPath: String?)
+    case continueReading(relativePath: String?)
     case previousVolume
     case nextVolumeFromEnd
 
     var preferredRelativePath: String? {
-        guard case .favorite(let innerPath) = self else { return nil }
-        return innerPath
+        switch self {
+        case .favorite(let innerPath):
+            return innerPath
+        case .continueReading(let relativePath):
+            return relativePath
+        default:
+            return nil
+        }
+    }
+
+    /// Continue Reading represents a precise persisted progress record. If
+    /// that child disappears, opening an arbitrary first volume would resume
+    /// the wrong book. Favorites keep their historical best-effort fallback.
+    var requiresPreferredRelativePath: Bool {
+        if case .continueReading(let relativePath) = self {
+            return relativePath?.isEmpty == false
+        }
+        return false
     }
 
     var preservesLibraryRoot: Bool {
@@ -30,6 +47,8 @@ enum ReaderLoadIntent: Equatable {
             "librarySelection"
         case .favorite:
             "favorite"
+        case .continueReading:
+            "continueReading"
         case .previousVolume:
             "previousVolume"
         case .nextVolumeFromEnd:
@@ -137,6 +156,7 @@ extension ReaderViewModel {
         guard hasSource else { return }
         sourceChangedOnDisk = true
         sourceChangeMessage = "The current book changed on disk."
+        Task { await refreshContinueReadingAvailability() }
     }
 
     func openLibraryURL(_ url: URL) {
@@ -195,6 +215,7 @@ extension ReaderViewModel {
     /// on-disk change callback.
     func refreshLibraryTree() {
         libraryRefreshToken = UUID()
+        Task { await refreshContinueReadingAvailability() }
     }
 
     /// (Re)point the recursive directory watcher at the current library root.

@@ -107,6 +107,37 @@ final class ReaderPositionStore {
         return restoredIndex(forKey: keys.primary, fileIdentityKey: keys.fileIdentity)
     }
 
+    func migrateSourcePath(from oldPath: String, to newPath: String) {
+        guard oldPath != newPath else { return }
+        saveDebouncer.cancel()
+        var dict = loaded()
+        var order = loadedOrder(dict: dict)
+        var replacements: [String: String] = [:]
+
+        for key in dict.keys {
+            guard let newKey = PositionKey.replacingSourcePath(
+                in: key,
+                from: oldPath,
+                to: newPath
+            ) else { continue }
+            replacements[key] = newKey
+        }
+        guard !replacements.isEmpty else { return }
+
+        for (oldKey, newKey) in replacements {
+            let value = dict.removeValue(forKey: oldKey)
+            if dict[newKey] == nil { dict[newKey] = value }
+        }
+        order = order.map { replacements[$0] ?? $0 }
+        var seen: Set<String> = []
+        order = order.filter { seen.insert($0).inserted && dict[$0] != nil }
+
+        cache = dict
+        orderCache = order
+        defaults.set(dict, forKey: positionsKey)
+        defaults.set(order, forKey: orderKey)
+    }
+
     private func writeNow(key: String, fileIdentityKey: String?, pageIndex: Int) {
         var dict = loaded()
         var order = loadedOrder(dict: dict)

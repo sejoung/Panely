@@ -66,6 +66,10 @@ struct SidebarHost: View {
                 viewModel.dismissSidebarOverlay()
                 requestFocus()
             },
+            onRemoveContinueReading: {
+                guard let suggestion = viewModel.continueReadingSuggestion else { return }
+                viewModel.removeContinueReading(suggestion)
+            },
             onRequestFolderAccess: { viewModel.requestFolderAccess() }
         )
     }

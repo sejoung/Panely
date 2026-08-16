@@ -8,6 +8,7 @@ import SwiftUI
 /// focus).
 struct ReaderScene: View {
     @Environment(ReaderViewModel.self) private var viewModel
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var toolbarVisible = false
     @State private var sidebarDismissTask: Task<Void, Never>?
@@ -72,6 +73,13 @@ struct ReaderScene: View {
         .animation(PanelyMotion.uiReveal, value: viewModel.sourceChangedOnDisk)
         .animation(PanelyMotion.uiReveal, value: viewModel.errorMessage)
         .frame(minWidth: 800, minHeight: 600)
+        .task {
+            await viewModel.refreshContinueReadingAvailability()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await viewModel.refreshContinueReadingAvailability() }
+        }
         .onDisappear { cancelSidebarDismiss() }
     }
 
@@ -113,6 +121,11 @@ private struct ReaderStatusBanner: View {
             }
         } else if let message = viewModel.errorMessage, !viewModel.isLoading {
             banner(systemImage: "exclamationmark.triangle", message: message) {
+                if viewModel.unavailableRecentItem != nil {
+                    Button("Remove from List", role: .destructive) {
+                        viewModel.removeUnavailableRecentItem()
+                    }
+                }
                 if viewModel.currentSourceURL != nil {
                     Button("Retry") {
                         viewModel.reloadCurrentSource()

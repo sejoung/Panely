@@ -91,6 +91,29 @@ final class PageBookmarksStore {
         }
     }
 
+    func migrateSourcePath(from oldPath: String, to newPath: String) {
+        guard oldPath != newPath else { return }
+        var migrated = pageBookmarksByBook
+        var changed = false
+
+        for (key, bookmarks) in pageBookmarksByBook {
+            guard let newKey = PositionKey.replacingSourcePath(
+                in: key,
+                from: oldPath,
+                to: newPath
+            ) else { continue }
+            migrated.removeValue(forKey: key)
+            let combined = (migrated[newKey] ?? []) + bookmarks
+            migrated[newKey] = Dictionary(grouping: combined, by: \.id)
+                .compactMap(\.value.first)
+                .sorted { $0.pageIndex < $1.pageIndex }
+            changed = true
+        }
+        guard changed else { return }
+        pageBookmarksByBook = migrated
+        save()
+    }
+
     // MARK: - Internals
 
     private func commit(_ list: [PageBookmark], forKey key: String) {

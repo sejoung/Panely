@@ -14,6 +14,7 @@ struct LibrarySidebarActions {
     var onTogglePin: () -> Void = {}
     var onRefresh: () -> Void = {}
     var onContinueReading: () -> Void = {}
+    var onRemoveContinueReading: () -> Void = {}
     var onRequestFolderAccess: () -> Void = {}
 }
 
@@ -142,6 +143,11 @@ struct LibrarySidebar: View {
                 }
                 .buttonStyle(.plain)
                 .listRowBackground(Color.clear)
+                .contextMenu {
+                    Button("Remove from Continue Reading", role: .destructive) {
+                        actions.onRemoveContinueReading()
+                    }
+                }
             }
         }
     }

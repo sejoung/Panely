@@ -73,6 +73,14 @@ final class ReaderViewModel {
         }
     }
     var errorMessage: String?
+    /// Set when a bookmark-backed Continue/Open Recent item cannot currently
+    /// be reached. Drives the status banner's explicit removal action.
+    var unavailableRecentItem: RecentItem?
+    /// Child-volume progress under an available container folder can become
+    /// stale independently of the folder bookmark. Refreshed off the render
+    /// path and consulted when building the Continue Reading suggestion.
+    var unavailableContinueReadingKeys: Set<String> = []
+    var continueReadingAvailabilityRefreshGeneration = 0
     var isLoading: Bool = false
     var loadingMessage: String = ""
 

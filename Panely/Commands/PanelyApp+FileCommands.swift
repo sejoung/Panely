@@ -19,14 +19,12 @@ extension PanelyApp {
             .disabled(viewModel.currentSourceURL == nil || viewModel.isLoading)
 
             Menu("Open Recent") {
-                if viewModel.recentItems.items.isEmpty {
+                if viewModel.recentItems.menuItems.isEmpty {
                     Text("No Recent Items")
                 } else {
-                    ForEach(viewModel.recentItems.items) { item in
+                    ForEach(viewModel.recentItems.menuItems) { item in
                         Button {
-                            if let url = viewModel.recentItems.resolve(item) {
-                                viewModel.openURL(url)
-                            }
+                            viewModel.openRecentItem(item)
                         } label: {
                             Label(item.title, systemImage: item.iconName)
                         }

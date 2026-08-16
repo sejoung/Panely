@@ -13,11 +13,14 @@ import Foundation
 
 private enum ReaderLoadError: LocalizedError {
     case extractionFailed(Error)
+    case preferredPathMissing(String)
 
     var errorDescription: String? {
         switch self {
         case .extractionFailed(let error):
             return "Failed to extract archive: \(error.localizedDescription)"
+        case .preferredPathMissing:
+            return "The saved book is no longer available in this source."
         }
     }
 }
@@ -78,9 +81,10 @@ extension ReaderViewModel {
             guard let archiveTarget = try await resolveArchiveTarget(for: targetURL, epoch: myEpoch) else {
                 return
             }
-            targetURL = targetByApplyingPreferredRelativePath(
+            targetURL = try targetByApplyingPreferredRelativePath(
                 to: archiveTarget,
-                applyingPreferredRelativePath: intent.preferredRelativePath
+                applyingPreferredRelativePath: intent.preferredRelativePath,
+                required: intent.requiresPreferredRelativePath
             )
 
             guard let folderTarget = await resolveFolderTarget(for: targetURL, epoch: myEpoch) else {
@@ -145,6 +149,10 @@ extension ReaderViewModel {
             await refreshImages()
         } catch {
             guard myEpoch == loadEpoch else { return }
+            if let loadError = error as? ReaderLoadError,
+               case .preferredPathMissing(let relativePath) = loadError {
+                invalidateMissingPreferredPath(sourceURL: url, relativePath: relativePath)
+            }
             let message = DiagnosticRedactor.redactKnownPaths(
                 in: error.localizedDescription,
                 urls: [url, targetURL]
@@ -168,6 +176,7 @@ extension ReaderViewModel {
     }
 
     private func startLoad() -> Int {
+        unavailableRecentItem = nil
         imageLoader.cancelBackgroundWork()
         ThumbnailLoader.shared.removeAll()
         sourceRenderRevision &+= 1
@@ -313,12 +322,22 @@ extension ReaderViewModel {
 
     private func targetByApplyingPreferredRelativePath(
         to targetURL: URL,
-        applyingPreferredRelativePath relativePath: String?
-    ) -> URL {
-        guard let relativePath,
-              !relativePath.isEmpty,
-              tempDir.isActive,
-              let root = tempDir.url else {
+        applyingPreferredRelativePath relativePath: String?,
+        required: Bool
+    ) throws -> URL {
+        guard let relativePath, !relativePath.isEmpty else {
+            return targetURL
+        }
+
+        let root: URL
+        if tempDir.isActive, let tempRoot = tempDir.url {
+            root = tempRoot
+        } else if isDirectory(targetURL) {
+            // Continue Reading can point from a remembered container folder
+            // to the actual child volume that supplied its progress.
+            root = targetURL
+        } else {
+            if required { throw ReaderLoadError.preferredPathMissing(relativePath) }
             return targetURL
         }
 
@@ -327,9 +346,24 @@ extension ReaderViewModel {
             .standardizedFileURL
         guard root.isAncestor(of: preferred),
               FileManager.default.fileExists(atPath: preferred.path) else {
+            if required { throw ReaderLoadError.preferredPathMissing(relativePath) }
             return targetURL
         }
         return preferred
+    }
+
+    private func invalidateMissingPreferredPath(sourceURL: URL, relativePath: String) {
+        let source = sourceURL.standardizedFileURL
+        let primary: String
+        let fileIdentity: String?
+        if isDirectory(source) {
+            primary = source.appendingPathComponent(relativePath).standardizedFileURL.path
+            fileIdentity = nil
+        } else {
+            primary = source.path + "#" + relativePath
+            fileIdentity = PositionKey.fileIdentity(for: source).map { $0 + "#" + relativePath }
+        }
+        readingProgress.remove(forKey: primary, fileIdentityKey: fileIdentity)
     }
 
     private func resolveFolderTarget(for url: URL, epoch: Int) async -> FolderTargetResolution? {

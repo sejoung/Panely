@@ -77,4 +77,70 @@ struct ReadingProgressStoreTests {
         #expect(store.progress(forKey: "a", fileIdentityKey: nil)?.page == 2) // re-touched, survives
         #expect(store.progress(forKey: "d", fileIdentityKey: nil) != nil)     // newest survives
     }
+
+    @Test func completionStaysFinishedWhenReaderMovesBackward() {
+        let store = ReadingProgressStore(
+            defaults: InMemoryKeyValueStore(),
+            storeKey: "rp-\(UUID())"
+        )
+        store.flushImmediately(
+            forKey: "book",
+            fileIdentityKey: nil,
+            page: 9,
+            total: 10,
+            finished: true
+        )
+
+        store.flushImmediately(
+            forKey: "book",
+            fileIdentityKey: nil,
+            page: 4,
+            total: 10,
+            finished: false
+        )
+
+        #expect(store.progress(forKey: "book", fileIdentityKey: nil)?.page == 4)
+        #expect(store.progress(forKey: "book", fileIdentityKey: nil)?.finished == true)
+    }
+
+    @Test func explicitResetStartsFreshReadAfterCompletion() {
+        let store = ReadingProgressStore(
+            defaults: InMemoryKeyValueStore(),
+            storeKey: "rp-\(UUID())"
+        )
+        store.flushImmediately(
+            forKey: "book",
+            fileIdentityKey: "fid",
+            page: 9,
+            total: 10,
+            finished: true
+        )
+
+        store.resetCompletion(
+            forKey: "book",
+            fileIdentityKey: "fid",
+            page: 0,
+            total: 10
+        )
+
+        #expect(store.progress(forKey: "book", fileIdentityKey: "fid")?.finished == false)
+        #expect(store.progress(forKey: "book", fileIdentityKey: "fid")?.page == 0)
+    }
+
+    @Test func pathMigrationMovesDirectNestedAndDirectoryChildEntries() {
+        let store = ReadingProgressStore(
+            defaults: InMemoryKeyValueStore(),
+            storeKey: "rp-\(UUID())"
+        )
+        store.flushImmediately(forKey: "/old/book.zip", fileIdentityKey: nil, page: 1, total: 10, finished: false)
+        store.flushImmediately(forKey: "/old/book.zip#Vol02", fileIdentityKey: nil, page: 2, total: 10, finished: false)
+        store.flushImmediately(forKey: "/old/book.zip/child", fileIdentityKey: nil, page: 3, total: 10, finished: false)
+
+        store.migrateSourcePath(from: "/old/book.zip", to: "/new/book.zip")
+
+        #expect(store.progress(forKey: "/old/book.zip", fileIdentityKey: nil) == nil)
+        #expect(store.progress(forKey: "/new/book.zip", fileIdentityKey: nil)?.page == 1)
+        #expect(store.progress(forKey: "/new/book.zip#Vol02", fileIdentityKey: nil)?.page == 2)
+        #expect(store.progress(forKey: "/new/book.zip/child", fileIdentityKey: nil)?.page == 3)
+    }
 }
