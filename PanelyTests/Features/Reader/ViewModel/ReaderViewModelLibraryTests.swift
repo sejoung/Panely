@@ -243,6 +243,53 @@ struct ReaderViewModelLibraryTests {
         #expect(vm.sidebarVolumes.last?.lastPathComponent == "Vol03.cbz")
     }
 
+    @Test func wrappedZipInZipVolumeKeepsOuterVolumeList() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+
+        let flatPages = workDir.appendingPathComponent("flat-pages", isDirectory: true)
+        try FileManager.default.createDirectory(at: flatPages, withIntermediateDirectories: true)
+        try Fixture.makePNG(width: 10, height: 10)
+            .write(to: flatPages.appendingPathComponent("001.png"))
+        let flatArchive = workDir.appendingPathComponent("Vol01.zip")
+        try Fixture.zipDirectory(flatPages, to: flatArchive)
+
+        let wrappedSource = workDir.appendingPathComponent("wrapped-source", isDirectory: true)
+        let wrappedPages = wrappedSource.appendingPathComponent("Vol02 pages", isDirectory: true)
+        try FileManager.default.createDirectory(at: wrappedPages, withIntermediateDirectories: true)
+        try Fixture.makePNG(width: 12, height: 10)
+            .write(to: wrappedPages.appendingPathComponent("001.png"))
+        let wrappedArchive = workDir.appendingPathComponent("Vol02.zip")
+        try Fixture.zipDirectory(wrappedSource, to: wrappedArchive)
+
+        let outerSource = workDir.appendingPathComponent("outer-source", isDirectory: true)
+        try FileManager.default.createDirectory(at: outerSource, withIntermediateDirectories: true)
+        try FileManager.default.moveItem(
+            at: flatArchive,
+            to: outerSource.appendingPathComponent("Vol01.zip")
+        )
+        try FileManager.default.moveItem(
+            at: wrappedArchive,
+            to: outerSource.appendingPathComponent("Vol02.zip")
+        )
+        let outerArchive = workDir.appendingPathComponent("Series.zip")
+        try Fixture.zipDirectory(outerSource, to: outerArchive)
+
+        let vm = makeTestViewModel()
+        await vm.load(url: outerArchive)
+        let outerVolumes = vm.siblings
+        let wrappedVolume = try #require(
+            outerVolumes.first { $0.lastPathComponent == "Vol02" }
+        )
+
+        await vm.load(url: wrappedVolume)
+
+        #expect(vm.siblings == outerVolumes)
+        #expect(vm.sidebarVolumes == outerVolumes)
+        #expect(vm.currentSiblingIndex == 1)
+        #expect(vm.currentSourceURL?.lastPathComponent == "Vol02 pages")
+    }
+
     @Test func sidebarActiveURLPrefersPendingSourceWhileLoading() {
         let vm = makeTestViewModel()
         let current = URL(fileURLWithPath: "/library/Vol01.cbz")

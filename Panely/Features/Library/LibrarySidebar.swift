@@ -153,7 +153,7 @@ struct LibrarySidebar: View {
                 ForEach(volumes, id: \.self) { url in
                     VolumeRow(
                         url: url,
-                        isActive: activeStdURL == url.standardizedFileURL,
+                        isActive: isActiveVolume(url, activeURL: activeStdURL),
                         badge: readingBadge(url),
                         onTap: { actions.onSelectVolume(url) }
                     )
@@ -161,6 +161,12 @@ struct LibrarySidebar: View {
                 }
             }
         }
+    }
+
+    private func isActiveVolume(_ volumeURL: URL, activeURL: URL?) -> Bool {
+        guard let activeURL else { return false }
+        let volume = volumeURL.standardizedFileURL
+        return volume == activeURL || volume.isAncestor(of: activeURL)
     }
 
     @ViewBuilder

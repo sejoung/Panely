@@ -11,7 +11,10 @@ extension ReaderViewModel {
     var currentSiblingIndex: Int? {
         guard let current = currentSourceURL else { return nil }
         let target = current.standardizedFileURL
-        return siblings.firstIndex { $0.standardizedFileURL == target }
+        return siblings.firstIndex {
+            let sibling = $0.standardizedFileURL
+            return sibling == target || sibling.isAncestor(of: target)
+        }
     }
 
     var hasMultipleVolumes: Bool { siblings.count > 1 }

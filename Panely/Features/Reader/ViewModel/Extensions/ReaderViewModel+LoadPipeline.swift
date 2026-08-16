@@ -61,7 +61,18 @@ extension ReaderViewModel {
         )
 
         var targetURL = url
+        // A selected volume can itself be a container folder (for example an
+        // inner ZIP that expands to `722/722 pages/*.jpg`). Keep the outer
+        // volume list before folder resolution descends into that wrapper;
+        // otherwise the wrapper's single child replaces the whole series and
+        // the sidebar's Volumes section appears to collapse.
         var siblingsToUse = knownSiblings
+        if siblingsToUse == nil,
+           siblings.contains(where: {
+               $0.standardizedFileURL == url.standardizedFileURL
+           }) {
+            siblingsToUse = siblings
+        }
 
         do {
             guard let archiveTarget = try await resolveArchiveTarget(for: targetURL, epoch: myEpoch) else {
@@ -79,7 +90,10 @@ extension ReaderViewModel {
             switch folderTarget {
             case .book(let url, let siblings):
                 targetURL = url
-                siblingsToUse = siblings ?? siblingsToUse
+                // Explicit/existing sibling context describes the selected
+                // volume's series and takes precedence over any child folders
+                // discovered while descending to the actual image directory.
+                siblingsToUse = siblingsToUse ?? siblings
                 if let siblings {
                     AppLog.info(
                         .load,
