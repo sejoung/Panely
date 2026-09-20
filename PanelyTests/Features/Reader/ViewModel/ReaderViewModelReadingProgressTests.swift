@@ -302,7 +302,11 @@ struct ReaderViewModelReadingProgressTests {
         try FileManager.default.removeItem(at: book)
 
         vm.openContinueReading(suggestion)
-        try await Task.sleep(for: .milliseconds(100))
+        // The availability check hops through a detached task; poll instead of
+        // a fixed sleep, which lost the race when the full suite ran in parallel.
+        for _ in 0..<200 where vm.unavailableRecentItem == nil {
+            try await Task.sleep(for: .milliseconds(10))
+        }
 
         #expect(vm.unavailableRecentItem?.id == suggestion.item.id)
         #expect(vm.errorMessage != nil)
