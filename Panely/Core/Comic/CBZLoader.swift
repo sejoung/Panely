@@ -29,6 +29,7 @@ nonisolated enum CBZLoader {
             let paths = await reader.entryPaths()
 
             let imagePaths = paths.filter { path in
+                guard !isMetadataEntry(path) else { return false }
                 let ext = (path as NSString).pathExtension.lowercased()
                 return FolderLoader.supportedExtensions.contains(ext)
             }
@@ -52,10 +53,20 @@ nonisolated enum CBZLoader {
             let reader = try ArchiveReader(url: url)
             let paths = await reader.entryPaths()
             return paths.contains { path in
+                guard !isMetadataEntry(path) else { return false }
                 let ext = (path as NSString).pathExtension.lowercased()
                 return supportedExtensions.contains(ext)
             }
         }.value
+    }
+
+    /// Entries that carry no content of their own: Finder's "Compress" stores
+    /// each file's resource fork as `__MACOSX/._<name>`, keeping the original
+    /// extension — so `__MACOSX/._001.jpg` would otherwise surface as an
+    /// undecodable page (and `._Vol01.zip` as a nested archive). Dot-files are
+    /// skipped too, matching `FolderLoader`'s `.skipsHiddenFiles`.
+    private static func isMetadataEntry(_ path: String) -> Bool {
+        path.split(separator: "/").contains { $0 == "__MACOSX" || $0.hasPrefix(".") }
     }
 
     static func extractAll(

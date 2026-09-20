@@ -10,22 +10,68 @@ nonisolated enum FolderResolver {
     /// naturally sorted. Used to seed the volume nav and the sibling list.
     static func enumerateVolumes(in directory: URL) async -> [URL] {
         await Task.detached(priority: .userInitiated) {
-            guard let contents = try? FileManager.default.contentsOfDirectory(
-                at: directory,
-                includingPropertiesForKeys: [.isDirectoryKey],
-                options: [.skipsHiddenFiles, .skipsPackageDescendants]
-            ) else {
-                return []
-            }
+            volumes(in: directory)
+        }.value
+    }
 
-            let volumes = contents.filter { candidate in
-                let isDir = (try? candidate.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
-                if isDir { return true }
-                let ext = candidate.pathExtension.lowercased()
-                return CBZLoader.supportedExtensions.contains(ext)
-            }
+    /// Directory names that never hold a book. Finder's "Compress" adds a
+    /// `__MACOSX` resource-fork folder next to the real content; counting it
+    /// as a volume makes a wrapper level look like a two-volume series.
+    private static let ignoredDirectoryNames: Set<String> = ["__MACOSX"]
 
-            return volumes.sorted(by: NaturalSort.byFilename)
+    private static func isDirectory(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
+    }
+
+    private static func isVolume(_ candidate: URL) -> Bool {
+        if isDirectory(candidate) {
+            return !ignoredDirectoryNames.contains(candidate.lastPathComponent)
+        }
+        return CBZLoader.supportedExtensions.contains(candidate.pathExtension.lowercased())
+    }
+
+    private static func volumes(in directory: URL) -> [URL] {
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else {
+            return []
+        }
+        return contents.filter(isVolume).sorted(by: NaturalSort.byFilename)
+    }
+
+    /// Whether a folder's volume listing describes a series the reader should
+    /// navigate, as opposed to a wrapper level. A lone child *folder* is a
+    /// wrapper (an inner ZIP expanding to `722/722 pages/*.jpg`); a lone
+    /// archive is a genuine one-volume series. Shared by the load pipeline's
+    /// top-down descent and `nearestSeriesVolumes` so opening and reopening
+    /// the same book agree on its volume list.
+    static func isSeriesLevel(_ volumes: [URL]) -> Bool {
+        if volumes.count > 1 { return true }
+        guard let only = volumes.first else { return false }
+        return !isDirectory(only)
+    }
+
+    /// Volume list for a book opened directly at a saved path below `root`
+    /// (Continue Reading, Reload, Favorites skip the top-down descent). Climbs
+    /// from `target` toward `root` and returns the nearest series level; when
+    /// every level is a wrapper, falls back to the outermost listing — the
+    /// same list the descent from `root` would have produced.
+    static func nearestSeriesVolumes(of target: URL, boundedBy root: URL) async -> [URL] {
+        await Task.detached(priority: .userInitiated) {
+            let rootPath = root.standardizedFileURL.path
+            var candidate = target
+            var outermost: [URL] = []
+            while candidate.standardizedFileURL.path != rootPath,
+                  root.isAncestor(of: candidate) {
+                let parent = candidate.deletingLastPathComponent()
+                let listing = volumes(in: parent)
+                if isSeriesLevel(listing) { return listing }
+                if !listing.isEmpty { outermost = listing }
+                candidate = parent
+            }
+            return outermost.isEmpty ? [target] : outermost
         }.value
     }
 
@@ -56,14 +102,10 @@ nonisolated enum FolderResolver {
             var volumes: [URL] = []
 
             for entry in contents {
-                let isDir = (try? entry.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
-                let ext = entry.pathExtension.lowercased()
-
-                if isDir {
+                if isVolume(entry) {
                     volumes.append(entry)
-                } else if CBZLoader.supportedExtensions.contains(ext) {
-                    volumes.append(entry)
-                } else if FolderLoader.supportedExtensions.contains(ext) {
+                } else if !isDirectory(entry),
+                          FolderLoader.supportedExtensions.contains(entry.pathExtension.lowercased()) {
                     hasImages = true
                 }
             }

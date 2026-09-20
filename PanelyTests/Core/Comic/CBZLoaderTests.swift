@@ -85,6 +85,47 @@ struct CBZLoaderIntegrationTests {
         #expect(comic.pages.map(\.displayName) == ["01.jpg", "02.jpg", "10.jpg"])
     }
 
+    @Test func loadSkipsMacOSXResourceForksAndHiddenEntries() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+
+        // Shape of a Finder-compressed archive: every page has a resource-fork
+        // twin under `__MACOSX/` that keeps the image extension.
+        let src = try Fixture.makeTempDir()
+        let forks = src.appendingPathComponent("__MACOSX", isDirectory: true)
+        try FileManager.default.createDirectory(at: forks, withIntermediateDirectories: true)
+        try Fixture.writeFile(src.appendingPathComponent("01.jpg"))
+        try Fixture.writeFile(src.appendingPathComponent("02.jpg"))
+        try Fixture.writeFile(src.appendingPathComponent("._02.jpg"))
+        try Fixture.writeFile(forks.appendingPathComponent("._01.jpg"))
+        try Fixture.writeFile(forks.appendingPathComponent("cover.jpg"))
+
+        let zipURL = workDir.appendingPathComponent("book.cbz")
+        try Fixture.zipDirectory(src, to: zipURL)
+        try? FileManager.default.removeItem(at: src)
+
+        let comic = try await CBZLoader.load(from: zipURL)
+        #expect(comic.pages.map(\.displayName) == ["01.jpg", "02.jpg"])
+    }
+
+    @Test func hasNestedArchivesIgnoresMacOSXResourceForks() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+
+        let src = try Fixture.makeTempDir()
+        let forks = src.appendingPathComponent("__MACOSX", isDirectory: true)
+        try FileManager.default.createDirectory(at: forks, withIntermediateDirectories: true)
+        try Fixture.writeFile(src.appendingPathComponent("001.jpg"))
+        try Fixture.writeFile(forks.appendingPathComponent("._old.zip"))
+
+        let zipURL = workDir.appendingPathComponent("book.cbz")
+        try Fixture.zipDirectory(src, to: zipURL)
+        try? FileManager.default.removeItem(at: src)
+
+        let hasNested = try await CBZLoader.hasNestedArchives(at: zipURL)
+        #expect(hasNested == false)
+    }
+
     @Test func extractAllRecursivelyUnpacksNestedArchives() async throws {
         let workDir = try Fixture.makeTempDir()
         defer { try? FileManager.default.removeItem(at: workDir) }

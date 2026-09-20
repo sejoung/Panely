@@ -81,11 +81,30 @@ extension ReaderViewModel {
             guard let archiveTarget = try await resolveArchiveTarget(for: targetURL, epoch: myEpoch) else {
                 return
             }
+            if archiveTarget.standardizedFileURL != url.standardizedFileURL {
+                // `url` turned out to be a zip-in-zip: its volumes live in the
+                // extraction, so a sibling list naming the outer archive (the
+                // library folder it sits in) doesn't describe them. Carrying
+                // it over would fill the Volumes section with outer files and
+                // leave prev/next volume without a current index.
+                siblingsToUse = nil
+            }
             targetURL = try targetByApplyingPreferredRelativePath(
                 to: archiveTarget,
                 applyingPreferredRelativePath: intent.preferredRelativePath,
                 required: intent.requiresPreferredRelativePath
             )
+            // Jumping straight to a saved inner path skips the top-down
+            // descent below, so the volume list has to be found by climbing
+            // back toward the root the path was resolved against.
+            let siblingRoot: URL?
+            if let tempRoot = tempDir.url {
+                siblingRoot = tempRoot
+            } else if targetURL != archiveTarget {
+                siblingRoot = archiveTarget
+            } else {
+                siblingRoot = nil
+            }
 
             guard let folderTarget = await resolveFolderTarget(for: targetURL, epoch: myEpoch) else {
                 return
@@ -129,6 +148,7 @@ extension ReaderViewModel {
                 loaded,
                 targetURL: targetURL,
                 siblingsToUse: siblingsToUse,
+                siblingRoot: siblingRoot,
                 restorePosition: intent.restoresPosition,
                 epoch: myEpoch
             )
@@ -387,10 +407,10 @@ extension ReaderViewModel {
             // Library/Series/Vol01.zip or Library/Series/Vol01/*.jpg.
             // Keep descending through "container" folders until we hit
             // an actual image folder or archive, and use the nearest
-            // sibling set as volume navigation. A single-child level is just
-            // a wrapper (an inner ZIP expanding to `722/722 pages/*.jpg`), not
-            // a series — it must not replace the volume list found above it.
-            if resolvedSiblings == nil || volumes.count > 1 {
+            // sibling set as volume navigation. A wrapper level (an inner ZIP
+            // expanding to `722/722 pages/*.jpg`) is not a series — it must
+            // not replace the volume list found above it.
+            if resolvedSiblings == nil || FolderResolver.isSeriesLevel(volumes) {
                 resolvedSiblings = volumes
             }
             candidate = first
@@ -412,6 +432,7 @@ extension ReaderViewModel {
         _ loaded: ComicSource,
         targetURL: URL,
         siblingsToUse: [URL]?,
+        siblingRoot: URL?,
         restorePosition: Bool,
         epoch: Int
     ) async -> Bool {
@@ -422,8 +443,11 @@ extension ReaderViewModel {
             $0.standardizedFileURL == targetURL.standardizedFileURL
         }) {
             resolvedSiblings = nil
-        } else if let tempRoot = tempDir.url, tempRoot.isAncestor(of: targetURL) {
-            resolvedSiblings = await extractedSiblings(of: targetURL, under: tempRoot)
+        } else if let siblingRoot, siblingRoot.isAncestor(of: targetURL) {
+            resolvedSiblings = await FolderResolver.nearestSeriesVolumes(
+                of: targetURL,
+                boundedBy: siblingRoot
+            )
             guard epoch == loadEpoch else { return false }
         } else {
             resolvedSiblings = await FolderResolver.scanSiblings(of: targetURL)
@@ -444,24 +468,6 @@ extension ReaderViewModel {
             : 0
         startSourceChangeMonitor(for: targetURL, source: loaded)
         return true
-    }
-
-    /// Sibling list for a book reopened directly inside the zip-in-zip
-    /// extraction (Continue Reading, Reload, Favorites jump straight to the
-    /// saved inner path, skipping the top-down folder descent). The saved path
-    /// can sit below its volume (`Vol02/Vol02 pages`), where the parent folder
-    /// lists only that wrapper child — climb toward the extraction root until
-    /// a level with real siblings turns up so the Volumes section survives.
-    private func extractedSiblings(of targetURL: URL, under tempRoot: URL) async -> [URL] {
-        var candidate = targetURL
-        while candidate.standardizedFileURL != tempRoot.standardizedFileURL,
-              tempRoot.isAncestor(of: candidate) {
-            let parent = candidate.deletingLastPathComponent()
-            let volumes = await FolderResolver.enumerateVolumes(in: parent)
-            if volumes.count > 1 { return volumes }
-            candidate = parent
-        }
-        return [targetURL]
     }
 
     func clearLoadedSource(message: String, preserveLibraryContext: Bool = false) {

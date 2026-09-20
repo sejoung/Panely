@@ -250,6 +250,12 @@ struct ReaderViewModelLibraryTests {
         #expect(vm.sidebarVolumes.last?.lastPathComponent == "Vol03.cbz")
     }
 
+    private func makeImageFolder(at url: URL) throws {
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        try Fixture.makePNG(width: 10, height: 10)
+            .write(to: url.appendingPathComponent("001.png"))
+    }
+
     /// `Series.zip` holding a flat `Vol01.zip` and a `Vol02.zip` whose pages
     /// sit inside a `Vol02 pages/` wrapper folder. With `wrapFirstVolume`,
     /// `Vol01.zip` gets the same wrapper shape.
@@ -312,14 +318,18 @@ struct ReaderViewModelLibraryTests {
         defer { try? FileManager.default.removeItem(at: workDir) }
         let outerArchive = try makeWrappedZipInZip(in: workDir)
 
-        let vm = makeTestViewModel()
-        await vm.load(url: outerArchive)
-        let outerVolumeNames = vm.siblings.map(\.lastPathComponent)
+        // Shared cache, separate view models: the reopen is a cold launch
+        // hitting the extraction cache, with no sibling state to fall back on.
+        let cache = TestExtractionCacheManager()
+        let firstLaunch = makeTestViewModel(extractionCache: cache)
+        await firstLaunch.load(url: outerArchive)
+        let outerVolumeNames = firstLaunch.siblings.map(\.lastPathComponent)
         #expect(outerVolumeNames == ["Vol01", "Vol02"])
 
         // Continue Reading / Reload / Favorites reopen the outer archive at
         // the saved inner book, which for a wrapped volume is the image
         // folder *below* the volume.
+        let vm = makeTestViewModel(extractionCache: cache)
         await vm.load(
             url: outerArchive,
             intent: .continueReading(relativePath: "Vol02/Vol02 pages")
@@ -342,6 +352,127 @@ struct ReaderViewModelLibraryTests {
         #expect(vm.currentSourceURL?.lastPathComponent == "Vol01 pages")
         #expect(vm.siblings.map(\.lastPathComponent) == ["Vol01", "Vol02"])
         #expect(vm.currentSiblingIndex == 0)
+    }
+
+    @Test func zipInZipIgnoresMacOSXFolderWhenListingVolumes() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+
+        // Finder's "Compress" puts a `__MACOSX` folder beside the content, so
+        // the wrapped volume's level lists two directories.
+        let junk = workDir
+            .appendingPathComponent("wrapped-source", isDirectory: true)
+            .appendingPathComponent("__MACOSX", isDirectory: true)
+        try FileManager.default.createDirectory(at: junk, withIntermediateDirectories: true)
+        try Fixture.writeFile(junk.appendingPathComponent("._001.png"))
+        let outerArchive = try makeWrappedZipInZip(in: workDir)
+
+        let vm = makeTestViewModel()
+        await vm.load(
+            url: outerArchive,
+            intent: .continueReading(relativePath: "Vol02/Vol02 pages")
+        )
+
+        #expect(vm.currentSourceURL?.lastPathComponent == "Vol02 pages")
+        #expect(vm.siblings.map(\.lastPathComponent) == ["Vol01", "Vol02"])
+
+        let wrappedVolume = try #require(vm.siblings.last)
+        await vm.load(url: wrappedVolume, knownSiblings: nil)
+        #expect(vm.currentSourceURL?.lastPathComponent == "Vol02 pages")
+        #expect(vm.siblings.map(\.lastPathComponent) == ["Vol01", "Vol02"])
+    }
+
+    @Test func singleWrappedZipInZipVolumeListsSameSiblingsOnReopen() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+
+        let pages = workDir
+            .appendingPathComponent("wrapped-source", isDirectory: true)
+            .appendingPathComponent("Vol01 pages", isDirectory: true)
+        try makeImageFolder(at: pages)
+        let outerSource = workDir.appendingPathComponent("outer-source", isDirectory: true)
+        try FileManager.default.createDirectory(at: outerSource, withIntermediateDirectories: true)
+        try Fixture.zipDirectory(
+            pages.deletingLastPathComponent(),
+            to: outerSource.appendingPathComponent("Vol01.zip")
+        )
+        let outerArchive = workDir.appendingPathComponent("Series.zip")
+        try Fixture.zipDirectory(outerSource, to: outerArchive)
+
+        let cache = TestExtractionCacheManager()
+        let opened = makeTestViewModel(extractionCache: cache)
+        await opened.load(url: outerArchive)
+        let reopened = makeTestViewModel(extractionCache: cache)
+        await reopened.load(
+            url: outerArchive,
+            intent: .continueReading(relativePath: "Vol01/Vol01 pages")
+        )
+
+        #expect(opened.siblings.map(\.lastPathComponent) == ["Vol01"])
+        #expect(reopened.siblings.map(\.standardizedFileURL) == opened.siblings.map(\.standardizedFileURL))
+    }
+
+    @Test func openingZipInZipFromLibraryDropsOuterSiblingList() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+
+        let library = workDir.appendingPathComponent("Library", isDirectory: true)
+        try FileManager.default.createDirectory(at: library, withIntermediateDirectories: true)
+        let otherPages = workDir.appendingPathComponent("other-pages", isDirectory: true)
+        try makeImageFolder(at: otherPages)
+        let other = library.appendingPathComponent("Other.cbz")
+        try Fixture.zipDirectory(otherPages, to: other)
+        let series = library.appendingPathComponent("Series.zip")
+        try FileManager.default.moveItem(at: try makeWrappedZipInZip(in: workDir), to: series)
+
+        let vm = makeTestViewModel()
+        await vm.load(url: other)
+        #expect(vm.siblings.map(\.lastPathComponent) == ["Other.cbz", "Series.zip"])
+
+        // The outer list names Series.zip itself, but its volumes live in the
+        // extraction — the stale list must not become the Volumes section.
+        await vm.load(url: series)
+
+        #expect(vm.siblings.map(\.lastPathComponent) == ["Vol01", "Vol02"])
+        #expect(vm.sidebarVolumes.map(\.lastPathComponent) == ["Vol01", "Vol02"])
+        #expect(vm.currentSiblingIndex == 0)
+    }
+
+    @Test func singleArchiveSeriesKeepsItsOwnVolumeList() async throws {
+        let library = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: library) }
+
+        // A lone archive is a one-volume series, not a wrapper: the library's
+        // series list must not leak in as the volume list.
+        let pages = library.appendingPathComponent("SeriesB/pages", isDirectory: true)
+        try makeImageFolder(at: pages)
+        let seriesA = library.appendingPathComponent("SeriesA", isDirectory: true)
+        try FileManager.default.createDirectory(at: seriesA, withIntermediateDirectories: true)
+        try Fixture.zipDirectory(pages, to: seriesA.appendingPathComponent("Vol01.cbz"))
+
+        let vm = makeTestViewModel()
+        await vm.load(url: library)
+
+        #expect(vm.currentSourceURL?.lastPathComponent == "Vol01.cbz")
+        #expect(vm.siblings.map(\.lastPathComponent) == ["Vol01.cbz"])
+    }
+
+    @Test func continueReadingWrappedFolderVolumeKeepsSeriesVolumeList() async throws {
+        let series = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: series) }
+
+        try makeImageFolder(at: series.appendingPathComponent("Vol01", isDirectory: true))
+        try makeImageFolder(at: series.appendingPathComponent("Vol02/Vol02 pages", isDirectory: true))
+
+        let vm = makeTestViewModel()
+        await vm.load(
+            url: series,
+            intent: .continueReading(relativePath: "Vol02/Vol02 pages")
+        )
+
+        #expect(vm.currentSourceURL?.lastPathComponent == "Vol02 pages")
+        #expect(vm.siblings.map(\.lastPathComponent) == ["Vol01", "Vol02"])
+        #expect(vm.currentSiblingIndex == 1)
     }
 
     @Test func sidebarActiveURLPrefersPendingSourceWhileLoading() {
