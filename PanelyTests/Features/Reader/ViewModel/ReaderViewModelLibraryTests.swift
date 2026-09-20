@@ -466,23 +466,64 @@ struct ReaderViewModelLibraryTests {
         #expect(vm.tempDir.url.map(cache.isCacheURL) == true)
     }
 
-    @Test func singleArchiveSeriesKeepsItsOwnVolumeList() async throws {
+    @Test func oneBookPerFolderLibraryNavigatesAcrossBooks() async throws {
         let library = try Fixture.makeTempDir()
         defer { try? FileManager.default.removeItem(at: library) }
-
-        // A lone archive is a one-volume series, not a wrapper: the library's
-        // series list must not leak in as the volume list.
-        let pages = library.appendingPathComponent("SeriesB/pages", isDirectory: true)
+        let pages = library.appendingPathComponent("BookB/pages", isDirectory: true)
         try makeImageFolder(at: pages)
-        let seriesA = library.appendingPathComponent("SeriesA", isDirectory: true)
-        try FileManager.default.createDirectory(at: seriesA, withIntermediateDirectories: true)
-        try Fixture.zipDirectory(pages, to: seriesA.appendingPathComponent("Vol01.cbz"))
+        let bookA = library.appendingPathComponent("BookA", isDirectory: true)
+        try FileManager.default.createDirectory(at: bookA, withIntermediateDirectories: true)
+        try Fixture.zipDirectory(pages, to: bookA.appendingPathComponent("BookA.cbz"))
 
+        // Library/BookA/BookA.cbz + Library/BookB/pages/*.png: each folder is
+        // one book, so the folders are what prev/next volume steps between.
         let vm = makeTestViewModel()
         await vm.load(url: library)
 
+        #expect(vm.currentSourceURL?.lastPathComponent == "BookA.cbz")
+        #expect(vm.siblings.map(\.lastPathComponent) == ["BookA", "BookB"])
+        #expect(vm.currentSiblingIndex == 0)
+        #expect(vm.nextVolumeDisplayName == "BookB")
+
+        let books = vm.siblings
+        await vm.load(url: books[1], knownSiblings: books, intent: .nextVolumeFromEnd)
+
+        #expect(vm.currentSourceURL?.lastPathComponent == "pages")
+        #expect(vm.siblings.map(\.lastPathComponent) == ["BookA", "BookB"])
+        #expect(vm.currentSiblingIndex == 1)
+        #expect(vm.canGoPreviousVolume)
+
+        // Reopening at the saved inner path finds the same list bottom-up.
+        let reopened = makeTestViewModel()
+        await reopened.load(url: library, intent: .continueReading(relativePath: "BookA/BookA.cbz"))
+        #expect(reopened.siblings.map(\.lastPathComponent) == ["BookA", "BookB"])
+    }
+
+    @Test func steppingIntoMultiVolumeSeriesAdoptsItsVolumeList() async throws {
+        let library = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: library) }
+        let pages = library.appendingPathComponent("SeriesB/pages-src", isDirectory: true)
+        try makeImageFolder(at: pages)
+        let seriesA = library.appendingPathComponent("SeriesA", isDirectory: true)
+        let seriesB = library.appendingPathComponent("SeriesB", isDirectory: true)
+        try FileManager.default.createDirectory(at: seriesA, withIntermediateDirectories: true)
+        try Fixture.zipDirectory(pages, to: seriesA.appendingPathComponent("Vol01.cbz"))
+        try Fixture.zipDirectory(pages, to: seriesB.appendingPathComponent("Vol01.cbz"))
+        try Fixture.zipDirectory(pages, to: seriesB.appendingPathComponent("Vol02.cbz"))
+        try FileManager.default.removeItem(at: pages)
+
+        let vm = makeTestViewModel()
+        await vm.load(url: library)
+        #expect(vm.siblings.map(\.lastPathComponent) == ["SeriesA", "SeriesB"])
+
+        // "Next volume" lands on a container with a real series inside: its
+        // own volumes must replace the outer list, or Vol02 is unreachable.
+        let outer = vm.siblings
+        await vm.load(url: outer[1], knownSiblings: outer, intent: .nextVolumeFromEnd)
+
         #expect(vm.currentSourceURL?.lastPathComponent == "Vol01.cbz")
-        #expect(vm.siblings.map(\.lastPathComponent) == ["Vol01.cbz"])
+        #expect(vm.siblings.map(\.lastPathComponent) == ["Vol01.cbz", "Vol02.cbz"])
+        #expect(vm.canGoNextVolume)
     }
 
     @Test func continueReadingWrappedFolderVolumeKeepsSeriesVolumeList() async throws {

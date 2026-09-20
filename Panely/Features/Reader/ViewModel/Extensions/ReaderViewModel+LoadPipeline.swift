@@ -128,9 +128,17 @@ extension ReaderViewModel {
             case .book(let url, let siblings):
                 targetURL = url
                 // Explicit/existing sibling context describes the selected
-                // volume's series and takes precedence over any child folders
+                // volume's series and takes precedence over wrapper folders
                 // discovered while descending to the actual image directory.
-                siblingsToUse = siblingsToUse ?? siblings
+                // A real series level below the selection is different: the
+                // "volume" was a container (stepping from one-book `SeriesA/`
+                // into five-volume `SeriesB/`), and keeping the outer list
+                // would strand the reader on its first volume.
+                if let siblings, FolderResolver.isSeriesLevel(siblings) {
+                    siblingsToUse = siblings
+                } else {
+                    siblingsToUse = siblingsToUse ?? siblings
+                }
                 if let siblings {
                     AppLog.info(
                         .load,

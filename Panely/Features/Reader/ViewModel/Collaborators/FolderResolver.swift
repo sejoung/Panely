@@ -43,15 +43,15 @@ nonisolated enum FolderResolver {
     }
 
     /// Whether a folder's volume listing describes a series the reader should
-    /// navigate, as opposed to a wrapper level. A lone child *folder* is a
-    /// wrapper (an inner ZIP expanding to `722/722 pages/*.jpg`); a lone
-    /// archive is a genuine one-volume series. Shared by the load pipeline's
-    /// top-down descent and `nearestSeriesVolumes` so opening and reopening
-    /// the same book agree on its volume list.
+    /// navigate, as opposed to a wrapper level. A level with a single child is
+    /// a wrapper whatever that child is: an inner ZIP expanding to
+    /// `722/722 pages/*.jpg`, or a one-book-per-folder library
+    /// (`Library/BookA/BookA.cbz`) where the books the reader steps between
+    /// are the folders one level up. Shared by the load pipeline's top-down
+    /// descent and `nearestSeriesVolumes` so opening and reopening the same
+    /// book agree on its volume list.
     static func isSeriesLevel(_ volumes: [URL]) -> Bool {
-        if volumes.count > 1 { return true }
-        guard let only = volumes.first else { return false }
-        return !isDirectory(only)
+        volumes.count > 1
     }
 
     /// Volume list for a book opened directly at a saved path below `root`
