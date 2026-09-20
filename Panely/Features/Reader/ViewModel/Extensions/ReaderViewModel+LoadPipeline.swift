@@ -387,8 +387,12 @@ extension ReaderViewModel {
             // Library/Series/Vol01.zip or Library/Series/Vol01/*.jpg.
             // Keep descending through "container" folders until we hit
             // an actual image folder or archive, and use the nearest
-            // sibling set as volume navigation.
-            resolvedSiblings = volumes
+            // sibling set as volume navigation. A single-child level is just
+            // a wrapper (an inner ZIP expanding to `722/722 pages/*.jpg`), not
+            // a series — it must not replace the volume list found above it.
+            if resolvedSiblings == nil || volumes.count > 1 {
+                resolvedSiblings = volumes
+            }
             candidate = first
         }
 
@@ -418,6 +422,9 @@ extension ReaderViewModel {
             $0.standardizedFileURL == targetURL.standardizedFileURL
         }) {
             resolvedSiblings = nil
+        } else if let tempRoot = tempDir.url, tempRoot.isAncestor(of: targetURL) {
+            resolvedSiblings = await extractedSiblings(of: targetURL, under: tempRoot)
+            guard epoch == loadEpoch else { return false }
         } else {
             resolvedSiblings = await FolderResolver.scanSiblings(of: targetURL)
             guard epoch == loadEpoch else { return false }
@@ -437,6 +444,24 @@ extension ReaderViewModel {
             : 0
         startSourceChangeMonitor(for: targetURL, source: loaded)
         return true
+    }
+
+    /// Sibling list for a book reopened directly inside the zip-in-zip
+    /// extraction (Continue Reading, Reload, Favorites jump straight to the
+    /// saved inner path, skipping the top-down folder descent). The saved path
+    /// can sit below its volume (`Vol02/Vol02 pages`), where the parent folder
+    /// lists only that wrapper child — climb toward the extraction root until
+    /// a level with real siblings turns up so the Volumes section survives.
+    private func extractedSiblings(of targetURL: URL, under tempRoot: URL) async -> [URL] {
+        var candidate = targetURL
+        while candidate.standardizedFileURL != tempRoot.standardizedFileURL,
+              tempRoot.isAncestor(of: candidate) {
+            let parent = candidate.deletingLastPathComponent()
+            let volumes = await FolderResolver.enumerateVolumes(in: parent)
+            if volumes.count > 1 { return volumes }
+            candidate = parent
+        }
+        return [targetURL]
     }
 
     func clearLoadedSource(message: String, preserveLibraryContext: Bool = false) {

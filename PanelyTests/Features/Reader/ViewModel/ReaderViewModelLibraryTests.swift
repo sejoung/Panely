@@ -250,16 +250,19 @@ struct ReaderViewModelLibraryTests {
         #expect(vm.sidebarVolumes.last?.lastPathComponent == "Vol03.cbz")
     }
 
-    @Test func wrappedZipInZipVolumeKeepsOuterVolumeList() async throws {
-        let workDir = try Fixture.makeTempDir()
-        defer { try? FileManager.default.removeItem(at: workDir) }
-
-        let flatPages = workDir.appendingPathComponent("flat-pages", isDirectory: true)
+    /// `Series.zip` holding a flat `Vol01.zip` and a `Vol02.zip` whose pages
+    /// sit inside a `Vol02 pages/` wrapper folder. With `wrapFirstVolume`,
+    /// `Vol01.zip` gets the same wrapper shape.
+    private func makeWrappedZipInZip(in workDir: URL, wrapFirstVolume: Bool = false) throws -> URL {
+        let flatSource = workDir.appendingPathComponent("flat-source", isDirectory: true)
+        let flatPages = wrapFirstVolume
+            ? flatSource.appendingPathComponent("Vol01 pages", isDirectory: true)
+            : flatSource
         try FileManager.default.createDirectory(at: flatPages, withIntermediateDirectories: true)
         try Fixture.makePNG(width: 10, height: 10)
             .write(to: flatPages.appendingPathComponent("001.png"))
         let flatArchive = workDir.appendingPathComponent("Vol01.zip")
-        try Fixture.zipDirectory(flatPages, to: flatArchive)
+        try Fixture.zipDirectory(flatSource, to: flatArchive)
 
         let wrappedSource = workDir.appendingPathComponent("wrapped-source", isDirectory: true)
         let wrappedPages = wrappedSource.appendingPathComponent("Vol02 pages", isDirectory: true)
@@ -281,6 +284,13 @@ struct ReaderViewModelLibraryTests {
         )
         let outerArchive = workDir.appendingPathComponent("Series.zip")
         try Fixture.zipDirectory(outerSource, to: outerArchive)
+        return outerArchive
+    }
+
+    @Test func wrappedZipInZipVolumeKeepsOuterVolumeList() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+        let outerArchive = try makeWrappedZipInZip(in: workDir)
 
         let vm = makeTestViewModel()
         await vm.load(url: outerArchive)
@@ -295,6 +305,43 @@ struct ReaderViewModelLibraryTests {
         #expect(vm.sidebarVolumes == outerVolumes)
         #expect(vm.currentSiblingIndex == 1)
         #expect(vm.currentSourceURL?.lastPathComponent == "Vol02 pages")
+    }
+
+    @Test func reopeningZipInZipAtWrappedVolumeKeepsOuterVolumeList() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+        let outerArchive = try makeWrappedZipInZip(in: workDir)
+
+        let vm = makeTestViewModel()
+        await vm.load(url: outerArchive)
+        let outerVolumeNames = vm.siblings.map(\.lastPathComponent)
+        #expect(outerVolumeNames == ["Vol01", "Vol02"])
+
+        // Continue Reading / Reload / Favorites reopen the outer archive at
+        // the saved inner book, which for a wrapped volume is the image
+        // folder *below* the volume.
+        await vm.load(
+            url: outerArchive,
+            intent: .continueReading(relativePath: "Vol02/Vol02 pages")
+        )
+
+        #expect(vm.currentSourceURL?.lastPathComponent == "Vol02 pages")
+        #expect(vm.siblings.map(\.lastPathComponent) == outerVolumeNames)
+        #expect(vm.sidebarVolumes.map(\.lastPathComponent) == outerVolumeNames)
+        #expect(vm.currentSiblingIndex == 1)
+    }
+
+    @Test func zipInZipWithWrappedFirstVolumeListsOuterVolumes() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+        let outerArchive = try makeWrappedZipInZip(in: workDir, wrapFirstVolume: true)
+
+        let vm = makeTestViewModel()
+        await vm.load(url: outerArchive)
+
+        #expect(vm.currentSourceURL?.lastPathComponent == "Vol01 pages")
+        #expect(vm.siblings.map(\.lastPathComponent) == ["Vol01", "Vol02"])
+        #expect(vm.currentSiblingIndex == 0)
     }
 
     @Test func sidebarActiveURLPrefersPendingSourceWhileLoading() {
