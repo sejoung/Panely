@@ -17,9 +17,20 @@ final class ReadingProgressStore {
 
     /// Keyed by `PositionKey`. Observed, so the sidebar re-renders its badges
     /// as soon as progress changes.
-    private(set) var entries: [String: ReadingProgress] = [:]
+    private(set) var entries: [String: ReadingProgress] = [:] {
+        didSet { revision &+= 1 }
+    }
+    /// Bumped on every `entries` change. Lets a reader memoize work derived
+    /// from the whole dictionary and revalidate in O(1) — and still register
+    /// an observation dependency — instead of re-scanning thousands of keys.
+    private(set) var revision = 0
 
     private let saveDebouncer = Debouncer()
+    /// Key of the write waiting in `saveDebouncer`. One debouncer serves every
+    /// book, so a write for a different key must flush this one first instead
+    /// of replacing it — otherwise finishing Vol 1 and immediately opening
+    /// Vol 2 drops Vol 1's "finished" record.
+    private var pendingKey: String?
     private let defaults: any KeyValueStoring
     private let storeKey: String
     private let maxEntries: Int
@@ -64,7 +75,9 @@ final class ReadingProgressStore {
     }
 
     func remove(forKey key: String, fileIdentityKey: String?) {
-        saveDebouncer.cancel()
+        // Settle the pending write first so it can't be lost (another book's)
+        // or resurrect what is being changed below (this book's).
+        saveDebouncer.flush()
         var dict = entries
         dict.removeValue(forKey: key)
         if let fileIdentityKey { dict.removeValue(forKey: fileIdentityKey) }
@@ -78,7 +91,9 @@ final class ReadingProgressStore {
     /// availability checks never destroy history for temporarily-offline
     /// removable volumes.
     func removeEntries(forSourcePath sourcePath: String) {
-        saveDebouncer.cancel()
+        // Settle the pending write first so it can't be lost (another book's)
+        // or resurrect what is being changed below (this book's).
+        saveDebouncer.flush()
         let filtered = entries.filter { key, _ in
             PositionKey.replacingSourcePath(in: key, from: sourcePath, to: "") == nil
         }
@@ -89,7 +104,9 @@ final class ReadingProgressStore {
 
     func migrateSourcePath(from oldPath: String, to newPath: String) {
         guard oldPath != newPath else { return }
-        saveDebouncer.cancel()
+        // Settle the pending write first so it can't be lost (another book's)
+        // or resurrect what is being changed below (this book's).
+        saveDebouncer.flush()
         var migrated = entries
         var changed = false
         for (key, progress) in entries {
@@ -120,7 +137,7 @@ final class ReadingProgressStore {
         page: Int,
         total: Int
     ) {
-        saveDebouncer.cancel()
+        saveDebouncer.flush()
         var dict = entries
         let progress = ReadingProgress(
             page: page,
@@ -140,12 +157,15 @@ final class ReadingProgressStore {
     /// Debounced write. Rapid repeat calls coalesce into one round-trip after
     /// ~300 ms of quiet (matches `ReaderPositionStore`).
     func record(forKey key: String, fileIdentityKey: String?, page: Int, total: Int, finished: Bool) {
+        settlePendingWrite(unlessFor: key)
+        pendingKey = key
         saveDebouncer.schedule { [weak self] in
             self?.writeNow(key: key, fileIdentityKey: fileIdentityKey, page: page, total: total, finished: finished)
         }
     }
 
     func flushImmediately(forKey key: String, fileIdentityKey: String?, page: Int, total: Int, finished: Bool) {
+        settlePendingWrite(unlessFor: key)
         saveDebouncer.cancel()
         writeNow(key: key, fileIdentityKey: fileIdentityKey, page: page, total: total, finished: finished)
     }
@@ -161,6 +181,12 @@ final class ReadingProgressStore {
     }
 
     // MARK: - Internals
+
+    /// A pending write for `key` is about to be superseded and can be dropped;
+    /// one for any other key is that record's last word and must land.
+    private func settlePendingWrite(unlessFor key: String) {
+        if pendingKey != key { saveDebouncer.flush() }
+    }
 
     private func writeNow(key: String, fileIdentityKey: String?, page: Int, total: Int, finished: Bool) {
         var dict = entries

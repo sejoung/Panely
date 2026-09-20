@@ -13,7 +13,10 @@ nonisolated protocol ExtractionCacheManaging: Sendable {
     func clearCache(in root: URL, excluding activeURL: URL?) -> UInt64
 }
 
-extension ExtractionCacheManaging {
+// `nonisolated`: the module defaults to MainActor isolation, which would
+// otherwise pin these helpers to the main actor even though the protocol
+// itself is nonisolated and they are called from background work.
+nonisolated extension ExtractionCacheManaging {
     /// Convenience for the no-active-book case (e.g. startup cleanup).
     func enforceBudget() { enforceBudget(excluding: nil) }
 }

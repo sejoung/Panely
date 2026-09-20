@@ -17,7 +17,8 @@ nonisolated enum FolderResolver {
     /// Directory names that never hold a book. Finder's "Compress" adds a
     /// `__MACOSX` resource-fork folder next to the real content; counting it
     /// as a volume makes a wrapper level look like a two-volume series.
-    private static let ignoredDirectoryNames: Set<String> = ["__MACOSX"]
+    /// Shared with `CBZLoader` (archive entries) and `FileNode` (Files tree).
+    static let ignoredDirectoryNames: Set<String> = ["__MACOSX"]
 
     private static func isDirectory(_ url: URL) -> Bool {
         (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false

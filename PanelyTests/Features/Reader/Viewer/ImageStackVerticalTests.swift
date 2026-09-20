@@ -19,6 +19,27 @@ struct ImageStackVerticalTests {
         #expect(stack.pageIndex(forViewportY: 5999) == 3)
     }
 
+    @Test func currentPageIndexPinsToShortPagesAtTheScrollEnds() {
+        let stack = ImageStackView(frame: .zero)
+        // Short cover slice, two full pages, short credits slice:
+        // y = [0,100) [100,1600) [1600,3100) [3100,3200)
+        let heights: [CGFloat] = [100, 1500, 1500, 100]
+        stack.setImages(heights.map { NSImage(size: NSSize(width: 1000, height: $0)) }, axis: .vertical)
+
+        func viewport(top: CGFloat) -> NSRect { NSRect(x: 0, y: top, width: 1000, height: 1000) }
+
+        // Mid-strip: the page under the viewport centre.
+        #expect(stack.currentPageIndex(visibleIn: viewport(top: 1200)) == 2)
+        // Fully scrolled down: the centre (y=2700) is still in page 2, but the
+        // reader has reached the end of the strip.
+        #expect(stack.currentPageIndex(visibleIn: viewport(top: 2200)) == 3)
+        // Fully scrolled up: the centre (y=500) is in page 1.
+        #expect(stack.currentPageIndex(visibleIn: viewport(top: 0)) == 0)
+        // A strip shorter than the viewport touches both ends — keep centre.
+        let tall = NSRect(x: 0, y: 0, width: 1000, height: 4000)
+        #expect(stack.currentPageIndex(visibleIn: tall) == 2)
+    }
+
     @Test func pageIndexBeyondLastReturnsLastIndex() {
         let stack = ImageStackView(frame: .zero)
         let images = (0..<2).map { _ in NSImage(size: NSSize(width: 100, height: 100)) }

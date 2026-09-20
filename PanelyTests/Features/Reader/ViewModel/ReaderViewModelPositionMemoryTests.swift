@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import AppKit
 @testable import Panely
 
 /// Covers the in-memory positions mirror added on top of KeyValueStoring. The
@@ -60,6 +61,37 @@ struct ReaderViewModelPositionMemoryTests {
             vm.flushPositionImmediately()
             // Same VM — must read latest from the in-memory mirror.
             #expect(vm.restoredIndex(for: url) == 7)
+        }
+    }
+
+    @Test func savingAnotherBookFlushesThePendingPosition() {
+        withPositionStore { defaults in
+            let store = ReaderPositionStore(defaults: defaults)
+
+            store.savePosition(forKey: "vol1", fileIdentityKey: nil, pageIndex: 9)
+            store.savePosition(forKey: "vol2", fileIdentityKey: nil, pageIndex: 0)
+
+            // One debouncer serves every book: Vol 2's save must land Vol 1's
+            // pending page instead of replacing it.
+            #expect(store.restoredIndex(forKey: "vol1", fileIdentityKey: nil) == 9)
+        }
+    }
+
+    @Test func appTerminationFlushesPendingPositionSynchronously() {
+        withPositionStore { defaults in
+            let url = URL(fileURLWithPath: "/tmp/terminate-test-\(UUID()).cbz")
+            let vm = makePositionViewModel(url: url, defaults: defaults)
+            vm.currentPageIndex = 7  // debounced save, still pending
+
+            // `terminate(_:)` posts this synchronously and exits without
+            // another run-loop turn, so the flush has to happen inline.
+            NotificationCenter.default.post(
+                name: NSApplication.willTerminateNotification,
+                object: NSApplication.shared
+            )
+
+            let reloaded = ReaderPositionStore(defaults: defaults)
+            #expect(reloaded.restoredIndex(for: url, opened: nil, tempRoot: nil) == 7)
         }
     }
 

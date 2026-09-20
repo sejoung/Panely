@@ -116,6 +116,51 @@ struct ReaderImageLoaderTests {
         #expect(loader.currentImages.count == 3)
     }
 
+    @Test func cancelledLazyBatchNeverLeavesLoadedPageOnPlaceholder() async throws {
+        let root = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let png = try Fixture.makePNG(width: 600, height: 600)
+        let pages: [ComicPage] = try (0..<40).map { i in
+            let url = root.appendingPathComponent("\(i).png")
+            try png.write(to: url)
+            return ComicPage(source: .file(url), displayName: "\(i).png")
+        }
+        let source = ComicSource(title: "Strip", pages: pages)
+
+        let loader = ReaderImageLoader()
+        var errors: [String] = []
+        await loader.refresh(
+            source: source,
+            layout: .vertical,
+            currentPageIndex: 0,
+            navigationStep: 1,
+            isCancelled: { false },
+            onError: { errors.append($0) }
+        )
+
+        // Scrolling: each call cancels the previous batch, some mid-decode.
+        for start in stride(from: 10, to: 30, by: 2) {
+            loader.setVisibleRange(start..<(start + 2), source: source, layout: .vertical) {
+                errors.append($0)
+            }
+            try await Task.sleep(for: .milliseconds(2))
+        }
+        for _ in 0..<200 where !loader.loadedPageIndices.isSuperset(of: [28, 29]) {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        // Cancellation is not a decode failure…
+        #expect(errors.isEmpty)
+        #expect(loader.failedPageIndices.isEmpty)
+        // …and a page is only "loaded" once its pixels are on the strip. The
+        // gray placeholder is a drawing-handler image with no bitmap rep.
+        #expect(loader.loadedPageIndices.isSuperset(of: [28, 29]))
+        for i in loader.loadedPageIndices {
+            #expect(loader.currentImages[i].representations.contains { $0.pixelsWide > 0 })
+        }
+    }
+
     // MARK: - estimatedBitmapCost
 
     @Test func bitmapCostUsesPixelDimensionsForBitmapReps() throws {

@@ -16,13 +16,52 @@ extension ReaderViewModel {
     /// have a saved page index but no recorded progress (read before progress
     /// tracking existed).
     func readingBadge(for url: URL) -> ReadingBadge? {
-        let keys = PositionKey.keys(for: url, opened: openedSourceURL, tempRoot: tempDir.url)
+        let keys = readingBadgeKeys(for: url)
         if let progress = readingProgress.progress(forKey: keys.primary, fileIdentityKey: keys.fileIdentity) {
             if progress.finished { return .finished }
             return .inProgress(fraction: progress.total > 0 ? progress.fraction : nil)
         }
         let index = positions.restoredIndex(forKey: keys.primary, fileIdentityKey: keys.fileIdentity)
         return index > 0 ? .inProgress(fraction: nil) : nil
+    }
+
+    struct ContinueReadingMemo {
+        struct Inputs: Equatable {
+            let progressRevision: Int
+            let recentsRevision: Int
+            let unavailableKeys: Set<String>
+        }
+        let inputs: Inputs
+        let suggestion: ContinueReadingSuggestion?
+    }
+
+    /// `PositionKey.keys` stats the file for its identity; the sidebar asks
+    /// for every visible row on every render. Keys only depend on the URL and
+    /// the opened/temp context, so they're kept until that context changes or
+    /// the library tree is re-scanned (files may have been replaced on disk).
+    struct ReadingBadgeKeyMemo {
+        struct Context: Equatable {
+            let opened: URL?
+            let tempRoot: URL?
+            let refreshToken: UUID
+        }
+        var context: Context?
+        var keys: [URL: PositionKey.Keys] = [:]
+    }
+
+    private func readingBadgeKeys(for url: URL) -> PositionKey.Keys {
+        let context = ReadingBadgeKeyMemo.Context(
+            opened: openedSourceURL,
+            tempRoot: tempDir.url,
+            refreshToken: libraryRefreshToken
+        )
+        if readingBadgeKeyMemo.context != context {
+            readingBadgeKeyMemo = ReadingBadgeKeyMemo(context: context)
+        }
+        if let cached = readingBadgeKeyMemo.keys[url] { return cached }
+        let keys = PositionKey.keys(for: url, opened: context.opened, tempRoot: context.tempRoot)
+        readingBadgeKeyMemo.keys[url] = keys
+        return keys
     }
 
     struct ContinueReadingSuggestion: Identifiable {
@@ -53,6 +92,22 @@ extension ReaderViewModel {
     /// the row tracks what you're actually reading. On a cold launch (nothing
     /// open) it resolves to whatever you read last — the primary use case.
     var continueReadingSuggestion: ContinueReadingSuggestion? {
+        // Reading the revisions (not just the memo) keeps the observation
+        // dependency on both stores alive when the memo hits.
+        let inputs = ContinueReadingMemo.Inputs(
+            progressRevision: readingProgress.revision,
+            recentsRevision: recentItems.revision,
+            unavailableKeys: unavailableContinueReadingKeys
+        )
+        if let memo = continueReadingMemo, memo.inputs == inputs {
+            return memo.suggestion
+        }
+        let suggestion = computeContinueReadingSuggestion()
+        continueReadingMemo = ContinueReadingMemo(inputs: inputs, suggestion: suggestion)
+        return suggestion
+    }
+
+    private func computeContinueReadingSuggestion() -> ContinueReadingSuggestion? {
         var best: ContinueReadingCandidate?
         var bestUpdatedAt = Date.distantPast
 

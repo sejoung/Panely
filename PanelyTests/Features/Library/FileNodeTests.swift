@@ -35,6 +35,21 @@ struct FileNodeTests {
 }
 
 struct FileNodeLoadTests {
+    @Test func skipsMacOSXResourceForkFolders() async throws {
+        let dir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let series = dir.appendingPathComponent("Series", isDirectory: true)
+        for folder in [dir.appendingPathComponent("__MACOSX"), series.appendingPathComponent("__MACOSX")] {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+        try Fixture.writeFile(series.appendingPathComponent("Vol01.cbz"))
+
+        let nodes = await FileNode.loadTree(from: dir)
+
+        #expect(nodes.map(\.name) == ["Series"])
+        #expect(nodes.first?.children?.map(\.name) == ["Vol01"])
+    }
+
     @Test func includesArchivesAndSubfoldersButNotLooseImages() async throws {
         let dir = try Fixture.makeTempDir()
         defer { try? FileManager.default.removeItem(at: dir) }

@@ -66,7 +66,9 @@ nonisolated enum CBZLoader {
     /// undecodable page (and `._Vol01.zip` as a nested archive). Dot-files are
     /// skipped too, matching `FolderLoader`'s `.skipsHiddenFiles`.
     private static func isMetadataEntry(_ path: String) -> Bool {
-        path.split(separator: "/").contains { $0 == "__MACOSX" || $0.hasPrefix(".") }
+        path.split(separator: "/").contains {
+            FolderResolver.ignoredDirectoryNames.contains(String($0)) || $0.hasPrefix(".")
+        }
     }
 
     static func extractAll(

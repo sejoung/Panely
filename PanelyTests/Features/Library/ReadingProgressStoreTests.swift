@@ -41,6 +41,41 @@ struct ReadingProgressStoreTests {
         #expect(store.progress(forKey: "different-path", fileIdentityKey: "fid")?.page == 3)
     }
 
+    @Test func recordForAnotherBookFlushesThePendingWrite() {
+        let store = ReadingProgressStore(defaults: InMemoryKeyValueStore(), storeKey: "rp-\(UUID())")
+
+        // Last page of Vol 1, then Vol 2 opens inside the debounce window.
+        store.record(forKey: "vol1", fileIdentityKey: nil, page: 9, total: 10, finished: true)
+        store.record(forKey: "vol2", fileIdentityKey: nil, page: 0, total: 10, finished: false)
+
+        // Vol 1's final write landed instead of being replaced by Vol 2's.
+        #expect(store.progress(forKey: "vol1", fileIdentityKey: nil)?.finished == true)
+        // Vol 2's own write is still debounced.
+        #expect(store.progress(forKey: "vol2", fileIdentityKey: nil) == nil)
+    }
+
+    @Test func removingOneBookKeepsAnotherBooksPendingWrite() {
+        let store = ReadingProgressStore(defaults: InMemoryKeyValueStore(), storeKey: "rp-\(UUID())")
+        store.flushImmediately(forKey: "old", fileIdentityKey: nil, page: 1, total: 10, finished: false)
+
+        store.record(forKey: "reading", fileIdentityKey: nil, page: 4, total: 10, finished: false)
+        store.remove(forKey: "old", fileIdentityKey: nil)
+
+        #expect(store.progress(forKey: "old", fileIdentityKey: nil) == nil)
+        #expect(store.progress(forKey: "reading", fileIdentityKey: nil)?.page == 4)
+    }
+
+    @Test func removingABookDropsItsOwnPendingWrite() async throws {
+        let store = ReadingProgressStore(defaults: InMemoryKeyValueStore(), storeKey: "rp-\(UUID())")
+
+        store.record(forKey: "gone", fileIdentityKey: nil, page: 4, total: 10, finished: false)
+        store.remove(forKey: "gone", fileIdentityKey: nil)
+        try await Task.sleep(for: .milliseconds(500))
+
+        // The debounced write must not resurrect the removed record.
+        #expect(store.progress(forKey: "gone", fileIdentityKey: nil) == nil)
+    }
+
     @Test func debouncedRecordEventuallyPersists() async throws {
         let defaults = InMemoryKeyValueStore()
         let key = "rp-\(UUID())"

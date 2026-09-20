@@ -82,6 +82,20 @@ extension ReaderViewModel {
                 return
             }
             if archiveTarget.standardizedFileURL != url.standardizedFileURL {
+                // `prepareScope` leaves `openedSourceURL` alone for a URL inside
+                // the scoped library, but everything keyed off the extraction
+                // (position/progress keys, series identity, favorites, reload,
+                // the on-disk change monitor) needs the archive that owns it —
+                // not the library folder or whichever book was open before.
+                // Pin the library root first: it is derived from
+                // `openedSourceURL`, and the Files tree shouldn't re-root onto
+                // the archive's parent just because a nested archive opened.
+                if openedSourceURL?.standardizedFileURL != url.standardizedFileURL {
+                    if explicitLibraryRootURL == nil {
+                        explicitLibraryRootURL = libraryRootURLIfItContains(url)
+                    }
+                    openedSourceURL = url
+                }
                 // `url` turned out to be a zip-in-zip: its volumes live in the
                 // extraction, so a sibling list naming the outer archive (the
                 // library folder it sits in) doesn't describe them. Carrying
@@ -302,14 +316,32 @@ extension ReaderViewModel {
                 metadata: ["source": "\(DiagnosticRedactor.describe(url))"]
             )
         }
-        let candidate = key.map { extractionCache.makeCachedCandidate(forKey: $0) }
-            ?? ReaderTempDirectory.makeSessionCandidate()
+        // Extract into a private staging dir and only move the finished tree
+        // into the keyed cache slot. The slot has no completion marker — any
+        // non-empty dir there is a cache hit — so extracting in place would
+        // let a quit mid-extraction poison every later open with a truncated
+        // tree, and let a superseded load's cleanup delete the very dir a
+        // newer load of the same archive had already adopted.
+        let staging = ReaderTempDirectory.makeSessionCandidate()
 
         do {
-            try await CBZLoader.extractAll(from: url, to: candidate)
+            try await CBZLoader.extractAll(from: url, to: staging)
             guard epoch == loadEpoch else {
-                try? FileManager.default.removeItem(at: candidate)
+                try? FileManager.default.removeItem(at: staging)
                 return nil
+            }
+            let candidate: URL
+            if let key {
+                let slot = extractionCache.makeCachedCandidate(forKey: key)
+                candidate = await Self.promoteExtraction(staging, toCacheSlot: slot)
+                guard epoch == loadEpoch else {
+                    if candidate == staging {
+                        try? FileManager.default.removeItem(at: staging)
+                    }
+                    return nil
+                }
+            } else {
+                candidate = staging
             }
             tempDir.adopt(candidate)
             AppLog.info(
@@ -317,7 +349,7 @@ extension ReaderViewModel {
                 "Nested archive extracted",
                 metadata: ["source": "\(DiagnosticRedactor.describe(url))"]
             )
-            if key != nil {
+            if extractionCache.isCacheURL(candidate) {
                 Task.detached(priority: .background) {
                     // Exclude the just-extracted cache dir for the book we're
                     // about to read so the budget sweep can't evict it.
@@ -326,8 +358,8 @@ extension ReaderViewModel {
             }
             return candidate
         } catch {
-            try? FileManager.default.removeItem(at: candidate)
-            let message = DiagnosticRedactor.redactKnownPaths(in: error.localizedDescription, urls: [url, candidate])
+            try? FileManager.default.removeItem(at: staging)
+            let message = DiagnosticRedactor.redactKnownPaths(in: error.localizedDescription, urls: [url, staging])
             AppLog.error(
                 .load,
                 "Nested archive extraction failed",
@@ -338,6 +370,29 @@ extension ReaderViewModel {
             )
             throw ReaderLoadError.extractionFailed(error)
         }
+    }
+
+    /// Move a finished extraction into its cache slot and return where the
+    /// tree ended up. If another load filled the slot first, its copy wins and
+    /// the staging dir is discarded; if the move fails, the staging dir is
+    /// used as a plain session dir (removed on book switch) instead.
+    private nonisolated static func promoteExtraction(_ staging: URL, toCacheSlot slot: URL) async -> URL {
+        await Task.detached(priority: .userInitiated) {
+            let fm = FileManager.default
+            if let existing = try? fm.contentsOfDirectory(atPath: slot.path) {
+                guard existing.isEmpty else {
+                    try? fm.removeItem(at: staging)
+                    return slot
+                }
+                try? fm.removeItem(at: slot)
+            }
+            do {
+                try fm.moveItem(at: staging, to: slot)
+                return slot
+            } catch {
+                return staging
+            }
+        }.value
     }
 
     private func targetByApplyingPreferredRelativePath(

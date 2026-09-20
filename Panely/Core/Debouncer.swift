@@ -9,6 +9,7 @@ import Foundation
 @MainActor
 final class Debouncer {
     private var task: Task<Void, Never>?
+    private var pending: (@MainActor () -> Void)?
     private let delay: Duration
 
     init(delay: Duration = .milliseconds(300)) {
@@ -20,12 +21,22 @@ final class Debouncer {
     /// straggler after the owner is gone is a no-op.
     func schedule(_ action: @MainActor @escaping () -> Void) {
         task?.cancel()
+        pending = action
         let delay = self.delay
-        task = Task {
+        task = Task { [weak self] in
             try? await Task.sleep(for: delay)
             guard !Task.isCancelled else { return }
-            action()
+            self?.flush()
         }
+    }
+
+    /// Run the pending action now instead of waiting out the delay. Used when
+    /// the next write is for a *different* record: replacing the pending
+    /// action would otherwise silently drop the previous record's last write.
+    func flush() {
+        let action = pending
+        cancel()
+        action?()
     }
 
     /// Drop any pending action without running it. Callers that need an
@@ -33,5 +44,6 @@ final class Debouncer {
     func cancel() {
         task?.cancel()
         task = nil
+        pending = nil
     }
 }

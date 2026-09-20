@@ -153,8 +153,7 @@ final class AppKitScrollerCoordinator {
         // Page-index callback is suppressed during programmatic scroll so
         // the model doesn't feedback-loop on its own jump.
         if !isProgrammaticallyScrolling {
-            let centerY = visibleRect.midY
-            let visibleIndex = stack.pageIndex(forViewportY: centerY)
+            let visibleIndex = stack.currentPageIndex(visibleIn: visibleRect)
             if visibleIndex != lastPageIndex {
                 lastPageIndex = visibleIndex
                 onPageIndexChanged(visibleIndex)

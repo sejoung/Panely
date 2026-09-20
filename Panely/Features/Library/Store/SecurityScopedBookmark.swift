@@ -7,7 +7,10 @@ nonisolated protocol SecurityScopedBookmarking: Sendable {
     func isDirectory(_ url: URL) -> Bool
 }
 
-extension SecurityScopedBookmarking {
+// `nonisolated`: the module defaults to MainActor isolation, which would
+// otherwise pin these helpers to the main actor even though the protocol
+// itself is nonisolated and they are called from background work.
+nonisolated extension SecurityScopedBookmarking {
     /// Resolve `data` and, when the OS reports the bookmark stale, mint a fresh
     /// one in place. Returns the resolved `url` plus, when a refresh happened,
     /// the new bookmark data and standardized path for the caller to persist.

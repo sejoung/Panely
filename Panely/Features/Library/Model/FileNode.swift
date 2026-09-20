@@ -75,6 +75,10 @@ nonisolated struct FileNode: Identifiable, Hashable, Sendable {
         let ext = entry.pathExtension.lowercased()
 
         if isDir {
+            // Finder's resource-fork folder — never holds a book.
+            guard !FolderResolver.ignoredDirectoryNames.contains(entry.lastPathComponent) else {
+                return nil
+            }
             let children: [FileNode]?
             if depth < maxDepth - 1 {
                 let loaded = buildTreeSerial(at: entry, depth: depth + 1, maxDepth: maxDepth)

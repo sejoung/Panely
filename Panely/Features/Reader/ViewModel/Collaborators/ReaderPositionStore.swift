@@ -27,6 +27,10 @@ final class ReaderPositionStore {
     /// `orderKey` so eviction survives relaunch.
     private var orderCache: [String]?
     private let saveDebouncer = Debouncer()
+    /// Key of the write waiting in `saveDebouncer`. The debouncer is shared by
+    /// every book, so a write for a different key flushes this one first
+    /// rather than replacing it (see `ReadingProgressStore.pendingKey`).
+    private var pendingKey: String?
     private let defaults: any KeyValueStoring
     private let positionsKey: String
     private let orderKey: String
@@ -48,6 +52,8 @@ final class ReaderPositionStore {
     /// (when available) is mirrored alongside the primary key so external-
     /// drive mount-path drifts ("/Volumes/X" → "/Volumes/X 1") still recover.
     func savePosition(forKey key: String, fileIdentityKey: String?, pageIndex: Int) {
+        if pendingKey != key { saveDebouncer.flush() }
+        pendingKey = key
         saveDebouncer.schedule { [weak self] in
             self?.writeNow(key: key, fileIdentityKey: fileIdentityKey, pageIndex: pageIndex)
         }
@@ -56,6 +62,7 @@ final class ReaderPositionStore {
     /// Synchronous flush. Used by the app-terminate observer and by the
     /// debounced path after its sleep expires.
     func flushImmediately(forKey key: String, fileIdentityKey: String?, pageIndex: Int) {
+        if pendingKey != key { saveDebouncer.flush() }
         saveDebouncer.cancel()
         writeNow(key: key, fileIdentityKey: fileIdentityKey, pageIndex: pageIndex)
     }
@@ -109,7 +116,8 @@ final class ReaderPositionStore {
 
     func migrateSourcePath(from oldPath: String, to newPath: String) {
         guard oldPath != newPath else { return }
-        saveDebouncer.cancel()
+        // Land the pending write under its old key so the migration carries it.
+        saveDebouncer.flush()
         var dict = loaded()
         var order = loadedOrder(dict: dict)
         var replacements: [String: String] = [:]

@@ -438,6 +438,34 @@ struct ReaderViewModelLibraryTests {
         #expect(vm.currentSiblingIndex == 0)
     }
 
+    @Test func zipInZipSelectedInsideFolderLibraryBecomesOpenedSource() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+
+        let library = workDir.appendingPathComponent("Library", isDirectory: true)
+        try makeImageFolder(at: library.appendingPathComponent("Plain Book", isDirectory: true))
+        let series = library.appendingPathComponent("Series.zip")
+        try FileManager.default.moveItem(at: try makeWrappedZipInZip(in: workDir), to: series)
+
+        let cache = TestExtractionCacheManager()
+        let vm = makeTestViewModel(extractionCache: cache)
+        await vm.load(url: library)
+        #expect(vm.openedSourceURL?.standardizedFileURL == library.standardizedFileURL)
+
+        // Inside the scoped library with no temp dir active: neither
+        // `prepareScope` branch runs, yet the extraction must be keyed to the
+        // archive — not to the library folder — and the tree must stay rooted.
+        await vm.load(url: series, intent: .librarySelection)
+
+        #expect(vm.openedSourceURL?.standardizedFileURL == series.standardizedFileURL)
+        #expect(vm.libraryRootURL?.standardizedFileURL == library.standardizedFileURL)
+        let current = try #require(vm.currentSourceURL)
+        #expect(vm.positionKey(for: current) == series.standardizedFileURL.path + "#Vol01")
+        #expect(vm.reloadRequest()?.url.standardizedFileURL == series.standardizedFileURL)
+        // The finished extraction was promoted into the cache slot.
+        #expect(vm.tempDir.url.map(cache.isCacheURL) == true)
+    }
+
     @Test func singleArchiveSeriesKeepsItsOwnVolumeList() async throws {
         let library = try Fixture.makeTempDir()
         defer { try? FileManager.default.removeItem(at: library) }

@@ -58,6 +58,45 @@ struct ReaderViewModelReadingProgressTests {
         #expect(suggestion?.fraction == 0.6)
     }
 
+    @Test func continueReadingMemoTracksProgressAndRecentsChanges() {
+        let vm = makeTestViewModel()
+        let a = URL(fileURLWithPath: "/lib/a.cbz")
+        let b = URL(fileURLWithPath: "/lib/b.cbz")
+        vm.recentItems.record(a, title: "A")
+        vm.readingProgress.flushImmediately(forKey: a.standardizedFileURL.path, fileIdentityKey: nil, page: 1, total: 10, finished: false)
+        #expect(vm.continueReadingSuggestion?.title == "A")
+        #expect(vm.continueReadingSuggestion?.fraction == 0.2)
+
+        // The memoized value must not outlive a change to either store.
+        vm.readingProgress.flushImmediately(forKey: a.standardizedFileURL.path, fileIdentityKey: nil, page: 4, total: 10, finished: false)
+        #expect(vm.continueReadingSuggestion?.fraction == 0.5)
+
+        vm.readingProgress.flushImmediately(forKey: b.standardizedFileURL.path, fileIdentityKey: nil, page: 2, total: 10, finished: false)
+        #expect(vm.continueReadingSuggestion?.title == "A")  // b isn't a recent yet
+        vm.recentItems.record(b, title: "B")
+        #expect(vm.continueReadingSuggestion?.title == "B")
+
+        vm.readingProgress.flushImmediately(forKey: b.standardizedFileURL.path, fileIdentityKey: nil, page: 9, total: 10, finished: true)
+        #expect(vm.continueReadingSuggestion?.title == "A")
+    }
+
+    @Test func readingBadgeKeyMemoFollowsOpenedContext() {
+        let vm = makeTestViewModel()
+        let temp = URL(fileURLWithPath: "/tmp/panely-memo")
+        let inner = temp.appendingPathComponent("Vol01")
+        let archiveA = URL(fileURLWithPath: "/lib/A.zip")
+        let archiveB = URL(fileURLWithPath: "/lib/B.zip")
+        vm.readingProgress.flushImmediately(forKey: archiveA.path + "#Vol01", fileIdentityKey: nil, page: 9, total: 10, finished: true)
+
+        vm.tempDir.url = temp
+        vm.openedSourceURL = archiveA
+        #expect(vm.readingBadge(for: inner) == .finished)
+
+        // Same inner URL, different owning archive → different key.
+        vm.openedSourceURL = archiveB
+        #expect(vm.readingBadge(for: inner) == nil)
+    }
+
     @Test func continueReadingIsNilWhenOnlyFinishedBooks() {
         let vm = makeTestViewModel()
         let a = URL(fileURLWithPath: "/lib/a.cbz")

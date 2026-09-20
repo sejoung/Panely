@@ -132,6 +132,22 @@ final class ImageStackView: NSView {
         return pageIndex(atOrBeforeY: y)
     }
 
+    /// The page the reader is "on" for a viewport: normally the one under the
+    /// viewport's vertical centre, but pinned to the first/last page once the
+    /// strip is scrolled fully to that end. Without the pin, a final page
+    /// shorter than half the viewport (a webtoon's credits slice) can never be
+    /// reached by the centre line, so the book never registers its last page —
+    /// no end-of-volume card, no "finished" progress, counter stuck at N-1/N.
+    func currentPageIndex(visibleIn rect: NSRect) -> Int {
+        guard let first = pageFrames.first, let last = pageFrames.last else { return 0 }
+        let atTop = rect.minY <= first.minY + 0.5
+        let atBottom = rect.maxY >= last.maxY - 0.5
+        // A strip that fits the viewport touches both ends; keep the centre.
+        if atBottom && !atTop { return pageFrames.count - 1 }
+        if atTop && !atBottom { return 0 }
+        return pageIndex(forViewportY: rect.midY)
+    }
+
     /// Half-open range of page indices whose frames intersect `rect`.
     /// Used by the viewer to ask the model to load every page currently
     /// visible (not just whichever one is at viewport center).

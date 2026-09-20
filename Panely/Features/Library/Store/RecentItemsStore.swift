@@ -32,8 +32,15 @@ final class RecentItemsStore {
 
     private let bookmarks: any SecurityScopedBookmarking
     private let defaults: any KeyValueStoring
-    private(set) var items: [RecentItem] = []
-    private(set) var availabilityByID: [UUID: RecentItemAvailability] = [:]
+    private(set) var items: [RecentItem] = [] {
+        didSet { revision &+= 1 }
+    }
+    private(set) var availabilityByID: [UUID: RecentItemAvailability] = [:] {
+        didSet { revision &+= 1 }
+    }
+    /// Bumped whenever `items` or their availability change (see
+    /// `ReadingProgressStore.revision`).
+    private(set) var revision = 0
 
     var menuItems: [RecentItem] {
         Array(items.prefix(Self.maxMenuItems))

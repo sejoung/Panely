@@ -81,6 +81,11 @@ final class ReaderViewModel {
     /// path and consulted when building the Continue Reading suggestion.
     var unavailableContinueReadingKeys: Set<String> = []
     var continueReadingAvailabilityRefreshGeneration = 0
+    /// Memo for `continueReadingSuggestion` / `readingBadge(for:)`. Both are
+    /// read from SwiftUI `body` on every page turn and would otherwise redo
+    /// file-identity stats and full progress-key scans on the main thread.
+    @ObservationIgnored var continueReadingMemo: ContinueReadingMemo?
+    @ObservationIgnored var readingBadgeKeyMemo = ReadingBadgeKeyMemo()
     var isLoading: Bool = false
     var loadingMessage: String = ""
 
@@ -300,14 +305,20 @@ final class ReaderViewModel {
     }
 
     /// Flush any pending debounced save when the process is about to exit.
-    /// The Task is captured weakly via the notification stream's self-capture
-    /// pattern — once the VM is gone the handler is a no-op, so the wait
-    /// doesn't extend the VM's lifetime.
+    /// Must be a block observer, not an async notification sequence:
+    /// `terminate(_:)` posts the notification synchronously and exits without
+    /// spinning the run loop again, so a Task continuation would never run and
+    /// a page turn inside the debounce window before ⌘Q would be lost. With a
+    /// nil queue the block runs inline on the posting (main) thread. The weak
+    /// capture makes it a no-op once the VM is gone.
     private func observeAppTermination() {
-        Task { @MainActor [weak self] in
-            for await _ in NotificationCenter.default.notifications(named: NSApplication.willTerminateNotification) {
+        _ = NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
                 self?.flushPositionImmediately()
-                break
             }
         }
     }

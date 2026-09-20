@@ -153,8 +153,9 @@ final class ReaderImageLoader {
 
         let images = await decodeSpreadInParallel(pages, generation: generation, onError: onError)
         // A newer refresh() may have started while the spread decoded — don't
-        // stomp its images with this stale book's pages.
-        guard generation == self.generation else { return }
+        // stomp its images with this stale book's pages. `nil` means the
+        // decode was cancelled; whoever cancelled it owns the next refresh.
+        guard let images, generation == self.generation else { return }
         currentImages = images
         schedulePreload()
     }
@@ -169,8 +170,8 @@ final class ReaderImageLoader {
         _ pages: [ComicPage],
         generation: Int,
         onError: @MainActor @escaping (String) -> Void
-    ) async -> [NSImage] {
-        await withTaskGroup(of: (Int, LoadedImage).self, returning: [NSImage].self) { group in
+    ) async -> [NSImage]? {
+        await withTaskGroup(of: (Int, LoadedImage?).self, returning: [NSImage]?.self) { group in
             for (i, page) in pages.enumerated() {
                 group.addTask { [self] in
                     let image = await self.loadVisibleImage(page, generation: generation, onError: onError)
@@ -178,9 +179,15 @@ final class ReaderImageLoader {
                 }
             }
             var slots: [(Int, LoadedImage)] = []
-            for await result in group {
-                slots.append(result)
+            var wasCancelled = false
+            for await (i, image) in group {
+                guard let image else {
+                    wasCancelled = true
+                    continue
+                }
+                slots.append((i, image))
             }
+            guard !wasCancelled else { return nil }
             slots.sort { $0.0 < $1.0 }
             // Paged mode re-decodes the spread on every refresh, so a failed
             // page just shows its error placeholder here — no loaded/failed
@@ -321,16 +328,16 @@ final class ReaderImageLoader {
         onError: @MainActor @escaping (String) -> Void
     ) async {
         guard !indices.isEmpty else { return }
-        var loaded: [(Int, NSImage)] = []
+        var loaded: [(Int, LoadedImage)] = []
         let maxConcurrent = ReaderImageLoadingPolicy.lazyConcurrencyLimit
 
         // Decode in bounded chunks. Decoding is CPU-heavy so spawning every
         // page at once would saturate the pool with no real benefit (cores
         // are bounded anyway) while still costing per-task overhead.
         for chunkStart in stride(from: 0, to: indices.count, by: maxConcurrent) {
-            if Task.isCancelled || generation != self.generation { return }
+            if Task.isCancelled || generation != self.generation { break }
             let chunkEnd = min(chunkStart + maxConcurrent, indices.count)
-            await withTaskGroup(of: (Int, LoadedImage).self) { group in
+            await withTaskGroup(of: (Int, LoadedImage?).self) { group in
                 for i in chunkStart..<chunkEnd {
                     let pageIndex = indices[i]
                     guard !loadedPageIndices.contains(pageIndex),
@@ -342,27 +349,34 @@ final class ReaderImageLoader {
                     }
                 }
                 for await (pageIndex, result) in group {
-                    // A newer refresh() invalidated this book — don't mark its
-                    // pages "loaded" against the now-current book's state.
-                    if Task.isCancelled || generation != self.generation { return }
-                    // Show the image either way; record success vs failure so a
-                    // failed page can retry on scroll-back (see failedPageIndices).
-                    loaded.append((pageIndex, result.display))
-                    if result.isFailure {
-                        failedPageIndices.insert(pageIndex)
-                    } else {
-                        loadedPageIndices.insert(pageIndex)
-                    }
+                    // nil: the decode was cancelled mid-flight, not failed.
+                    guard let result else { continue }
+                    loaded.append((pageIndex, result))
                 }
             }
         }
 
-        guard !Task.isCancelled, generation == self.generation, !loaded.isEmpty else { return }
+        // A newer refresh() invalidated this book — don't mark its pages
+        // "loaded" against the now-current book's state. A batch that was
+        // merely cancelled by a newer `setVisibleRange` still applies what it
+        // finished decoding: bookkeeping and pixels must change together, or a
+        // page recorded as loaded keeps its gray placeholder and is never
+        // re-requested while it stays inside the keep window.
+        guard generation == self.generation, !loaded.isEmpty else { return }
         // Mutate the backing buffer in place. This avoids copying a thousands-
         // long placeholder array every time a small lazy-load batch completes.
         currentImages.withUnsafeMutableBufferPointer { buffer in
-            for (i, image) in loaded where i < buffer.count {
-                buffer[i] = image
+            for (i, result) in loaded where i < buffer.count {
+                buffer[i] = result.display
+            }
+        }
+        // Show the image either way; record success vs failure so a failed
+        // page can retry on scroll-back (see failedPageIndices).
+        for (i, result) in loaded where i < currentImages.count {
+            if result.isFailure {
+                failedPageIndices.insert(i)
+            } else {
+                loadedPageIndices.insert(i)
             }
         }
     }
@@ -418,7 +432,11 @@ final class ReaderImageLoader {
         }
     }
 
-    private func loadVisibleImage(_ page: ComicPage, generation: Int, onError: @MainActor @escaping (String) -> Void) async -> LoadedImage {
+    /// `nil` when the decode was cancelled rather than failed — scrolling
+    /// cancels the previous lazy batch constantly, and reporting that as a
+    /// decode failure would raise a spurious "Failed to load" banner and pin
+    /// an error placeholder on a perfectly good page.
+    private func loadVisibleImage(_ page: ComicPage, generation: Int, onError: @MainActor @escaping (String) -> Void) async -> LoadedImage? {
         if let cached = cachedImage(for: page) {
             return .image(cached)
         }
@@ -427,6 +445,7 @@ final class ReaderImageLoader {
             cacheImage(image, for: page)
             return .image(image)
         } catch {
+            if error is CancellationError || Task.isCancelled { return nil }
             // Only surface the error if this decode still belongs to the
             // current book — otherwise a failure from a book the user just
             // left would flash onto the now-current one.
