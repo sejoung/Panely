@@ -92,6 +92,11 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   읽고 있는 폴더에 페이지를 추가·삭제·수정해도 같은 알림이 뜸
 - **이미지 오류 플레이스홀더** — 읽을 수 없는 페이지는 라벨이 있는 오류
   타일로 남겨 한 장의 깨진 이미지가 펼침/스트립 레이아웃을 무너뜨리지 않음
+- **스크롤 휠 페이지 넘김** — 단일/두 페이지 레이아웃에서 일반 스크롤 휠이나
+  트랙패드 스크롤로, 더 이상 이동할 여백이 없을 때 페이지를 넘김(아래 = 다음,
+  위 = 이전, 트랙패드는 스와이프당 1페이지). 읽기 방향과 권 카드도 화살표 키와
+  똑같이 따름. 기본 켜짐·영속 저장이며 **View → Disable / Enable Scroll Page
+  Turning** 으로 전환
 
 ### 파일 지원
 - **폴더**, **CBZ/ZIP**, **CBR/RAR** 열기 (RAR 4 · RAR 5, solid 아카이브 포함).
@@ -111,8 +116,9 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   앱 버전/build, macOS 버전, 최근 Panely 로그, redacted 열기/로드 이벤트,
   캐시 용량, 현재 설정, 마지막 reader 에러를 담은 zip을 생성해 버그
   리포트에 첨부할 수 있음. 같은 기능은 **Settings → Diagnostics** 에도 있음.
-  Diagnostics에는 현재 파일 로그 크기, 로그 레벨, 로그 폴더 바로 열기,
-  bounded `recent-log.txt`를 비우는 **File → Clear Diagnostic Logs** 도 있음.
+  Diagnostics에는 현재 파일 로그 크기, 로그 레벨, 로그 폴더 바로 열기
+  (**File → Open Diagnostic Logs Folder** 로도 가능), bounded
+  `recent-log.txt`를 비우는 **File → Clear Diagnostic Logs** 도 있음.
 - 자연 파일명 정렬(`1, 2, 10` — `1, 10, 2` 아님) — `NaturalSort` 헬퍼로
   모든 로더/스캐너에서 일관 적용
 - 비이미지 파일과 숨김 항목 필터링
@@ -132,7 +138,7 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   상태는 실행 간 유지
 - **사이드바 트리** — 폴더와 아카이브가 시각적으로 구분됨:
   `folder` vs `doc.zipper` 아이콘, 아카이브엔 빠른 식별용으로 희미한
-  `.cbz` / `.zip` 접미사
+  `.cbz` / `.zip` / `.cbr` / `.rar` 접미사
 - **트리에서 현재 책 표시** — 책을 열면 상위 폴더들이 자동으로 펼쳐져
   현재 권이 항상 사이드바에 보이고, 권 사이를 이동하면 펼침 상태도 따라감
 - **파일 트리 새로고침** — 사이드바 헤더의 **새로고침 버튼**으로 라이브러리를
@@ -220,6 +226,8 @@ open Panely.xcodeproj
 Panely는 Swift Package Manager를 사용합니다:
 
 - **[ZIPFoundation](https://github.com/weichsel/ZIPFoundation)** — CBZ/ZIP 아카이브 읽기 및 추출
+- **[swift-log](https://github.com/apple/swift-log)** — `AppLog` 뒤의 로깅 facade
+  (OSLog + bounded 진단 로그 파일)
 - **[UnrarKit](https://github.com/abbeycode/UnrarKit)** — CBR/RAR 아카이브 읽기 및 추출.
   업스트림에 SwiftPM 매니페스트가 없어 `Packages/UnrarKit`에 로컬 패키지로
   vendoring했고, RARLAB의 최신 UnRAR 소스로 빌드. 버전과 로컬 패치는
@@ -298,7 +306,7 @@ xcodebuild test \
   CODE_SIGN_IDENTITY="-"
 ```
 
-**71 스위트에 걸친 519개 테스트**가 다음을 커버:
+**74 스위트에 걸친 577개 테스트**가 다음을 커버:
 
 `SnapshotGalleryTests`는 기본 테스트에서 발견은 되지만
 `scripts/generate-snapshots.sh`가 스냅샷 생성을 활성화할 때만 실행됩니다.
@@ -395,9 +403,24 @@ xcodebuild test \
   더블클릭 선호값 매핑(`zoom` / `minimize` / `none`)
 - **`PanelyAppDelegate`** — `applicationShouldTerminateAfterLastWindowClosed`가
   true 반환해서 빨간 닫기 버튼이 앱 종료
+- **`SpreadCalculator`** — 표지 한 장 오프셋 유무에 따른 스프레드 짝짓기
+  (스프레드 시작/끝, step 이동, 도달 가능한 마지막 스프레드)
+- **`WheelPageTurnEngine`** — 스크롤 휠 페이지 넘김 상태 머신: 가장자리에서
+  이동 vs 넘김, 트랙패드 스와이프당 1회, 모멘텀·마우스 휠 쿨다운 처리
+- **줌 유지 / 시리즈별 설정** — `ReaderSeriesIdentity` 판별(폴더 vs
+  zip-in-zip), `ReaderSeriesPreferencesStore` 영속성과 상한,
+  `ReaderViewModel`의 시리즈 단위 줌·레이아웃·방향·맞춤 복원
+- **읽기 진행도 & 라이브러리** — `ReadingProgressStore`(디바운스, 최근성
+  상한, 배지, 이어보기), `LastLibraryRootStore`, `LibrarySidebarModel`
+  (현재 책 상위 폴더 펼침), `SecurityScopedBookmark` stale 갱신
+- **소스 변경 & 진단** — `SourceChangeMonitor` 파일/폴더 감시,
+  `AppLog` / `DiagnosticLogStore` 파일 로깅, `DiagnosticReportExporter`
+  zip 내용
+- **`EntitlementsTests` / `FileAssociationTests`** — 저장 패널 대상용 샌드박스
+  entitlement, Info.plist 문서 타입 / exported UTI(폴더, CBZ/ZIP, CBR/RAR)
 
-테스트는 소스 트리를 그대로 반영합니다: `PanelyTests/Core/Comic/`,
-`PanelyTests/Features/Library/`, `PanelyTests/Features/Settings/`, 그리고
+테스트는 소스 트리를 그대로 반영합니다: `PanelyTests/Core/{Comic, Diagnostics,
+Extensions}/`, `PanelyTests/Features/Library/`, `PanelyTests/Features/Settings/`, 그리고
 `PanelyTests/Features/Reader/{Model, Viewer, Thumbnails, ViewModel,
 ViewModel/Collaborators}`. 공유 픽스처(실제 PNG 생성기 포함)는
 `PanelyTests/TestFixtures.swift`에 있고, persistence 테스트는
@@ -428,7 +451,7 @@ Panely/
 │   │   ├── AppLog.swift                # swift-log facade + OSLog/file 진단 backend
 │   │   └── DiagnosticLogStore.swift    # rolling recent-log.txt 캐시 파일
 │   ├── SourceChangeMonitor.swift       # DispatchSource 기반 다중 URL 파일/폴더 감시 (세션 가드)
-│   ├── LibraryDirectoryWatcher.swift   # 라이브러리 루트 재귀 FSEvents 감시 → 사이드바 트리 자동 갱신
+│   ├── LibraryDirectoryWatcher.swift   # 라이브러리 루트 재귀 FSEvents 감시 (자동 갱신은 현재 비활성)
 │   ├── Debouncer.swift                 # 공용 트레일링 디바운스 헬퍼 (위치/진행도 저장)
 │   ├── FilePicking.swift               # NSOpenPanel seam (주입) → open / folder-access 흐름 테스트 가능
 │   └── Extensions/                     # 공유 Foundation helper
@@ -437,7 +460,7 @@ Panely/
 │   └── Primitives/                     # 아이콘 버튼, 슬라이더
 ├── Features/
 │   ├── Reader/
-│   │   ├── ReaderScene.swift           # ZStack: SidebarHost + ViewerArea + ThumbnailSidebarHost (~100줄, 진입 뷰)
+│   │   ├── ReaderScene.swift           # ZStack: SidebarHost + ViewerArea + ThumbnailSidebarHost (진입 뷰)
 │   │   ├── Scene/                      # ReaderScene 하위 뷰 (파일당 struct 하나)
 │   │   │   ├── HotEdgeReveal.swift
 │   │   │   ├── SidebarHost.swift               # 뷰모델 액션과 연결된 LibrarySidebar
@@ -452,9 +475,10 @@ Panely/
 │   │   │   ├── FitMode.swift           # 3가지 + 순환
 │   │   │   ├── FitCalculator.swift     # 순수 배율 계산
 │   │   │   ├── PositionKey.swift       # 책별 안정적 위치 키
-│   │   │   └── SidebarMode.swift       # pinned / overlay 상태 값 타입
+│   │   │   ├── SidebarMode.swift       # pinned / overlay 상태 값 타입
+│   │   │   └── SpreadCalculator.swift  # 스프레드 짝짓기 (+ 표지 한 장 오프셋)
 │   │   ├── ViewModel/                  # @Observable @MainActor 리더 상태
-│   │   │   ├── ReaderViewModel.swift           # 세션 상태 + 합성 (~180줄)
+│   │   │   ├── ReaderViewModel.swift           # 세션 상태 + 합성
 │   │   │   ├── Extensions/                     # 관심사별 로직 분할
 │   │   │   │   ├── ReaderViewModel+Navigation.swift   # 페이지 네비, Quick jump, chrome 토글
 │   │   │   │   ├── ReaderViewModel+Source.swift       # 로드 진입점 + ReaderLoadIntent
@@ -463,10 +487,13 @@ Panely/
 │   │   │   │   ├── ReaderViewModel+Toolbar.swift      # PanelyToolbar 상태/액션 번들
 │   │   │   │   ├── ReaderViewModel+Volumes.swift      # 형제 권 카운터 + 볼륨 카드
 │   │   │   │   ├── ReaderViewModel+ImageLoading.swift # ReaderImageLoader 위 얇은 facade
-│   │   │   │   └── ReaderViewModel+Bookmarks.swift    # 즐겨찾기 + 페이지 북마크 연동
+│   │   │   │   ├── ReaderViewModel+Bookmarks.swift    # 즐겨찾기 + 페이지 북마크 연동
+│   │   │   │   └── ReaderViewModel+ReadingProgress.swift # 진행도 기록 → 사이드바 배지 + 이어보기
 │   │   │   └── Collaborators/                  # ReaderViewModel이 합성, 각각 단일 책임
 │   │   │       ├── ReaderPreferences.swift     # KeyValueStoring 기반 레이아웃 / 맞춤 / 고정
 │   │   │       ├── ReaderPositionStore.swift   # 디바운스된 책별 페이지 메모리
+│   │   │       ├── ReaderSeriesIdentity.swift  # 시리즈 키 (권 폴더 / 연 아카이브)
+│   │   │       ├── ReaderSeriesPreferencesStore.swift # 시리즈별 레이아웃 / 방향 / 맞춤
 │   │   │       ├── FolderResolver.swift        # 오프메인 폴더/권 스캐너 (순수 파일시스템 탐색)
 │   │   │       ├── ReaderImageLoader.swift     # 캐시 + 페이지 새로고침 + 세로 지연 윈도 + 프리로드
 │   │   │       ├── ReaderImageLoadingSupport.swift # 이미지 메모리 캐시 + 로딩 헬퍼
@@ -479,10 +506,11 @@ Panely/
 │   │   │   └── AppKit/                         # 내부 AppKit 브리지
 │   │   │       ├── AppKitImageScroller.swift       # NSViewRepresentable + applyFit
 │   │   │       ├── AppKitScrollerCoordinator.swift # 옵저버 + 상태 diff
-│   │   │       ├── PanelyScrollView.swift          # ⌘+휠 줌이 가능한 NSScrollView
+│   │   │       ├── PanelyScrollView.swift          # ⌘+휠 줌 + 휠 페이지 넘김 NSScrollView
 │   │   │       ├── TitleBarPassthrough.swift       # 상단 28 px 드래그 + 커서 처리
 │   │   │       ├── CenteringClipView.swift         # 작은 문서 중앙정렬 NSClipView
-│   │   │       └── ImageStackView.swift            # 페이지 프레임 + 풀링된 NSImageView
+│   │   │       ├── ImageStackView.swift            # 페이지 프레임 + 풀링된 NSImageView
+│   │   │       └── WheelPageTurnEngine.swift       # 스크롤 휠 페이지 넘김 상태 머신
 │   │   ├── Toolbar/
 │   │   │   ├── PanelyToolbar.swift     # 5개 버튼 그룹: chrome / 레이아웃 / 맞춤·줌 / 북마크 / 네비
 │   │   │   └── QuickJumpField.swift    # 페이지 카운터 인라인 편집
@@ -495,7 +523,8 @@ Panely/
 │   │       ├── ThumbnailSidebar.swift  # 우측 썸네일 패널 (LazyVStack)
 │   │       └── ThumbnailLoader.swift   # Image I/O 썸네일 + NSCache
 │   ├── Settings/
-│   │   ├── SettingsView.swift          # Storage + Diagnostics 탭
+│   │   ├── SettingsView.swift          # Library + Storage + Diagnostics 탭
+│   │   ├── LibrarySettingsView.swift   # 마지막 폴더 다시 열기 토글 + Forget Now
 │   │   ├── StorageSettingsView.swift   # Storage 설정 UI + 캐시 용량 / 삭제 컨트롤
 │   │   ├── DiagnosticsSettingsView.swift # 진단 리포트 export UI
 │   │   ├── DiagnosticReportExporter.swift # zip 리포트 writer
@@ -515,16 +544,19 @@ Panely/
 │       │   ├── PageBookmarksStore.swift        # 책당 + 총 책 상한이 적용된 페이지 북마크
 │       │   ├── RecentItemsStore.swift          # 재열기 시 북마크 중복 제거
 │       │   ├── ReadingProgressStore.swift      # 책당 진행도 (디바운스, 최근성 상한) → 배지 + 이어보기
-│       │   └── LastLibraryRootStore.swift       # 마지막 라이브러리 루트 security-scoped 북마크 → 실행 시 복원
+│       │   ├── LastLibraryRootStore.swift      # 마지막 라이브러리 루트 security-scoped 북마크 → 실행 시 복원
+│       │   └── SecurityScopedBookmark.swift    # 공용 북마크 생성/resolve + stale 갱신
 │       └── Rows/                       # 사이드바 row 뷰 (파일당 struct 하나)
 │           ├── FileNodeRow.swift
 │           ├── FavoriteRow.swift
 │           ├── VolumeRow.swift
-│           └── PageBookmarkRow.swift
+│           ├── PageBookmarkRow.swift
+│           └── ReadingBadgeView.swift  # 진행 링 / 완독 체크
 └── Core/
     ├── Extensions/                     # 공유 Foundation 유틸 extension (DRY)
     │   ├── URL+IsAncestor.swift        # path-component 단위 접두사 포함 체크
-    │   └── UserDefaults+Codable.swift  # KeyValueStoring + JSON encode/decode 헬퍼
+    │   ├── UserDefaults+Codable.swift  # KeyValueStoring + JSON encode/decode 헬퍼
+    │   └── Dictionary+CapByRecency.swift # persistence store 공용 최근성 기반 상한
     └── Comic/
         ├── ComicPage.swift / ComicSource.swift / ComicPageSource.swift
         ├── FolderLoader.swift
@@ -541,6 +573,7 @@ PanelyTests/                            # 소스 트리를 미러링
 ├── TestFixtures.swift                  # 공유 temp-dir / zip / PNG 헬퍼
 ├── PanelyAppDelegateTests.swift
 ├── FileAssociationTests.swift
+├── EntitlementsTests.swift
 ├── TestKeyValueStore.swift             # persistence 테스트용 in-memory KeyValueStoring
 ├── Snapshots/                          # docs/screenshots/ 생성기 (CI에서 skip)
 │   ├── SnapshotRenderer.swift          # NSHostingView + offscreen window → PNG
@@ -548,24 +581,35 @@ PanelyTests/                            # 소스 트리를 미러링
 │   └── SnapshotGalleryTests.swift      # 15개 매뉴얼 시나리오
 ├── Core/Comic/                         # ArchiveLoader, ZIP/RAR 리더, FolderLoader, ImageLoader{Load,Dimensions},
 │                                       # ComicModel, LoaderExtension, NaturalSort
+├── Core/Diagnostics/                   # AppLog, DiagnosticLogStore
+├── Core/Extensions/                    # URL 상대 하위 경로 헬퍼
+├── Core/SourceChangeMonitorTests.swift
 ├── Features/Library/                   # FavoritesStore, PageBookmarksStore, RecentItem,
-│                                       # FileNode, FavoriteBook, PageBookmark
+│                                       # FileNode, FavoriteBook, PageBookmark,
+│                                       # ReadingProgressStore, LastLibraryRootStore,
+│                                       # LibrarySidebarModel, SecurityScopedBookmark
 ├── Features/Settings/                  # CacheMaintenance, Settings UI, diagnostic report export
 └── Features/Reader/
-    ├── Model/                          # FitCalculator, PositionKey, ReaderEnum, SidebarMode
+    ├── Model/                          # FitCalculator, PositionKey, ReaderEnum, SidebarMode,
+    │                                   # SpreadCalculator
     ├── Viewer/                         # CenteringClipView, FitMagnificationStability,
     │                                   # ImageStackVertical, ScrollZoomCalculator,
     │                                   # ViewerController, ViewerResizeFit,
-    │                                   # AppKitScrollerCoordinator, TitleBarPassthrough
+    │                                   # AppKitScrollerCoordinator, TitleBarPassthrough,
+    │                                   # WheelPageTurnEngine, ZoomCarryOver
     ├── Thumbnails/                     # ThumbnailLoader
-    └── ViewModel/                      # 통합 테스트 10개 (Bookmarks, EndOfVolume,
-        │                               # Library, PagedMode, PositionMemory, QuickJump,
-        │                               # SetLayout, ThumbnailSidebar, ToolbarPin,
-        │                               # VerticalMode)
+    └── ViewModel/                      # ReaderViewModel 통합 테스트 14개 (Bookmarks,
+        │                               # BookSwitchStripReset, EndOfVolume, Library,
+        │                               # OpenSource, PagedMode, PositionMemory, QuickJump,
+        │                               # ReadingProgress, SeriesPreferences, SetLayout,
+        │                               # ThumbnailSidebar, ToolbarPin, VerticalMode)
+        │                               # + ReaderSeriesIdentity / SeriesPreferencesStore
         └── Collaborators/              # collaborator들의 포커싱된 단위 테스트
 
 docs/
+├── index.html                          # 프로젝트 소개 페이지
 ├── manual.md                           # 영문 사용 설명서 (스크린샷 둘러보기)
+├── manual.html                         # 매뉴얼 HTML 버전
 ├── manual.ko.md                        # 한글 사용 설명서
 ├── screenshots/                        # SnapshotGalleryTests가 생성하는 15개 PNG
 ├── panely_design_system_mac_os.md
@@ -589,14 +633,15 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북�
 - **`@Observable` + `@MainActor`** — `ReaderViewModel`은 메인 액터 격리
   상태로 async 로드를 지휘하며, 로딩 오버레이를 위한 명시적 단계 메시지를
   보냅니다. 클래스 본체는 세션 상태와 포커싱된 **collaborator**
-  (`ReaderPreferences`, `ReaderPositionStore`, `ReaderImageLoader`,
-  `ReaderTempDirectory`, `ReaderLibraryScope`)와 공유 서비스용
+  (`ReaderPreferences`, `ReaderSeriesPreferencesStore`, `ReaderPositionStore`,
+  `ReaderImageLoader`, `ReaderTempDirectory`, `ReaderLibraryScope`)와 공유 서비스용
   `AppDependencies`(추출 캐시, security-scoped bookmark, 라이브러리 트리
   로딩, key-value persistence, 시스템 설정)를 보유합니다. 각 observable
   프로퍼티를 forwarding으로 노출해서 뷰 호출(`viewModel.layout`,
   `viewModel.currentImages`)이 그대로 동작하면서도 내부 타입들은 독립적으로
-  상태를 소유합니다. 관심사별 로직은 다섯 extension(`+Navigation`,
-  `+Source`, `+Volumes`, `+ImageLoading`, `+Bookmarks`)에 분할됩니다.
+  상태를 소유합니다. 관심사별 로직은 extension(`+Navigation`,
+  `+Source`, `+LoadPipeline`, `+Cache`, `+Toolbar`, `+Volumes`,
+  `+ImageLoading`, `+Bookmarks`, `+ReadingProgress`)에 분할됩니다.
 - **Dependency-injected 앱 서비스** — production은 `AppDependencies.live`를
   쓰고, 테스트는 protocol 기반 서비스(`ExtractionCacheManaging`,
   `SecurityScopedBookmarking`, `LibraryTreeLoading`, `KeyValueStoring`,
@@ -628,6 +673,16 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북�
   주입된 `SystemSettingsReading`을 통해 더블클릭 zoom/minimize/none 처리
   (production에서는 `AppleActionOnDoubleClick`). `.hiddenTitleBar` 아래에서
   실제 창 가장자리와 정렬되도록 `.ignoresSafeArea(edges: .top)` 사용.
+- **`SpreadCalculator`** — 두 페이지 짝짓기의 단일 진실 공급원. 표지 한 장
+  오프셋이 켜지면 0쪽이 단독 스프레드이고 나머지는 (1,2)(3,4)…로 짝지어짐.
+  네비게이션 step, `visiblePages`, 위치 복원이 모두 여기에 물어보므로 서로
+  어긋날 수 없음.
+- **`WheelPageTurnEngine`** — 스크롤 이벤트 스냅샷 위의 순수 상태 머신
+  (`NSEvent` 의존성 없음). 일반 스크롤은 이동으로 흡수할 수 없을 때(페이지가
+  뷰포트에 맞거나, 밀고 있는 가장자리에 이미 닿아 있을 때)만 페이지를 넘기고,
+  트랙패드 제스처는 스와이프당 최대 1회(넘긴 뒤 남은 제스처와 모멘텀은 흡수),
+  일반 마우스 휠은 쿨다운을 두고 노치당 1페이지. `PanelyScrollView`가
+  이벤트를 넘기고 결과는 `advanceForward()` / `goBackward()`로 라우팅됨.
 - **`FitCalculator`** — 물리 뷰포트(`scrollView.contentSize`)가 배율
   불변이라서, 맞춤 모드 토글이 안정적인 배율을 생성(피드백 루프 없음).
 - **리사이즈 시 뷰어 자동 재맞춤** — `AppKitImageScroller`가 자신의

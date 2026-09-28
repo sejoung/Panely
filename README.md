@@ -102,6 +102,12 @@ pages.
   pages in a folder you're reading surfaces the same prompt
 - **Image error placeholders** — an unreadable page stays visible as a
   labeled error tile, so one bad image doesn't collapse the spread/strip
+- **Scroll-wheel page turning** — in single / double layouts a plain
+  scroll-wheel or trackpad scroll turns the page once the page can't pan any
+  further (down = next, up = previous; one page per trackpad swipe). It
+  follows reading direction and the volume cards exactly like the arrow
+  keys. On by default and persisted; toggle via **View → Disable / Enable
+  Scroll Page Turning**
 
 ### File support
 - Open **folder**, **CBZ/ZIP**, or **CBR/RAR** (RAR 4 and RAR 5, including
@@ -122,8 +128,9 @@ pages.
   open/load events, cache size, current settings, and the last reader error
   for bug reports. The same action is also available in **Settings →
   Diagnostics**. Diagnostics also exposes the current file-log size, log level,
-  a logs-folder shortcut, and **File → Clear Diagnostic Logs** for clearing the
-  bounded `recent-log.txt` file.
+  a logs-folder shortcut (also **File → Open Diagnostic Logs Folder**), and
+  **File → Clear Diagnostic Logs** for clearing the bounded `recent-log.txt`
+  file.
 - Natural filename sort (`1, 2, 10` — not `1, 10, 2`) — applied
   consistently across loaders / scanners via the `NaturalSort` helper
 - Filters non-image files and hidden entries
@@ -143,8 +150,8 @@ pages.
 - **Sidebar / toolbar pin** — both follow the same `pin` ↔ `pin.fill` toggle
   pattern. Pin state persists across launches
 - **Sidebar tree** — folders and archives are visually disambiguated:
-  `folder` vs `doc.zipper` icons, plus a faint `.cbz` / `.zip` suffix on
-  archives for quick reading
+  `folder` vs `doc.zipper` icons, plus a faint `.cbz` / `.zip` / `.cbr` /
+  `.rar` suffix on archives for quick reading
 - **Reveal-active in the tree** — opening a book auto-expands its ancestor
   folders so the current volume is always visible in the sidebar, and the
   expansion follows along as you move between volumes
@@ -243,6 +250,8 @@ Select the **Panely** scheme and press **⌘R**.
 Panely uses Swift Package Manager:
 
 - **[ZIPFoundation](https://github.com/weichsel/ZIPFoundation)** — CBZ/ZIP archive reading &amp; extraction
+- **[swift-log](https://github.com/apple/swift-log)** — logging facade behind `AppLog`
+  (OSLog + the bounded diagnostic log file)
 - **[UnrarKit](https://github.com/abbeycode/UnrarKit)** — CBR/RAR archive reading &amp; extraction.
   Vendored as a local package in `Packages/UnrarKit` (upstream ships no
   SwiftPM manifest) and built against RARLAB's current UnRAR source; see
@@ -324,7 +333,7 @@ xcodebuild test \
   CODE_SIGN_IDENTITY="-"
 ```
 
-**519 tests across 71 suites** cover:
+**577 tests across 74 suites** cover:
 
 `SnapshotGalleryTests` is discovered in normal runs but gated off unless
 `scripts/generate-snapshots.sh` enables snapshot generation, so the default
@@ -430,9 +439,28 @@ xcodebuild test \
   (`zoom` / `minimize` / `none`) through the injected settings reader
 - **`PanelyAppDelegate`** — `applicationShouldTerminateAfterLastWindowClosed`
   returns true so the red close button quits the app
+- **`SpreadCalculator`** — spread grouping with and without the
+  standalone-cover offset (spread start/end, stepping, last reachable spread)
+- **`WheelPageTurnEngine`** — scroll-wheel page-turn state machine: pan vs.
+  turn at the edges, one turn per trackpad swipe, momentum and mouse-wheel
+  cooldown handling
+- **Zoom carry-over / per-series settings** — `ReaderSeriesIdentity`
+  resolution (folder vs. zip-in-zip), `ReaderSeriesPreferencesStore`
+  persistence and cap, and series-scoped zoom / layout / direction / fit
+  restore in `ReaderViewModel`
+- **Reading progress & library** — `ReadingProgressStore` (debounce,
+  recency cap, badges, Continue Reading), `LastLibraryRootStore`,
+  `LibrarySidebarModel` (reveal-active expansion), and
+  `SecurityScopedBookmark` stale-refresh
+- **Source change & diagnostics** — `SourceChangeMonitor` file/folder
+  watching, `AppLog` / `DiagnosticLogStore` file logging, and
+  `DiagnosticReportExporter` zip contents
+- **`EntitlementsTests` / `FileAssociationTests`** — sandbox entitlement for
+  save-panel destinations, and the Info.plist document types / exported UTIs
+  (folders, CBZ/ZIP, CBR/RAR)
 
-Tests mirror the source tree: `PanelyTests/Core/Comic/`,
-`PanelyTests/Features/Library/`, `PanelyTests/Features/Settings/`, and
+Tests mirror the source tree: `PanelyTests/Core/{Comic, Diagnostics,
+Extensions}/`, `PanelyTests/Features/Library/`, `PanelyTests/Features/Settings/`, and
 `PanelyTests/Features/Reader/{Model, Viewer, Thumbnails, ViewModel,
 ViewModel/Collaborators}`. Shared fixtures (including a real PNG generator)
 live in `PanelyTests/TestFixtures.swift`; persistence tests use
@@ -464,7 +492,7 @@ Panely/
 │   │   ├── AppLog.swift                # swift-log facade + OSLog/file diagnostic backend
 │   │   └── DiagnosticLogStore.swift    # rolling recent-log.txt cache file
 │   ├── SourceChangeMonitor.swift       # DispatchSource-backed multi-URL file/folder watcher (session-guarded)
-│   ├── LibraryDirectoryWatcher.swift   # FSEvents recursive watch on the library root → auto-refresh the sidebar tree
+│   ├── LibraryDirectoryWatcher.swift   # FSEvents recursive watch on the library root (auto-refresh currently disabled)
 │   ├── Debouncer.swift                 # shared trailing-debounce helper (position / progress saves)
 │   ├── FilePicking.swift               # NSOpenPanel seam (injected) → open / folder-access flows stay testable
 │   └── Extensions/                     # shared Foundation helpers
@@ -473,7 +501,7 @@ Panely/
 │   └── Primitives/                     # Icon button, slider
 ├── Features/
 │   ├── Reader/
-│   │   ├── ReaderScene.swift           # ZStack: SidebarHost + ViewerArea + ThumbnailSidebarHost (~100 lines, entry view)
+│   │   ├── ReaderScene.swift           # ZStack: SidebarHost + ViewerArea + ThumbnailSidebarHost (entry view)
 │   │   ├── Scene/                      # ReaderScene sub-views (one struct per file)
 │   │   │   ├── HotEdgeReveal.swift
 │   │   │   ├── SidebarHost.swift               # LibrarySidebar wired to viewmodel actions
@@ -488,9 +516,10 @@ Panely/
 │   │   │   ├── FitMode.swift           # 3 cases + cycle
 │   │   │   ├── FitCalculator.swift     # pure magnification math
 │   │   │   ├── PositionKey.swift       # stable per-book position keys
-│   │   │   └── SidebarMode.swift       # pinned / overlay state value-type
+│   │   │   ├── SidebarMode.swift       # pinned / overlay state value-type
+│   │   │   └── SpreadCalculator.swift  # spread grouping (+ standalone-cover offset)
 │   │   ├── ViewModel/                  # @Observable @MainActor reader state
-│   │   │   ├── ReaderViewModel.swift           # session state + composition (~180 lines)
+│   │   │   ├── ReaderViewModel.swift           # session state + composition
 │   │   │   ├── Extensions/                     # logic split by concern
 │   │   │   │   ├── ReaderViewModel+Navigation.swift   # page nav, Quick jump, chrome toggles
 │   │   │   │   ├── ReaderViewModel+Source.swift       # load entry points + ReaderLoadIntent
@@ -499,10 +528,13 @@ Panely/
 │   │   │   │   ├── ReaderViewModel+Toolbar.swift      # PanelyToolbar state/actions bundle
 │   │   │   │   ├── ReaderViewModel+Volumes.swift      # sibling counters + volume cards
 │   │   │   │   ├── ReaderViewModel+ImageLoading.swift # facade over ReaderImageLoader
-│   │   │   │   └── ReaderViewModel+Bookmarks.swift    # favorites + page bookmarks integration
+│   │   │   │   ├── ReaderViewModel+Bookmarks.swift    # favorites + page bookmarks integration
+│   │   │   │   └── ReaderViewModel+ReadingProgress.swift # progress records → sidebar badges + Continue Reading
 │   │   │   └── Collaborators/                  # composed by ReaderViewModel; each single-responsibility
 │   │   │       ├── ReaderPreferences.swift     # KeyValueStoring-backed layout / fit / pins
 │   │   │       ├── ReaderPositionStore.swift   # debounced per-book page memory
+│   │   │       ├── ReaderSeriesIdentity.swift  # series key (volume folder / opened archive)
+│   │   │       ├── ReaderSeriesPreferencesStore.swift # per-series layout / direction / fit
 │   │   │       ├── FolderResolver.swift        # off-main folder/volume scanners (pure file-system walks)
 │   │   │       ├── ReaderImageLoader.swift     # cache + paged refresh + vertical lazy window + preload
 │   │   │       ├── ReaderImageLoadingSupport.swift # image memory cache + loading helpers
@@ -515,10 +547,11 @@ Panely/
 │   │   │   └── AppKit/                         # internal AppKit bridge
 │   │   │       ├── AppKitImageScroller.swift       # NSViewRepresentable + applyFit
 │   │   │       ├── AppKitScrollerCoordinator.swift # observers + state diffing
-│   │   │       ├── PanelyScrollView.swift          # NSScrollView with ⌘+scroll zoom
+│   │   │       ├── PanelyScrollView.swift          # NSScrollView with ⌘+scroll zoom + wheel page turn
 │   │   │       ├── TitleBarPassthrough.swift       # top 28 px drag + cursor handling
 │   │   │       ├── CenteringClipView.swift         # small-document centering NSClipView
-│   │   │       └── ImageStackView.swift            # page frames + pooled NSImageViews
+│   │   │       ├── ImageStackView.swift            # page frames + pooled NSImageViews
+│   │   │       └── WheelPageTurnEngine.swift       # scroll-wheel page-turn state machine
 │   │   ├── Toolbar/
 │   │   │   ├── PanelyToolbar.swift     # 5 button groups: chrome / layout / fit&zoom / bookmarks / nav
 │   │   │   └── QuickJumpField.swift    # inline-editable page counter
@@ -531,7 +564,8 @@ Panely/
 │   │       ├── ThumbnailSidebar.swift  # right-side thumbnail panel (LazyVStack)
 │   │       └── ThumbnailLoader.swift   # Image I/O thumbnails + NSCache
 │   ├── Settings/
-│   │   ├── SettingsView.swift          # Storage + Diagnostics tabs
+│   │   ├── SettingsView.swift          # Library + Storage + Diagnostics tabs
+│   │   ├── LibrarySettingsView.swift   # reopen-last-folder toggle + Forget Now
 │   │   ├── StorageSettingsView.swift   # Storage settings UI + cache size / clear controls
 │   │   ├── DiagnosticsSettingsView.swift # diagnostic report export UI
 │   │   ├── DiagnosticReportExporter.swift # zip report writer
@@ -551,16 +585,19 @@ Panely/
 │       │   ├── PageBookmarksStore.swift        # per-book pages with per-book + total caps
 │       │   ├── RecentItemsStore.swift          # bookmark dedup on repeat opens
 │       │   ├── ReadingProgressStore.swift      # per-book progress (debounced, recency-capped) → badges + Continue Reading
-│       │   └── LastLibraryRootStore.swift       # security-scoped bookmark of the last library root → reopen on launch
+│       │   ├── LastLibraryRootStore.swift      # security-scoped bookmark of the last library root → reopen on launch
+│       │   └── SecurityScopedBookmark.swift    # shared bookmark create/resolve + stale refresh
 │       └── Rows/                       # sidebar row views (one struct per file)
 │           ├── FileNodeRow.swift
 │           ├── FavoriteRow.swift
 │           ├── VolumeRow.swift
-│           └── PageBookmarkRow.swift
+│           ├── PageBookmarkRow.swift
+│           └── ReadingBadgeView.swift  # progress ring / finished check
 └── Core/
     ├── Extensions/                     # shared Foundation utility extensions (DRY)
     │   ├── URL+IsAncestor.swift        # path-component-aware prefix containment
-    │   └── UserDefaults+Codable.swift  # KeyValueStoring + JSON encode/decode helpers
+    │   ├── UserDefaults+Codable.swift  # KeyValueStoring + JSON encode/decode helpers
+    │   └── Dictionary+CapByRecency.swift # recency-based cap shared by persistence stores
     └── Comic/
         ├── ComicPage.swift / ComicSource.swift / ComicPageSource.swift
         ├── FolderLoader.swift
@@ -577,6 +614,7 @@ PanelyTests/                            # mirrors the source tree
 ├── TestFixtures.swift                  # shared temp-dir / zip / PNG helpers
 ├── PanelyAppDelegateTests.swift
 ├── FileAssociationTests.swift
+├── EntitlementsTests.swift
 ├── TestKeyValueStore.swift             # in-memory KeyValueStoring for persistence tests
 ├── Snapshots/                          # docs/screenshots/ generator (skipped in CI)
 │   ├── SnapshotRenderer.swift          # NSHostingView + offscreen window → PNG
@@ -584,24 +622,35 @@ PanelyTests/                            # mirrors the source tree
 │   └── SnapshotGalleryTests.swift      # 15 manual scenarios
 ├── Core/Comic/                         # ArchiveLoader, ZIP/RAR readers, FolderLoader, ImageLoader{Load,Dimensions},
 │                                       # ComicModel, LoaderExtension, NaturalSort
+├── Core/Diagnostics/                   # AppLog, DiagnosticLogStore
+├── Core/Extensions/                    # URL relative-subpath helpers
+├── Core/SourceChangeMonitorTests.swift
 ├── Features/Library/                   # FavoritesStore, PageBookmarksStore, RecentItem,
-│                                       # FileNode, FavoriteBook, PageBookmark
+│                                       # FileNode, FavoriteBook, PageBookmark,
+│                                       # ReadingProgressStore, LastLibraryRootStore,
+│                                       # LibrarySidebarModel, SecurityScopedBookmark
 ├── Features/Settings/                  # CacheMaintenance, Settings UI, diagnostic report export
 └── Features/Reader/
-    ├── Model/                          # FitCalculator, PositionKey, ReaderEnum, SidebarMode
+    ├── Model/                          # FitCalculator, PositionKey, ReaderEnum, SidebarMode,
+    │                                   # SpreadCalculator
     ├── Viewer/                         # CenteringClipView, FitMagnificationStability,
     │                                   # ImageStackVertical, ScrollZoomCalculator,
     │                                   # ViewerController, ViewerResizeFit,
-    │                                   # AppKitScrollerCoordinator, TitleBarPassthrough
+    │                                   # AppKitScrollerCoordinator, TitleBarPassthrough,
+    │                                   # WheelPageTurnEngine, ZoomCarryOver
     ├── Thumbnails/                     # ThumbnailLoader
-    └── ViewModel/                      # 10 integration files (Bookmarks, EndOfVolume,
-        │                               # Library, PagedMode, PositionMemory, QuickJump,
-        │                               # SetLayout, ThumbnailSidebar, ToolbarPin,
-        │                               # VerticalMode)
+    └── ViewModel/                      # 14 ReaderViewModel integration files (Bookmarks,
+        │                               # BookSwitchStripReset, EndOfVolume, Library,
+        │                               # OpenSource, PagedMode, PositionMemory, QuickJump,
+        │                               # ReadingProgress, SeriesPreferences, SetLayout,
+        │                               # ThumbnailSidebar, ToolbarPin, VerticalMode)
+        │                               # + ReaderSeriesIdentity / SeriesPreferencesStore
         └── Collaborators/              # focused unit tests for the collaborators
 
 docs/
+├── index.html                          # project landing page
 ├── manual.md                           # English user manual (screenshot walkthrough)
+├── manual.html                         # HTML build of the manual
 ├── manual.ko.md                        # Korean user manual
 ├── screenshots/                        # 15 PNGs generated by SnapshotGalleryTests
 ├── panely_design_system_mac_os.md
@@ -626,14 +675,15 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   and orchestrates async loads via explicit stage messages to drive the
   loading overlay. The class file holds session state + composition of focused
   **collaborators** (`ReaderPreferences`,
-  `ReaderPositionStore`, `ReaderImageLoader`, `ReaderTempDirectory`,
-  `ReaderLibraryScope`) plus `AppDependencies` for shared services
+  `ReaderSeriesPreferencesStore`, `ReaderPositionStore`, `ReaderImageLoader`,
+  `ReaderTempDirectory`, `ReaderLibraryScope`) plus `AppDependencies` for shared services
   (extraction cache, security-scoped bookmarks, library tree loading,
   key-value persistence, and system settings). It forwards collaborator
   properties so view callsites (`viewModel.layout`, `viewModel.currentImages`)
   stay unchanged while the underlying types own their state independently.
-  Per-concern logic is split across five extensions (`+Navigation`,
-  `+Source`, `+Volumes`, `+ImageLoading`, `+Bookmarks`).
+  Per-concern logic is split across extensions (`+Navigation`, `+Source`,
+  `+LoadPipeline`, `+Cache`, `+Toolbar`, `+Volumes`, `+ImageLoading`,
+  `+Bookmarks`, `+ReadingProgress`).
 - **Dependency-injected app services** — production uses `AppDependencies.live`,
   while tests can inject protocol-backed services (`ExtractionCacheManaging`,
   `SecurityScopedBookmarking`, `LibraryTreeLoading`, `KeyValueStoring`,
@@ -669,6 +719,17 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   injected `SystemSettingsReading` (`AppleActionOnDoubleClick` in production).
   The overlay uses `.ignoresSafeArea(edges: .top)` so it lines up with the
   actual window edge under `.hiddenTitleBar`.
+- **`SpreadCalculator`** — single source of truth for double-page grouping.
+  With the standalone-cover offset on, page 0 is its own spread and the rest
+  pair as (1,2)(3,4)…; navigation stepping, `visiblePages`, and position
+  restore all ask it, so they can't drift apart.
+- **`WheelPageTurnEngine`** — a pure state machine over scroll-event
+  snapshots (no `NSEvent` dependency). A plain scroll only turns the page
+  when panning can't absorb it (the page fits, or it's pinned at the edge
+  being pushed past), trackpad gestures turn at most once per swipe (the
+  rest of that gesture, momentum included, is swallowed), and discrete mouse
+  wheels turn one page per notch behind a cooldown. `PanelyScrollView` feeds it and routes the
+  result through `advanceForward()` / `goBackward()`.
 - **`FitCalculator`** — physical viewport (`scrollView.contentSize`) is
   magnification-invariant, so toggling fit modes produces stable
   magnifications (no feedback loop).
