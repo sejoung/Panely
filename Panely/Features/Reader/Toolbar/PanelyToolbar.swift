@@ -74,7 +74,7 @@ struct PanelyToolbar: View {
     private var chromeGroup: some View {
         Group {
             PanelyIconButton(systemImage: "folder", action: actions.onOpen)
-                .help("Open Folder, CBZ, or ZIP… (⌘O)")
+                .help("Open Folder, CBZ/CBR, or ZIP/RAR… (⌘O)")
 
             PanelyIconButton(
                 systemImage: state.sidebarPinned ? "pin.fill" : "pin",

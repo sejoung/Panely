@@ -98,9 +98,7 @@ extension ReaderViewModel {
 
     func openSource() {
         var types: [UTType] = [.folder, .zip]
-        if let cbz = UTType(filenameExtension: "cbz") {
-            types.append(cbz)
-        }
+        types += ["cbz", "cbr", "rar"].compactMap { UTType(filenameExtension: $0) }
         let request = FilePickerRequest(
             canChooseFiles: true,
             canChooseDirectories: true,

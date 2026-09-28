@@ -25,6 +25,29 @@ enum Fixture {
         try FileManager.default.zipItem(at: sourceDir, to: zipURL, shouldKeepParent: false)
     }
 
+    /// Copies a checked-in archive from `PanelyTests/Fixtures/Archives` into
+    /// `dir` (optionally under a new name) so a test can't mutate the bundled
+    /// original. RAR fixtures are pre-built — there's no RAR writer to
+    /// generate them at test time.
+    ///
+    /// - `panely-rar5.cbr` / `panely-rar5-solid.cbr`: RAR 5 (plain / solid),
+    ///   `01.png` 12×34, `02.png` 56×78, `10.png` 90×120.
+    /// - `panely-rar5-nested.cbr`: `vol01.cbz` (01, 02) + `vol02.cbr` (10).
+    /// - `panely-rar4.rar`: RAR 4 with `Test File A.txt`, `B.jpg`, `C.m4a`.
+    /// - `panely-rar5-password.rar`: encrypted entry data (password "password").
+    /// - `panely-rar4-header-password.rar`: encrypted headers.
+    static func bundledArchive(_ name: String, in dir: URL, as newName: String? = nil) throws -> URL {
+        let bundle = Bundle(for: FixtureBundleToken.self)
+        guard let source = bundle.url(forResource: name, withExtension: nil)
+            ?? bundle.url(forResource: name, withExtension: nil, subdirectory: "Fixtures/Archives")
+        else {
+            throw NSError(domain: "Fixture", code: 4, userInfo: [NSLocalizedDescriptionKey: "Missing fixture \(name)"])
+        }
+        let destination = dir.appendingPathComponent(newName ?? name)
+        try FileManager.default.copyItem(at: source, to: destination)
+        return destination
+    }
+
     static func makeImagePages(count: Int, title: String = "p") -> [ComicPage] {
         do {
             let dir = try makeTempDir()
@@ -71,3 +94,5 @@ enum Fixture {
         return mutableData as Data
     }
 }
+
+private final class FixtureBundleToken {}

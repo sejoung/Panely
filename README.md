@@ -104,7 +104,9 @@ pages.
   labeled error tile, so one bad image doesn't collapse the spread/strip
 
 ### File support
-- Open **folder**, **CBZ**, or **ZIP**
+- Open **folder**, **CBZ/ZIP**, or **CBR/RAR** (RAR 4 and RAR 5, including
+  solid archives). The container is detected from the file's contents, so a
+  ZIP renamed to `.cbr` (or a RAR renamed to `.cbz`) still opens
 - **Series-root auto-detection** — pick a folder of volumes and the first one opens
 - **Nested archive extraction** (up to 3 levels deep, recursive, with a
   5 GB cumulative-size safety cap — guards against zip-bombs)
@@ -238,18 +240,22 @@ Select the **Panely** scheme and press **⌘R**.
 
 ### Dependency
 
-Panely uses Swift Package Manager. The only external dependency is:
+Panely uses Swift Package Manager:
 
 - **[ZIPFoundation](https://github.com/weichsel/ZIPFoundation)** — CBZ/ZIP archive reading &amp; extraction
+- **[UnrarKit](https://github.com/abbeycode/UnrarKit)** — CBR/RAR archive reading &amp; extraction.
+  Vendored as a local package in `Packages/UnrarKit` (upstream ships no
+  SwiftPM manifest) and built against RARLAB's current UnRAR source; see
+  `Packages/UnrarKit/README.md` for versions and local patches
 
-Xcode resolves it automatically on first build.
+Xcode resolves them automatically on first build.
 
 ## Finder integration
 
-Panely registers itself as a handler for folders, `.cbz`, and `.zip` so
-you can open them straight from Finder.
+Panely registers itself as a handler for folders, `.cbz`, `.zip`, `.cbr`,
+and `.rar` so you can open them straight from Finder.
 
-- **Files** (`.cbz`, `.zip`) — right-click → **Open With → Panely**
+- **Files** (`.cbz`, `.zip`, `.cbr`, `.rar`) — right-click → **Open With → Panely**
 - **Folders** — macOS does not surface "Open With" for folders, so
   drag the folder onto the Panely.app icon (or its Dock icon), or use
   **File → Open With → Panely** from the menu bar
@@ -282,7 +288,7 @@ Terminal) and move the result straight to `/Applications`.
 
 | Input | Action |
 |:------|:-------|
-| `⌘O` | Open folder / CBZ / ZIP |
+| `⌘O` | Open folder / CBZ / ZIP / CBR / RAR |
 | `⌘R` | Reload current book |
 | `←` / `→` | Previous / next page (direction-aware; advances to the next/previous volume when the matching end-of-volume card is showing) |
 | `Space` | Next page (advances to the next volume when the end-of-volume card is showing) |
@@ -330,7 +336,8 @@ xcodebuild test \
 - **FolderLoader** integration with real temp directories
 - **FileNode.loadTree** scanning, sorting, empty/unreadable cases, and the
   `fileExtension` exposure used for sidebar badges
-- **CBZLoader** integration with programmatically-built zip fixtures,
+- **ArchiveLoader** integration with programmatically-built zip fixtures
+  and checked-in RAR fixtures (`PanelyTests/Fixtures/Archives`),
   including recursive nested-archive extraction
 - **ImageLoader.dimensions** — header-only size reads for both file URLs
   and archive entries
@@ -557,9 +564,12 @@ Panely/
     └── Comic/
         ├── ComicPage.swift / ComicSource.swift / ComicPageSource.swift
         ├── FolderLoader.swift
-        ├── CBZLoader.swift             # flat + recursive-nested extraction + 5 GB safety cap
-        ├── ArchiveReader.swift         # actor around ZIPFoundation.Archive
+        ├── ArchiveLoader.swift         # flat + recursive-nested extraction + 5 GB safety cap
+        ├── ArchiveReader.swift         # ArchiveReader protocol + ArchiveFormat (magic-byte sniffing)
+        ├── ZIPArchiveReader.swift      # actor around ZIPFoundation.Archive
         │                               # (loadDataPrefix for header-only reads)
+        ├── RARArchiveReader.swift      # actor around UnrarKit's URKArchive
+        │                               # (solid archives served from a one-time extraction)
         ├── NaturalSort.swift           # locale-aware natural ordering helper
         └── ImageLoader.swift           # async NSImage + dimensions(for:) header read
 
@@ -572,7 +582,7 @@ PanelyTests/                            # mirrors the source tree
 │   ├── SnapshotRenderer.swift          # NSHostingView + offscreen window → PNG
 │   ├── SnapshotSampleContent.swift     # placeholder pages + LibraryFixture
 │   └── SnapshotGalleryTests.swift      # 15 manual scenarios
-├── Core/Comic/                         # CBZLoader, FolderLoader, ImageLoader{Load,Dimensions},
+├── Core/Comic/                         # ArchiveLoader, ZIP/RAR readers, FolderLoader, ImageLoader{Load,Dimensions},
 │                                       # ComicModel, LoaderExtension, NaturalSort
 ├── Features/Library/                   # FavoritesStore, PageBookmarksStore, RecentItem,
 │                                       # FileNode, FavoriteBook, PageBookmark
@@ -629,11 +639,16 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   `SecurityScopedBookmarking`, `LibraryTreeLoading`, `KeyValueStoring`,
   `SystemSettingsReading`) without touching real app preferences, cache roots,
   or sandbox bookmarks.
-- **`nonisolated` core types** — `ComicPage`, `FolderLoader`, `CBZLoader`,
+- **`nonisolated` core types** — `ComicPage`, `FolderLoader`, `ArchiveLoader`,
   `ImageLoader`, `FitCalculator`, `PositionKey` run off-main via
   `Task.detached`.
-- **`actor ArchiveReader`** — wraps ZIPFoundation's `Archive` for
-  serialised, thread-safe entry reads.
+- **`ArchiveReader` actors** — `ZIPArchiveReader` wraps ZIPFoundation's
+  `Archive` and `RARArchiveReader` wraps UnrarKit's `URKArchive` for
+  serialised, thread-safe entry reads. unrar keeps its error state in a
+  process-wide global, so every UnrarKit call additionally goes through one
+  shared lock. Solid RARs (one continuous compressed stream, where reading
+  entry N means decompressing 0..<N) are extracted once on first access into
+  a reader-owned temp directory instead of being read per entry.
 - **AppKit viewer core** — `ViewerContainer` is SwiftUI, but the scrollable
   zoomable stage is `AppKitImageScroller` (`NSViewRepresentable`) wrapping
   `NSScrollView` + `CenteringClipView` + a custom `ImageStackView`.
@@ -666,7 +681,7 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
 - **Vertical (webtoon) lazy windowing** — entering vertical mode pre-fetches
   every page's pixel dimensions concurrently (header-only `CGImageSource`
   read; for archive entries `ArchiveReader.loadDataPrefix(maxBytes: 64 KB)`
-  bails out of ZIPFoundation's extract early so we don't decompress the
+  bails out of the ZIP/RAR extract early so we don't decompress the
   whole entry just to read width/height). Dimension fetches and decodes
   both run through chunked `withTaskGroup` capped at `min(8, cores)` to
   avoid blowing through the cooperative pool on big folders.
@@ -744,8 +759,8 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   staleness check. All three stores share JSON encode/decode through
   `KeyValueStoring.loadCodable(_:forKey:)` / `saveCodable(_:forKey:)` in
   `Core/Extensions/` (`LiveKeyValueStore` is backed by `UserDefaults`).
-- **CBZ extraction size cap** — `CBZLoader.maxExtractedBytes = 5 GB`. The
-  top-level `unzipItem` seeds a running byte total (one walk of the
+- **Archive extraction size cap** — `ArchiveLoader.maxExtractedBytes = 5 GB`. The
+  top-level extraction seeds a running byte total (one walk of the
   destination); each nested extraction then adds only the bytes of the
   folder it just expanded and subtracts the archive it replaced, so the
   tree is summed once overall (O(n), not re-walked per nested archive). If

@@ -1,0 +1,66 @@
+import Foundation
+import ZIPFoundation
+
+actor ZIPArchiveReader: ArchiveReader {
+    nonisolated let archiveURL: URL
+    private let archive: Archive
+
+    init(url: URL) throws {
+        self.archiveURL = url
+        do {
+            self.archive = try Archive(url: url, accessMode: .read)
+        } catch {
+            throw ArchiveReaderError.cannotOpen(url)
+        }
+    }
+
+    func entryPaths() -> [String] {
+        // Dedupe by path: `archive[path]` resolves to the *first* matching
+        // entry, so two entries sharing a path would otherwise produce two
+        // pages that both read the first entry's bytes. Collapsing to one
+        // path per unique name keeps page → bytes addressing unambiguous.
+        var seen = Set<String>()
+        var paths: [String] = []
+        for entry in archive where entry.type == .file {
+            if seen.insert(entry.path).inserted {
+                paths.append(entry.path)
+            }
+        }
+        return paths
+    }
+
+    func loadData(at path: String) throws -> Data {
+        guard let entry = archive[path] else {
+            throw ArchiveReaderError.entryNotFound(path)
+        }
+        var buffer = Data()
+        _ = try archive.extract(entry) { chunk in
+            buffer.append(chunk)
+        }
+        return buffer
+    }
+
+    /// Reads at most `maxBytes` of an entry by stopping the extract early.
+    /// Used by `ImageLoader.dimensions` to decode the image header without
+    /// decompressing the whole entry (a 5 MB image otherwise costs the full
+    /// 5 MB of disk + decompression just to read width/height).
+    /// `skipCRC32: true` because we're not reading the whole stream and
+    /// the checksum can't be validated.
+    func loadDataPrefix(at path: String, maxBytes: Int) throws -> Data {
+        guard let entry = archive[path] else {
+            throw ArchiveReaderError.entryNotFound(path)
+        }
+        var buffer = Data()
+        do {
+            _ = try archive.extract(entry, skipCRC32: true) { chunk in
+                buffer.append(chunk)
+                if buffer.count >= maxBytes {
+                    throw ArchiveReaderError.prefixComplete
+                }
+            }
+        } catch ArchiveReaderError.prefixComplete {
+            // expected — we got our prefix and bailed early
+        }
+        return buffer
+    }
+}

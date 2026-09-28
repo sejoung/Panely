@@ -57,7 +57,7 @@ struct ViewerContainer: View {
             Text("No image loaded")
                 .font(PanelyTypography.body)
                 .foregroundStyle(PanelyColor.textSecondary)
-            Text("Open a folder, CBZ, or ZIP to start reading")
+            Text("Open a folder, CBZ/CBR, or ZIP/RAR to start reading")
                 .font(PanelyTypography.caption)
                 .foregroundStyle(PanelyColor.textSecondary.opacity(0.7))
         }

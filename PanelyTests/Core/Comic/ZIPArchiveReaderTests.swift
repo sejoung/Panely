@@ -3,7 +3,7 @@ import Foundation
 import ZIPFoundation
 @testable import Panely
 
-struct ArchiveReaderTests {
+struct ZIPArchiveReaderTests {
     /// A ZIP may legally contain two entries with the same path. `archive[path]`
     /// resolves to the first match, so `entryPaths()` must collapse duplicates —
     /// otherwise two pages would alias the same bytes.
@@ -20,7 +20,7 @@ struct ArchiveReaderTests {
         try archive.addEntry(with: "001.jpg", fileURL: payload) // duplicate path
         try archive.addEntry(with: "002.jpg", fileURL: payload)
 
-        let reader = try ArchiveReader(url: zipURL)
+        let reader = try ZIPArchiveReader(url: zipURL)
         let paths = await reader.entryPaths()
 
         #expect(paths == ["001.jpg", "002.jpg"])
@@ -42,7 +42,7 @@ struct ArchiveReaderTests {
         let archive = try Archive(url: zipURL, accessMode: .create)
         try archive.addEntry(with: "page.bin", fileURL: payload)
 
-        let reader = try ArchiveReader(url: zipURL)
+        let reader = try ZIPArchiveReader(url: zipURL)
         let data = try await reader.loadData(at: "page.bin")
 
         #expect(Array(data) == original)
@@ -60,7 +60,7 @@ struct ArchiveReaderTests {
         let archive = try Archive(url: zipURL, accessMode: .create)
         try archive.addEntry(with: "001.jpg", fileURL: payload)
 
-        let reader = try ArchiveReader(url: zipURL)
+        let reader = try ZIPArchiveReader(url: zipURL)
         await #expect(throws: ArchiveReaderError.self) {
             _ = try await reader.loadData(at: "missing.jpg")
         }
@@ -83,7 +83,7 @@ struct ArchiveReaderTests {
         let archive = try Archive(url: zipURL, accessMode: .create)
         try archive.addEntry(with: "big.bin", fileURL: payload)
 
-        let reader = try ArchiveReader(url: zipURL)
+        let reader = try ZIPArchiveReader(url: zipURL)
         let prefix = try await reader.loadDataPrefix(at: "big.bin", maxBytes: 100)
 
         #expect(prefix.count >= 100, "must buffer at least maxBytes")
@@ -104,7 +104,7 @@ struct ArchiveReaderTests {
         let archive = try Archive(url: zipURL, accessMode: .create)
         try archive.addEntry(with: "small.bin", fileURL: payload)
 
-        let reader = try ArchiveReader(url: zipURL)
+        let reader = try ZIPArchiveReader(url: zipURL)
         let prefix = try await reader.loadDataPrefix(at: "small.bin", maxBytes: 1_000_000)
 
         #expect(Array(prefix) == original)
@@ -121,7 +121,7 @@ struct ArchiveReaderTests {
         let archive = try Archive(url: zipURL, accessMode: .create)
         try archive.addEntry(with: "001.jpg", fileURL: payload)
 
-        let reader = try ArchiveReader(url: zipURL)
+        let reader = try ZIPArchiveReader(url: zipURL)
         await #expect(throws: ArchiveReaderError.self) {
             _ = try await reader.loadDataPrefix(at: "missing.jpg", maxBytes: 10)
         }

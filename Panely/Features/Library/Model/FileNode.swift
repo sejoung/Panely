@@ -93,7 +93,7 @@ nonisolated struct FileNode: Identifiable, Hashable, Sendable {
                 kind: .folder,
                 children: children
             )
-        } else if CBZLoader.supportedExtensions.contains(ext) {
+        } else if ArchiveLoader.supportedExtensions.contains(ext) {
             return FileNode(
                 id: entry,
                 url: entry,

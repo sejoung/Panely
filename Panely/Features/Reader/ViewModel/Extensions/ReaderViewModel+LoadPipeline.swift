@@ -273,7 +273,7 @@ extension ReaderViewModel {
         }
 
         loadingMessage = "Analyzing archive…"
-        guard let hasNested = try? await CBZLoader.hasNestedArchives(at: url) else {
+        guard let hasNested = try? await ArchiveLoader.hasNestedArchives(at: url) else {
             return url
         }
         guard epoch == loadEpoch else { return nil }
@@ -333,7 +333,7 @@ extension ReaderViewModel {
         let staging = ReaderTempDirectory.makeSessionCandidate()
 
         do {
-            try await CBZLoader.extractAll(from: url, to: staging)
+            try await ArchiveLoader.extractAll(from: url, to: staging)
             guard epoch == loadEpoch else {
                 try? FileManager.default.removeItem(at: staging)
                 return nil
@@ -488,7 +488,7 @@ extension ReaderViewModel {
                 try FolderLoader.load(from: url)
             }.value
         }
-        return try await CBZLoader.load(from: url)
+        return try await ArchiveLoader.load(from: url)
     }
 
     private func applyLoadedSource(
@@ -603,6 +603,6 @@ extension ReaderViewModel {
     }
 
     private func isSupportedArchive(_ url: URL) -> Bool {
-        !isDirectory(url) && CBZLoader.supportedExtensions.contains(url.pathExtension.lowercased())
+        !isDirectory(url) && ArchiveLoader.supportedExtensions.contains(url.pathExtension.lowercased())
     }
 }

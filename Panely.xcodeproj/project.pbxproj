@@ -11,6 +11,7 @@
 		B263CE902F94F819006DD5A0 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = B263CE892F94F819006DD5A0 /* ZIPFoundation */; };
 		B27F3C012FAA000100000001 /* Logging in Frameworks */ = {isa = PBXBuildFile; productRef = B27F3C012FAA000100000004 /* Logging */; };
 		B27F3C012FAA000100000002 /* Logging in Frameworks */ = {isa = PBXBuildFile; productRef = B27F3C012FAA000100000004 /* Logging */; };
+		B2C0A1012FB0000100000001 /* UnrarKit in Frameworks */ = {isa = PBXBuildFile; productRef = B2C0A1012FB0000100000002 /* UnrarKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -68,6 +69,7 @@
 			files = (
 				B27F3C012FAA000100000001 /* Logging in Frameworks */,
 				B263CE8A2F94F819006DD5A0 /* ZIPFoundation in Frameworks */,
+				B2C0A1012FB0000100000001 /* UnrarKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -139,6 +141,7 @@
 			packageProductDependencies = (
 				B27F3C012FAA000100000004 /* Logging */,
 				B263CE892F94F819006DD5A0 /* ZIPFoundation */,
+				B2C0A1012FB0000100000002 /* UnrarKit */,
 			);
 			productName = Panely;
 			productReference = B263CE162F94EE33006DD5A0 /* Panely.app */;
@@ -200,6 +203,7 @@
 			packageReferences = (
 				B27F3C012FAA000100000003 /* XCRemoteSwiftPackageReference "swift-log" */,
 				B263CE812F94F1E3006DD5A0 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
+				B2C0A1012FB0000100000003 /* XCLocalSwiftPackageReference "Packages/UnrarKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B263CE172F94EE33006DD5A0 /* Products */;
@@ -511,6 +515,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		B2C0A1012FB0000100000003 /* XCLocalSwiftPackageReference "Packages/UnrarKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/UnrarKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		B263CE812F94F1E3006DD5A0 /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -540,6 +551,10 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B27F3C012FAA000100000003 /* XCRemoteSwiftPackageReference "swift-log" */;
 			productName = Logging;
+		};
+		B2C0A1012FB0000100000002 /* UnrarKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = UnrarKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

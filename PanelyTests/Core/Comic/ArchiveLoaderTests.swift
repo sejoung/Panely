@@ -1,9 +1,10 @@
 import Testing
+import AppKit
 import Foundation
 import ZIPFoundation
 @testable import Panely
 
-struct CBZLoaderIntegrationTests {
+struct ArchiveLoaderIntegrationTests {
 
     /// A malicious archive whose entry path escapes the extraction root via
     /// `../` must never write outside the destination directory. ZIPFoundation
@@ -24,7 +25,7 @@ struct CBZLoaderIntegrationTests {
         let dest = workDir.appendingPathComponent("extracted", isDirectory: true)
         // May throw (traversal rejected) or contain it silently — either way
         // the escaped file must not materialize beside the extraction root.
-        _ = try? await CBZLoader.extractAll(from: archiveURL, to: dest)
+        _ = try? await ArchiveLoader.extractAll(from: archiveURL, to: dest)
 
         let escapedSibling = workDir.appendingPathComponent("escaped.png")
         #expect(!FileManager.default.fileExists(atPath: escapedSibling.path))
@@ -42,7 +43,7 @@ struct CBZLoaderIntegrationTests {
         try Fixture.zipDirectory(src, to: zipURL)
         try? FileManager.default.removeItem(at: src)
 
-        let hasNested = try await CBZLoader.hasNestedArchives(at: zipURL)
+        let hasNested = try await ArchiveLoader.hasNestedArchives(at: zipURL)
         #expect(hasNested == false)
     }
 
@@ -64,7 +65,7 @@ struct CBZLoaderIntegrationTests {
         try Fixture.zipDirectory(outerSrc, to: outerZip)
         try? FileManager.default.removeItem(at: outerSrc)
 
-        let hasNested = try await CBZLoader.hasNestedArchives(at: outerZip)
+        let hasNested = try await ArchiveLoader.hasNestedArchives(at: outerZip)
         #expect(hasNested == true)
     }
 
@@ -81,7 +82,7 @@ struct CBZLoaderIntegrationTests {
         try Fixture.zipDirectory(src, to: zipURL)
         try? FileManager.default.removeItem(at: src)
 
-        let comic = try await CBZLoader.load(from: zipURL)
+        let comic = try await ArchiveLoader.load(from: zipURL)
         #expect(comic.pages.map(\.displayName) == ["01.jpg", "02.jpg", "10.jpg"])
     }
 
@@ -104,7 +105,7 @@ struct CBZLoaderIntegrationTests {
         try Fixture.zipDirectory(src, to: zipURL)
         try? FileManager.default.removeItem(at: src)
 
-        let comic = try await CBZLoader.load(from: zipURL)
+        let comic = try await ArchiveLoader.load(from: zipURL)
         #expect(comic.pages.map(\.displayName) == ["01.jpg", "02.jpg"])
     }
 
@@ -122,7 +123,7 @@ struct CBZLoaderIntegrationTests {
         try Fixture.zipDirectory(src, to: zipURL)
         try? FileManager.default.removeItem(at: src)
 
-        let hasNested = try await CBZLoader.hasNestedArchives(at: zipURL)
+        let hasNested = try await ArchiveLoader.hasNestedArchives(at: zipURL)
         #expect(hasNested == false)
     }
 
@@ -145,7 +146,7 @@ struct CBZLoaderIntegrationTests {
         try? FileManager.default.removeItem(at: outerSrc)
 
         let dest = workDir.appendingPathComponent("extracted", isDirectory: true)
-        try await CBZLoader.extractAll(from: outerZip, to: dest)
+        try await ArchiveLoader.extractAll(from: outerZip, to: dest)
 
         // After recursive extraction: dest/vol01/ folder exists with p1.jpg inside
         var isDir: ObjCBool = false
@@ -185,8 +186,8 @@ struct CBZLoaderIntegrationTests {
         try? FileManager.default.removeItem(at: outerSrc)
 
         let dest = workDir.appendingPathComponent("extracted-limit", isDirectory: true)
-        await #expect(throws: CBZLoader.LoadError.self) {
-            try await CBZLoader.extractAll(
+        await #expect(throws: ArchiveLoader.LoadError.self) {
+            try await ArchiveLoader.extractAll(
                 from: outerZip,
                 to: dest,
                 maxExtractedBytes: 1_000_000
@@ -210,8 +211,8 @@ struct CBZLoaderIntegrationTests {
         try? FileManager.default.removeItem(at: src)
 
         let dest = workDir.appendingPathComponent("extracted-single", isDirectory: true)
-        await #expect(throws: CBZLoader.LoadError.self) {
-            try await CBZLoader.extractAll(
+        await #expect(throws: ArchiveLoader.LoadError.self) {
+            try await ArchiveLoader.extractAll(
                 from: zipURL,
                 to: dest,
                 maxExtractedBytes: 1_000_000
@@ -255,7 +256,7 @@ struct CBZLoaderIntegrationTests {
         let outer = try makeArchive(named: "outer.cbz", containing: [a])
 
         let dest = workDir.appendingPathComponent("extracted-depth", isDirectory: true)
-        try await CBZLoader.extractAll(from: outer, to: dest)
+        try await ArchiveLoader.extractAll(from: outer, to: dest)
 
         // A (depth 0), B (1) and C (2) unpack; D sits at depth 3 where the
         // guard fires, so D.cbz remains an un-extracted archive file.
@@ -305,12 +306,92 @@ struct CBZLoaderIntegrationTests {
         let dest = workDir.appendingPathComponent("extracted-symlink", isDirectory: true)
         // May throw (uncontained symlink rejected) or be contained silently —
         // either way the payload must never escape into `outside`.
-        _ = try? await CBZLoader.extractAll(from: archiveURL, to: dest)
+        _ = try? await ArchiveLoader.extractAll(from: archiveURL, to: dest)
 
         let escaped = outside.appendingPathComponent("escaped.png")
         #expect(
             FileManager.default.fileExists(atPath: escaped.path) == false,
             "file must not be written outside the destination via a symlink entry"
         )
+    }
+}
+
+struct ArchiveLoaderRARTests {
+
+    @Test func loadProducesNaturallySortedPagesFromCBR() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+        let url = try Fixture.bundledArchive("panely-rar5.cbr", in: workDir)
+
+        let source = try await ArchiveLoader.load(from: url)
+
+        #expect(source.title == "panely-rar5")
+        #expect(source.pages.map(\.displayName) == ["01.png", "02.png", "10.png"])
+        let size = try await ImageLoader.dimensions(for: source.pages[2])
+        #expect(size == CGSize(width: 90, height: 120))
+    }
+
+    @Test func loadReadsSolidCBR() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+        let url = try Fixture.bundledArchive("panely-rar5-solid.cbr", in: workDir)
+
+        let source = try await ArchiveLoader.load(from: url)
+        #expect(source.pageCount == 3)
+        let image = try await ImageLoader.load(source.pages[1])
+        #expect(image.size == CGSize(width: 56, height: 78))
+    }
+
+    /// A ZIP renamed to `.cbr` (common in the wild) opens through the ZIP reader.
+    @Test func loadOpensZIPMislabeledAsCBR() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+        let src = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: src) }
+        try Fixture.makePNG(width: 3, height: 4).write(to: src.appendingPathComponent("001.png"))
+        let url = workDir.appendingPathComponent("book.cbr")
+        try Fixture.zipDirectory(src, to: url)
+
+        let source = try await ArchiveLoader.load(from: url)
+        #expect(source.pages.map(\.displayName) == ["001.png"])
+    }
+
+    @Test func hasNestedArchivesDetectsArchivesInsideRAR() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+        let nested = try Fixture.bundledArchive("panely-rar5-nested.cbr", in: workDir)
+        let flat = try Fixture.bundledArchive("panely-rar5.cbr", in: workDir)
+
+        #expect(try await ArchiveLoader.hasNestedArchives(at: nested))
+        #expect(try await ArchiveLoader.hasNestedArchives(at: flat) == false)
+    }
+
+    /// A RAR holding a CBZ and a CBR expands both inner archives into folders.
+    @Test func extractAllUnpacksMixedNestedArchivesInsideRAR() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+        let url = try Fixture.bundledArchive("panely-rar5-nested.cbr", in: workDir)
+        let dest = workDir.appendingPathComponent("extracted", isDirectory: true)
+
+        try await ArchiveLoader.extractAll(from: url, to: dest)
+
+        let fm = FileManager.default
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("vol01/01.png").path))
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("vol01/02.png").path))
+        #expect(fm.fileExists(atPath: dest.appendingPathComponent("vol02/10.png").path))
+        #expect(!fm.fileExists(atPath: dest.appendingPathComponent("vol01.cbz").path))
+        #expect(!fm.fileExists(atPath: dest.appendingPathComponent("vol02.cbr").path))
+    }
+
+    @Test func extractAllAppliesSizeCapToRAR() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+        let url = try Fixture.bundledArchive("panely-rar5.cbr", in: workDir)
+        let dest = workDir.appendingPathComponent("extracted", isDirectory: true)
+
+        await #expect(throws: ArchiveLoader.LoadError.self) {
+            try await ArchiveLoader.extractAll(from: url, to: dest, maxExtractedBytes: 1_000)
+        }
+        #expect(!FileManager.default.fileExists(atPath: dest.path))
     }
 }

@@ -34,7 +34,7 @@ final class ReaderTempDirectory {
         url?.isAncestor(of: candidate) ?? false
     }
 
-    static func makeSessionCandidate() -> URL {
+    nonisolated static func makeSessionCandidate() -> URL {
         FileManager.default.temporaryDirectory
             .appendingPathComponent("\(sessionDirPrefix)\(UUID().uuidString)", isDirectory: true)
     }

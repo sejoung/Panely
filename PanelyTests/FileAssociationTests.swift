@@ -3,7 +3,7 @@ import Foundation
 @testable import Panely
 
 /// Verifies the Info.plist registrations that make Panely show up in Finder's
-/// "Open With" menu for folders, .zip and .cbz files. A silent regression here
+/// "Open With" menu for folders, .zip/.cbz and .rar/.cbr files. A silent regression here
 /// (typo in a UTI string, wrong LSHandlerRank) would not break the build but
 /// would break the right-click flow — these tests catch that.
 struct FileAssociationTests {
@@ -51,6 +51,19 @@ struct FileAssociationTests {
         #expect(entry?["LSHandlerRank"] as? String == "Owner")
     }
 
+    @Test func registersRARAsAlternateHandler() {
+        // Like zip, never displace the system's default RAR handler.
+        let entry = documentType(forContentType: "com.rarlab.rar-archive")
+        #expect(entry != nil, "Missing CFBundleDocumentTypes entry for com.rarlab.rar-archive")
+        #expect(entry?["LSHandlerRank"] as? String == "Alternate")
+    }
+
+    @Test func registersCBRAsOwner() {
+        let entry = documentType(forContentType: "com.panely.cbr")
+        #expect(entry != nil, "Missing CFBundleDocumentTypes entry for com.panely.cbr")
+        #expect(entry?["LSHandlerRank"] as? String == "Owner")
+    }
+
     // MARK: - UTImportedTypeDeclarations
 
     @Test func declaresCBZUTIConformingToZip() {
@@ -70,5 +83,20 @@ struct FileAssociationTests {
         let tags = cbz?["UTTypeTagSpecification"] as? [String: Any] ?? [:]
         let extensions = tags["public.filename-extension"] as? [String] ?? []
         #expect(extensions.contains("cbz"))
+    }
+
+    @Test func declaresCBRUTIConformingToRAR() {
+        let imported = info["UTImportedTypeDeclarations"] as? [[String: Any]] ?? []
+        let cbr = imported.first {
+            $0["UTTypeIdentifier"] as? String == "com.panely.cbr"
+        }
+
+        #expect(cbr != nil, "com.panely.cbr UTI must be declared in UTImportedTypeDeclarations")
+        let conformsTo = cbr?["UTTypeConformsTo"] as? [String] ?? []
+        #expect(conformsTo.contains("com.rarlab.rar-archive"))
+
+        let tags = cbr?["UTTypeTagSpecification"] as? [String: Any] ?? [:]
+        let extensions = tags["public.filename-extension"] as? [String] ?? []
+        #expect(extensions.contains("cbr"))
     }
 }

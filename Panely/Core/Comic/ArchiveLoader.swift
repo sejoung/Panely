@@ -1,8 +1,8 @@
 import Foundation
 import ZIPFoundation
 
-nonisolated enum CBZLoader {
-    static let supportedExtensions: Set<String> = ["cbz", "zip"]
+nonisolated enum ArchiveLoader {
+    static let supportedExtensions: Set<String> = ["cbz", "zip", "cbr", "rar"]
 
     /// Soft cap on cumulative bytes extracted by `extractAll`. Single
     /// archives can legitimately be several GB (high-res scan series), so
@@ -25,8 +25,8 @@ nonisolated enum CBZLoader {
 
     static func load(from url: URL) async throws -> ComicSource {
         try await Task.detached(priority: .userInitiated) {
-            let reader = try ArchiveReader(url: url)
-            let paths = await reader.entryPaths()
+            let reader = try ArchiveFormat.openReader(for: url)
+            let paths = try await reader.entryPaths()
 
             let imagePaths = paths.filter { path in
                 guard !isMetadataEntry(path) else { return false }
@@ -50,8 +50,8 @@ nonisolated enum CBZLoader {
 
     static func hasNestedArchives(at url: URL) async throws -> Bool {
         try await Task.detached(priority: .userInitiated) {
-            let reader = try ArchiveReader(url: url)
-            let paths = await reader.entryPaths()
+            let reader = try ArchiveFormat.openReader(for: url)
+            let paths = try await reader.entryPaths()
             return paths.contains { path in
                 guard !isMetadataEntry(path) else { return false }
                 let ext = (path as NSString).pathExtension.lowercased()
@@ -90,7 +90,7 @@ nonisolated enum CBZLoader {
                     at: destination,
                     withIntermediateDirectories: true
                 )
-                try fm.unzipItem(at: url, to: destination)
+                try extractArchive(at: url, to: destination)
                 // Running cumulative byte count, threaded through the nested
                 // descent so each step only sums the bytes it just added
                 // instead of re-walking the whole growing tree (O(n) overall
@@ -155,7 +155,7 @@ nonisolated enum CBZLoader {
                 cleanup: root
             )
             try FileManager.default.createDirectory(at: destDir, withIntermediateDirectories: true)
-            try FileManager.default.unzipItem(at: entry, to: destDir)
+            try extractArchive(at: entry, to: destDir)
             try FileManager.default.removeItem(at: entry)
             // Net change to the running total: drop the now-removed archive
             // file, add the bytes it expanded into. Only the new folder is
@@ -195,11 +195,26 @@ nonisolated enum CBZLoader {
         try checkLimit(saturatedAdd(base, declared), limit: limit, cleanup: cleanup)
     }
 
+    private static func extractArchive(at url: URL, to destination: URL) throws {
+        switch ArchiveFormat.detect(at: url) {
+        case .zip: try FileManager.default.unzipItem(at: url, to: destination)
+        case .rar: try RARArchiveReader.extractAll(from: url, to: destination)
+        case nil: throw ArchiveReaderError.cannotOpen(url)
+        }
+    }
+
     private static func declaredUncompressedSize(of archiveURL: URL) throws -> UInt64 {
-        let archive = try Archive(url: archiveURL, accessMode: .read)
-        return archive.reduce(UInt64(0)) { total, entry in
-            guard entry.type != .directory else { return total }
-            return saturatedAdd(total, entry.uncompressedSize)
+        switch ArchiveFormat.detect(at: archiveURL) {
+        case .zip:
+            let archive = try Archive(url: archiveURL, accessMode: .read)
+            return archive.reduce(UInt64(0)) { total, entry in
+                guard entry.type != .directory else { return total }
+                return saturatedAdd(total, entry.uncompressedSize)
+            }
+        case .rar:
+            return try RARArchiveReader.declaredUncompressedSize(of: archiveURL)
+        case nil:
+            throw ArchiveReaderError.cannotOpen(archiveURL)
         }
     }
 

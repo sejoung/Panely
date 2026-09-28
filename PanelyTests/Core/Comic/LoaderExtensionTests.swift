@@ -12,8 +12,10 @@ struct LoaderExtensionTests {
     }
 
     @Test func cbzLoaderSupportsArchiveExtensions() {
-        let exts = CBZLoader.supportedExtensions
+        let exts = ArchiveLoader.supportedExtensions
         #expect(exts.contains("cbz"))
         #expect(exts.contains("zip"))
+        #expect(exts.contains("cbr"))
+        #expect(exts.contains("rar"))
     }
 }

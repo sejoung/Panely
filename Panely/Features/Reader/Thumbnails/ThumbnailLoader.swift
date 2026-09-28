@@ -72,7 +72,7 @@ final class ThumbnailLoader {
 
         case .archiveEntry(let reader, let path):
             // Archive entries need the raw bytes first. Reader is an actor so
-            // the fetch is serialised; ZIPFoundation does the decompression.
+            // the fetch is serialised; the ZIP/RAR reader does the decompression.
             let data = try await reader.loadData(at: path)
             return try await Task.detached(priority: .userInitiated) {
                 guard let src = CGImageSourceCreateWithData(data as CFData, nil) else {

@@ -1,75 +1,87 @@
 import Foundation
-import ZIPFoundation
 
-enum ArchiveReaderError: Error {
+enum ArchiveReaderError: LocalizedError, Equatable {
     case cannotOpen(URL)
     case entryNotFound(String)
+    case passwordProtected
     /// Internal sentinel — thrown by the partial-read consumer to stop
     /// ZIPFoundation's extract loop once enough bytes have been buffered.
     /// Caller swallows it.
     case prefixComplete
+
+    var errorDescription: String? {
+        switch self {
+        case .cannotOpen:
+            return "The archive could not be opened."
+        case .entryNotFound(let path):
+            return "The archive has no entry named \"\(path)\"."
+        case .passwordProtected:
+            return "Password-protected archives are not supported."
+        case .prefixComplete:
+            return nil
+        }
+    }
 }
 
-actor ArchiveReader {
-    let archiveURL: URL
-    private let archive: Archive
+/// Random access to the entries of a comic archive. One actor per open
+/// archive; pages address their bytes through it via
+/// `ComicPageSource.archiveEntry`.
+protocol ArchiveReader: Actor {
+    /// Identifies the archive — `ComicPage` ids are derived from it, so it
+    /// must be readable without hopping onto the actor.
+    nonisolated var archiveURL: URL { get }
 
-    init(url: URL) throws {
-        self.archiveURL = url
-        do {
-            self.archive = try Archive(url: url, accessMode: .read)
-        } catch {
-            throw ArchiveReaderError.cannotOpen(url)
+    /// Unique paths of every file entry (directories excluded), in archive order.
+    func entryPaths() throws -> [String]
+
+    func loadData(at path: String) throws -> Data
+
+    /// Reads at least the first `maxBytes` of an entry (or the whole entry if
+    /// it is smaller) without necessarily decompressing all of it.
+    func loadDataPrefix(at path: String, maxBytes: Int) throws -> Data
+}
+
+/// Container format, identified by the file's leading magic bytes rather than
+/// its extension: `.cbr` files that are really ZIPs (and vice versa) are
+/// common in the wild, since many tools only rename the extension.
+nonisolated enum ArchiveFormat: Sendable {
+    case zip
+    case rar
+
+    private static let zipSignatures: [[UInt8]] = [
+        [0x50, 0x4B, 0x03, 0x04],  // local file header
+        [0x50, 0x4B, 0x05, 0x06],  // empty archive (end of central directory)
+    ]
+    /// `Rar!\x1A\x07` — shared prefix of the RAR 1.5–4.x and RAR 5 signatures.
+    private static let rarSignature: [UInt8] = [0x52, 0x61, 0x72, 0x21, 0x1A, 0x07]
+
+    static func detect(at url: URL) -> ArchiveFormat? {
+        if let header = readHeader(of: url) {
+            if zipSignatures.contains(where: { header.starts(with: $0) }) { return .zip }
+            if header.starts(with: rarSignature) { return .rar }
+        }
+        // Unreadable or unrecognised header — let the extension decide so the
+        // reader surfaces a real "cannot open" error instead of silently
+        // skipping the file.
+        switch url.pathExtension.lowercased() {
+        case "zip", "cbz": return .zip
+        case "rar", "cbr": return .rar
+        default: return nil
         }
     }
 
-    func entryPaths() -> [String] {
-        // Dedupe by path: `archive[path]` resolves to the *first* matching
-        // entry, so two entries sharing a path would otherwise produce two
-        // pages that both read the first entry's bytes. Collapsing to one
-        // path per unique name keeps page → bytes addressing unambiguous.
-        var seen = Set<String>()
-        var paths: [String] = []
-        for entry in archive where entry.type == .file {
-            if seen.insert(entry.path).inserted {
-                paths.append(entry.path)
-            }
+    static func openReader(for url: URL) throws -> any ArchiveReader {
+        switch detect(at: url) {
+        case .zip: return try ZIPArchiveReader(url: url)
+        case .rar: return try RARArchiveReader(url: url)
+        case nil: throw ArchiveReaderError.cannotOpen(url)
         }
-        return paths
     }
 
-    func loadData(at path: String) throws -> Data {
-        guard let entry = archive[path] else {
-            throw ArchiveReaderError.entryNotFound(path)
-        }
-        var buffer = Data()
-        _ = try archive.extract(entry) { chunk in
-            buffer.append(chunk)
-        }
-        return buffer
-    }
-
-    /// Reads at most `maxBytes` of an entry by stopping the extract early.
-    /// Used by `ImageLoader.dimensions` to decode the image header without
-    /// decompressing the whole entry (a 5 MB image otherwise costs the full
-    /// 5 MB of disk + decompression just to read width/height).
-    /// `skipCRC32: true` because we're not reading the whole stream and
-    /// the checksum can't be validated.
-    func loadDataPrefix(at path: String, maxBytes: Int) throws -> Data {
-        guard let entry = archive[path] else {
-            throw ArchiveReaderError.entryNotFound(path)
-        }
-        var buffer = Data()
-        do {
-            _ = try archive.extract(entry, skipCRC32: true) { chunk in
-                buffer.append(chunk)
-                if buffer.count >= maxBytes {
-                    throw ArchiveReaderError.prefixComplete
-                }
-            }
-        } catch ArchiveReaderError.prefixComplete {
-            // expected — we got our prefix and bailed early
-        }
-        return buffer
+    private static func readHeader(of url: URL) -> [UInt8]? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        guard let data = try? handle.read(upToCount: rarSignature.count) else { return nil }
+        return Array(data)
     }
 }

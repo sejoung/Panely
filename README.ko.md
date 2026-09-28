@@ -94,7 +94,9 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   타일로 남겨 한 장의 깨진 이미지가 펼침/스트립 레이아웃을 무너뜨리지 않음
 
 ### 파일 지원
-- **폴더**, **CBZ**, **ZIP** 열기
+- **폴더**, **CBZ/ZIP**, **CBR/RAR** 열기 (RAR 4 · RAR 5, solid 아카이브 포함).
+  컨테이너 형식은 파일 내용으로 판별하므로 `.cbr`로 이름만 바뀐 ZIP(또는
+  `.cbz`로 바뀐 RAR)도 열림
 - **시리즈 루트 자동 감지** — 볼륨들이 들어있는 폴더를 고르면 첫 번째가 열림
 - **중첩 아카이브 추출**(최대 3단계 재귀, 누적 추출 5 GB 안전 상한 —
   zip-bomb 보호)
@@ -215,17 +217,21 @@ open Panely.xcodeproj
 
 ### 의존성
 
-Panely는 Swift Package Manager를 사용합니다. 외부 의존성은 하나뿐:
+Panely는 Swift Package Manager를 사용합니다:
 
 - **[ZIPFoundation](https://github.com/weichsel/ZIPFoundation)** — CBZ/ZIP 아카이브 읽기 및 추출
+- **[UnrarKit](https://github.com/abbeycode/UnrarKit)** — CBR/RAR 아카이브 읽기 및 추출.
+  업스트림에 SwiftPM 매니페스트가 없어 `Packages/UnrarKit`에 로컬 패키지로
+  vendoring했고, RARLAB의 최신 UnRAR 소스로 빌드. 버전과 로컬 패치는
+  `Packages/UnrarKit/README.md` 참고
 
 Xcode가 첫 빌드에서 자동 해결합니다.
 
 ## 파인더 연동
 
-Panely는 Finder에서 폴더 · `.cbz` · `.zip`을 바로 열 수 있도록 등록됩니다.
+Panely는 Finder에서 폴더 · `.cbz` · `.zip` · `.cbr` · `.rar`을 바로 열 수 있도록 등록됩니다.
 
-- **파일** (`.cbz`, `.zip`) — 우클릭 → **다음으로 열기 → Panely**
+- **파일** (`.cbz`, `.zip`, `.cbr`, `.rar`) — 우클릭 → **다음으로 열기 → Panely**
 - **폴더** — macOS는 폴더에 "다음으로 열기"를 표시하지 않으므로
   폴더를 Panely.app(또는 Dock 아이콘)에 **드래그**, 혹은 메뉴바
   **파일 → 다음으로 열기 → Panely**
@@ -256,7 +262,7 @@ LaunchServices 캐시에 남을 수 있으니, 우클릭 → "다음으로 압�
 
 | 입력 | 동작 |
 |:------|:-------|
-| `⌘O` | 폴더 / CBZ / ZIP 열기 |
+| `⌘O` | 폴더 / CBZ / ZIP / CBR / RAR 열기 |
 | `⌘R` | 현재 책 다시 읽기 |
 | `←` / `→` | 이전 / 다음 페이지 (방향 반영. 매칭되는 권 카드가 떠 있으면 다음/이전 권으로 이동) |
 | `Space` | 다음 페이지 (Up next 카드가 떠 있으면 다음 권으로 이동) |
@@ -304,7 +310,7 @@ xcodebuild test \
 - 실제 임시 디렉터리와 통합한 **FolderLoader**
 - **FileNode.loadTree** 스캔, 정렬, 비어있음/읽기 불가 케이스, 사이드바 배지용
   `fileExtension` 노출
-- 프로그래매틱하게 만든 zip 픽스처와의 **CBZLoader** 통합 — 재귀 중첩 아카이브
+- 프로그래매틱하게 만든 zip 픽스처 및 커밋된 RAR 픽스처(`PanelyTests/Fixtures/Archives`)와의 **ArchiveLoader** 통합 — 재귀 중첩 아카이브
   추출 포함
 - **ImageLoader.dimensions** — 파일 URL과 아카이브 엔트리 모두 헤더만 읽어 크기 추출
 - **FitCalculator** 다양한 종횡비와 0 입력에 대한 순수 계산 (세로 소스에서
@@ -522,9 +528,12 @@ Panely/
     └── Comic/
         ├── ComicPage.swift / ComicSource.swift / ComicPageSource.swift
         ├── FolderLoader.swift
-        ├── CBZLoader.swift             # 평면 + 재귀 중첩 추출 + 5 GB 안전 상한
-        ├── ArchiveReader.swift         # ZIPFoundation.Archive 감싼 actor
+        ├── ArchiveLoader.swift         # 평면 + 재귀 중첩 추출 + 5 GB 안전 상한
+        ├── ArchiveReader.swift         # ArchiveReader 프로토콜 + ArchiveFormat(매직 바이트 판별)
+        ├── ZIPArchiveReader.swift      # ZIPFoundation.Archive 감싼 actor
         │                               # (헤더 전용 읽기용 loadDataPrefix)
+        ├── RARArchiveReader.swift      # UnrarKit URKArchive 감싼 actor
+        │                               # (solid 아카이브는 최초 접근 시 1회 추출)
         ├── NaturalSort.swift           # 로케일 인식 자연 정렬 헬퍼
         └── ImageLoader.swift           # async NSImage + dimensions(for:) 헤더 읽기
 
@@ -537,7 +546,7 @@ PanelyTests/                            # 소스 트리를 미러링
 │   ├── SnapshotRenderer.swift          # NSHostingView + offscreen window → PNG
 │   ├── SnapshotSampleContent.swift     # placeholder 페이지 + LibraryFixture
 │   └── SnapshotGalleryTests.swift      # 15개 매뉴얼 시나리오
-├── Core/Comic/                         # CBZLoader, FolderLoader, ImageLoader{Load,Dimensions},
+├── Core/Comic/                         # ArchiveLoader, ZIP/RAR 리더, FolderLoader, ImageLoader{Load,Dimensions},
 │                                       # ComicModel, LoaderExtension, NaturalSort
 ├── Features/Library/                   # FavoritesStore, PageBookmarksStore, RecentItem,
 │                                       # FileNode, FavoriteBook, PageBookmark
@@ -593,11 +602,15 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북�
   `SecurityScopedBookmarking`, `LibraryTreeLoading`, `KeyValueStoring`,
   `SystemSettingsReading`)를 주입해 실제 앱 preference, cache root,
   sandbox bookmark를 건드리지 않음.
-- **`nonisolated` 코어 타입** — `ComicPage`, `FolderLoader`, `CBZLoader`,
+- **`nonisolated` 코어 타입** — `ComicPage`, `FolderLoader`, `ArchiveLoader`,
   `ImageLoader`, `FitCalculator`, `PositionKey`는 `Task.detached`로
   메인 스레드 밖에서 실행.
-- **`actor ArchiveReader`** — ZIPFoundation의 `Archive`를 감싸 순차적,
-  스레드 안전한 엔트리 읽기 제공.
+- **`ArchiveReader` actor들** — `ZIPArchiveReader`는 ZIPFoundation의
+  `Archive`를, `RARArchiveReader`는 UnrarKit의 `URKArchive`를 감싸 순차적,
+  스레드 안전한 엔트리 읽기 제공. unrar는 에러 상태를 프로세스 전역 객체에
+  두기 때문에 모든 UnrarKit 호출은 공유 락 하나를 추가로 거침. solid RAR
+  (하나의 연속 압축 스트림이라 N번째 엔트리를 읽으려면 0..<N을 모두 풀어야
+  함)는 엔트리 단위로 읽지 않고, 최초 접근 시 리더 전용 임시 폴더에 1회 추출.
 - **AppKit 뷰어 코어** — `ViewerContainer`는 SwiftUI지만 스크롤 가능한 줌
   스테이지는 `AppKitImageScroller`(`NSViewRepresentable`)가 `NSScrollView`
   + `CenteringClipView` + 커스텀 `ImageStackView`를 감쌈.
@@ -625,7 +638,7 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북�
   잠금+줌 상태에 따름.
 - **세로(웹툰) 지연 윈도잉** — 세로 모드 진입 시 모든 페이지의 픽셀
   크기를 동시에 미리 가져옴(헤더만 `CGImageSource` 읽기. 아카이브 엔트리는
-  `ArchiveReader.loadDataPrefix(maxBytes: 64 KB)`로 ZIPFoundation 추출을
+  `ArchiveReader.loadDataPrefix(maxBytes: 64 KB)`로 ZIP/RAR 추출을
   조기 중단해 너비/높이만 읽기 위해 엔트리 전체를 압축 해제 안 함).
   크기 페치와 디코드 둘 다 `min(8, cores)`로 제한된 청크 `withTaskGroup`으로
   실행해 큰 폴더에서 cooperative pool을 날려버리지 않음.
@@ -697,8 +710,8 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북�
   `KeyValueStoring.loadCodable(_:forKey:)` / `saveCodable(_:forKey:)`를
   공유해 JSON 인/디코드 보일러플레이트를 한 곳에 둠
   (`LiveKeyValueStore`는 `UserDefaults` 기반).
-- **CBZ 추출 안전 상한** — `CBZLoader.maxExtractedBytes = 5 GB`. 최상위
-  `unzipItem`이 누적 바이트 합계를 시드(destination 1회 walk)하고, 각 중첩
+- **아카이브 추출 안전 상한** — `ArchiveLoader.maxExtractedBytes = 5 GB`. 최상위
+  추출이 누적 바이트 합계를 시드(destination 1회 walk)하고, 각 중첩
   추출은 방금 펼친 폴더의 바이트만 더하고 대체된 아카이브 크기는 빼므로
   전체를 한 번만 합산(O(n), 중첩마다 트리 재walk 안 함). 누적 합계가 상한을
   넘으면 `LoadError.extractedSizeExceeded`를 throw하고 부분 추출물을 정리 —
