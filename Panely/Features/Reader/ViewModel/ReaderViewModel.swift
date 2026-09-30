@@ -18,8 +18,8 @@ import UniformTypeIdentifiers
 /// - `ReaderViewModel+LoadPipeline` — the `load(url:)` state machine.
 /// - `ReaderViewModel+Navigation` — page stepping, chrome toggles, jumps.
 /// - `ReaderViewModel+ImageLoading` — thin facade over `imageLoader`.
-/// - `ReaderViewModel+Volumes` — sibling-volume counters and prev/next volume
-///   prompts/actions.
+/// - `ReaderViewModel+Volumes` — sibling-volume counters, prev/next volume
+///   prompts/actions, and the "can't step" notice.
 /// - `ReaderViewModel+ReadingProgress` — sidebar badges and Continue Reading
 ///   suggestion/opening.
 /// - `ReaderViewModel+Bookmarks` — favorites + per-page bookmarks.
@@ -92,6 +92,15 @@ final class ReaderViewModel {
     var currentSourceURL: URL?
     var pendingSourceURL: URL?
     var siblings: [URL] = []
+    /// True when the open book's folder can't be listed — it was opened on
+    /// its own, so the sandbox grant covers just that file. Volume stepping
+    /// then needs a folder grant before it can find the neighbours.
+    var siblingFolderUnreadable = false
+    /// Transient feedback for a volume step that couldn't happen (no
+    /// neighbour, or the folder isn't readable yet). Shown in the status
+    /// banner; cleared on a timer, by the next load, or on dismissal.
+    var volumeNotice: VolumeNavigationNotice?
+    @ObservationIgnored var volumeNoticeDismissTask: Task<Void, Never>?
     var sourceRenderRevision: Int = 0
     var sourceChangedOnDisk: Bool = false
     var sourceChangeMessage: String?

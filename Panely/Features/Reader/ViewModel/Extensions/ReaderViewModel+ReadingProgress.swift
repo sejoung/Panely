@@ -293,7 +293,9 @@ extension ReaderViewModel {
         return "\(item.title) · \(innerTitle)"
     }
 
-    private func applyRecentItemMigration(_ migration: RecentItemPathMigration?) {
+    /// Re-key everything filed under a source's old path after its bookmark
+    /// resolves somewhere new. Shared with the page-bookmark open path.
+    func applyRecentItemMigration(_ migration: RecentItemPathMigration?) {
         guard let migration else { return }
         readingProgress.migrateSourcePath(from: migration.oldPath, to: migration.newPath)
         positions.migrateSourcePath(from: migration.oldPath, to: migration.newPath)
@@ -346,9 +348,9 @@ extension ReaderViewModel {
         unavailableRecentItem = item
         switch availability {
         case .temporarilyUnavailable:
-            errorMessage = "This book is currently unavailable. Reconnect its drive or restore the file."
+            errorMessage = String(localized: "This book is currently unavailable. Reconnect its drive or restore the file.")
         case .invalidBookmark, .unknown:
-            errorMessage = "This recent book can no longer be opened."
+            errorMessage = String(localized: "This recent book can no longer be opened.")
         case .available:
             break
         }

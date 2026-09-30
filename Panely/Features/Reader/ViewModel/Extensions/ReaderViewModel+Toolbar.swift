@@ -18,15 +18,20 @@ extension ReaderViewModel {
             sidebarPinned: sidebarPinned,
             autoFitOnResize: autoFitOnResize,
             toolbarPinned: toolbarPinned,
-            showVolumeNav: hasMultipleVolumes,
-            canGoPreviousVolume: canGoPreviousVolume,
-            canGoNextVolume: canGoNextVolume,
+            showVolumeNav: hasMultipleVolumes || volumeNavigationNeedsFolderAccess,
+            canGoPreviousVolume: canStepToPreviousVolume,
+            canGoNextVolume: canStepToNextVolume,
             hasSource: hasSource,
             isBookFavorite: isCurrentBookFavorite,
             isPageBookmarked: isCurrentPageBookmarked,
             thumbnailSidebarVisible: thumbnailSidebarVisible,
             doublePageCoverAlone: doublePageCoverAlone,
-            isAtFit: isAtFit
+            isAtFit: isAtFit,
+            pageBookmarks: currentBookPageBookmarks,
+            visiblePageRange: currentSpread,
+            canGoPreviousBookmark: canGoPreviousBookmark,
+            canGoNextBookmark: canGoNextBookmark,
+            otherBookmarkedBooks: otherBookmarkedBooks
         )
     }
 
@@ -58,12 +63,17 @@ extension ReaderViewModel {
             onZoomOut: { viewerController.zoomOut() },
             onToggleAutoFit: { [self] in toggleAutoFitOnResize() },
             onToggleToolbarPin: { [self] in toggleToolbarPin() },
-            onPreviousVolume: { [self] in previousVolume() },
-            onNextVolume: { [self] in nextVolume() },
+            onPreviousVolume: { [self] in stepToPreviousVolume() },
+            onNextVolume: { [self] in stepToNextVolume() },
             onToggleFavorite: { [self] in toggleFavoriteForCurrentBook() },
             onTogglePageBookmark: { [self] in toggleCurrentPageBookmark() },
             onToggleThumbnailSidebar: { [self] in toggleThumbnailSidebar() },
-            onToggleDoublePageCoverAlone: { [self] in toggleDoublePageCoverAlone() }
+            onToggleDoublePageCoverAlone: { [self] in toggleDoublePageCoverAlone() },
+            onJumpToBookmark: { [self] in jumpToBookmark($0) },
+            onPreviousBookmark: { [self] in jumpToPreviousBookmark() },
+            onNextBookmark: { [self] in jumpToNextBookmark() },
+            onOpenBookmark: { [self] bookmark, book in openBookmark(bookmark, in: book) },
+            onRemoveAllPageBookmarks: { [self] in BookmarkAlerts.removeAllInCurrentBook(self) }
         )
     }
 }

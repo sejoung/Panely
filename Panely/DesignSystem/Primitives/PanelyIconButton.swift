@@ -6,7 +6,7 @@ struct PanelyIconButton: View {
     /// VoiceOver label. Falls back to the SF Symbol name when unset so the
     /// button still announces something, but callers should pass a real
     /// label — `.help()` is sighted-user only.
-    var accessibilityTitle: String? = nil
+    var accessibilityTitle: LocalizedStringKey? = nil
     let action: () -> Void
 
     @State private var isHovering = false
@@ -24,7 +24,7 @@ struct PanelyIconButton: View {
         .onHover { isHovering = $0 }
         .animation(PanelyMotion.uiReveal, value: isHovering)
         .animation(PanelyMotion.uiReveal, value: isActive)
-        .accessibilityLabel(accessibilityTitle ?? systemImage)
+        .accessibilityLabel(accessibilityTitle.map { Text($0) } ?? Text(verbatim: systemImage))
         .accessibilityAddTraits(isActive ? [.isSelected] : [])
     }
 

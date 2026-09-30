@@ -53,14 +53,14 @@ nonisolated struct CacheMaintenance: Sendable {
     func presentClearResult(removedBytes: UInt64) {
         let alert = NSAlert()
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: String(localized: "OK"))
 
         if removedBytes > 0 {
-            alert.messageText = "Extraction Cache Cleared"
-            alert.informativeText = "\(formattedBytes(removedBytes)) was removed."
+            alert.messageText = String(localized: "Extraction Cache Cleared")
+            alert.informativeText = String(localized: "\(formattedBytes(removedBytes)) was removed.")
         } else {
-            alert.messageText = "No Extraction Cache Cleared"
-            alert.informativeText = "There is no inactive extraction cache to remove."
+            alert.messageText = String(localized: "No Extraction Cache Cleared")
+            alert.informativeText = String(localized: "There is no inactive extraction cache to remove.")
         }
 
         if let window = NSApp.keyWindow ?? NSApp.mainWindow {

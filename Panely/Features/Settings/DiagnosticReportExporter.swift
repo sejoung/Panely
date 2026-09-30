@@ -76,10 +76,10 @@ enum DiagnosticReportAlerts {
     static func presentExportResult(destination: URL) {
         let alert = NSAlert()
         alert.alertStyle = .informational
-        alert.messageText = "Diagnostic Report Exported"
-        alert.informativeText = "\(destination.lastPathComponent) was created."
-        alert.addButton(withTitle: "Reveal in Finder")
-        alert.addButton(withTitle: "OK")
+        alert.messageText = String(localized: "Diagnostic Report Exported")
+        alert.informativeText = String(localized: "\(destination.lastPathComponent) was created.")
+        alert.addButton(withTitle: String(localized: "Reveal in Finder"))
+        alert.addButton(withTitle: String(localized: "OK"))
         present(alert) { response in
             if response == .alertFirstButtonReturn {
                 revealInFinder(destination)
@@ -100,9 +100,9 @@ enum DiagnosticReportAlerts {
 
         let alert = NSAlert()
         alert.alertStyle = .critical
-        alert.messageText = "Diagnostic Report Export Failed"
+        alert.messageText = String(localized: "Diagnostic Report Export Failed")
         alert.informativeText = error.localizedDescription
-        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: String(localized: "OK"))
         present(alert)
     }
 
@@ -110,24 +110,24 @@ enum DiagnosticReportAlerts {
         let alert = NSAlert()
         if success {
             alert.alertStyle = .informational
-            alert.messageText = "Diagnostic Logs Cleared"
-            alert.informativeText = "Recent file logs were removed."
+            alert.messageText = String(localized: "Diagnostic Logs Cleared")
+            alert.informativeText = String(localized: "Recent file logs were removed.")
         } else {
             alert.alertStyle = .warning
-            alert.messageText = "Could Not Clear Diagnostic Logs"
-            alert.informativeText = "The recent file log could not be removed. Please try again."
+            alert.messageText = String(localized: "Could Not Clear Diagnostic Logs")
+            alert.informativeText = String(localized: "The recent file log could not be removed. Please try again.")
         }
-        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: String(localized: "OK"))
         present(alert)
     }
 
     static func confirmClearLogs() -> Bool {
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "Clear Diagnostic Logs?"
-        alert.informativeText = "This removes Panely's recent file log. It does not clear OSLog, cache data, recent files, bookmarks, favorites, or reading position."
-        alert.addButton(withTitle: "Clear Logs")
-        alert.addButton(withTitle: "Cancel")
+        alert.messageText = String(localized: "Clear Diagnostic Logs?")
+        alert.informativeText = String(localized: "This removes Panely's recent file log. It does not clear OSLog, cache data, recent files, bookmarks, favorites, or reading position.")
+        alert.addButton(withTitle: String(localized: "Clear Logs"))
+        alert.addButton(withTitle: String(localized: "Cancel"))
         return alert.runModal() == .alertFirstButtonReturn
     }
 

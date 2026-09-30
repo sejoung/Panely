@@ -9,6 +9,11 @@ struct LibrarySidebarActions {
     var onRemoveFavorite: (FavoriteBook) -> Void = { _ in }
     var onJumpToBookmark: (PageBookmark) -> Void = { _ in }
     var onRemovePageBookmark: (PageBookmark) -> Void = { _ in }
+    var onRemoveAllPageBookmarks: () -> Void = {}
+    var onOpenBookmark: (PageBookmark, BookmarkedBook) -> Void = { _, _ in }
+    var onRemoveBookmark: (PageBookmark, BookmarkedBook) -> Void = { _, _ in }
+    var onRemoveBookmarks: (BookmarkedBook) -> Void = { _ in }
+    var onRemoveAllBookmarks: () -> Void = {}
     var onSelectVolume: (URL) -> Void = { _ in }
     var onOpen: () -> Void = {}
     var onTogglePin: () -> Void = {}
@@ -25,6 +30,10 @@ struct LibrarySidebar: View {
     let pinned: Bool
     let favorites: [FavoriteBook]
     let pageBookmarks: [PageBookmark]
+    /// The open book's pages, so its bookmark rows can show thumbnails.
+    var bookmarkPages: [ComicPage] = []
+    /// Bookmarks left in books other than the open one.
+    var otherBookmarkedBooks: [BookmarkedBook] = []
     let volumes: [URL]
     let libraryTreeLoader: any LibraryTreeLoading
     let currentPageIndex: Int
@@ -34,6 +43,7 @@ struct LibrarySidebar: View {
     let actions: LibrarySidebarActions
 
     @State private var model = LibrarySidebarModel()
+    @State private var expandedBookmarkBooks: Set<String> = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -57,7 +67,10 @@ struct LibrarySidebar: View {
     /// True when there's nothing in any of the sidebar's non-tree sections
     /// (favorites / page bookmarks / volumes).
     private var hasSidebarExtras: Bool {
-        !favorites.isEmpty || !pageBookmarks.isEmpty || !volumes.isEmpty
+        !favorites.isEmpty
+            || !pageBookmarks.isEmpty
+            || !otherBookmarkedBooks.isEmpty
+            || !volumes.isEmpty
     }
 
     @ViewBuilder
@@ -75,10 +88,11 @@ struct LibrarySidebar: View {
         HStack(spacing: PanelySpacing.sm) {
             PanelyIconButton(
                 systemImage: "books.vertical",
+                accessibilityTitle: "Change Library Root…",
                 action: actions.onRequestFolderAccess
             )
             .help("Change Library Root…")
-            Text(rootURL?.lastPathComponent ?? "Library")
+            headerTitle
                 .font(PanelyTypography.body)
                 .foregroundStyle(PanelyColor.textPrimary)
                 .lineLimit(1)
@@ -93,12 +107,22 @@ struct LibrarySidebar: View {
             PanelyIconButton(
                 systemImage: pinned ? "pin.fill" : "pin",
                 isActive: pinned,
+                accessibilityTitle: pinned ? "Unpin Library (⌃⌘S)" : "Pin Library Open (⌃⌘S)",
                 action: actions.onTogglePin
             )
             .help(pinned ? "Unpin Library (⌃⌘S)" : "Pin Library Open (⌃⌘S)")
         }
         .padding(.horizontal, PanelySpacing.sm)
         .padding(.vertical, PanelySpacing.xs)
+    }
+
+    /// Folder names are shown as-is; only the placeholder is localized.
+    private var headerTitle: Text {
+        if let name = rootURL?.lastPathComponent {
+            Text(verbatim: name)
+        } else {
+            Text("Library")
+        }
     }
 
     private var tree: some View {
@@ -111,6 +135,7 @@ struct LibrarySidebar: View {
             volumesSection(activeStdURL: activeStdURL)
             favoritesSection(activeStdURL: activeStdURL)
             bookmarksSection
+            otherBooksBookmarksSection
             filesSection(activeStdURL: activeStdURL)
         }
         .listStyle(.sidebar)
@@ -195,10 +220,11 @@ struct LibrarySidebar: View {
     @ViewBuilder
     private var bookmarksSection: some View {
         if !pageBookmarks.isEmpty {
-            Section(header: sectionHeader("Bookmarks", systemImage: "bookmark.fill")) {
+            Section(header: bookmarksHeader) {
                 ForEach(pageBookmarks) { bm in
                     PageBookmarkRow(
                         bookmark: bm,
+                        page: bookmarkPages.indices.contains(bm.pageIndex) ? bookmarkPages[bm.pageIndex] : nil,
                         isCurrent: bm.pageIndex == currentPageIndex,
                         onTap: { actions.onJumpToBookmark(bm) },
                         onRemove: { actions.onRemovePageBookmark(bm) }
@@ -206,6 +232,93 @@ struct LibrarySidebar: View {
                     .listRowBackground(Color.clear)
                 }
             }
+        }
+    }
+
+    /// "Bookmarks" header with the count and a clear-all button, so emptying
+    /// a book's bookmarks doesn't mean removing them one by one.
+    private var bookmarksHeader: some View {
+        HStack(spacing: PanelySpacing.xs) {
+            sectionHeader("Bookmarks", systemImage: "bookmark.fill")
+            Text(verbatim: "\(pageBookmarks.count)")
+                .font(PanelyTypography.caption)
+                .foregroundStyle(PanelyColor.textSecondary.opacity(0.7))
+            Spacer(minLength: 0)
+            Button(action: actions.onRemoveAllPageBookmarks) {
+                Image(systemName: "trash")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(PanelyColor.textSecondary)
+                    .frame(width: 18, height: 18)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Remove All Bookmarks in This Book…")
+            .accessibilityLabel(Text("Remove All Bookmarks in This Book…"))
+        }
+        .contextMenu {
+            Button("Remove All Bookmarks in This Book…", role: .destructive) {
+                actions.onRemoveAllPageBookmarks()
+            }
+            Button("Remove All Bookmarks…", role: .destructive) {
+                actions.onRemoveAllBookmarks()
+            }
+        }
+    }
+
+    /// Bookmarks left in other books, one expandable row per book. Picking a
+    /// page opens that book on it.
+    @ViewBuilder
+    private var otherBooksBookmarksSection: some View {
+        if !otherBookmarkedBooks.isEmpty {
+            Section(header: otherBooksBookmarksHeader) {
+                ForEach(otherBookmarkedBooks) { book in
+                    DisclosureGroup(isExpanded: bookmarkBookExpansion(for: book.key)) {
+                        ForEach(book.bookmarks) { bm in
+                            PageBookmarkRow(
+                                bookmark: bm,
+                                isCurrent: false,
+                                onTap: { actions.onOpenBookmark(bm, book) },
+                                onRemove: { actions.onRemoveBookmark(bm, book) }
+                            )
+                        }
+                    } label: {
+                        BookmarkedBookRow(
+                            book: book,
+                            onTap: { toggleBookmarkBookExpansion(book.key) },
+                            onRemoveAll: { actions.onRemoveBookmarks(book) }
+                        )
+                    }
+                    .listRowBackground(Color.clear)
+                }
+            }
+        }
+    }
+
+    private var otherBooksBookmarksHeader: some View {
+        sectionHeader("Bookmarks in Other Books", systemImage: "bookmark")
+            .contextMenu {
+                Button("Remove All Bookmarks…", role: .destructive) {
+                    actions.onRemoveAllBookmarks()
+                }
+            }
+    }
+
+    private func bookmarkBookExpansion(for key: String) -> Binding<Bool> {
+        Binding(
+            get: { expandedBookmarkBooks.contains(key) },
+            set: { isExpanded in
+                if isExpanded {
+                    expandedBookmarkBooks.insert(key)
+                } else {
+                    expandedBookmarkBooks.remove(key)
+                }
+            }
+        )
+    }
+
+    private func toggleBookmarkBookExpansion(_ key: String) {
+        if !expandedBookmarkBooks.insert(key).inserted {
+            expandedBookmarkBooks.remove(key)
         }
     }
 
@@ -227,7 +340,7 @@ struct LibrarySidebar: View {
         }
     }
 
-    private func sectionHeader(_ title: String, systemImage: String) -> some View {
+    private func sectionHeader(_ title: LocalizedStringKey, systemImage: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: systemImage)
                 .font(.system(size: 10, weight: .medium))

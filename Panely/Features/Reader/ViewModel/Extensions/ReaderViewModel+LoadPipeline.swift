@@ -18,9 +18,9 @@ private enum ReaderLoadError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .extractionFailed(let error):
-            return "Failed to extract archive: \(error.localizedDescription)"
+            return String(localized: "Failed to extract archive: \(error.localizedDescription)")
         case .preferredPathMissing:
-            return "The saved book is no longer available in this source."
+            return String(localized: "The saved book is no longer available in this source.")
         }
     }
 }
@@ -156,13 +156,13 @@ extension ReaderViewModel {
                     metadata: ["source": "\(DiagnosticRedactor.describe(targetURL))"]
                 )
                 clearLoadedSource(
-                    message: "Folder is empty or has no supported content",
+                    message: String(localized: "Folder is empty or has no supported content"),
                     preserveLibraryContext: preservesExistingLibraryContext
                 )
                 return
             }
 
-            loadingMessage = "Loading pages…"
+            loadingMessage = String(localized: "Loading pages…")
             let loaded = try await loadComicSource(from: targetURL)
             guard myEpoch == loadEpoch else { return }
 
@@ -172,17 +172,19 @@ extension ReaderViewModel {
                 siblingsToUse: siblingsToUse,
                 siblingRoot: siblingRoot,
                 restorePosition: intent.restoresPosition,
+                explicitPageIndex: intent.explicitPageIndex,
                 epoch: myEpoch
             )
             guard didApply else { return }
             // Library root has settled — point the directory watcher at it so
             // files added on disk refresh the sidebar tree automatically.
             syncLibraryWatcher()
-            errorMessage = loaded.isEmpty ? "No images found" : nil
+            errorMessage = loaded.isEmpty ? String(localized: "No images found") : nil
             AppLog.info(
                 .load,
                 "Load finished",
                 metadata: [
+                    "folderReadable": "\(!siblingFolderUnreadable)",
                     "pages": "\(loaded.pageCount)",
                     "siblings": "\(siblings.count)",
                     "source": "\(DiagnosticRedactor.describe(targetURL))",
@@ -231,10 +233,11 @@ extension ReaderViewModel {
         // when the new book's saved position lands at index 0 (didSet on
         // currentPageIndex doesn't fire when oldValue == newValue == 0).
         wantsPreviousVolumePrompt = false
+        dismissVolumeNotice()
 
         loadEpoch &+= 1
         isLoading = true
-        loadingMessage = "Opening…"
+        loadingMessage = String(localized: "Opening…")
         // Drop the outgoing book's strip now (while isLoading guards against a
         // scroll-driven position overwrite) so the new book's restored-position
         // scroll-sync doesn't run against the previous book's stale frames.
@@ -246,6 +249,20 @@ extension ReaderViewModel {
     private func prepareScope(for url: URL, preservedLibraryRootURL: URL?) -> Bool {
         if !isInsideCurrentTree(url) {
             tempDir.cleanup()
+            // A book file opened on its own only carries a grant for that one
+            // file. If the user already granted a folder that contains it,
+            // open it under that folder instead — exactly as if it had been
+            // picked from the library tree — so its sibling volumes are
+            // readable without asking again. Folders are left alone: opening
+            // one is an explicit "this is my root" choice.
+            if preservedLibraryRootURL == nil,
+               !isDirectory(url),
+               let folder = rememberedFolderGrant(containing: url),
+               libraryScope.acquire(folder) {
+                explicitLibraryRootURL = folder
+                openedSourceURL = url
+                return true
+            }
             let didAcquire = libraryScope.acquire(url)
             explicitLibraryRootURL = preservedLibraryRootURL
             openedSourceURL = url
@@ -272,7 +289,7 @@ extension ReaderViewModel {
             return url
         }
 
-        loadingMessage = "Analyzing archive…"
+        loadingMessage = String(localized: "Analyzing archive…")
         guard let hasNested = try? await ArchiveLoader.hasNestedArchives(at: url) else {
             return url
         }
@@ -307,7 +324,7 @@ extension ReaderViewModel {
             return cached
         }
 
-        loadingMessage = "Extracting archive…"
+        loadingMessage = String(localized: "Extracting archive…")
         if let key {
             AppLog.info(
                 .cache,
@@ -454,7 +471,7 @@ extension ReaderViewModel {
         var resolvedSiblings: [URL]?
 
         while isDirectory(candidate) {
-            loadingMessage = "Scanning folder…"
+            loadingMessage = String(localized: "Scanning folder…")
             let (hasImages, volumes) = await FolderResolver.analyzeFolder(candidate)
             guard epoch == loadEpoch else { return nil }
 
@@ -497,6 +514,7 @@ extension ReaderViewModel {
         siblingsToUse: [URL]?,
         siblingRoot: URL?,
         restorePosition: Bool,
+        explicitPageIndex: Int?,
         epoch: Int
     ) async -> Bool {
         let resolvedSiblings: [URL]?
@@ -526,9 +544,14 @@ extension ReaderViewModel {
         // Restore this series' remembered direction/layout/fitMode before the
         // page index is computed, so the spread snap uses the final layout.
         applySeriesPreferences()
-        currentPageIndex = restorePosition
-            ? clampedRestoredIndex(for: targetURL, pageCount: loaded.pageCount)
-            : 0
+        if let explicitPageIndex {
+            currentPageIndex = spreadStart(containing: explicitPageIndex, pageCount: loaded.pageCount)
+        } else {
+            currentPageIndex = restorePosition
+                ? clampedRestoredIndex(for: targetURL, pageCount: loaded.pageCount)
+                : 0
+        }
+        refreshSiblingFolderReadability(for: targetURL)
         startSourceChangeMonitor(for: targetURL, source: loaded)
         return true
     }
@@ -545,6 +568,7 @@ extension ReaderViewModel {
         currentSourceURL = nil
         pendingSourceURL = nil
         siblings = []
+        siblingFolderUnreadable = false
         sourceChangeMonitor?.stopWatching()
         sourceChangeMonitor = nil
         if !preserveLibraryContext {

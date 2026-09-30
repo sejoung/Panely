@@ -1,5 +1,27 @@
 import Foundation
 
+/// Why a volume step didn't happen. Surfaced in the status banner so a
+/// keypress that can't go anywhere still answers the user instead of
+/// silently doing nothing.
+enum VolumeNavigationNotice: Equatable {
+    /// The book was opened on its own, so its folder is unreadable. The
+    /// banner offers the folder grant that unlocks stepping.
+    case needsFolderAccess
+    case noNextVolume
+    case noPreviousVolume
+
+    var message: String {
+        switch self {
+        case .needsFolderAccess:
+            String(localized: "Panely can only see this one book. Allow access to its folder to move between the books in it.")
+        case .noNextVolume:
+            String(localized: "This is the last book in the folder.")
+        case .noPreviousVolume:
+            String(localized: "This is the first book in the folder.")
+        }
+    }
+}
+
 /// Volume / sibling navigation: counter labels, prev/next sibling stepping,
 /// and the end- and start-of-volume card decisions. Reads `siblings` and
 /// `currentSourceURL` from the viewmodel; drives `load(url:knownSiblings:intent:)`
@@ -33,7 +55,7 @@ extension ReaderViewModel {
 
     var volumeCounterLabel: String? {
         guard hasMultipleVolumes, let idx = currentSiblingIndex else { return nil }
-        return "Vol \(idx + 1) / \(siblings.count)"
+        return String(localized: "Vol \(idx + 1) / \(siblings.count)")
     }
 
     var combinedCounterLabel: String {
@@ -83,6 +105,64 @@ extension ReaderViewModel {
         )
         recordVolumeRecent(target)
         Task { await load(url: target, knownSiblings: preservedSiblings, intent: .previousVolume) }
+    }
+
+    // MARK: - Explicit volume stepping (`[` / `]`, toolbar, Go menu)
+
+    /// True when the open book has no neighbours *because its folder can't be
+    /// read* — as opposed to genuinely being alone. Volume controls stay
+    /// available in this state so using one can offer the folder grant.
+    var volumeNavigationNeedsFolderAccess: Bool {
+        hasSource && !hasMultipleVolumes && siblingFolderUnreadable
+    }
+
+    var canStepToPreviousVolume: Bool {
+        canGoPreviousVolume || volumeNavigationNeedsFolderAccess
+    }
+
+    var canStepToNextVolume: Bool {
+        canGoNextVolume || volumeNavigationNeedsFolderAccess
+    }
+
+    /// Go to the next sibling, or say why not. Unlike `nextVolume()` (which
+    /// silently no-ops) this is for a direct "next book" request, where
+    /// nothing happening reads as the feature being missing.
+    func stepToNextVolume() {
+        if canGoNextVolume {
+            nextVolume()
+        } else if hasSource {
+            presentVolumeNotice(volumeNavigationNeedsFolderAccess ? .needsFolderAccess : .noNextVolume)
+        }
+    }
+
+    func stepToPreviousVolume() {
+        if canGoPreviousVolume {
+            previousVolume()
+        } else if hasSource {
+            presentVolumeNotice(volumeNavigationNeedsFolderAccess ? .needsFolderAccess : .noPreviousVolume)
+        }
+    }
+
+    private func presentVolumeNotice(_ notice: VolumeNavigationNotice) {
+        AppLog.info(.reader, "Volume step unavailable", metadata: ["reason": "\(notice)"])
+        volumeNotice = notice
+        volumeNoticeDismissTask?.cancel()
+        // The folder prompt carries an action, so it stays until answered;
+        // the "no more books" notes are just an acknowledgement.
+        guard notice != .needsFolderAccess else { return }
+        volumeNoticeDismissTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            self?.volumeNotice = nil
+        }
+    }
+
+    func dismissVolumeNotice() {
+        volumeNoticeDismissTask?.cancel()
+        volumeNoticeDismissTask = nil
+        if volumeNotice != nil {
+            volumeNotice = nil
+        }
     }
 
     /// Volume navigation opens a sibling book, so it should land in Recents

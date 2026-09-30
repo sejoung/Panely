@@ -114,6 +114,133 @@ struct PageBookmarksStoreTests {
         #expect(reader.isPageBookmarked(key: key, pageIndex: 42) == true)
     }
 
+    // MARK: - Bulk removal
+
+    @Test func removeAllPageBookmarksForKeyClearsOnlyThatBook() {
+        let store = freshStore()
+        for p in [1, 2, 3] { _ = store.togglePageBookmark(key: "/lib/A.cbz", pageIndex: p) }
+        _ = store.togglePageBookmark(key: "/lib/B.cbz", pageIndex: 9)
+
+        store.removeAllPageBookmarks(forKey: "/lib/A.cbz")
+
+        #expect(store.pageBookmarksByBook["/lib/A.cbz"] == nil)
+        #expect(store.pageBookmarks(forKey: "/lib/B.cbz").map(\.pageIndex) == [9])
+    }
+
+    @Test func removeAllClearsEveryBookAndPersists() {
+        let defaults = InMemoryKeyValueStore()
+        let store = PageBookmarksStore(defaults: defaults)
+        _ = store.togglePageBookmark(key: "/lib/A.cbz", pageIndex: 1)
+        _ = store.togglePageBookmark(key: "/lib/B.cbz", pageIndex: 2)
+        store.setBookRef(makeRef(title: "A", path: "/lib/A.cbz"), forKey: "/lib/A.cbz")
+        #expect(store.totalBookmarkCount == 2)
+
+        store.removeAll()
+
+        #expect(store.totalBookmarkCount == 0)
+        let reloaded = PageBookmarksStore(defaults: defaults)
+        #expect(reloaded.pageBookmarksByBook.isEmpty)
+        #expect(reloaded.bookRef(forKey: "/lib/A.cbz") == nil)
+    }
+
+    // MARK: - Book references
+
+    @Test func bookRefPersistsAndIsDroppedWithTheLastBookmark() {
+        let defaults = InMemoryKeyValueStore()
+        let store = PageBookmarksStore(defaults: defaults)
+        let key = "/lib/A.cbz"
+        _ = store.togglePageBookmark(key: key, pageIndex: 4)
+        store.setBookRef(makeRef(title: "A", path: key), forKey: key)
+
+        #expect(PageBookmarksStore(defaults: defaults).bookRef(forKey: key)?.title == "A")
+
+        _ = store.togglePageBookmark(key: key, pageIndex: 4) // removes the last one
+
+        #expect(store.bookRef(forKey: key) == nil)
+        #expect(PageBookmarksStore(defaults: defaults).bookRef(forKey: key) == nil)
+    }
+
+    @Test func bookRefIsIgnoredForBookWithoutBookmarks() {
+        let store = freshStore()
+        store.setBookRef(makeRef(title: "Ghost", path: "/lib/Ghost.cbz"), forKey: "/lib/Ghost.cbz")
+        #expect(store.bookRef(forKey: "/lib/Ghost.cbz") == nil)
+    }
+
+    @Test func titleFallsBackToKeyForBookmarksWithoutRef() {
+        let store = freshStore()
+        #expect(store.title(forKey: "/lib/Series/Vol 03.cbz") == "Vol 03")
+        // zip-in-zip keys are `outer#inner`.
+        #expect(store.title(forKey: "/lib/Series.zip#Vol02/pages") == "Series · pages")
+    }
+
+    // MARK: - Cross-book listing
+
+    @Test func bookmarkedBooksExcludesCurrentAndOrdersByMostRecentBookmark() {
+        let store = freshStore()
+        let old = Date(timeIntervalSince1970: 1_000)
+        let mid = Date(timeIntervalSince1970: 2_000)
+        let new = Date(timeIntervalSince1970: 3_000)
+        store.pageBookmarksByBook = [
+            "/lib/Old.cbz": [PageBookmark(pageIndex: 1, createdAt: old)],
+            "/lib/New.cbz": [
+                PageBookmark(pageIndex: 2, createdAt: old),
+                PageBookmark(pageIndex: 8, createdAt: new),
+            ],
+            "/lib/Current.cbz": [PageBookmark(pageIndex: 5, createdAt: mid)],
+        ]
+
+        let books = store.bookmarkedBooks(excluding: "/lib/Current.cbz")
+
+        #expect(books.map(\.title) == ["New", "Old"])
+        // Volume files are often just "Vol 03" — the folder disambiguates.
+        #expect(books.first?.qualifiedTitle == "lib / New")
+        #expect(books.first?.bookmarks.map(\.pageIndex) == [2, 8])
+        #expect(store.bookmarkedBooks().count == 3)
+    }
+
+    @Test func moveBookmarksMergesIntoTheNewKey() {
+        let store = freshStore()
+        _ = store.togglePageBookmark(key: "/old/A.cbz", pageIndex: 3)
+        _ = store.togglePageBookmark(key: "/old/A.cbz", pageIndex: 7)
+        store.setBookRef(makeRef(title: "A", path: "/old/A.cbz"), forKey: "/old/A.cbz")
+        _ = store.togglePageBookmark(key: "/new/A.cbz", pageIndex: 7)
+
+        store.moveBookmarks(fromKey: "/old/A.cbz", toKey: "/new/A.cbz")
+
+        #expect(store.pageBookmarksByBook["/old/A.cbz"] == nil)
+        // Page 7 was bookmarked under both keys — it must not be listed twice.
+        #expect(store.pageBookmarks(forKey: "/new/A.cbz").map(\.pageIndex) == [3, 7])
+        #expect(store.bookRef(forKey: "/new/A.cbz")?.title == "A")
+    }
+
+    @Test func migrateSourcePathCarriesBookRefToTheNewKey() {
+        let store = freshStore()
+        let oldKey = "/old/Series.zip#Vol02"
+        _ = store.togglePageBookmark(key: oldKey, pageIndex: 3)
+        store.setBookRef(
+            makeRef(title: "Series · Vol02", path: "/old/Series.zip", innerPath: "Vol02"),
+            forKey: oldKey
+        )
+
+        store.migrateSourcePath(from: "/old/Series.zip", to: "/new/Series.zip")
+
+        let newKey = "/new/Series.zip#Vol02"
+        #expect(store.pageBookmarks(forKey: newKey).map(\.pageIndex) == [3])
+        #expect(store.bookRef(forKey: oldKey) == nil)
+        #expect(store.bookRef(forKey: newKey)?.path == "/new/Series.zip")
+        #expect(store.bookRef(forKey: newKey)?.innerPath == "Vol02")
+    }
+
+    private func makeRef(title: String, path: String, innerPath: String? = nil) -> PageBookmarkBookRef {
+        PageBookmarkBookRef(
+            title: title,
+            path: path,
+            innerPath: innerPath,
+            isDirectory: false,
+            bookmarkData: nil
+        )
+    }
+
     private func freshStore() -> PageBookmarksStore {
         PageBookmarksStore(defaults: InMemoryKeyValueStore())
     }

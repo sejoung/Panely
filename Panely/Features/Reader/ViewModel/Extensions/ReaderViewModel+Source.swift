@@ -7,6 +7,9 @@ enum ReaderLoadIntent: Equatable {
     case librarySelection
     case favorite(innerPath: String?)
     case continueReading(relativePath: String?)
+    /// Opening a page bookmark that lives in another book: land on
+    /// `pageIndex` instead of the book's last-read position.
+    case bookmark(innerPath: String?, pageIndex: Int)
     case previousVolume
     case nextVolumeFromEnd
 
@@ -16,19 +19,30 @@ enum ReaderLoadIntent: Equatable {
             return innerPath
         case .continueReading(let relativePath):
             return relativePath
+        case .bookmark(let innerPath, _):
+            return innerPath
         default:
             return nil
         }
     }
 
+    /// Page to open on, overriding the restored reading position.
+    var explicitPageIndex: Int? {
+        if case .bookmark(_, let pageIndex) = self { return pageIndex }
+        return nil
+    }
+
     /// Continue Reading represents a precise persisted progress record. If
     /// that child disappears, opening an arbitrary first volume would resume
-    /// the wrong book. Favorites keep their historical best-effort fallback.
+    /// the wrong book — and a page bookmark would land on the wrong page of
+    /// it. Favorites keep their historical best-effort fallback.
     var requiresPreferredRelativePath: Bool {
-        if case .continueReading(let relativePath) = self {
+        switch self {
+        case .continueReading(let relativePath), .bookmark(let relativePath, _):
             return relativePath?.isEmpty == false
+        default:
+            return false
         }
-        return false
     }
 
     var preservesLibraryRoot: Bool {
@@ -49,6 +63,8 @@ enum ReaderLoadIntent: Equatable {
             "favorite"
         case .continueReading:
             "continueReading"
+        case .bookmark:
+            "bookmark"
         case .previousVolume:
             "previousVolume"
         case .nextVolumeFromEnd:
@@ -103,7 +119,7 @@ extension ReaderViewModel {
             canChooseFiles: true,
             canChooseDirectories: true,
             allowedContentTypes: types,
-            prompt: "Open"
+            prompt: String(localized: "Open")
         )
 
         guard let url = filePicker.pickURL(request) else { return }
@@ -153,7 +169,7 @@ extension ReaderViewModel {
     func markSourceChangedOnDisk() {
         guard hasSource else { return }
         sourceChangedOnDisk = true
-        sourceChangeMessage = "The current book changed on disk."
+        sourceChangeMessage = String(localized: "The current book changed on disk.")
         Task { await refreshContinueReadingAvailability() }
     }
 
@@ -167,13 +183,20 @@ extension ReaderViewModel {
         Task { await load(url: url, intent: .librarySelection) }
     }
 
-    func requestFolderAccess() {
+    /// Ask the user for a folder to browse. `forVolumeNavigation` is the
+    /// "this book was opened on its own, so its neighbours are unreadable"
+    /// case — same panel, but worded around stepping between books and
+    /// anchored on the folder the open book actually lives in.
+    func requestFolderAccess(forVolumeNavigation: Bool = false) {
+        let bookURL = tempDir.isActive ? openedSourceURL : currentSourceURL
         let request = FilePickerRequest(
             canChooseFiles: false,
             canChooseDirectories: true,
-            prompt: "Select",
-            message: "Select a folder to browse books from.",
-            directoryURL: currentSourceURL?.deletingLastPathComponent()
+            prompt: forVolumeNavigation ? String(localized: "Allow") : String(localized: "Select"),
+            message: forVolumeNavigation
+                ? String(localized: "Allow access to this folder so Panely can open the next and previous books in it.")
+                : String(localized: "Select a folder to browse books from."),
+            directoryURL: bookURL?.deletingLastPathComponent()
         )
 
         guard let folderURL = filePicker.pickURL(request) else { return }
@@ -184,7 +207,7 @@ extension ReaderViewModel {
         )
 
         guard libraryScope.acquire(folderURL) else {
-            errorMessage = "Could not access selected folder."
+            errorMessage = String(localized: "Could not access selected folder.")
             AppLog.error(
                 .library,
                 "Folder access failed",
@@ -195,15 +218,59 @@ extension ReaderViewModel {
 
         recentItems.record(folderURL, title: displayTitle(for: folderURL))
         explicitLibraryRootURL = folderURL
+        dismissVolumeNotice()
 
         Task {
-            let volumes = await FolderResolver.enumerateVolumes(in: folderURL)
             if let current = currentSourceURL, libraryScope.contains(current) {
-                siblings = volumes.isEmpty ? [current] : volumes
+                // Climb from the book rather than listing the picked folder:
+                // the user may have granted a folder a few levels above it,
+                // and volume stepping wants the book's own series level.
+                siblings = await FolderResolver.nearestSeriesVolumes(of: current, boundedBy: folderURL)
+                refreshSiblingFolderReadability(for: current)
             }
             libraryRefreshToken = UUID()
             syncLibraryWatcher()
         }
+    }
+
+    /// A folder the user has already granted — a recent folder or the
+    /// remembered library root — that contains `url`. The deepest match wins,
+    /// so a file inside a previously opened series folder re-roots on that
+    /// series rather than on the whole library above it.
+    ///
+    /// A book file opened on its own (Finder, Open…, a favorite) carries a
+    /// sandbox grant for that one file only; its folder, and therefore its
+    /// sibling volumes, stay unreadable. Reusing an earlier folder grant is
+    /// what makes "allow this folder once" stick across launches.
+    func rememberedFolderGrant(containing url: URL) -> URL? {
+        let target = url.standardizedFileURL
+        let candidates = recentItems.items
+            .filter {
+                $0.isDirectory
+                    && $0.path != target.path
+                    && URL(fileURLWithPath: $0.path).isAncestor(of: target)
+            }
+            .sorted { $0.path.count > $1.path.count }
+        for item in candidates {
+            guard let folder = recentItems.resolve(item),
+                  folder.path != target.path,
+                  folder.isAncestor(of: target) else { continue }
+            return folder
+        }
+        if let folder = lastLibraryRoot.peek()?.standardizedFileURL,
+           folder.path != target.path,
+           folder.isAncestor(of: target) {
+            return folder
+        }
+        return nil
+    }
+
+    /// Record whether the open book's folder can be listed. Checked once per
+    /// load / folder grant instead of on every render — the toolbar reads the
+    /// result to decide whether volume stepping needs a folder grant first.
+    func refreshSiblingFolderReadability(for bookURL: URL) {
+        let parent = bookURL.deletingLastPathComponent()
+        siblingFolderUnreadable = !FileManager.default.isReadableFile(atPath: parent.path)
     }
 
     /// Force a re-scan of the library file tree. Bumping the token changes
@@ -415,14 +482,17 @@ extension ReaderViewModel {
     }
 
     func clampedRestoredIndex(for url: URL, pageCount: Int) -> Int {
+        spreadStart(containing: restoredIndex(for: url), pageCount: pageCount)
+    }
+
+    /// Snap `index` to its spread's start under the current layout and
+    /// offset. `SpreadCalculator` clamps out-of-range indices to the final
+    /// spread, so the last spread stays reachable (no off-by-one snap back to
+    /// the previous spread).
+    func spreadStart(containing index: Int, pageCount: Int) -> Int {
         guard pageCount > 0 else { return 0 }
-        let restored = restoredIndex(for: url)
-        // Snap the restored page to its spread's start under the current layout
-        // and offset. `SpreadCalculator` clamps out-of-range indices to the
-        // final spread, so the last spread stays reachable (no off-by-one snap
-        // back to the previous spread).
         return SpreadCalculator.spread(
-            containing: restored,
+            containing: index,
             pageCount: pageCount,
             step: navigationStep,
             coverAlone: spreadCoverAlone

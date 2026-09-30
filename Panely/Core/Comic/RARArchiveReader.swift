@@ -147,7 +147,16 @@ actor RARArchiveReader: ArchiveReader {
     }
 
     private static func openArchive(at url: URL) throws -> URKArchive {
-        guard URKArchive.urlIsARAR(url), let archive = try? URKArchive(url: url) else {
+        // Under `unrarLock` like every other UnrarKit call. `URKArchive.init`
+        // mints a file bookmark, which goes through a synchronous XPC call
+        // (LaunchServices → NetFS). When several archives are opened at the
+        // same moment, those calls can all block and never return — every
+        // thread parked in `bookmarkData(options:)`, the loads behind them
+        // stalled. Opening one at a time does not hang.
+        let archive = unrarLock.withLock {
+            URKArchive.urlIsARAR(url) ? try? URKArchive(url: url) : nil
+        }
+        guard let archive else {
             throw ArchiveReaderError.cannotOpen(url)
         }
         return archive

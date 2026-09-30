@@ -8,7 +8,13 @@ struct PanelyApp: App {
     @State var viewerController = ViewerController()
 
     var body: some Scene {
-        WindowGroup {
+        // A single `Window`, not a `WindowGroup`: a group opens a *second*
+        // window for every file handed to the running app (Finder
+        // double-click, Open With). Both windows would share the one
+        // `viewModel` / `viewerController` below, and two viewers attaching
+        // to the same controller invalidate each other forever — the app
+        // pins a core and stops responding.
+        Window("Panely", id: "main") {
             ContentView()
                 .environment(viewModel)
                 .environment(viewerController)

@@ -1,0 +1,1906 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@ max, reports include %@" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최대 %1$@, 리포트에는 %2$@ 포함"
+          }
+        }
+      }
+    },
+    "%@ was created." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 파일을 만들었습니다."
+          }
+        }
+      }
+    },
+    "%@ was removed." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@을(를) 삭제했습니다."
+          }
+        }
+      }
+    },
+    "%lld%% read" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%% 읽음"
+          }
+        }
+      }
+    },
+    "Add Page Bookmark" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "페이지 북마크 추가"
+          }
+        }
+      }
+    },
+    "Add to Favorites" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기에 추가"
+          }
+        }
+      }
+    },
+    "Add to Favorites (⌘⇧D)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기에 추가 (⌘⇧D)"
+          }
+        }
+      }
+    },
+    "Allow" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "허용"
+          }
+        }
+      }
+    },
+    "Allow Folder Access…" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "폴더 접근 허용…"
+          }
+        }
+      }
+    },
+    "Allow access to this folder so Panely can open the next and previous books in it." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Panely가 이 폴더의 이전·다음 책을 열 수 있도록 폴더 접근을 허용해 주세요."
+          }
+        }
+      }
+    },
+    "Analyzing archive…" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "압축파일 분석 중…"
+          }
+        }
+      }
+    },
+    "App version" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱 버전"
+          }
+        }
+      }
+    },
+    "Archive expanded past the safety limit (%lld MB)." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "압축을 푼 크기가 안전 한도(%lldMB)를 넘었습니다."
+          }
+        }
+      }
+    },
+    "Available after loading finishes." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "불러오기가 끝나면 사용할 수 있습니다."
+          }
+        }
+      }
+    },
+    "Bookmark Current Page (⌘D)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 페이지 북마크 (⌘D)"
+          }
+        }
+      }
+    },
+    "Bookmark List" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "북마크 목록"
+          }
+        }
+      }
+    },
+    "Bookmarks" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "북마크"
+          }
+        }
+      }
+    },
+    "Bookmarks in Other Books" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다른 책의 북마크"
+          }
+        }
+      }
+    },
+    "Bookmarks to remove: %lld. This can't be undone." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "북마크 %lld개를 삭제합니다. 되돌릴 수 없습니다."
+          }
+        }
+      }
+    },
+    "Building vertical strip…" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "세로 스크롤 준비 중…"
+          }
+        }
+      }
+    },
+    "Cache limit" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "캐시 한도"
+          }
+        }
+      }
+    },
+    "Cancel" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "취소"
+          }
+        }
+      }
+    },
+    "Change Library Root…" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이브러리 폴더 변경…"
+          }
+        }
+      }
+    },
+    "Clear Cache" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "캐시 지우기"
+          }
+        }
+      }
+    },
+    "Clear Diagnostic Logs" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "진단 로그 지우기"
+          }
+        }
+      }
+    },
+    "Clear Diagnostic Logs?" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "진단 로그를 지울까요?"
+          }
+        }
+      }
+    },
+    "Clear Extraction Cache" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "압축 해제 캐시 지우기"
+          }
+        }
+      }
+    },
+    "Clear Logs" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "로그 지우기"
+          }
+        }
+      }
+    },
+    "Clear Menu" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "메뉴 지우기"
+          }
+        }
+      }
+    },
+    "Clearable cache" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지울 수 있는 캐시"
+          }
+        }
+      }
+    },
+    "Click to jump to a page (⌘G)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "클릭해서 페이지로 이동 (⌘G)"
+          }
+        }
+      }
+    },
+    "Continue Reading" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이어보기"
+          }
+        }
+      }
+    },
+    "Could Not Clear Diagnostic Logs" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "진단 로그를 지우지 못했습니다"
+          }
+        }
+      }
+    },
+    "Could not access selected folder." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선택한 폴더에 접근할 수 없습니다."
+          }
+        }
+      }
+    },
+    "Could not clear diagnostic logs." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "진단 로그를 지우지 못했습니다."
+          }
+        }
+      }
+    },
+    "Current book cache is kept while open." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "열려 있는 책의 캐시는 유지됩니다."
+          }
+        }
+      }
+    },
+    "Diagnostic Logs Cleared" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "진단 로그를 지웠습니다"
+          }
+        }
+      }
+    },
+    "Diagnostic Report Export Failed" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "진단 리포트를 내보내지 못했습니다"
+          }
+        }
+      }
+    },
+    "Diagnostic Report Exported" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "진단 리포트를 내보냈습니다"
+          }
+        }
+      }
+    },
+    "Diagnostic log level set to %@." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "진단 로그 수준: %@"
+          }
+        }
+      }
+    },
+    "Diagnostic logs cleared." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "진단 로그를 지웠습니다."
+          }
+        }
+      }
+    },
+    "Diagnostic report exported." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "진단 리포트를 내보냈습니다."
+          }
+        }
+      }
+    },
+    "Diagnostics" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "진단"
+          }
+        }
+      }
+    },
+    "Disable Scroll Page Turning" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스크롤로 페이지 넘기기 끄기"
+          }
+        }
+      }
+    },
+    "Dismiss" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "닫기"
+          }
+        }
+      }
+    },
+    "Double Page" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "두 장 보기"
+          }
+        }
+      }
+    },
+    "Double Page (⌘⇧2)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "두 장 보기 (⌘⇧2)"
+          }
+        }
+      }
+    },
+    "Enable Scroll Page Turning" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스크롤로 페이지 넘기기 켜기"
+          }
+        }
+      }
+    },
+    "Enter a page number (1 – %lld):" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "페이지 번호를 입력하세요 (1 – %lld):"
+          }
+        }
+      }
+    },
+    "Export Diagnostic Report…" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "진단 리포트 내보내기…"
+          }
+        }
+      }
+    },
+    "Export failed: %@" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "내보내기 실패: %@"
+          }
+        }
+      }
+    },
+    "Extracting archive…" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "압축 푸는 중…"
+          }
+        }
+      }
+    },
+    "Extraction Cache Cleared" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "압축 해제 캐시를 지웠습니다"
+          }
+        }
+      }
+    },
+    "Extraction cache" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "압축 해제 캐시"
+          }
+        }
+      }
+    },
+    "Failed to extract archive: %@" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "압축을 풀지 못했습니다: %@"
+          }
+        }
+      }
+    },
+    "Favorites" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기"
+          }
+        }
+      }
+    },
+    "File log" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "파일 로그"
+          }
+        }
+      }
+    },
+    "Files" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "파일"
+          }
+        }
+      }
+    },
+    "Finished" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다 읽음"
+          }
+        }
+      }
+    },
+    "Fit & Zoom" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "맞춤 · 확대/축소"
+          }
+        }
+      }
+    },
+    "Fit Height (⌘3)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "높이에 맞춤 (⌘3)"
+          }
+        }
+      }
+    },
+    "Fit Width (⌘2)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "너비에 맞춤 (⌘2)"
+          }
+        }
+      }
+    },
+    "Fit to Height" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "높이에 맞춤"
+          }
+        }
+      }
+    },
+    "Fit to Screen" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "화면에 맞춤"
+          }
+        }
+      }
+    },
+    "Fit to Screen (⌘1)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "화면에 맞춤 (⌘1)"
+          }
+        }
+      }
+    },
+    "Fit to Width" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "너비에 맞춤"
+          }
+        }
+      }
+    },
+    "Folder is empty or has no supported content" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "폴더가 비어 있거나 지원하는 파일이 없습니다"
+          }
+        }
+      }
+    },
+    "Forget Now" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금 잊기"
+          }
+        }
+      }
+    },
+    "Go" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이동"
+          }
+        }
+      }
+    },
+    "Go to Page" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "페이지로 이동"
+          }
+        }
+      }
+    },
+    "Go to Page…" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "페이지로 이동…"
+          }
+        }
+      }
+    },
+    "Hide Thumbnails" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "썸네일 숨기기"
+          }
+        }
+      }
+    },
+    "Hide Thumbnails (⌃⌘P)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "썸네일 숨기기 (⌃⌘P)"
+          }
+        }
+      }
+    },
+    "In progress" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "읽는 중"
+          }
+        }
+      }
+    },
+    "Last opened" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "마지막으로 연 폴더"
+          }
+        }
+      }
+    },
+    "Library" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이브러리"
+          }
+        }
+      }
+    },
+    "Loading pages…" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "페이지 불러오는 중…"
+          }
+        }
+      }
+    },
+    "Loading…" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "불러오는 중…"
+          }
+        }
+      }
+    },
+    "Lock View Size" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "보기 크기 고정"
+          }
+        }
+      }
+    },
+    "Lock view size (don't auto-fit on resize) (⌘L)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "보기 크기 고정 — 창 크기를 바꿔도 다시 맞추지 않음 (⌘L)"
+          }
+        }
+      }
+    },
+    "Log level" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "로그 수준"
+          }
+        }
+      }
+    },
+    "Next Bookmark" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다음 북마크"
+          }
+        }
+      }
+    },
+    "Next Page (%@ or Space)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다음 페이지 (%@ 또는 Space)"
+          }
+        }
+      }
+    },
+    "Next Volume" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다음 권"
+          }
+        }
+      }
+    },
+    "Next Volume (])" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다음 권 · 다음 압축파일 (])"
+          }
+        }
+      }
+    },
+    "Next volume" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다음 권 보기"
+          }
+        }
+      }
+    },
+    "No Bookmarks" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "북마크 없음"
+          }
+        }
+      }
+    },
+    "No Bookmarks in This Book" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 책에는 북마크가 없습니다"
+          }
+        }
+      }
+    },
+    "No Extraction Cache Cleared" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지울 캐시가 없습니다"
+          }
+        }
+      }
+    },
+    "No Recent Items" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최근 항목 없음"
+          }
+        }
+      }
+    },
+    "No books to show" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "표시할 책이 없습니다"
+          }
+        }
+      }
+    },
+    "No folder remembered yet — it's saved the first time you browse one." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아직 기억된 폴더가 없습니다. 폴더를 처음 둘러볼 때 저장됩니다."
+          }
+        }
+      }
+    },
+    "No image loaded" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "열린 책이 없습니다"
+          }
+        }
+      }
+    },
+    "No images found" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미지를 찾을 수 없습니다"
+          }
+        }
+      }
+    },
+    "No library opened" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "열린 라이브러리가 없습니다"
+          }
+        }
+      }
+    },
+    "No pages" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "페이지 없음"
+          }
+        }
+      }
+    },
+    "OK" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "확인"
+          }
+        }
+      }
+    },
+    "Offset spread (standalone cover)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "펼침면 맞추기 (표지 한 장 따로)"
+          }
+        }
+      }
+    },
+    "Open" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "열기"
+          }
+        }
+      }
+    },
+    "Open Diagnostic Logs Folder" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "진단 로그 폴더 열기"
+          }
+        }
+      }
+    },
+    "Open Folder, CBZ/CBR, or ZIP/RAR… (⌘O)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "폴더, CBZ/CBR, ZIP/RAR 열기… (⌘O)"
+          }
+        }
+      }
+    },
+    "Open Folder…" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "폴더 열기…"
+          }
+        }
+      }
+    },
+    "Open Logs Folder" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "로그 폴더 열기"
+          }
+        }
+      }
+    },
+    "Open Recent" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최근 항목 열기"
+          }
+        }
+      }
+    },
+    "Open a folder, CBZ/CBR, or ZIP/RAR to start reading" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "폴더, CBZ/CBR 또는 ZIP/RAR을 열어 읽기를 시작하세요"
+          }
+        }
+      }
+    },
+    "Opening…" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "여는 중…"
+          }
+        }
+      }
+    },
+    "Open…" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "열기…"
+          }
+        }
+      }
+    },
+    "Other Books" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다른 책"
+          }
+        }
+      }
+    },
+    "Page %lld" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld페이지"
+          }
+        }
+      }
+    },
+    "Page Layout" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "페이지 배치"
+          }
+        }
+      }
+    },
+    "Pages" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "페이지"
+          }
+        }
+      }
+    },
+    "Panely can only see this one book. Allow access to its folder to move between the books in it." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금은 이 책 하나만 볼 수 있습니다. 폴더 접근을 허용하면 같은 폴더의 이전·다음 책으로 이동할 수 있습니다."
+          }
+        }
+      }
+    },
+    "Password-protected archives are not supported." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "암호가 걸린 압축파일은 지원하지 않습니다."
+          }
+        }
+      }
+    },
+    "Pick Folder…" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "폴더 선택…"
+          }
+        }
+      }
+    },
+    "Pick a folder to browse its contents." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "폴더를 선택하면 안에 있는 책을 둘러볼 수 있습니다."
+          }
+        }
+      }
+    },
+    "Pin Library" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이브러리 고정"
+          }
+        }
+      }
+    },
+    "Pin Library (⌃⌘S)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이브러리 고정 (⌃⌘S)"
+          }
+        }
+      }
+    },
+    "Pin Library Open (⌃⌘S)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이브러리 고정 (⌃⌘S)"
+          }
+        }
+      }
+    },
+    "Pin Toolbar" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "툴바 고정"
+          }
+        }
+      }
+    },
+    "Pin Toolbar (⌃⌘T)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "툴바 고정 (⌃⌘T)"
+          }
+        }
+      }
+    },
+    "Previous" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이전 권"
+          }
+        }
+      }
+    },
+    "Previous Bookmark" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이전 북마크"
+          }
+        }
+      }
+    },
+    "Previous Page (%@)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이전 페이지 (%@)"
+          }
+        }
+      }
+    },
+    "Previous Volume" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이전 권"
+          }
+        }
+      }
+    },
+    "Previous Volume ([)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이전 권 · 이전 압축파일 ([)"
+          }
+        }
+      }
+    },
+    "Previous volume" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이전 권 보기"
+          }
+        }
+      }
+    },
+    "Read Left to Right" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "왼쪽에서 오른쪽으로 읽기로 전환"
+          }
+        }
+      }
+    },
+    "Read Right to Left" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오른쪽에서 왼쪽으로 읽기로 전환"
+          }
+        }
+      }
+    },
+    "Reading direction is fixed in vertical mode" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "세로 스크롤에서는 읽기 방향이 고정됩니다"
+          }
+        }
+      }
+    },
+    "Recent file logs were removed." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최근 파일 로그를 삭제했습니다."
+          }
+        }
+      }
+    },
+    "Refresh File Tree" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "파일 목록 새로고침"
+          }
+        }
+      }
+    },
+    "Reload" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다시 불러오기"
+          }
+        }
+      }
+    },
+    "Reload Book" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "책 다시 불러오기"
+          }
+        }
+      }
+    },
+    "Remove All" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모두 삭제"
+          }
+        }
+      }
+    },
+    "Remove All Bookmarks in This Book…" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 책의 북마크 모두 삭제…"
+          }
+        }
+      }
+    },
+    "Remove All Bookmarks…" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 북마크 삭제…"
+          }
+        }
+      }
+    },
+    "Remove Bookmark" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "북마크 제거"
+          }
+        }
+      }
+    },
+    "Remove Page Bookmark" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "페이지 북마크 제거"
+          }
+        }
+      }
+    },
+    "Remove Page Bookmark (⌘D)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 페이지 북마크 제거 (⌘D)"
+          }
+        }
+      }
+    },
+    "Remove This Book's Bookmarks…" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 책의 북마크 삭제…"
+          }
+        }
+      }
+    },
+    "Remove all bookmarks in every book?" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 책의 북마크를 삭제할까요?"
+          }
+        }
+      }
+    },
+    "Remove all bookmarks in this book?" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 책의 북마크를 모두 삭제할까요?"
+          }
+        }
+      }
+    },
+    "Remove all bookmarks in “%@”?" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”의 북마크를 모두 삭제할까요?"
+          }
+        }
+      }
+    },
+    "Remove from Continue Reading" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이어보기에서 제거"
+          }
+        }
+      }
+    },
+    "Remove from Favorites" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기에서 제거"
+          }
+        }
+      }
+    },
+    "Remove from Favorites (⌘⇧D)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기에서 제거 (⌘⇧D)"
+          }
+        }
+      }
+    },
+    "Remove from List" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "목록에서 제거"
+          }
+        }
+      }
+    },
+    "Reopen last folder on launch" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "실행 시 마지막 폴더 다시 열기"
+          }
+        }
+      }
+    },
+    "Reset Zoom" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "확대/축소 초기화"
+          }
+        }
+      }
+    },
+    "Restart" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "처음부터 다시"
+          }
+        }
+      }
+    },
+    "Retention" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "보존"
+          }
+        }
+      }
+    },
+    "Retry" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다시 시도"
+          }
+        }
+      }
+    },
+    "Reveal in Finder" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finder에서 보기"
+          }
+        }
+      }
+    },
+    "Scanning folder…" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "폴더 살펴보는 중…"
+          }
+        }
+      }
+    },
+    "Select" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선택"
+          }
+        }
+      }
+    },
+    "Select a folder to browse books from." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "책을 둘러볼 폴더를 선택하세요."
+          }
+        }
+      }
+    },
+    "Session" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "세션"
+          }
+        }
+      }
+    },
+    "Settings…" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "설정…"
+          }
+        }
+      }
+    },
+    "Show Thumbnails" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "썸네일 보기"
+          }
+        }
+      }
+    },
+    "Show Thumbnails (⌃⌘P)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "썸네일 보기 (⌃⌘P)"
+          }
+        }
+      }
+    },
+    "Single Page" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "한 장 보기"
+          }
+        }
+      }
+    },
+    "Single Page (⌘⇧1)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "한 장 보기 (⌘⇧1)"
+          }
+        }
+      }
+    },
+    "Storage" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장 공간"
+          }
+        }
+      }
+    },
+    "The archive could not be opened." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "압축파일을 열 수 없습니다."
+          }
+        }
+      }
+    },
+    "The archive has no entry named \"%@\"." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "압축파일에 “%@” 항목이 없습니다."
+          }
+        }
+      }
+    },
+    "The current book changed on disk." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 책이 디스크에서 변경되었습니다."
+          }
+        }
+      }
+    },
+    "The recent file log could not be removed. Please try again." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최근 파일 로그를 삭제하지 못했습니다. 다시 시도해 주세요."
+          }
+        }
+      }
+    },
+    "The saved book is no longer available in this source." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장된 책을 이 위치에서 더 이상 찾을 수 없습니다."
+          }
+        }
+      }
+    },
+    "There is no inactive extraction cache to remove." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "삭제할 수 있는 압축 해제 캐시가 없습니다."
+          }
+        }
+      }
+    },
+    "This book is currently unavailable. Reconnect its drive or restore the file." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 책을 지금은 열 수 없습니다. 드라이브를 다시 연결하거나 파일을 복원하세요."
+          }
+        }
+      }
+    },
+    "This bookmarked book can no longer be opened." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "북마크한 책을 더 이상 열 수 없습니다."
+          }
+        }
+      }
+    },
+    "This is the first book in the folder." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "폴더의 첫 번째 책입니다."
+          }
+        }
+      }
+    },
+    "This is the last book in the folder." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "폴더의 마지막 책입니다."
+          }
+        }
+      }
+    },
+    "This recent book can no longer be opened." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 최근 항목은 더 이상 열 수 없습니다."
+          }
+        }
+      }
+    },
+    "This removes Panely's recent file log. It does not clear OSLog, cache data, recent files, bookmarks, favorites, or reading position." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Panely의 최근 파일 로그를 삭제합니다. OSLog, 캐시, 최근 항목, 북마크, 즐겨찾기, 읽던 위치는 지워지지 않습니다."
+          }
+        }
+      }
+    },
+    "Unlock View Size" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "보기 크기 고정 해제"
+          }
+        }
+      }
+    },
+    "Unlock view size (auto-fit on resize) (⌘L)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "보기 크기 고정 해제 — 창 크기에 맞춰 다시 맞춤 (⌘L)"
+          }
+        }
+      }
+    },
+    "Unpin Library" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이브러리 고정 해제"
+          }
+        }
+      }
+    },
+    "Unpin Library (⌃⌘S)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이브러리 고정 해제 (⌃⌘S)"
+          }
+        }
+      }
+    },
+    "Unpin Toolbar" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "툴바 고정 해제"
+          }
+        }
+      }
+    },
+    "Unpin Toolbar (⌃⌘T)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "툴바 고정 해제 (⌃⌘T)"
+          }
+        }
+      }
+    },
+    "Up next" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다음 권"
+          }
+        }
+      }
+    },
+    "Vertical Scroll" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "세로 스크롤"
+          }
+        }
+      }
+    },
+    "Vertical Scroll (⌘⇧3)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "세로 스크롤 (⌘⇧3)"
+          }
+        }
+      }
+    },
+    "Vol %lld / %lld" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld / %lld권"
+          }
+        }
+      }
+    },
+    "Volumes" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "권"
+          }
+        }
+      }
+    },
+    "Zoom In" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "확대"
+          }
+        }
+      }
+    },
+    "Zoom In (⌘+)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "확대 (⌘+)"
+          }
+        }
+      }
+    },
+    "Zoom Out" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "축소"
+          }
+        }
+      }
+    },
+    "Zoom Out (⌘−)" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "축소 (⌘−)"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

@@ -136,7 +136,7 @@ pages.
 - Filters non-image files and hidden entries
 
 ### Navigation
-- **Keyboard-first** — `← → Space` for pages, `⌘[ ⌘]` for volumes,
+- **Keyboard-first** — `← → Space` for pages, `[ ]` (or `⌘[ ⌘]`) for volumes,
   `⌘1 ⌘2 ⌘3` for fit modes, `⌘+ ⌘- ⌘0` for zoom, `⌃⌘S` to pin the sidebar,
   `⌃⌘T` to pin the toolbar, `⌘L` to lock view size, `⌘O` to open,
   and `⌘R` to reload
@@ -181,7 +181,24 @@ pages.
   **Reopen last folder on launch** toggle (on by default), the remembered
   path, and a one-shot **Forget Now** to drop the saved folder
 - **Folder access grant** — when a single file is opened and siblings aren't
-  visible, the sidebar offers a one-click prompt to pick the enclosing folder
+  visible, the sidebar offers a one-click prompt to pick the enclosing folder.
+  Asking for the next/previous book in that state (`[` / `]`, the toolbar, the
+  Go menu) raises the same prompt instead of doing nothing, and the grant is
+  remembered: later, a book opened on its own from inside a folder you've
+  already granted opens under that folder, so its neighbours are reachable
+  without asking again
+- **Page bookmarks across books** — the sidebar lists the open book's
+  bookmarks (with page thumbnails, a per-row remove button, and a clear-all)
+  plus the bookmarks left in every other book; picking one of those opens
+  that book on the bookmarked page. The same list is one click away in the
+  toolbar's bookmark menu and under **Go → Bookmarks**
+- **Instant toolbar hints** — hovering a toolbar icon shows its name and
+  shortcut immediately, rather than after the system tooltip delay
+- **Toolbar that fits the window** — when the row is wider than the window
+  (small window, or the library pinned), the fit/zoom and then the layout
+  controls fold into menus instead of clipping the buttons at either end
+- **Korean UI** — menus, toolbar hints, sidebar, settings, and messages follow
+  the system language (English and Korean)
 - **Window controls** — with the title bar hidden, the top 28 px strip still
   supports native drag-to-move and double-click-to-zoom (respecting the
   system's `AppleActionOnDoubleClick` preference); an open-hand cursor
@@ -301,7 +318,7 @@ Terminal) and move the result straight to `/Applications`.
 | `⌘R` | Reload current book |
 | `←` / `→` | Previous / next page (direction-aware; advances to the next/previous volume when the matching end-of-volume card is showing) |
 | `Space` | Next page (advances to the next volume when the end-of-volume card is showing) |
-| `⌘[` / `⌘]` | Previous / next volume |
+| `[` / `]` (or `⌘[` / `⌘]`) | Previous / next volume — the next book or archive in the same folder |
 | `⌘G` | Go to page… (modal prompt) |
 | `⌘D` | Add / remove page bookmark |
 | `⌘⇧D` | Add / remove current book from favorites |
@@ -482,6 +499,7 @@ Panely/
 ├── ContentView.swift
 ├── AppDependencies.swift               # injected app services (cache, bookmarks, persistence, system settings, file watching)
 ├── AppIcon.icns                        # generated from docs/icon/*.svg
+├── Localizable.xcstrings               # string catalog: English source + Korean
 ├── Commands/                           # @CommandsBuilder extensions on PanelyApp
 │   ├── PanelyApp+FileCommands.swift    # Open / Open Recent
 │   ├── PanelyApp+ViewCommands.swift    # chrome / layout / fit / zoom / autofit
@@ -498,7 +516,7 @@ Panely/
 │   └── Extensions/                     # shared Foundation helpers
 ├── DesignSystem/
 │   ├── Tokens/                         # Color / Spacing / Typography / Motion
-│   └── Primitives/                     # Icon button, slider
+│   └── Primitives/                     # Icon button, icon menu, slider
 ├── Features/
 │   ├── Reader/
 │   │   ├── ReaderScene.swift           # ZStack: SidebarHost + ViewerArea + ThumbnailSidebarHost (entry view)
@@ -553,7 +571,8 @@ Panely/
 │   │   │       ├── ImageStackView.swift            # page frames + pooled NSImageViews
 │   │   │       └── WheelPageTurnEngine.swift       # scroll-wheel page-turn state machine
 │   │   ├── Toolbar/
-│   │   │   ├── PanelyToolbar.swift     # 5 button groups: chrome / layout / fit&zoom / bookmarks / nav
+│   │   │   ├── PanelyToolbar.swift     # 5 button groups: chrome / layout / fit&zoom / bookmarks / nav; folds groups into menus when narrow
+│   │   │   ├── ToolbarHint.swift       # instant hover hint under a toolbar control
 │   │   │   └── QuickJumpField.swift    # inline-editable page counter
 │   │   ├── Overlays/
 │   │   │   ├── LoadingOverlay.swift
@@ -572,6 +591,7 @@ Panely/
 │   │   └── CacheMaintenance.swift      # clear-cache result and formatting helpers
 │   └── Library/
 │       ├── LibrarySidebar.swift        # pin button + extension badge + two-phase load
+│       ├── BookmarkAlerts.swift        # confirmation for bulk bookmark removal
 │       ├── LibrarySidebarModel.swift   # sidebar presentation model + expand-ancestors-of-active
 │       ├── LibraryTreeLoader.swift     # injectable FileNode.loadTree wrapper
 │       ├── Model/

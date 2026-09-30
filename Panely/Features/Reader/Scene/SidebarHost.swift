@@ -17,6 +17,8 @@ struct SidebarHost: View {
             pinned: viewModel.sidebarPinned,
             favorites: viewModel.favorites.favorites,
             pageBookmarks: viewModel.currentBookPageBookmarks,
+            bookmarkPages: viewModel.source.pages,
+            otherBookmarkedBooks: viewModel.otherBookmarkedBooks,
             volumes: viewModel.sidebarVolumes,
             libraryTreeLoader: viewModel.dependencies.libraryTreeLoader,
             currentPageIndex: viewModel.currentPageIndex,
@@ -47,8 +49,24 @@ struct SidebarHost: View {
                 requestFocus()
             },
             onRemovePageBookmark: { bm in
-                guard let key = viewModel.currentPositionKey else { return }
-                viewModel.pageBookmarks.removePageBookmark(forKey: key, id: bm.id)
+                viewModel.removeCurrentBookPageBookmark(bm)
+            },
+            onRemoveAllPageBookmarks: {
+                BookmarkAlerts.removeAllInCurrentBook(viewModel)
+            },
+            onOpenBookmark: { bm, book in
+                viewModel.openBookmark(bm, in: book)
+                viewModel.dismissSidebarOverlay()
+                requestFocus()
+            },
+            onRemoveBookmark: { bm, book in
+                viewModel.pageBookmarks.removePageBookmark(forKey: book.key, id: bm.id)
+            },
+            onRemoveBookmarks: { book in
+                BookmarkAlerts.removeAll(in: book, viewModel)
+            },
+            onRemoveAllBookmarks: {
+                BookmarkAlerts.removeAllEverywhere(viewModel)
             },
             onSelectVolume: { url in
                 viewModel.openURL(url)

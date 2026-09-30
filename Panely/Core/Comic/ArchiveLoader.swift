@@ -17,8 +17,9 @@ nonisolated enum ArchiveLoader {
         var errorDescription: String? {
             switch self {
             case .extractedSizeExceeded(let limit):
-                let mb = limit / (1024 * 1024)
-                return "Archive expanded past the safety limit (\(mb) MB)."
+                // `Int` so the catalog key is the ordinary `%lld` form.
+                let mb = Int(limit / (1024 * 1024))
+                return String(localized: "Archive expanded past the safety limit (\(mb) MB).")
             }
         }
     }

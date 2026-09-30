@@ -15,7 +15,7 @@ struct ReadingBadgeView: View {
                 .help("Finished")
         case .inProgress(let fraction):
             ReadingProgressRing(fraction: fraction)
-                .help(fraction.map { "\(Int(($0 * 100).rounded()))% read" } ?? "In progress")
+                .help(fraction.map { String(localized: "\(Int(($0 * 100).rounded()))% read") } ?? String(localized: "In progress"))
         }
     }
 }

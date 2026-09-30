@@ -30,6 +30,15 @@ struct ReaderScene: View {
                     requestFocus: requestFocus,
                     focusBinding: $isFocused
                 )
+                // Anchored to the viewer, not the whole window, so a long
+                // message wraps instead of spilling over a pinned sidebar.
+                // The top inset clears the floating toolbar (12 pt inset +
+                // 40 pt tall): a notice raised from a toolbar button
+                // shouldn't land on top of it.
+                .overlay(alignment: .top) {
+                    ReaderStatusBanner()
+                        .padding(.top, 60)
+                }
                 if viewModel.thumbnailSidebarVisible && viewModel.hasSource {
                     ThumbnailSidebarHost(requestFocus: requestFocus)
                         .transition(.move(edge: .trailing).combined(with: .opacity))
@@ -65,13 +74,10 @@ struct ReaderScene: View {
                 LoadingOverlay(message: viewModel.loadingMessage)
             }
         }
-        .overlay(alignment: .top) {
-            ReaderStatusBanner()
-                .padding(.top, 42)
-        }
         .animation(PanelyMotion.uiReveal, value: viewModel.isLoading)
         .animation(PanelyMotion.uiReveal, value: viewModel.sourceChangedOnDisk)
         .animation(PanelyMotion.uiReveal, value: viewModel.errorMessage)
+        .animation(PanelyMotion.uiReveal, value: viewModel.volumeNotice)
         .frame(minWidth: 800, minHeight: 600)
         .task {
             await viewModel.refreshContinueReadingAvailability()
@@ -135,6 +141,20 @@ private struct ReaderStatusBanner: View {
                     viewModel.openSource()
                 }
             }
+        } else if let notice = viewModel.volumeNotice, !viewModel.isLoading {
+            banner(
+                systemImage: notice == .needsFolderAccess ? "folder.badge.questionmark" : "books.vertical",
+                message: notice.message
+            ) {
+                if notice == .needsFolderAccess {
+                    Button("Allow Folder Access…") {
+                        viewModel.requestFolderAccess(forVolumeNavigation: true)
+                    }
+                    Button("Dismiss") {
+                        viewModel.dismissVolumeNotice()
+                    }
+                }
+            }
         }
     }
 
@@ -148,6 +168,7 @@ private struct ReaderStatusBanner: View {
                 .font(.system(size: 16, weight: .semibold))
             Text(message)
                 .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
                 .font(.system(size: 13, weight: .medium))
             actions()
                 .buttonStyle(.bordered)

@@ -100,7 +100,7 @@ struct DiagnosticsSettingsView: View {
         }
         .onChange(of: selectedLogLevel) { _, newValue in
             DiagnosticLogConfiguration.setCurrentLogLevel(newValue)
-            exportMessage = "Diagnostic log level set to \(newValue.displayName)."
+            exportMessage = String(localized: "Diagnostic log level set to \(newValue.displayName).")
         }
     }
 
@@ -118,7 +118,7 @@ struct DiagnosticsSettingsView: View {
         Task {
             do {
                 try await exporter.exportReport(to: url)
-                exportMessage = "Diagnostic report exported."
+                exportMessage = String(localized: "Diagnostic report exported.")
             } catch {
                 let message = DiagnosticRedactor.redactKnownPaths(
                     in: error.localizedDescription,
@@ -129,7 +129,7 @@ struct DiagnosticsSettingsView: View {
                     "Diagnostic report export failed",
                     metadata: ["error": "\(message)"]
                 )
-                exportMessage = "Export failed: \(error.localizedDescription)"
+                exportMessage = String(localized: "Export failed: \(error.localizedDescription)")
             }
             isExporting = false
             await refreshLogSize()
@@ -142,8 +142,8 @@ struct DiagnosticsSettingsView: View {
             let cleared = await DiagnosticLogStore.shared.clear()
             await refreshLogSize()
             exportMessage = cleared
-                ? "Diagnostic logs cleared."
-                : "Could not clear diagnostic logs."
+                ? String(localized: "Diagnostic logs cleared.")
+                : String(localized: "Could not clear diagnostic logs.")
         }
     }
 

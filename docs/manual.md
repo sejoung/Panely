@@ -39,6 +39,7 @@ The sidebar surfaces up to three sections automatically:
 
 - **Favorites** — books you've starred (`⌘⇧D` or the ★ toolbar button).
 - **Bookmarks** — pages you've marked (`⌘D` or the 🔖 toolbar button) in the current book.
+- **Bookmarks in Other Books** — bookmarks you left in other books; click one to open that book on the page.
 - **Files** — your library folder tree. Folders and archives (`.cbz` / `.zip`) are visually distinguished.
 
 The pin icon at the top of the sidebar (or `⌃⌘S`) keeps it open
@@ -106,8 +107,14 @@ Left to right, the toolbar groups are:
 1. **Chrome** — Open file (`⌘O`), pin library (`⌃⌘S`), pin toolbar (`⌃⌘T`)
 2. **Layout** — Single / Double / Vertical, reading direction toggle, and (in double-page mode) the standalone-cover offset toggle
 3. **Fit & Zoom** — Fit screen / width / height (`⌘1` / `⌘2` / `⌘3`), zoom in/out (`⌘+` / `⌘−`), view-size lock (`⌘L`)
-4. **Bookmarks** — Favorite book (`⌘⇧D`), bookmark page (`⌘D`), toggle thumbnail sidebar (`⌃⌘P`)
-5. **Navigation** (right edge) — Previous/next volume (`⌘[` / `⌘]`), previous/next page (`←` / `→`)
+4. **Bookmarks** — Favorite book (`⌘⇧D`), bookmark page (`⌘D`), bookmark list menu, toggle thumbnail sidebar (`⌃⌘P`)
+5. **Navigation** (right edge) — Previous/next volume (`[` / `]`), previous/next page (`←` / `→`)
+
+Hover any icon to see its name and shortcut right away.
+
+When the window is too narrow for the whole row — a small window, or the
+library pinned — the Fit & Zoom group, and then the Layout group, fold into
+a single menu button each, so no button is ever cut off.
 
 The toolbar auto-hides when your cursor leaves the top edge. Pin it with
 `⌃⌘T` to keep it visible while reading.
@@ -151,6 +158,18 @@ Prefer scrolling to only ever pan? Turn it off via
 When a series spans multiple files in the same folder, Panely treats
 them as sibling volumes and surfaces continuation cards at the
 boundaries.
+
+Press `]` / `[` (or `⌘]` / `⌘[`) at any time to jump straight to the
+next / previous book or archive in the folder.
+
+### Opening a single file
+
+macOS only lets Panely read what you opened. If you open one archive on
+its own (double-click in Finder, **Open…**), the rest of its folder is
+off-limits, so there is nothing to step to. Press `]` and Panely says so
+and offers **Allow Folder Access…** — pick the folder once and volume
+stepping works. The grant is remembered: the next time you open a book
+from that folder, its neighbours are already available.
 
 ### End of volume
 
@@ -306,7 +325,25 @@ Press `⌘D` (or the 🔖 toolbar button) to mark the current page in the
 500 entries per book, 200 books total), keyed by a stable identifier
 that survives temp-directory re-extractions of zip-in-zip archives.
 
+Each row shows a thumbnail of the page. Click a row to jump there; hover
+it and click ✕ (or right-click → **Remove Bookmark**) to delete it. The
+trash button in the section header removes every bookmark in the book
+after a confirmation.
+
 Step between bookmarks within the current book with `⌘⇧[` / `⌘⇧]`.
+
+### Bookmarks in other books
+
+Bookmarks aren't lost when you move on to another book. The sidebar's
+**Bookmarks in Other Books** section lists every other bookmarked book;
+expand one and click a page to open that book right on it.
+
+The same list is available without the sidebar:
+
+- the **bookmark list** button in the toolbar (next to 🔖), and
+- **Go → Bookmarks** in the menu bar.
+
+**Go → Remove All Bookmarks…** clears the bookmarks in every book.
 
 ---
 
@@ -319,7 +356,8 @@ The most-used:
 | Action | Shortcut |
 |---|---|
 | Next / previous page | `→` / `←` (also `Space` for next) |
-| Next / previous volume | `⌘]` / `⌘[` |
+| Next / previous volume | `]` / `[` (also `⌘]` / `⌘[`) |
+| Next / previous bookmark | `⌘⇧]` / `⌘⇧[` |
 | Open file | `⌘O` |
 | Reload current book | `⌘R` |
 | Go to page… | `⌘G` |

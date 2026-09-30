@@ -74,6 +74,20 @@ struct ViewerArea: View {
                 viewModel.advanceForward()
                 return .handled
             }
+            // Bare brackets step between books in the folder. Modified presses
+            // fall through to the menu (`⌘[`/`⌘]` volumes, `⇧⌘[`/`⇧⌘]` bookmarks).
+            // `.down` only — a held key shouldn't machine-gun through a series.
+            .onKeyPress(keys: ["[", "]"], phases: .down) { press in
+                guard press.modifiers.isDisjoint(with: [.command, .control, .option, .shift]) else {
+                    return .ignored
+                }
+                if press.key == "[" {
+                    viewModel.stepToPreviousVolume()
+                } else {
+                    viewModel.stepToNextVolume()
+                }
+                return .handled
+            }
             .onKeyPress(.escape) {
                 if viewModel.sidebarOverlayVisible {
                     viewModel.dismissSidebarOverlay()

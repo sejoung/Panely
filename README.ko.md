@@ -124,7 +124,7 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
 - 비이미지 파일과 숨김 항목 필터링
 
 ### 네비게이션
-- **키보드 우선** — `← → Space` 페이지, `⌘[ ⌘]` 볼륨,
+- **키보드 우선** — `← → Space` 페이지, `[ ]`(또는 `⌘[ ⌘]`) 볼륨,
   `⌘1 ⌘2 ⌘3` 맞춤 모드, `⌘+ ⌘- ⌘0` 줌, `⌃⌘S` 사이드바 고정,
   `⌃⌘T` 툴바 고정, `⌘L` 뷰 크기 잠금, `⌘O` 열기, `⌘R` 리로드
 - **라이브러리 사이드바 기본 고정** — fresh install에서는 폴더 트리가
@@ -163,7 +163,21 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   다시 열기** 토글(기본 켜짐), 기억된 경로, 일회성 **Forget Now**(저장 폴더
   삭제)가 있음
 - **폴더 접근 허용** — 단일 파일을 열었고 형제 책들이 안 보일 때,
-  사이드바에서 상위 폴더를 고를 수 있는 원클릭 프롬프트 제공
+  사이드바에서 상위 폴더를 고를 수 있는 원클릭 프롬프트 제공. 이 상태에서
+  이전/다음 책을 요청하면(`[` / `]`, 툴바, 이동 메뉴) 아무 일도 안 일어나는
+  대신 같은 프롬프트가 뜸. 한 번 허용한 폴더는 기억되어, 나중에 그 폴더 안의
+  책을 단독으로 열어도 같은 폴더 권한으로 열리므로 다시 묻지 않고 이전/다음
+  책으로 이동 가능
+- **책을 넘나드는 페이지 북마크** — 사이드바에 현재 책의 북마크(페이지 썸네일,
+  행마다 삭제 버튼, 전체삭제)와 다른 책에 남겨 둔 북마크가 함께 표시됨. 다른
+  책의 북마크를 고르면 그 책이 해당 페이지로 열림. 같은 목록을 툴바의 북마크
+  메뉴와 **이동 → 북마크**에서도 바로 볼 수 있음
+- **즉시 뜨는 툴바 설명** — 툴바 아이콘에 마우스를 올리면 시스템 툴팁 지연
+  없이 이름과 단축키가 바로 표시됨
+- **창 크기에 맞는 툴바** — 창이 좁거나 라이브러리를 고정해 툴바가 다 들어가지
+  않으면, 양 끝 버튼이 잘리는 대신 맞춤/줌 → 레이아웃 순으로 메뉴로 접힘
+- **한국어 UI** — 메뉴, 툴바 설명, 사이드바, 설정, 메시지가 시스템 언어를
+  따름(영어·한국어)
 - **창 컨트롤** — 타이틀바가 숨겨진 상태에서도 상단 28 px 스트립에서
   네이티브 드래그 이동과 더블클릭 확대(시스템 `AppleActionOnDoubleClick`
   환경설정 존중) 지원. 드래그 영역은 open-hand 커서로 표시
@@ -274,7 +288,7 @@ LaunchServices 캐시에 남을 수 있으니, 우클릭 → "다음으로 압�
 | `⌘R` | 현재 책 다시 읽기 |
 | `←` / `→` | 이전 / 다음 페이지 (방향 반영. 매칭되는 권 카드가 떠 있으면 다음/이전 권으로 이동) |
 | `Space` | 다음 페이지 (Up next 카드가 떠 있으면 다음 권으로 이동) |
-| `⌘[` / `⌘]` | 이전 / 다음 볼륨 |
+| `[` / `]` (또는 `⌘[` / `⌘]`) | 이전 / 다음 볼륨 — 같은 폴더의 이전 / 다음 책·압축파일 |
 | `⌘G` | 페이지 번호로 이동… (모달 프롬프트) |
 | `⌘D` | 페이지 북마크 추가 / 제거 |
 | `⌘⇧D` | 현재 책 즐겨찾기 추가 / 제거 |
@@ -441,6 +455,7 @@ Panely/
 ├── ContentView.swift
 ├── AppDependencies.swift               # 주입되는 앱 서비스(cache, bookmark, persistence, system settings, 파일 감시)
 ├── AppIcon.icns                        # docs/icon/*.svg에서 생성
+├── Localizable.xcstrings               # 문자열 카탈로그: 영어 원문 + 한국어
 ├── Commands/                           # PanelyApp에 대한 @CommandsBuilder extension
 │   ├── PanelyApp+FileCommands.swift    # Open / Open Recent
 │   ├── PanelyApp+ViewCommands.swift    # chrome / 레이아웃 / 맞춤 / 줌 / autofit
@@ -457,7 +472,7 @@ Panely/
 │   └── Extensions/                     # 공유 Foundation helper
 ├── DesignSystem/
 │   ├── Tokens/                         # Color / Spacing / Typography / Motion
-│   └── Primitives/                     # 아이콘 버튼, 슬라이더
+│   └── Primitives/                     # 아이콘 버튼, 아이콘 메뉴, 슬라이더
 ├── Features/
 │   ├── Reader/
 │   │   ├── ReaderScene.swift           # ZStack: SidebarHost + ViewerArea + ThumbnailSidebarHost (진입 뷰)
@@ -512,7 +527,8 @@ Panely/
 │   │   │       ├── ImageStackView.swift            # 페이지 프레임 + 풀링된 NSImageView
 │   │   │       └── WheelPageTurnEngine.swift       # 스크롤 휠 페이지 넘김 상태 머신
 │   │   ├── Toolbar/
-│   │   │   ├── PanelyToolbar.swift     # 5개 버튼 그룹: chrome / 레이아웃 / 맞춤·줌 / 북마크 / 네비
+│   │   │   ├── PanelyToolbar.swift     # 5개 버튼 그룹: chrome / 레이아웃 / 맞춤·줌 / 북마크 / 네비. 좁으면 그룹이 메뉴로 접힘
+│   │   │   ├── ToolbarHint.swift       # 툴바 컨트롤 아래에 즉시 뜨는 설명
 │   │   │   └── QuickJumpField.swift    # 페이지 카운터 인라인 편집
 │   │   ├── Overlays/
 │   │   │   ├── LoadingOverlay.swift
@@ -531,6 +547,7 @@ Panely/
 │   │   └── CacheMaintenance.swift      # 캐시 삭제 결과와 포맷팅 헬퍼
 │   └── Library/
 │       ├── LibrarySidebar.swift        # 고정 버튼 + 확장자 배지 + 2단계 로드
+│       ├── BookmarkAlerts.swift        # 북마크 일괄 삭제 확인
 │       ├── LibrarySidebarModel.swift   # 사이드바 표시 모델 + 현재 책 상위 폴더 펼침
 │       ├── LibraryTreeLoader.swift     # 주입 가능한 FileNode.loadTree 래퍼
 │       ├── Model/

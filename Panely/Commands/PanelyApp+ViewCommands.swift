@@ -5,9 +5,13 @@ extension PanelyApp {
     /// lock, separated by dividers in that order so keyboard shortcuts
     /// cluster by intent (`⌃⌘X` chrome, `⇧⌘1-3` layout, `⌘1-3` fit,
     /// `⌘+/-/0` zoom).
+    ///
+    /// Added to the system's View menu (ahead of Enter Full Screen) rather
+    /// than declared as a `CommandMenu("View")`, which puts a second,
+    /// identically named menu in the menu bar.
     @CommandsBuilder
     var viewCommands: some Commands {
-        CommandMenu("View") {
+        CommandGroup(before: .toolbar) {
             Button(viewModel.sidebarPinned ? "Unpin Library" : "Pin Library") {
                 viewModel.toggleSidebarPin()
             }
@@ -91,6 +95,8 @@ extension PanelyApp {
             Button(viewModel.wheelPageTurn ? "Disable Scroll Page Turning" : "Enable Scroll Page Turning") {
                 viewModel.toggleWheelPageTurn()
             }
+
+            Divider()
         }
     }
 }
