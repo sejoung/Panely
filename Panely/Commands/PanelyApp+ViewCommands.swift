@@ -12,17 +12,29 @@ extension PanelyApp {
     @CommandsBuilder
     var viewCommands: some Commands {
         CommandGroup(before: .toolbar) {
-            Button(viewModel.sidebarPinned ? "Unpin Library" : "Pin Library") {
+            Button(
+                viewModel.sidebarPinned
+                    ? String(localized: "Unpin Library", bundle: .localized)
+                    : String(localized: "Pin Library", bundle: .localized)
+            ) {
                 viewModel.toggleSidebarPin()
             }
             .keyboardShortcut("s", modifiers: [.control, .command])
 
-            Button(viewModel.toolbarPinned ? "Unpin Toolbar" : "Pin Toolbar") {
+            Button(
+                viewModel.toolbarPinned
+                    ? String(localized: "Unpin Toolbar", bundle: .localized)
+                    : String(localized: "Pin Toolbar", bundle: .localized)
+            ) {
                 viewModel.toggleToolbarPin()
             }
             .keyboardShortcut("t", modifiers: [.control, .command])
 
-            Button(viewModel.thumbnailSidebarVisible ? "Hide Thumbnails" : "Show Thumbnails") {
+            Button(
+                viewModel.thumbnailSidebarVisible
+                    ? String(localized: "Hide Thumbnails", bundle: .localized)
+                    : String(localized: "Show Thumbnails", bundle: .localized)
+            ) {
                 viewModel.toggleThumbnailSidebar()
             }
             .keyboardShortcut("p", modifiers: [.control, .command])
@@ -30,19 +42,19 @@ extension PanelyApp {
 
             Divider()
 
-            Button("Single Page") {
+            Button(String(localized: "Single Page", bundle: .localized)) {
                 viewModel.setLayout(.single)
             }
             .keyboardShortcut("1", modifiers: [.command, .shift])
             .disabled(viewModel.layout == .single)
 
-            Button("Double Page") {
+            Button(String(localized: "Double Page", bundle: .localized)) {
                 viewModel.setLayout(.double)
             }
             .keyboardShortcut("2", modifiers: [.command, .shift])
             .disabled(viewModel.layout == .double)
 
-            Button("Vertical Scroll") {
+            Button(String(localized: "Vertical Scroll", bundle: .localized)) {
                 viewModel.setLayout(.vertical)
             }
             .keyboardShortcut("3", modifiers: [.command, .shift])
@@ -50,19 +62,19 @@ extension PanelyApp {
 
             Divider()
 
-            Button("Fit to Screen") {
+            Button(String(localized: "Fit to Screen", bundle: .localized)) {
                 viewModel.setFitMode(.fitScreen)
             }
             .keyboardShortcut("1", modifiers: .command)
             .disabled(viewModel.fitMode == .fitScreen)
 
-            Button("Fit to Width") {
+            Button(String(localized: "Fit to Width", bundle: .localized)) {
                 viewModel.setFitMode(.fitWidth)
             }
             .keyboardShortcut("2", modifiers: .command)
             .disabled(viewModel.fitMode == .fitWidth)
 
-            Button("Fit to Height") {
+            Button(String(localized: "Fit to Height", bundle: .localized)) {
                 viewModel.setFitMode(.fitHeight)
             }
             .keyboardShortcut("3", modifiers: .command)
@@ -70,29 +82,37 @@ extension PanelyApp {
 
             Divider()
 
-            Button("Zoom In") {
+            Button(String(localized: "Zoom In", bundle: .localized)) {
                 viewerController.zoomIn()
             }
             .keyboardShortcut("+", modifiers: .command)
 
-            Button("Zoom Out") {
+            Button(String(localized: "Zoom Out", bundle: .localized)) {
                 viewerController.zoomOut()
             }
             .keyboardShortcut("-", modifiers: .command)
 
-            Button("Reset Zoom") {
+            Button(String(localized: "Reset Zoom", bundle: .localized)) {
                 viewerController.resetZoom()
             }
             .keyboardShortcut("0", modifiers: .command)
 
             Divider()
 
-            Button(viewModel.autoFitOnResize ? "Lock View Size" : "Unlock View Size") {
+            Button(
+                viewModel.autoFitOnResize
+                    ? String(localized: "Lock View Size", bundle: .localized)
+                    : String(localized: "Unlock View Size", bundle: .localized)
+            ) {
                 viewModel.toggleAutoFitOnResize()
             }
             .keyboardShortcut("l", modifiers: .command)
 
-            Button(viewModel.wheelPageTurn ? "Disable Scroll Page Turning" : "Enable Scroll Page Turning") {
+            Button(
+                viewModel.wheelPageTurn
+                    ? String(localized: "Disable Scroll Page Turning", bundle: .localized)
+                    : String(localized: "Enable Scroll Page Turning", bundle: .localized)
+            ) {
                 viewModel.toggleWheelPageTurn()
             }
 

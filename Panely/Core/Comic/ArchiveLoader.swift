@@ -19,7 +19,7 @@ nonisolated enum ArchiveLoader {
             case .extractedSizeExceeded(let limit):
                 // `Int` so the catalog key is the ordinary `%lld` form.
                 let mb = Int(limit / (1024 * 1024))
-                return String(localized: "Archive expanded past the safety limit (\(mb) MB).")
+                return String(localized: "Archive expanded past the safety limit (\(mb) MB).", bundle: .localized)
             }
         }
     }

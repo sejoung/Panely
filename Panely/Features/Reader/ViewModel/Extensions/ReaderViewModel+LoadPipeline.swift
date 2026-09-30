@@ -18,9 +18,9 @@ private enum ReaderLoadError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .extractionFailed(let error):
-            return String(localized: "Failed to extract archive: \(error.localizedDescription)")
+            return String(localized: "Failed to extract archive: \(error.localizedDescription)", bundle: .localized)
         case .preferredPathMissing:
-            return String(localized: "The saved book is no longer available in this source.")
+            return String(localized: "The saved book is no longer available in this source.", bundle: .localized)
         }
     }
 }
@@ -156,13 +156,13 @@ extension ReaderViewModel {
                     metadata: ["source": "\(DiagnosticRedactor.describe(targetURL))"]
                 )
                 clearLoadedSource(
-                    message: String(localized: "Folder is empty or has no supported content"),
+                    message: String(localized: "Folder is empty or has no supported content", bundle: .localized),
                     preserveLibraryContext: preservesExistingLibraryContext
                 )
                 return
             }
 
-            loadingMessage = String(localized: "Loading pages…")
+            loadingMessage = String(localized: "Loading pages…", bundle: .localized)
             let loaded = try await loadComicSource(from: targetURL)
             guard myEpoch == loadEpoch else { return }
 
@@ -179,7 +179,7 @@ extension ReaderViewModel {
             // Library root has settled — point the directory watcher at it so
             // files added on disk refresh the sidebar tree automatically.
             syncLibraryWatcher()
-            errorMessage = loaded.isEmpty ? String(localized: "No images found") : nil
+            errorMessage = loaded.isEmpty ? String(localized: "No images found", bundle: .localized) : nil
             AppLog.info(
                 .load,
                 "Load finished",
@@ -237,7 +237,7 @@ extension ReaderViewModel {
 
         loadEpoch &+= 1
         isLoading = true
-        loadingMessage = String(localized: "Opening…")
+        loadingMessage = String(localized: "Opening…", bundle: .localized)
         // Drop the outgoing book's strip now (while isLoading guards against a
         // scroll-driven position overwrite) so the new book's restored-position
         // scroll-sync doesn't run against the previous book's stale frames.
@@ -289,7 +289,7 @@ extension ReaderViewModel {
             return url
         }
 
-        loadingMessage = String(localized: "Analyzing archive…")
+        loadingMessage = String(localized: "Analyzing archive…", bundle: .localized)
         guard let hasNested = try? await ArchiveLoader.hasNestedArchives(at: url) else {
             return url
         }
@@ -324,7 +324,7 @@ extension ReaderViewModel {
             return cached
         }
 
-        loadingMessage = String(localized: "Extracting archive…")
+        loadingMessage = String(localized: "Extracting archive…", bundle: .localized)
         if let key {
             AppLog.info(
                 .cache,
@@ -471,7 +471,7 @@ extension ReaderViewModel {
         var resolvedSiblings: [URL]?
 
         while isDirectory(candidate) {
-            loadingMessage = String(localized: "Scanning folder…")
+            loadingMessage = String(localized: "Scanning folder…", bundle: .localized)
             let (hasImages, volumes) = await FolderResolver.analyzeFolder(candidate)
             guard epoch == loadEpoch else { return nil }
 

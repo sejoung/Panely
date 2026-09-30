@@ -12,11 +12,11 @@ enum ArchiveReaderError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .cannotOpen:
-            return String(localized: "The archive could not be opened.")
+            return String(localized: "The archive could not be opened.", bundle: .localized)
         case .entryNotFound(let path):
-            return String(localized: "The archive has no entry named \"\(path)\".")
+            return String(localized: "The archive has no entry named \"\(path)\".", bundle: .localized)
         case .passwordProtected:
-            return String(localized: "Password-protected archives are not supported.")
+            return String(localized: "Password-protected archives are not supported.", bundle: .localized)
         case .prefixComplete:
             return nil
         }

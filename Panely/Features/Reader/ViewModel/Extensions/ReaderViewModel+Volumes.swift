@@ -13,11 +13,11 @@ enum VolumeNavigationNotice: Equatable {
     var message: String {
         switch self {
         case .needsFolderAccess:
-            String(localized: "Panely can only see this one book. Allow access to its folder to move between the books in it.")
+            String(localized: "Panely can only see this one book. Allow access to its folder to move between the books in it.", bundle: .localized)
         case .noNextVolume:
-            String(localized: "This is the last book in the folder.")
+            String(localized: "This is the last book in the folder.", bundle: .localized)
         case .noPreviousVolume:
-            String(localized: "This is the first book in the folder.")
+            String(localized: "This is the first book in the folder.", bundle: .localized)
         }
     }
 }
@@ -55,7 +55,7 @@ extension ReaderViewModel {
 
     var volumeCounterLabel: String? {
         guard hasMultipleVolumes, let idx = currentSiblingIndex else { return nil }
-        return String(localized: "Vol \(idx + 1) / \(siblings.count)")
+        return String(localized: "Vol \(idx + 1) / \(siblings.count)", bundle: .localized)
     }
 
     var combinedCounterLabel: String {

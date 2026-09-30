@@ -18,6 +18,10 @@ struct PanelyApp: App {
             ContentView()
                 .environment(viewModel)
                 .environment(viewerController)
+                // SwiftUI resolves `Text("…")` against this locale, so the
+                // window follows a language switch without a restart (see
+                // `AppLocalization`).
+                .environment(\.locale, viewModel.localization.locale)
                 // Dark-only by design. `PanelyColor` tokens (`bgPrimary` #0F1115
                 // etc.) are tuned for a dark reading surface — comic pages have
                 // arbitrary content, and a near-black chrome stays out of the
@@ -48,6 +52,7 @@ struct PanelyApp: App {
 
         Settings {
             SettingsView(viewModel: viewModel)
+                .environment(\.locale, viewModel.localization.locale)
                 .preferredColorScheme(.dark)
         }
     }

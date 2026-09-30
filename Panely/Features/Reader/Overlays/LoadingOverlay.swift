@@ -11,7 +11,7 @@ struct LoadingOverlay: View {
             HStack(spacing: PanelySpacing.md) {
                 ProgressView()
                     .controlSize(.regular)
-                Text(message.isEmpty ? String(localized: "Loading…") : message)
+                Text(message.isEmpty ? String(localized: "Loading…", bundle: .localized) : message)
                     .font(PanelyTypography.body)
                     .foregroundStyle(PanelyColor.textPrimary)
             }

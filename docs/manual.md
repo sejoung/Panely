@@ -232,6 +232,23 @@ so reopening the same archive is instant on subsequent launches.
 
 ---
 
+## General settings
+
+![General settings: interface language with the restart prompt](screenshots/16-general-settings.png)
+
+Panely follows your Mac's primary language when it's English or Korean,
+and shows English for any other language. To choose yourself, open
+**File → Settings… → General → Language** and pick **System Default**,
+**English**, or **한국어**. Language names are always shown in their own
+language, so the right one is easy to find whichever language is on screen.
+
+The switch happens immediately — the window, menus, and settings change as
+soon as you pick. A few menu items that macOS draws itself (the Edit and
+Window menus, Quit, and so on) keep the previous language until Panely
+restarts; **Restart Now** does that and reopens the book you were reading.
+
+---
+
 ## Library settings
 
 ![Library settings: reopen-on-launch toggle and Forget control](screenshots/15-library-settings.png)

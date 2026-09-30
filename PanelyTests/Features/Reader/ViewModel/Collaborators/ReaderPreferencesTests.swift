@@ -122,4 +122,67 @@ struct ReaderPreferencesTests {
         prefs.sidebarMode.togglePin() // false → true
         #expect(ReaderPreferences(defaults: defaults).sidebarMode.pinned == true)
     }
+
+    // MARK: - Interface language
+
+    @Test func appLanguageDefaultsToSystemWithoutOverride() {
+        let defaults = InMemoryKeyValueStore()
+
+        let prefs = ReaderPreferences(defaults: defaults, systemLanguages: { ["ko-KR", "en"] })
+
+        #expect(prefs.appLanguage == .system)
+        #expect(defaults.array(forKey: ReaderPreferences.appleLanguagesKey) == nil)
+    }
+
+    @Test func choosingALanguageOverridesAppleLanguages() {
+        let defaults = InMemoryKeyValueStore()
+        let prefs = ReaderPreferences(defaults: defaults, systemLanguages: { ["ko-KR"] })
+
+        prefs.appLanguage = .english
+        #expect(defaults.array(forKey: ReaderPreferences.appleLanguagesKey) as? [String] == ["en"])
+
+        prefs.appLanguage = .korean
+        #expect(defaults.array(forKey: ReaderPreferences.appleLanguagesKey) as? [String] == ["ko"])
+        #expect(ReaderPreferences(defaults: defaults).appLanguage == .korean)
+    }
+
+    @Test func systemDefaultOnASupportedLanguageLeavesItToMacOS() {
+        let defaults = InMemoryKeyValueStore()
+        let prefs = ReaderPreferences(defaults: defaults, systemLanguages: { ["ko-KR", "en"] })
+        prefs.appLanguage = .english
+
+        prefs.appLanguage = .system
+
+        #expect(defaults.array(forKey: ReaderPreferences.appleLanguagesKey) == nil)
+        #expect(ReaderPreferences(defaults: defaults).appLanguage == .system)
+    }
+
+    @Test func systemDefaultOnAnUnsupportedLanguageFallsBackToEnglish() {
+        // Without the override macOS would pick Korean — the next supported
+        // language in the list — for its own menus while Panely shows English.
+        let defaults = InMemoryKeyValueStore()
+        let prefs = ReaderPreferences(defaults: defaults, systemLanguages: { ["ja-JP", "ko-KR"] })
+
+        prefs.appLanguage = .system
+
+        #expect(defaults.array(forKey: ReaderPreferences.appleLanguagesKey) as? [String] == ["en"])
+    }
+
+    @Test func refreshingTheOverrideTracksAChangedSystemLanguage() {
+        var system = ["ja-JP"]
+        let defaults = InMemoryKeyValueStore()
+        let prefs = ReaderPreferences(defaults: defaults, systemLanguages: { system })
+        prefs.refreshAppleLanguagesOverride()
+        #expect(defaults.array(forKey: ReaderPreferences.appleLanguagesKey) as? [String] == ["en"])
+
+        system = ["ko-KR"]
+        prefs.refreshAppleLanguagesOverride()
+
+        #expect(defaults.array(forKey: ReaderPreferences.appleLanguagesKey) == nil)
+    }
+
+    @Test func unknownStoredLanguageFallsBackToSystem() {
+        let defaults = InMemoryKeyValueStore([ReaderPreferences.appLanguageKey: "klingon"])
+        #expect(ReaderPreferences(defaults: defaults).appLanguage == .system)
+    }
 }

@@ -13,6 +13,10 @@ nonisolated struct AppDependencies {
     /// Release builds; tests and previews can still disable it.
     let libraryAutoRefreshEnabled: Bool
     let filePickerFactory: @MainActor () -> any FilePicking
+    /// Which language the UI is in. Live: the process-wide instance behind
+    /// `Bundle.localized`. Tests get their own so switching languages in one
+    /// test can't leak into another's strings.
+    let localization: AppLocalization
 
     // Reader collaborators are surfaced as factories so tests can swap in
     // doubles without subclassing `ReaderViewModel`. The live implementations
@@ -38,6 +42,7 @@ nonisolated struct AppDependencies {
             libraryDirectoryWatcherFactory: { LiveLibraryDirectoryWatcher() },
             libraryAutoRefreshEnabled: true,
             filePickerFactory: { LiveFilePicker() },
+            localization: .shared,
             makeReaderPreferences: { ReaderPreferences(defaults: keyValueStore) },
             makeReaderPositions: { ReaderPositionStore(defaults: keyValueStore) },
             makeReadingProgress: { ReadingProgressStore(defaults: keyValueStore) },

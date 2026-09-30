@@ -348,9 +348,9 @@ extension ReaderViewModel {
         unavailableRecentItem = item
         switch availability {
         case .temporarilyUnavailable:
-            errorMessage = String(localized: "This book is currently unavailable. Reconnect its drive or restore the file.")
+            errorMessage = String(localized: "This book is currently unavailable. Reconnect its drive or restore the file.", bundle: .localized)
         case .invalidBookmark, .unknown:
-            errorMessage = String(localized: "This recent book can no longer be opened.")
+            errorMessage = String(localized: "This recent book can no longer be opened.", bundle: .localized)
         case .available:
             break
         }

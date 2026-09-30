@@ -19,6 +19,7 @@ struct KoreanLocalizationTests {
         #expect(String(localized: "Zoom In (⌘+)", bundle: ko) == "확대 (⌘+)")
         #expect(String(localized: "Next Volume (])", bundle: ko) == "다음 권 · 다음 압축파일 (])")
         #expect(String(localized: "Bookmarks", bundle: ko) == "북마크")
+        #expect(String(localized: "System Default", bundle: ko) == "시스템 설정 따르기")
     }
 
     @Test func interpolatedKeysResolveToKorean() throws {

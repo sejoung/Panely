@@ -7,20 +7,20 @@ extension PanelyApp {
     @CommandsBuilder
     var fileCommands: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button("Open…") {
+            Button(String(localized: "Open…", bundle: .localized)) {
                 viewModel.openSource()
             }
             .keyboardShortcut("o", modifiers: .command)
 
-            Button("Reload Book") {
+            Button(String(localized: "Reload Book", bundle: .localized)) {
                 viewModel.reloadCurrentSource()
             }
             .keyboardShortcut("r", modifiers: .command)
             .disabled(viewModel.currentSourceURL == nil || viewModel.isLoading)
 
-            Menu("Open Recent") {
+            Menu(String(localized: "Open Recent", bundle: .localized)) {
                 if viewModel.recentItems.menuItems.isEmpty {
-                    Text("No Recent Items")
+                    Text(String(localized: "No Recent Items", bundle: .localized))
                 } else {
                     ForEach(viewModel.recentItems.menuItems) { item in
                         Button {
@@ -30,7 +30,7 @@ extension PanelyApp {
                         }
                     }
                     Divider()
-                    Button("Clear Menu") {
+                    Button(String(localized: "Clear Menu", bundle: .localized)) {
                         viewModel.recentItems.clear()
                     }
                 }
@@ -39,12 +39,12 @@ extension PanelyApp {
             Divider()
 
             SettingsLink {
-                Text("Settings…")
+                Text(String(localized: "Settings…", bundle: .localized))
             }
 
             Divider()
 
-            Button("Export Diagnostic Report…") {
+            Button(String(localized: "Export Diagnostic Report…", bundle: .localized)) {
                 let exporter = DiagnosticReportExporter(viewModel: viewModel)
                 guard let destination = exporter.selectDestination() else { return }
                 Task {
@@ -57,7 +57,7 @@ extension PanelyApp {
                 }
             }
 
-            Button("Clear Diagnostic Logs") {
+            Button(String(localized: "Clear Diagnostic Logs", bundle: .localized)) {
                 guard DiagnosticReportAlerts.confirmClearLogs() else { return }
                 Task {
                     let cleared = await DiagnosticLogStore.shared.clear()
@@ -65,11 +65,11 @@ extension PanelyApp {
                 }
             }
 
-            Button("Open Diagnostic Logs Folder") {
+            Button(String(localized: "Open Diagnostic Logs Folder", bundle: .localized)) {
                 DiagnosticReportAlerts.openDiagnosticsFolder()
             }
 
-            Button("Clear Extraction Cache") {
+            Button(String(localized: "Clear Extraction Cache", bundle: .localized)) {
                 viewModel.clearExtractionCache()
             }
             .disabled(viewModel.isLoading)

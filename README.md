@@ -198,7 +198,11 @@ pages.
   (small window, or the library pinned), the fit/zoom and then the layout
   controls fold into menus instead of clipping the buttons at either end
 - **Korean UI** — menus, toolbar hints, sidebar, settings, and messages follow
-  the system language (English and Korean)
+  the Mac's primary language, falling back to English when it's neither
+  English nor Korean. **Settings → General → Language** overrides it (System
+  Default / English / 한국어) and switches the UI on the spot; only macOS's
+  own menu items (Edit, Window, Quit…) wait for a restart, which the pane
+  offers with **Restart Now** (reopening the book you were reading)
 - **Window controls** — with the title bar hidden, the top 28 px strip still
   supports native drag-to-move and double-click-to-zoom (respecting the
   system's `AppleActionOnDoubleClick` preference); an open-hand cursor
@@ -512,6 +516,8 @@ Panely/
 │   ├── SourceChangeMonitor.swift       # DispatchSource-backed multi-URL file/folder watcher (session-guarded)
 │   ├── LibraryDirectoryWatcher.swift   # FSEvents recursive watch on the library root (auto-refresh currently disabled)
 │   ├── Debouncer.swift                 # shared trailing-debounce helper (position / progress saves)
+│   ├── AppLanguage.swift               # System Default / English / Korean choice
+│   ├── AppLocalization.swift           # language in effect; `Bundle.localized` for live switching
 │   ├── FilePicking.swift               # NSOpenPanel seam (injected) → open / folder-access flows stay testable
 │   └── Extensions/                     # shared Foundation helpers
 ├── DesignSystem/
@@ -583,7 +589,9 @@ Panely/
 │   │       ├── ThumbnailSidebar.swift  # right-side thumbnail panel (LazyVStack)
 │   │       └── ThumbnailLoader.swift   # Image I/O thumbnails + NSCache
 │   ├── Settings/
-│   │   ├── SettingsView.swift          # Library + Storage + Diagnostics tabs
+│   │   ├── SettingsView.swift          # General + Library + Storage + Diagnostics tabs
+│   │   ├── GeneralSettingsView.swift   # interface language picker (live) + Restart Now for AppKit menus
+│   │   ├── AppRelauncher.swift         # relaunch (reopening the current book) to apply a language
 │   │   ├── LibrarySettingsView.swift   # reopen-last-folder toggle + Forget Now
 │   │   ├── StorageSettingsView.swift   # Storage settings UI + cache size / clear controls
 │   │   ├── DiagnosticsSettingsView.swift # diagnostic report export UI

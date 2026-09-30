@@ -3,6 +3,12 @@
   "strings" : {
     "%@ max, reports include %@" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ max, reports include %@"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -13,6 +19,12 @@
     },
     "%@ was created." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ was created."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -23,6 +35,12 @@
     },
     "%@ was removed." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ was removed."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -33,6 +51,12 @@
     },
     "%lld%% read" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%% read"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -43,6 +67,12 @@
     },
     "Add Page Bookmark" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Page Bookmark"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -53,6 +83,12 @@
     },
     "Add to Favorites" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add to Favorites"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -63,6 +99,12 @@
     },
     "Add to Favorites (⌘⇧D)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add to Favorites (⌘⇧D)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -73,6 +115,12 @@
     },
     "Allow" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -83,6 +131,12 @@
     },
     "Allow Folder Access…" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow Folder Access…"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -93,6 +147,12 @@
     },
     "Allow access to this folder so Panely can open the next and previous books in it." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow access to this folder so Panely can open the next and previous books in it."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -103,6 +163,12 @@
     },
     "Analyzing archive…" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Analyzing archive…"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -113,6 +179,12 @@
     },
     "App version" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App version"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -123,6 +195,12 @@
     },
     "Archive expanded past the safety limit (%lld MB)." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archive expanded past the safety limit (%lld MB)."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -133,6 +211,12 @@
     },
     "Available after loading finishes." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Available after loading finishes."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -143,6 +227,12 @@
     },
     "Bookmark Current Page (⌘D)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bookmark Current Page (⌘D)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -153,6 +243,12 @@
     },
     "Bookmark List" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bookmark List"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -163,6 +259,12 @@
     },
     "Bookmarks" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bookmarks"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -173,6 +275,12 @@
     },
     "Bookmarks in Other Books" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bookmarks in Other Books"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -183,6 +291,12 @@
     },
     "Bookmarks to remove: %lld. This can't be undone." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bookmarks to remove: %lld. This can't be undone."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -193,6 +307,12 @@
     },
     "Building vertical strip…" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Building vertical strip…"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -203,6 +323,12 @@
     },
     "Cache limit" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cache limit"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -213,6 +339,12 @@
     },
     "Cancel" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -223,6 +355,12 @@
     },
     "Change Library Root…" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change Library Root…"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -233,6 +371,12 @@
     },
     "Clear Cache" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear Cache"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -243,6 +387,12 @@
     },
     "Clear Diagnostic Logs" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear Diagnostic Logs"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -253,6 +403,12 @@
     },
     "Clear Diagnostic Logs?" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear Diagnostic Logs?"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -263,6 +419,12 @@
     },
     "Clear Extraction Cache" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear Extraction Cache"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -273,6 +435,12 @@
     },
     "Clear Logs" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear Logs"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -283,6 +451,12 @@
     },
     "Clear Menu" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear Menu"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -293,6 +467,12 @@
     },
     "Clearable cache" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clearable cache"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -303,6 +483,12 @@
     },
     "Click to jump to a page (⌘G)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Click to jump to a page (⌘G)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -313,6 +499,12 @@
     },
     "Continue Reading" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continue Reading"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -323,6 +515,12 @@
     },
     "Could Not Clear Diagnostic Logs" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could Not Clear Diagnostic Logs"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -333,6 +531,12 @@
     },
     "Could not access selected folder." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not access selected folder."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -343,6 +547,12 @@
     },
     "Could not clear diagnostic logs." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not clear diagnostic logs."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -351,8 +561,30 @@
         }
       }
     },
+    "Could not restart Panely." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not restart Panely."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Panely를 다시 시작하지 못했습니다."
+          }
+        }
+      }
+    },
     "Current book cache is kept while open." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current book cache is kept while open."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -363,6 +595,12 @@
     },
     "Diagnostic Logs Cleared" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnostic Logs Cleared"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -373,6 +611,12 @@
     },
     "Diagnostic Report Export Failed" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnostic Report Export Failed"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -383,6 +627,12 @@
     },
     "Diagnostic Report Exported" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnostic Report Exported"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -393,6 +643,12 @@
     },
     "Diagnostic log level set to %@." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnostic log level set to %@."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -403,6 +659,12 @@
     },
     "Diagnostic logs cleared." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnostic logs cleared."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -413,6 +675,12 @@
     },
     "Diagnostic report exported." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnostic report exported."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -423,6 +691,12 @@
     },
     "Diagnostics" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnostics"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -433,6 +707,12 @@
     },
     "Disable Scroll Page Turning" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disable Scroll Page Turning"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -443,6 +723,12 @@
     },
     "Dismiss" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dismiss"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -453,6 +739,12 @@
     },
     "Double Page" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Double Page"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -463,6 +755,12 @@
     },
     "Double Page (⌘⇧2)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Double Page (⌘⇧2)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -473,6 +771,12 @@
     },
     "Enable Scroll Page Turning" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable Scroll Page Turning"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -483,6 +787,12 @@
     },
     "Enter a page number (1 – %lld):" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter a page number (1 – %lld):"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -493,6 +803,12 @@
     },
     "Export Diagnostic Report…" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export Diagnostic Report…"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -503,6 +819,12 @@
     },
     "Export failed: %@" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export failed: %@"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -513,6 +835,12 @@
     },
     "Extracting archive…" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extracting archive…"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -523,6 +851,12 @@
     },
     "Extraction Cache Cleared" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extraction Cache Cleared"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -533,6 +867,12 @@
     },
     "Extraction cache" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extraction cache"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -543,6 +883,12 @@
     },
     "Failed to extract archive: %@" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failed to extract archive: %@"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -553,6 +899,12 @@
     },
     "Favorites" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favorites"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -563,6 +915,12 @@
     },
     "File log" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File log"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -573,6 +931,12 @@
     },
     "Files" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Files"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -583,6 +947,12 @@
     },
     "Finished" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finished"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -593,6 +963,12 @@
     },
     "Fit & Zoom" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fit & Zoom"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -603,6 +979,12 @@
     },
     "Fit Height (⌘3)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fit Height (⌘3)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -613,6 +995,12 @@
     },
     "Fit Width (⌘2)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fit Width (⌘2)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -623,6 +1011,12 @@
     },
     "Fit to Height" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fit to Height"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -633,6 +1027,12 @@
     },
     "Fit to Screen" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fit to Screen"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -643,6 +1043,12 @@
     },
     "Fit to Screen (⌘1)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fit to Screen (⌘1)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -653,6 +1059,12 @@
     },
     "Fit to Width" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fit to Width"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -663,6 +1075,12 @@
     },
     "Folder is empty or has no supported content" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Folder is empty or has no supported content"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -673,6 +1091,12 @@
     },
     "Forget Now" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forget Now"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -681,8 +1105,30 @@
         }
       }
     },
+    "General" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "General"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일반"
+          }
+        }
+      }
+    },
     "Go" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -693,6 +1139,12 @@
     },
     "Go to Page" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to Page"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -703,6 +1155,12 @@
     },
     "Go to Page…" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to Page…"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -713,6 +1171,12 @@
     },
     "Hide Thumbnails" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide Thumbnails"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -723,6 +1187,12 @@
     },
     "Hide Thumbnails (⌃⌘P)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide Thumbnails (⌃⌘P)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -733,6 +1203,12 @@
     },
     "In progress" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In progress"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -741,8 +1217,30 @@
         }
       }
     },
+    "Language" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Language"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "언어"
+          }
+        }
+      }
+    },
     "Last opened" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last opened"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -753,6 +1251,12 @@
     },
     "Library" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Library"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -763,6 +1267,12 @@
     },
     "Loading pages…" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading pages…"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -773,6 +1283,12 @@
     },
     "Loading…" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading…"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -783,6 +1299,12 @@
     },
     "Lock View Size" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lock View Size"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -793,6 +1315,12 @@
     },
     "Lock view size (don't auto-fit on resize) (⌘L)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lock view size (don't auto-fit on resize) (⌘L)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -803,6 +1331,12 @@
     },
     "Log level" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Log level"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -813,6 +1347,12 @@
     },
     "Next Bookmark" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next Bookmark"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -823,6 +1363,12 @@
     },
     "Next Page (%@ or Space)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next Page (%@ or Space)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -833,6 +1379,12 @@
     },
     "Next Volume" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next Volume"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -843,6 +1395,12 @@
     },
     "Next Volume (])" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next Volume (])"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -853,6 +1411,12 @@
     },
     "Next volume" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next volume"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -863,6 +1427,12 @@
     },
     "No Bookmarks" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Bookmarks"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -873,6 +1443,12 @@
     },
     "No Bookmarks in This Book" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Bookmarks in This Book"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -883,6 +1459,12 @@
     },
     "No Extraction Cache Cleared" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Extraction Cache Cleared"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -893,6 +1475,12 @@
     },
     "No Recent Items" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Recent Items"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -903,6 +1491,12 @@
     },
     "No books to show" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No books to show"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -913,6 +1507,12 @@
     },
     "No folder remembered yet — it's saved the first time you browse one." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No folder remembered yet — it's saved the first time you browse one."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -923,6 +1523,12 @@
     },
     "No image loaded" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No image loaded"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -933,6 +1539,12 @@
     },
     "No images found" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No images found"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -943,6 +1555,12 @@
     },
     "No library opened" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No library opened"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -953,6 +1571,12 @@
     },
     "No pages" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No pages"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -963,6 +1587,12 @@
     },
     "OK" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -973,6 +1603,12 @@
     },
     "Offset spread (standalone cover)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offset spread (standalone cover)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -983,6 +1619,12 @@
     },
     "Open" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -993,6 +1635,12 @@
     },
     "Open Diagnostic Logs Folder" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Diagnostic Logs Folder"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1003,6 +1651,12 @@
     },
     "Open Folder, CBZ/CBR, or ZIP/RAR… (⌘O)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Folder, CBZ/CBR, or ZIP/RAR… (⌘O)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1013,6 +1667,12 @@
     },
     "Open Folder…" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Folder…"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1023,6 +1683,12 @@
     },
     "Open Logs Folder" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Logs Folder"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1033,6 +1699,12 @@
     },
     "Open Recent" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Recent"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1043,6 +1715,12 @@
     },
     "Open a folder, CBZ/CBR, or ZIP/RAR to start reading" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open a folder, CBZ/CBR, or ZIP/RAR to start reading"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1053,6 +1731,12 @@
     },
     "Opening…" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opening…"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1063,6 +1747,12 @@
     },
     "Open…" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open…"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1073,6 +1763,12 @@
     },
     "Other Books" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Other Books"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1083,6 +1779,12 @@
     },
     "Page %lld" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Page %lld"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1093,6 +1795,12 @@
     },
     "Page Layout" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Page Layout"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1103,6 +1811,12 @@
     },
     "Pages" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pages"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1113,6 +1827,12 @@
     },
     "Panely can only see this one book. Allow access to its folder to move between the books in it." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Panely can only see this one book. Allow access to its folder to move between the books in it."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1123,6 +1843,12 @@
     },
     "Password-protected archives are not supported." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Password-protected archives are not supported."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1133,6 +1859,12 @@
     },
     "Pick Folder…" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pick Folder…"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1143,6 +1875,12 @@
     },
     "Pick a folder to browse its contents." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pick a folder to browse its contents."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1153,6 +1891,12 @@
     },
     "Pin Library" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pin Library"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1163,6 +1907,12 @@
     },
     "Pin Library (⌃⌘S)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pin Library (⌃⌘S)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1173,6 +1923,12 @@
     },
     "Pin Library Open (⌃⌘S)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pin Library Open (⌃⌘S)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1183,6 +1939,12 @@
     },
     "Pin Toolbar" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pin Toolbar"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1193,6 +1955,12 @@
     },
     "Pin Toolbar (⌃⌘T)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pin Toolbar (⌃⌘T)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1203,6 +1971,12 @@
     },
     "Previous" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previous"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1213,6 +1987,12 @@
     },
     "Previous Bookmark" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previous Bookmark"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1223,6 +2003,12 @@
     },
     "Previous Page (%@)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previous Page (%@)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1233,6 +2019,12 @@
     },
     "Previous Volume" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previous Volume"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1243,6 +2035,12 @@
     },
     "Previous Volume ([)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previous Volume ([)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1253,6 +2051,12 @@
     },
     "Previous volume" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previous volume"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1261,8 +2065,30 @@
         }
       }
     },
+    "Quit and reopen Panely to apply the new language." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quit and reopen Panely to apply the new language."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Panely를 종료한 뒤 다시 열면 새 언어가 적용됩니다."
+          }
+        }
+      }
+    },
     "Read Left to Right" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read Left to Right"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1273,6 +2099,12 @@
     },
     "Read Right to Left" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read Right to Left"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1283,6 +2115,12 @@
     },
     "Reading direction is fixed in vertical mode" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading direction is fixed in vertical mode"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1293,6 +2131,12 @@
     },
     "Recent file logs were removed." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recent file logs were removed."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1303,6 +2147,12 @@
     },
     "Refresh File Tree" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refresh File Tree"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1313,6 +2163,12 @@
     },
     "Reload" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reload"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1323,6 +2179,12 @@
     },
     "Reload Book" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reload Book"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1333,6 +2195,12 @@
     },
     "Remove All" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove All"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1343,6 +2211,12 @@
     },
     "Remove All Bookmarks in This Book…" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove All Bookmarks in This Book…"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1353,6 +2227,12 @@
     },
     "Remove All Bookmarks…" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove All Bookmarks…"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1363,6 +2243,12 @@
     },
     "Remove Bookmark" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove Bookmark"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1373,6 +2259,12 @@
     },
     "Remove Page Bookmark" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove Page Bookmark"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1383,6 +2275,12 @@
     },
     "Remove Page Bookmark (⌘D)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove Page Bookmark (⌘D)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1393,6 +2291,12 @@
     },
     "Remove This Book's Bookmarks…" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove This Book's Bookmarks…"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1403,6 +2307,12 @@
     },
     "Remove all bookmarks in every book?" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove all bookmarks in every book?"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1413,6 +2323,12 @@
     },
     "Remove all bookmarks in this book?" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove all bookmarks in this book?"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1423,6 +2339,12 @@
     },
     "Remove all bookmarks in “%@”?" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove all bookmarks in “%@”?"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1433,6 +2355,12 @@
     },
     "Remove from Continue Reading" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove from Continue Reading"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1443,6 +2371,12 @@
     },
     "Remove from Favorites" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove from Favorites"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1453,6 +2387,12 @@
     },
     "Remove from Favorites (⌘⇧D)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove from Favorites (⌘⇧D)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1463,6 +2403,12 @@
     },
     "Remove from List" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove from List"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1473,6 +2419,12 @@
     },
     "Reopen last folder on launch" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reopen last folder on launch"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1483,6 +2435,12 @@
     },
     "Reset Zoom" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset Zoom"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1493,6 +2451,12 @@
     },
     "Restart" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restart"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1501,8 +2465,30 @@
         }
       }
     },
+    "Restart Now" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restart Now"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금 다시 시작"
+          }
+        }
+      }
+    },
     "Retention" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retention"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1513,6 +2499,12 @@
     },
     "Retry" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retry"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1523,6 +2515,12 @@
     },
     "Reveal in Finder" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reveal in Finder"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1533,6 +2531,12 @@
     },
     "Scanning folder…" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scanning folder…"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1543,6 +2547,12 @@
     },
     "Select" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1553,6 +2563,12 @@
     },
     "Select a folder to browse books from." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select a folder to browse books from."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1563,6 +2579,12 @@
     },
     "Session" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Session"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1573,6 +2595,12 @@
     },
     "Settings…" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Settings…"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1583,6 +2611,12 @@
     },
     "Show Thumbnails" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show Thumbnails"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1593,6 +2627,12 @@
     },
     "Show Thumbnails (⌃⌘P)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show Thumbnails (⌃⌘P)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1603,6 +2643,12 @@
     },
     "Single Page" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Single Page"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1613,6 +2659,12 @@
     },
     "Single Page (⌘⇧1)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Single Page (⌘⇧1)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1621,8 +2673,30 @@
         }
       }
     },
+    "Some macOS menus, like Edit and Window, change after Panely restarts." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some macOS menus, like Edit and Window, change after Panely restarts."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "편집, 윈도우 같은 macOS 기본 메뉴는 Panely를 다시 시작한 뒤에 바뀝니다."
+          }
+        }
+      }
+    },
     "Storage" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Storage"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1631,8 +2705,30 @@
         }
       }
     },
+    "System Default" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System Default"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시스템 설정 따르기"
+          }
+        }
+      }
+    },
     "The archive could not be opened." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The archive could not be opened."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1643,6 +2739,12 @@
     },
     "The archive has no entry named \"%@\"." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The archive has no entry named \"%@\"."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1653,6 +2755,12 @@
     },
     "The current book changed on disk." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The current book changed on disk."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1663,6 +2771,12 @@
     },
     "The recent file log could not be removed. Please try again." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The recent file log could not be removed. Please try again."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1673,6 +2787,12 @@
     },
     "The saved book is no longer available in this source." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The saved book is no longer available in this source."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1683,6 +2803,12 @@
     },
     "There is no inactive extraction cache to remove." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "There is no inactive extraction cache to remove."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1693,6 +2819,12 @@
     },
     "This book is currently unavailable. Reconnect its drive or restore the file." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This book is currently unavailable. Reconnect its drive or restore the file."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1703,6 +2835,12 @@
     },
     "This bookmarked book can no longer be opened." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This bookmarked book can no longer be opened."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1713,6 +2851,12 @@
     },
     "This is the first book in the folder." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This is the first book in the folder."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1723,6 +2867,12 @@
     },
     "This is the last book in the folder." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This is the last book in the folder."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1733,6 +2883,12 @@
     },
     "This recent book can no longer be opened." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This recent book can no longer be opened."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1743,6 +2899,12 @@
     },
     "This removes Panely's recent file log. It does not clear OSLog, cache data, recent files, bookmarks, favorites, or reading position." : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This removes Panely's recent file log. It does not clear OSLog, cache data, recent files, bookmarks, favorites, or reading position."
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1753,6 +2915,12 @@
     },
     "Unlock View Size" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock View Size"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1763,6 +2931,12 @@
     },
     "Unlock view size (auto-fit on resize) (⌘L)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlock view size (auto-fit on resize) (⌘L)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1773,6 +2947,12 @@
     },
     "Unpin Library" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unpin Library"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1783,6 +2963,12 @@
     },
     "Unpin Library (⌃⌘S)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unpin Library (⌃⌘S)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1793,6 +2979,12 @@
     },
     "Unpin Toolbar" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unpin Toolbar"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1803,6 +2995,12 @@
     },
     "Unpin Toolbar (⌃⌘T)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unpin Toolbar (⌃⌘T)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1813,6 +3011,12 @@
     },
     "Up next" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Up next"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1823,6 +3027,12 @@
     },
     "Vertical Scroll" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vertical Scroll"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1833,6 +3043,12 @@
     },
     "Vertical Scroll (⌘⇧3)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vertical Scroll (⌘⇧3)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1843,6 +3059,12 @@
     },
     "Vol %lld / %lld" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vol %lld / %lld"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1853,6 +3075,12 @@
     },
     "Volumes" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volumes"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1863,6 +3091,12 @@
     },
     "Zoom In" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoom In"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1873,6 +3107,12 @@
     },
     "Zoom In (⌘+)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoom In (⌘+)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1883,6 +3123,12 @@
     },
     "Zoom Out" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoom Out"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1893,6 +3139,12 @@
     },
     "Zoom Out (⌘−)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zoom Out (⌘−)"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",

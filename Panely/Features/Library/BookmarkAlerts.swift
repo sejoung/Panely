@@ -12,7 +12,7 @@ enum BookmarkAlerts {
         let count = viewModel.currentBookPageBookmarks.count
         guard count > 0 else { return }
         let confirmed = confirm(
-            title: String(localized: "Remove all bookmarks in this book?"),
+            title: String(localized: "Remove all bookmarks in this book?", bundle: .localized),
             count: count
         )
         if confirmed {
@@ -23,7 +23,7 @@ enum BookmarkAlerts {
     static func removeAll(in book: BookmarkedBook, _ viewModel: ReaderViewModel) {
         guard !book.bookmarks.isEmpty else { return }
         let confirmed = confirm(
-            title: String(localized: "Remove all bookmarks in “\(book.title)”?"),
+            title: String(localized: "Remove all bookmarks in “\(book.title)”?", bundle: .localized),
             count: book.bookmarks.count
         )
         if confirmed {
@@ -35,7 +35,7 @@ enum BookmarkAlerts {
         let count = viewModel.pageBookmarks.totalBookmarkCount
         guard count > 0 else { return }
         let confirmed = confirm(
-            title: String(localized: "Remove all bookmarks in every book?"),
+            title: String(localized: "Remove all bookmarks in every book?", bundle: .localized),
             count: count
         )
         if confirmed {
@@ -47,9 +47,9 @@ enum BookmarkAlerts {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = title
-        alert.informativeText = String(localized: "Bookmarks to remove: \(count). This can't be undone.")
-        alert.addButton(withTitle: String(localized: "Remove All"))
-        alert.addButton(withTitle: String(localized: "Cancel"))
+        alert.informativeText = String(localized: "Bookmarks to remove: \(count). This can't be undone.", bundle: .localized)
+        alert.addButton(withTitle: String(localized: "Remove All", bundle: .localized))
+        alert.addButton(withTitle: String(localized: "Cancel", bundle: .localized))
         return alert.runModal() == .alertFirstButtonReturn
     }
 }

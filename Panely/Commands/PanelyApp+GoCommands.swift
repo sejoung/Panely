@@ -13,8 +13,8 @@ extension PanelyApp {
     /// text field too.
     @CommandsBuilder
     var goCommands: some Commands {
-        CommandMenu("Go") {
-            Button("Go to Page…") {
+        CommandMenu(String(localized: "Go", bundle: .localized)) {
+            Button(String(localized: "Go to Page…", bundle: .localized)) {
                 promptJumpToPage(viewModel: viewModel)
             }
             .keyboardShortcut("g", modifiers: .command)
@@ -22,19 +22,23 @@ extension PanelyApp {
 
             Divider()
 
-            Button(viewModel.isCurrentPageBookmarked ? "Remove Page Bookmark" : "Add Page Bookmark") {
+            Button(
+                viewModel.isCurrentPageBookmarked
+                    ? String(localized: "Remove Page Bookmark", bundle: .localized)
+                    : String(localized: "Add Page Bookmark", bundle: .localized)
+            ) {
                 viewModel.toggleCurrentPageBookmark()
             }
             .keyboardShortcut("d", modifiers: .command)
             .disabled(!viewModel.hasSource)
 
-            Button("Previous Bookmark") {
+            Button(String(localized: "Previous Bookmark", bundle: .localized)) {
                 viewModel.jumpToPreviousBookmark()
             }
             .keyboardShortcut("[", modifiers: [.command, .shift])
             .disabled(!viewModel.canGoPreviousBookmark)
 
-            Button("Next Bookmark") {
+            Button(String(localized: "Next Bookmark", bundle: .localized)) {
                 viewModel.jumpToNextBookmark()
             }
             .keyboardShortcut("]", modifiers: [.command, .shift])
@@ -42,19 +46,23 @@ extension PanelyApp {
 
             bookmarksMenu
 
-            Button("Remove All Bookmarks in This Book…") {
+            Button(String(localized: "Remove All Bookmarks in This Book…", bundle: .localized)) {
                 BookmarkAlerts.removeAllInCurrentBook(viewModel)
             }
             .disabled(!viewModel.hasPageBookmarks)
 
-            Button("Remove All Bookmarks…") {
+            Button(String(localized: "Remove All Bookmarks…", bundle: .localized)) {
                 BookmarkAlerts.removeAllEverywhere(viewModel)
             }
             .disabled(!viewModel.hasAnyPageBookmarks)
 
             Divider()
 
-            Button(viewModel.isCurrentBookFavorite ? "Remove from Favorites" : "Add to Favorites") {
+            Button(
+                viewModel.isCurrentBookFavorite
+                    ? String(localized: "Remove from Favorites", bundle: .localized)
+                    : String(localized: "Add to Favorites", bundle: .localized)
+            ) {
                 viewModel.toggleFavoriteForCurrentBook()
             }
             .keyboardShortcut("d", modifiers: [.command, .shift])
@@ -62,13 +70,13 @@ extension PanelyApp {
 
             Divider()
 
-            Button("Previous Volume") {
+            Button(String(localized: "Previous Volume", bundle: .localized)) {
                 viewModel.stepToPreviousVolume()
             }
             .keyboardShortcut("[", modifiers: .command)
             .disabled(!viewModel.canStepToPreviousVolume)
 
-            Button("Next Volume") {
+            Button(String(localized: "Next Volume", bundle: .localized)) {
                 viewModel.stepToNextVolume()
             }
             .keyboardShortcut("]", modifiers: .command)
@@ -82,12 +90,12 @@ extension PanelyApp {
     private var bookmarksMenu: some View {
         let current = viewModel.currentBookPageBookmarks
         let others = viewModel.otherBookmarkedBooks
-        Menu("Bookmarks") {
+        Menu(String(localized: "Bookmarks", bundle: .localized)) {
             if current.isEmpty && others.isEmpty {
-                Text("No Bookmarks")
+                Text(String(localized: "No Bookmarks", bundle: .localized))
             }
             ForEach(current) { bookmark in
-                Button("Page \(bookmark.pageIndex + 1)") {
+                Button(String(localized: "Page \(bookmark.pageIndex + 1)", bundle: .localized)) {
                     viewModel.jumpToBookmark(bookmark)
                 }
             }
@@ -97,7 +105,7 @@ extension PanelyApp {
             ForEach(others) { book in
                 Menu(book.qualifiedTitle) {
                     ForEach(book.bookmarks) { bookmark in
-                        Button("Page \(bookmark.pageIndex + 1)") {
+                        Button(String(localized: "Page \(bookmark.pageIndex + 1)", bundle: .localized)) {
                             viewModel.openBookmark(bookmark, in: book)
                         }
                     }
@@ -115,10 +123,10 @@ func promptJumpToPage(viewModel: ReaderViewModel) {
     guard viewModel.hasSource, viewModel.totalPages > 1 else { return }
 
     let alert = NSAlert()
-    alert.messageText = String(localized: "Go to Page")
-    alert.informativeText = String(localized: "Enter a page number (1 – \(viewModel.totalPages)):")
-    alert.addButton(withTitle: String(localized: "Go"))
-    alert.addButton(withTitle: String(localized: "Cancel"))
+    alert.messageText = String(localized: "Go to Page", bundle: .localized)
+    alert.informativeText = String(localized: "Enter a page number (1 – \(viewModel.totalPages)):", bundle: .localized)
+    alert.addButton(withTitle: String(localized: "Go", bundle: .localized))
+    alert.addButton(withTitle: String(localized: "Cancel", bundle: .localized))
 
     let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 220, height: 24))
     field.placeholderString = "\(viewModel.currentPageNumber)"

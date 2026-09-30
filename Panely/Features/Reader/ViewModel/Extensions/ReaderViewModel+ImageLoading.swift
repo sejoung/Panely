@@ -32,7 +32,7 @@ extension ReaderViewModel {
         // folders). refreshImages clears isLoading when it finishes.
         if layout.isContinuous && !oldLayout.isContinuous {
             isLoading = true
-            loadingMessage = String(localized: "Building vertical strip…")
+            loadingMessage = String(localized: "Building vertical strip…", bundle: .localized)
         }
         Task { await refreshImages() }
     }

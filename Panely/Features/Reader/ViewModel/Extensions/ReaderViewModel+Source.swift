@@ -119,7 +119,7 @@ extension ReaderViewModel {
             canChooseFiles: true,
             canChooseDirectories: true,
             allowedContentTypes: types,
-            prompt: String(localized: "Open")
+            prompt: String(localized: "Open", bundle: .localized)
         )
 
         guard let url = filePicker.pickURL(request) else { return }
@@ -169,7 +169,7 @@ extension ReaderViewModel {
     func markSourceChangedOnDisk() {
         guard hasSource else { return }
         sourceChangedOnDisk = true
-        sourceChangeMessage = String(localized: "The current book changed on disk.")
+        sourceChangeMessage = String(localized: "The current book changed on disk.", bundle: .localized)
         Task { await refreshContinueReadingAvailability() }
     }
 
@@ -192,10 +192,10 @@ extension ReaderViewModel {
         let request = FilePickerRequest(
             canChooseFiles: false,
             canChooseDirectories: true,
-            prompt: forVolumeNavigation ? String(localized: "Allow") : String(localized: "Select"),
+            prompt: forVolumeNavigation ? String(localized: "Allow", bundle: .localized) : String(localized: "Select", bundle: .localized),
             message: forVolumeNavigation
-                ? String(localized: "Allow access to this folder so Panely can open the next and previous books in it.")
-                : String(localized: "Select a folder to browse books from."),
+                ? String(localized: "Allow access to this folder so Panely can open the next and previous books in it.", bundle: .localized)
+                : String(localized: "Select a folder to browse books from.", bundle: .localized),
             directoryURL: bookURL?.deletingLastPathComponent()
         )
 
@@ -207,7 +207,7 @@ extension ReaderViewModel {
         )
 
         guard libraryScope.acquire(folderURL) else {
-            errorMessage = String(localized: "Could not access selected folder.")
+            errorMessage = String(localized: "Could not access selected folder.", bundle: .localized)
             AppLog.error(
                 .library,
                 "Folder access failed",

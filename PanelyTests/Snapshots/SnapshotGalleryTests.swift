@@ -209,6 +209,20 @@ struct SnapshotGalleryTests {
         )
     }
 
+    @Test func generalSettings() async throws {
+        let vm = SnapshotSampleContent.emptyViewModel()
+        vm.appLanguage = .english
+
+        try await render(
+            ZStack {
+                PanelyColor.bgPrimary
+                GeneralSettingsView(viewModel: vm)
+            },
+            size: SnapshotRenderer.settingsSize,
+            named: "16-general-settings.png"
+        )
+    }
+
     @Test func librarySettings() async throws {
         let vm = SnapshotSampleContent.emptyViewModel()
         // Seed a remembered folder so the shot shows the populated state —

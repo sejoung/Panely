@@ -6,6 +6,11 @@ struct SettingsView: View {
 
     var body: some View {
         TabView {
+            GeneralSettingsView(viewModel: viewModel)
+                .tabItem {
+                    Label("General", systemImage: "gearshape")
+                }
+
             LibrarySettingsView(viewModel: viewModel)
                 .tabItem {
                     Label("Library", systemImage: "books.vertical")

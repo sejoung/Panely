@@ -25,8 +25,15 @@ final class ReaderPreferences {
     static let doublePageCoverAloneKey = "panely.doublePageCoverAlone"
     static let reopenLastFolderOnLaunchKey = "panely.reopenLastFolderOnLaunch"
     static let wheelPageTurnKey = "panely.wheelPageTurn"
+    static let appLanguageKey = "panely.appLanguage"
+    /// Read by AppKit at launch to pick the app's localization. Written into
+    /// Panely's own defaults only — the system-wide list is never touched.
+    static let appleLanguagesKey = "AppleLanguages"
 
     private let defaults: any KeyValueStoring
+    /// The Mac's language list — injectable so tests don't depend on the
+    /// machine they run on.
+    private let systemLanguages: () -> [String]
 
     var layout: PageLayout = .single {
         didSet {
@@ -101,8 +108,32 @@ final class ReaderPreferences {
         }
     }
 
-    init(defaults: any KeyValueStoring = LiveKeyValueStore()) {
+    /// Interface language choice (see `AppLanguage`). Panely's own UI
+    /// follows it immediately through `AppLocalization`; the mirrored
+    /// `AppleLanguages` covers AppKit's parts from the next launch.
+    var appLanguage: AppLanguage = .system {
+        didSet {
+            defaults.set(appLanguage.rawValue, forKey: Self.appLanguageKey)
+            refreshAppleLanguagesOverride()
+        }
+    }
+
+    /// Re-derive the `AppleLanguages` override. Also run at launch: under
+    /// "System Default" the right value depends on the Mac's language, which
+    /// may have changed since it was last written.
+    func refreshAppleLanguagesOverride() {
+        defaults.set(
+            AppLocalization.appleLanguagesOverride(for: appLanguage, systemLanguages: systemLanguages()),
+            forKey: Self.appleLanguagesKey
+        )
+    }
+
+    init(
+        defaults: any KeyValueStoring = LiveKeyValueStore(),
+        systemLanguages: @escaping () -> [String] = { AppLocalization.systemPreferredLanguages() }
+    ) {
         self.defaults = defaults
+        self.systemLanguages = systemLanguages
 
         // Snapshot once. Each individual defaults lookup
         // / `.bool(...)` / `.object(...)` call is a syscall + KVO check; on
@@ -146,6 +177,10 @@ final class ReaderPreferences {
         }
         if let value = storedDefaults[Self.wheelPageTurnKey] as? Bool {
             wheelPageTurn = value
+        }
+        if let raw = storedDefaults[Self.appLanguageKey] as? String,
+           let stored = AppLanguage(rawValue: raw) {
+            appLanguage = stored
         }
     }
 }

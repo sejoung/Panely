@@ -249,6 +249,7 @@ func makeTestDependencies(
     libraryDirectoryWatcherFactory: @MainActor @escaping () -> any LibraryDirectoryWatching = { TestLibraryDirectoryWatcher() },
     libraryAutoRefreshEnabled: Bool = true,
     filePicker: any FilePicking = TestFilePicker(),
+    localization: AppLocalization = AppLocalization(language: "en"),
     readerLibraryScopeFactory: @MainActor @escaping () -> ReaderLibraryScope = { ReaderLibraryScope() }
 ) -> AppDependencies {
     AppDependencies(
@@ -261,6 +262,7 @@ func makeTestDependencies(
         libraryDirectoryWatcherFactory: libraryDirectoryWatcherFactory,
         libraryAutoRefreshEnabled: libraryAutoRefreshEnabled,
         filePickerFactory: { filePicker },
+        localization: localization,
         makeReaderPreferences: { ReaderPreferences(defaults: keyValueStore) },
         makeReaderPositions: { ReaderPositionStore(defaults: keyValueStore) },
         makeReadingProgress: { ReadingProgressStore(defaults: keyValueStore) },

@@ -127,7 +127,7 @@ extension ReaderViewModel {
         }
         guard let target = resolveBookmarkedBook(forKey: book.key) else {
             AppLog.error(.load, "Bookmarked book could not be resolved")
-            errorMessage = String(localized: "This bookmarked book can no longer be opened.")
+            errorMessage = String(localized: "This bookmarked book can no longer be opened.", bundle: .localized)
             return
         }
         AppLog.info(
