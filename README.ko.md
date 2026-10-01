@@ -178,9 +178,8 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   않으면, 양 끝 버튼이 잘리는 대신 맞춤/줌 → 레이아웃 순으로 메뉴로 접힘
 - **한국어 UI** — 메뉴, 툴바 설명, 사이드바, 설정, 메시지가 Mac의 기본 언어를
   따르고, 기본 언어가 영어·한국어가 아니면 영어로 표시됨. **설정 → 일반 →
-  언어**에서 시스템 설정 따르기 / English / 한국어를 고르면 바로 바뀜. macOS가
-  그리는 기본 메뉴 항목(편집, 윈도우, 종료 등)만 다시 시작해야 바뀌며, 설정
-  창의 **지금 다시 시작** 버튼이 읽던 책을 다시 연 채로 재시작함
+  언어**에서 시스템 설정 따르기 / English / 한국어를 고르면 macOS 기본 메뉴
+  항목(편집, 윈도우, 종료 등)까지 바로 바뀌며, 다시 시작할 필요가 없음
 - **창 컨트롤** — 타이틀바가 숨겨진 상태에서도 상단 28 px 스트립에서
   네이티브 드래그 이동과 더블클릭 확대(시스템 `AppleActionOnDoubleClick`
   환경설정 존중) 지원. 드래그 영역은 open-hand 커서로 표시
@@ -473,6 +472,7 @@ Panely/
 │   ├── Debouncer.swift                 # 공용 트레일링 디바운스 헬퍼 (위치/진행도 저장)
 │   ├── AppLanguage.swift               # 시스템 설정 따르기 / 영어 / 한국어 선택
 │   ├── AppLocalization.swift           # 현재 적용 언어, 즉시 전환용 `Bundle.localized`
+│   ├── AppMenuLocalizer.swift          # macOS 기본 메뉴 언어 즉시 전환
 │   ├── FilePicking.swift               # NSOpenPanel seam (주입) → open / folder-access 흐름 테스트 가능
 │   └── Extensions/                     # 공유 Foundation helper
 ├── DesignSystem/
@@ -545,8 +545,7 @@ Panely/
 │   │       └── ThumbnailLoader.swift   # Image I/O 썸네일 + NSCache
 │   ├── Settings/
 │   │   ├── SettingsView.swift          # General + Library + Storage + Diagnostics 탭
-│   │   ├── GeneralSettingsView.swift   # 인터페이스 언어 선택(즉시 적용) + AppKit 메뉴용 지금 다시 시작
-│   │   ├── AppRelauncher.swift         # 언어 적용을 위한 재시작(읽던 책 다시 열기)
+│   │   ├── GeneralSettingsView.swift   # 인터페이스 언어 선택(즉시 적용)
 │   │   ├── LibrarySettingsView.swift   # 마지막 폴더 다시 열기 토글 + Forget Now
 │   │   ├── StorageSettingsView.swift   # Storage 설정 UI + 캐시 용량 / 삭제 컨트롤
 │   │   ├── DiagnosticsSettingsView.swift # 진단 리포트 export UI

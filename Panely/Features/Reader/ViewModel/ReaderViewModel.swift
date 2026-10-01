@@ -60,9 +60,6 @@ final class ReaderViewModel {
     let libraryAutoRefreshEnabled: Bool
     let filePicker: any FilePicking
     let localization: AppLocalization
-    /// The localization AppKit picked when this process launched — what its
-    /// own menu items are in regardless of later switches.
-    let launchUILanguage: String
 
     // MARK: - Source state
 
@@ -227,26 +224,14 @@ final class ReaderViewModel {
     }
 
     /// Interface language chosen in Settings. Panely's own UI switches on
-    /// assignment (through `localization`); AppKit's menus follow on the
-    /// next launch — see `appLanguageNeedsRestart`.
+    /// assignment (through `localization`); `AppMenuLocalizer` updates the
+    /// standard macOS menu titles in the same running process.
     var appLanguage: AppLanguage {
         get { preferences.appLanguage }
         set {
             preferences.appLanguage = newValue
             localization.apply(newValue)
         }
-    }
-
-    /// True when the language on screen differs from the one AppKit launched
-    /// with, so its own menu items (Edit, Window, Quit…) are still in the old
-    /// language until Panely restarts.
-    var appLanguageNeedsRestart: Bool { localization.language != launchUILanguage }
-
-    /// What to hand a relaunched instance so it reopens the book on screen:
-    /// the book itself, or — for a volume extracted from an archive — the
-    /// archive it came from. `nil` when nothing is open.
-    var relaunchBookURL: URL? {
-        tempDir.isActive ? openedSourceURL : currentSourceURL
     }
 
     /// The folder a cold launch would reopen, resolved read-only for display in
@@ -329,7 +314,6 @@ final class ReaderViewModel {
         self.libraryAutoRefreshEnabled = dependencies.libraryAutoRefreshEnabled
         self.filePicker = dependencies.filePickerFactory()
         self.localization = dependencies.localization
-        self.launchUILanguage = Bundle.main.preferredLocalizations.first ?? AppLocalization.fallbackLanguage
         localization.apply(preferences.appLanguage)
         preferences.refreshAppleLanguagesOverride()
 

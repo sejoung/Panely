@@ -4,8 +4,7 @@ import SwiftUI
 /// are shown in their own language ("English", "한국어") so the right one is
 /// recognizable whatever language the UI is in right now.
 ///
-/// A choice applies immediately. AppKit's own menu items (Edit, Window, Quit…)
-/// only change on the next launch, so the pane offers a restart for those.
+/// A choice applies immediately, including the standard macOS menus.
 @MainActor
 struct GeneralSettingsView: View {
     let viewModel: ReaderViewModel
@@ -23,21 +22,6 @@ struct GeneralSettingsView: View {
                 Picker("Language", selection: language) {
                     ForEach(AppLanguage.allCases) { option in
                         name(of: option).tag(option)
-                    }
-                }
-
-                if viewModel.appLanguageNeedsRestart {
-                    HStack {
-                        Text("Some macOS menus, like Edit and Window, change after Panely restarts.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Button("Restart Now") {
-                            // Write the open book's position before this
-                            // process goes away; the new one reads it back.
-                            viewModel.flushPositionImmediately()
-                            AppRelauncher.relaunch(reopening: viewModel.relaunchBookURL)
-                        }
                     }
                 }
             }

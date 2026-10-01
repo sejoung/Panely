@@ -2,8 +2,8 @@ import Testing
 import Foundation
 @testable import Panely
 
-/// Picking a language switches Panely's own UI on the spot; AppKit's menu
-/// items keep the launch language until a restart, which Settings offers.
+/// Picking a language switches Panely's UI on the spot without reopening
+/// the app or the current book.
 @MainActor
 struct ReaderViewModelAppLanguageTests {
 
@@ -20,19 +20,6 @@ struct ReaderViewModelAppLanguageTests {
         vm.appLanguage = .english
 
         #expect(String(localized: "Bookmarks", bundle: vm.localization.bundle) == "Bookmarks")
-    }
-
-    @Test func restartOnlyOfferedWhileAppKitIsInAnotherLanguage() {
-        // The test host launches in English (the scheme's language).
-        let vm = makeTestViewModel()
-        #expect(vm.launchUILanguage == "en")
-        #expect(vm.appLanguageNeedsRestart == false)
-
-        vm.appLanguage = .korean
-        #expect(vm.appLanguageNeedsRestart)
-
-        vm.appLanguage = .english
-        #expect(vm.appLanguageNeedsRestart == false)
     }
 
     @Test func savedChoiceIsAppliedAtLaunch() {
@@ -54,23 +41,18 @@ struct ReaderViewModelAppLanguageTests {
         #expect(english.localization.language == "en")
     }
 
-    @Test func relaunchReopensTheOpenBookOrItsArchive() throws {
+    @Test func switchingLanguagePreservesTheOpenBookAndPage() {
         let vm = makeTestViewModel()
-        #expect(vm.relaunchBookURL == nil)
-
         let book = URL(fileURLWithPath: "/lib/Series/Vol02.cbz")
         vm.currentSourceURL = book
         vm.openedSourceURL = URL(fileURLWithPath: "/lib", isDirectory: true)
-        #expect(vm.relaunchBookURL == book)
+        vm.currentPageIndex = 12
 
-        // A volume extracted from an archive only exists in the temp dir;
-        // the new instance has to reopen the archive itself.
-        let archive = URL(fileURLWithPath: "/lib/Series.zip")
-        let tempRoot = try Fixture.makeTempDir()
-        defer { try? FileManager.default.removeItem(at: tempRoot) }
-        vm.tempDir.url = tempRoot
-        vm.openedSourceURL = archive
-        vm.currentSourceURL = tempRoot.appendingPathComponent("Vol02")
-        #expect(vm.relaunchBookURL == archive)
+        vm.appLanguage = .korean
+        vm.appLanguage = .english
+
+        #expect(vm.currentSourceURL == book)
+        #expect(vm.openedSourceURL == URL(fileURLWithPath: "/lib", isDirectory: true))
+        #expect(vm.currentPageIndex == 12)
     }
 }

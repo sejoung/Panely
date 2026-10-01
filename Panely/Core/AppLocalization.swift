@@ -9,8 +9,8 @@ import Observation
 /// strings up in the chosen `.lproj` explicitly — `String(localized:bundle:
 /// .localized)` in code, the `\.locale` environment for SwiftUI text — and
 /// both follow this object, so the UI changes the moment a language is
-/// picked. Only AppKit's own items (Edit/Window menus, Quit, standard panel
-/// buttons) stay in the launch language until the next start.
+/// picked. `AppMenuLocalizer` updates AppKit's standard menu titles too;
+/// macOS-owned content inside system panels remains managed by AppKit.
 ///
 /// Observable so any SwiftUI body or menu that reads `bundle` / `locale`
 /// re-renders on a switch. Lock-protected because strings are also looked
@@ -80,7 +80,7 @@ nonisolated final class AppLocalization: @unchecked Sendable {
     }
 
     /// What to store as Panely's own `AppleLanguages`, which is what AppKit
-    /// reads at launch for the parts Panely doesn't draw itself. An explicit
+    /// reads at launch for system UI outside the main menu. An explicit
     /// choice is written through; "System Default" normally clears it so
     /// macOS decides — except when the primary language is unsupported,
     /// where macOS would pick the next supported one down the list and the

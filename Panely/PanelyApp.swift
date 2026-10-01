@@ -62,7 +62,10 @@ struct PanelyApp: App {
 /// single-window viewer — keeping the process alive with no window visible
 /// would leave users wondering why the red close button "only minimizes".
 final class PanelyAppDelegate: NSObject, NSApplicationDelegate {
+    private let menuLocalizer = AppMenuLocalizer(localization: .shared)
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        menuLocalizer.start()
         AppLog.info(
             .app,
             "Application did finish launching",
@@ -74,6 +77,7 @@ final class PanelyAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        menuLocalizer.stop()
         AppLog.info(.app, "Application will terminate")
     }
 

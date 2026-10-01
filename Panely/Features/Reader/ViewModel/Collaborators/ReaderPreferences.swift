@@ -110,7 +110,8 @@ final class ReaderPreferences {
 
     /// Interface language choice (see `AppLanguage`). Panely's own UI
     /// follows it immediately through `AppLocalization`; the mirrored
-    /// `AppleLanguages` covers AppKit's parts from the next launch.
+    /// `AppMenuLocalizer` updates native menus live. The mirrored
+    /// `AppleLanguages` also sets the language for future launches.
     var appLanguage: AppLanguage = .system {
         didSet {
             defaults.set(appLanguage.rawValue, forKey: Self.appLanguageKey)
