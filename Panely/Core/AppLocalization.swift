@@ -9,7 +9,9 @@ import Observation
 /// strings up in the chosen `.lproj` explicitly — `String(localized:bundle:
 /// .localized)` in code, the `\.locale` environment for SwiftUI text — and
 /// both follow this object, so the UI changes the moment a language is
-/// picked. `AppMenuLocalizer` updates AppKit's standard menu titles too;
+/// picked. Popovers don't inherit the window's `\.locale` (they get the
+/// system one), so each SwiftUI popover passes it on explicitly; content in
+/// an AppKit `NSPopover` uses `.localized`. `AppMenuLocalizer` updates AppKit's standard menu titles too;
 /// macOS-owned content inside system panels remains managed by AppKit.
 ///
 /// Observable so any SwiftUI body or menu that reads `bundle` / `locale`

@@ -622,6 +622,8 @@ struct BackgroundTranslationsIndicator: View {
                     .padding(PanelySpacing.md)
                     .frame(width: 320)
                     .environment(viewModel)
+                    // Popovers don't inherit the window's `\.locale`.
+                    .environment(\.locale, viewModel.localization.locale)
             }
             .transition(.opacity)
         }
