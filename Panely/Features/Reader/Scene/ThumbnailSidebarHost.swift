@@ -12,6 +12,7 @@ struct ThumbnailSidebarHost: View {
             pages: viewModel.source.pages,
             pageDimensions: viewModel.pageDimensions,
             currentPageIndex: viewModel.currentPageIndex,
+            translatedPages: viewModel.translatedPageIndices,
             onJump: { idx in
                 viewModel.jump(to: idx)
                 requestFocus()

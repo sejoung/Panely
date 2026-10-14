@@ -21,6 +21,8 @@ struct ViewerContainer: View {
     var wheelPageTurn: Bool = true
     var onWheelPageTurn: (PageTurnDirection) -> Void = { _ in }
     var viewerController: ViewerController? = nil
+    var translationPages: [TranslatedPage?] = []
+    var showsTranslation: Bool = false
 
     var body: some View {
         ZStack {
@@ -43,7 +45,9 @@ struct ViewerContainer: View {
                     autoFitOnResize: autoFitOnResize,
                     wheelPageTurn: wheelPageTurn,
                     onWheelPageTurn: onWheelPageTurn,
-                    viewerController: viewerController
+                    viewerController: viewerController,
+                    translationPages: translationPages,
+                    showsTranslation: showsTranslation
                 )
             }
         }

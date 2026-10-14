@@ -26,6 +26,9 @@ struct AppKitImageScroller: NSViewRepresentable {
     var wheelPageTurn: Bool = true
     var onWheelPageTurn: (PageTurnDirection) -> Void = { _ in }
     var viewerController: ViewerController? = nil
+    /// Translation assist results aligned with `images` (empty when off).
+    var translationPages: [TranslatedPage?] = []
+    var showsTranslation: Bool = false
 
     /// Looser than `ViewerController.fitTolerance` (10×) on purpose: a tiny
     /// stray manual zoom should still count as "at base" so the first
@@ -60,6 +63,7 @@ struct AppKitImageScroller: NSViewRepresentable {
 
         refreshCoordinatorBindings(context.coordinator, scrollView: scrollView)
         let contentStructureChanged = updateContentImages(content)
+        updateTranslationOverlay(content)
 
         // Read the outgoing series before recordPropChange commits the new one,
         // so the carry-over can stash where we left it.
@@ -138,6 +142,17 @@ struct AppKitImageScroller: NSViewRepresentable {
         // RTL only applies to paged horizontal modes — webtoon strips are top-to-bottom.
         let ordered = (direction.isRTL && !layout.isContinuous) ? images.reversed() : images
         return content.setImages(ordered, axis: axis)
+    }
+
+    /// Same ordering rule as `updateContentImages`, so each overlay lands on
+    /// its own page. A count mismatch (images mid-swap) shows none.
+    private func updateTranslationOverlay(_ content: ImageStackView) {
+        guard translationPages.count == images.count else {
+            content.setTranslationOverlay([], showsTranslation: false)
+            return
+        }
+        let ordered = (direction.isRTL && !layout.isContinuous) ? translationPages.reversed() : translationPages
+        content.setTranslationOverlay(ordered, showsTranslation: showsTranslation)
     }
 
     /// Compares incoming props against the coordinator's last-seen snapshot,

@@ -30,6 +30,14 @@ final class ImageStackView: NSView {
     private var viewPool: [NSImageView] = []
     private static let viewPoolMaxSize = 24
 
+    /// Translation assist results aligned with `currentImages` (empty when
+    /// the feature is off). Each live page with a translation gets a
+    /// `TranslationOverlayView`, kept above every image view so a balloon
+    /// that runs into the next slice of a strip isn't covered by it.
+    private var overlayPages: [TranslatedPage?] = []
+    private var showsTranslation = false
+    private var overlayViews: [Int: TranslationOverlayView] = [:]
+
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { false }
 
@@ -49,6 +57,7 @@ final class ImageStackView: NSView {
             currentImages = newImages
             for (index, view) in liveViews where currentImages.indices.contains(index) {
                 view.image = currentImages[index]
+                syncOverlay(index: index)
             }
             return false
         }
@@ -66,6 +75,8 @@ final class ImageStackView: NSView {
             }
         }
         liveViews.removeAll()
+        for overlay in overlayViews.values { overlay.removeFromSuperview() }
+        overlayViews.removeAll()
 
         switch axis {
         case .horizontal: layoutFramesHorizontally()
@@ -114,12 +125,65 @@ final class ImageStackView: NSView {
                 viewPool.append(view)
             }
             liveViews.removeValue(forKey: index)
+            overlayViews.removeValue(forKey: index)?.removeFromSuperview()
         }
 
         // Materialize views for newly-visible pages (reusing pool entries).
         for index in nowVisible where liveViews[index] == nil {
             materializeViewForPage(index)
         }
+    }
+
+    /// Update the translation overlays. `pages` is aligned with the images
+    /// last passed to `setImages` (same order, including RTL reversal).
+    func setTranslationOverlay(_ pages: [TranslatedPage?], showsTranslation: Bool) {
+        overlayPages = pages
+        self.showsTranslation = showsTranslation
+        for index in Array(overlayViews.keys) where liveViews[index] == nil {
+            overlayViews.removeValue(forKey: index)?.removeFromSuperview()
+        }
+        for index in liveViews.keys {
+            syncOverlay(index: index)
+        }
+    }
+
+    /// Create, place, update or remove the overlay for a live page.
+    private func syncOverlay(index: Int) {
+        guard overlayPages.indices.contains(index),
+              currentImages.indices.contains(index),
+              pageFrames.indices.contains(index),
+              let page = overlayPages[index],
+              page.imageWidth > 0,
+              // Only over the image it was made for: paged mode swaps images
+              // after decode, and a size mismatch means this slot isn't
+              // showing that page (yet).
+              currentImages[index].size == page.imageSize
+        else {
+            overlayViews.removeValue(forKey: index)?.removeFromSuperview()
+            return
+        }
+        let pageFrame = pageFrames[index]
+        let scale = pageFrame.width / page.imageWidth
+        let content = TranslationOverlayLayout.contentRect(for: page)
+        let frame = CGRect(
+            x: pageFrame.minX + content.minX * scale,
+            y: pageFrame.minY + content.minY * scale,
+            width: content.width * scale,
+            height: content.height * scale
+        )
+        let overlay = overlayViews[index] ?? {
+            let overlay = TranslationOverlayView(frame: frame)
+            addSubview(overlay) // last → above every image view
+            overlayViews[index] = overlay
+            return overlay
+        }()
+        overlay.frame = frame
+        overlay.update(
+            page: page,
+            showsTranslation: showsTranslation,
+            pageOrigin: CGPoint(x: pageFrame.minX - frame.minX, y: pageFrame.minY - frame.minY),
+            scale: scale
+        )
     }
 
     func frame(forPageAt index: Int) -> NSRect? {
@@ -235,8 +299,10 @@ final class ImageStackView: NSView {
             view.wantsLayer = true
             view.layer?.contentsGravity = .resizeAspect
         }
-        addSubview(view)
+        // Images stay below every translation overlay.
+        addSubview(view, positioned: .below, relativeTo: nil)
         liveViews[index] = view
+        syncOverlay(index: index)
     }
 
     override func mouseDown(with event: NSEvent) {

@@ -31,7 +31,17 @@ extension ReaderViewModel {
             visiblePageRange: currentSpread,
             canGoPreviousBookmark: canGoPreviousBookmark,
             canGoNextBookmark: canGoNextBookmark,
-            otherBookmarkedBooks: otherBookmarkedBooks
+            otherBookmarkedBooks: otherBookmarkedBooks,
+            translation: toolbarTranslationState
+        )
+    }
+
+    private var toolbarTranslationState: ToolbarTranslationState? {
+        guard translationFeatureAvailable else { return nil }
+        return ToolbarTranslationState(
+            showsTranslation: translationOverlayVisible,
+            isWorking: translationManager.openBook.contains(where: \.isWorking),
+            hasTranslations: !translation.pages.isEmpty
         )
     }
 

@@ -25,6 +25,11 @@ struct SettingsView: View {
                 .tabItem {
                     Label("Diagnostics", systemImage: "stethoscope")
                 }
+
+            ExperimentalSettingsView(viewModel: viewModel)
+                .tabItem {
+                    Label("Experimental", systemImage: "flask")
+                }
         }
         .frame(minWidth: 560, minHeight: 280)
     }

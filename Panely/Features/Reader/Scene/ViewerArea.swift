@@ -38,7 +38,9 @@ struct ViewerArea: View {
                     case .backward: viewModel.goBackward()
                     }
                 },
-                viewerController: viewerController
+                viewerController: viewerController,
+                translationPages: viewModel.translationOverlayPages,
+                showsTranslation: viewModel.translationOverlayVisible
             )
             .overlay(alignment: .top) {
                 TitleBarPassthrough(systemSettings: viewModel.dependencies.systemSettings)
@@ -47,6 +49,16 @@ struct ViewerArea: View {
             }
             .overlay(alignment: .top) { ReaderToolbarOverlay(shown: toolbarShown) }
             .overlay(alignment: .bottom) { ReaderSliderOverlay(shown: toolbarShown) }
+            // Above the slider so both can show at once.
+            .overlay(alignment: .bottom) {
+                VStack(spacing: PanelySpacing.xs) {
+                    BackgroundTranslationsIndicator()
+                    TranslationProgressHUD()
+                }
+                .padding(.bottom, 76)
+                .animation(PanelyMotion.uiReveal, value: viewModel.translation.phase)
+                .animation(PanelyMotion.uiReveal, value: viewModel.translationManager.backgroundJobs.count)
+            }
             .overlay(alignment: .bottom) { EndOfVolumeCardOverlay(requestFocus: requestFocus) }
             .overlay(alignment: .top) { PreviousVolumeCardOverlay(requestFocus: requestFocus) }
             .onContinuousHover { phase in

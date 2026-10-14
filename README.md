@@ -26,6 +26,7 @@
   <a href="https://github.com/sejoung/Panely/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/sejoung/Panely?label=latest&color=brightgreen"></a>
   <a href="https://github.com/sejoung/Panely/releases/latest"><img alt="Release date" src="https://img.shields.io/github/release-date/sejoung/Panely?color=blue"></a>
   <a href="https://github.com/sejoung/Panely/releases"><img alt="Total downloads" src="https://img.shields.io/github/downloads/sejoung/Panely/total?color=brightgreen"></a>
+  <a href="https://github.com/sponsors/sejoung"><img alt="Sponsor" src="https://img.shields.io/badge/sponsor-%E2%9D%A4-ea4aaa?logo=githubsponsors&logoColor=white"></a>
 </p>
 
 ---
@@ -207,6 +208,48 @@ pages.
   system's `AppleActionOnDoubleClick` preference); an open-hand cursor
   makes the draggable region obvious
 
+### Translation assist (experimental, macOS 26+)
+A comprehension aid for comics in a language you don't read: Panely reads the
+text in speech balloons on-device and shows a machine translation over the
+page. Off by default — turn it on in **Settings → Experimental**. It helps you
+follow the story; it doesn't replace a real translation, and the original is
+always one click (or `⇧⌘T`) away. Nothing leaves the Mac and nothing is
+written into your files.
+
+- **On-device** — Vision's document recognizer (OCR, including vertical
+  Japanese) + Apple Translation. A missing language pack is downloaded once
+  through the system prompt, from the translation panel or the status banner
+- **Translation panel** (toolbar → translate button) — choose what to **view**:
+  the original (translation off) or any of the book's languages. Each language
+  has its own progress and its own start / pause / stop, and the choice is
+  remembered per series. The book's own language is detected on first use and
+  remembered per series too
+- **Several languages per book** — each language is a separate job and cache;
+  clicking a balloon shows its translation, the other languages and the
+  original side by side (selectable, so Look Up works)
+- **Background jobs** — translating continues when you open another book; a
+  pill over the page shows other books' progress and opens the job list
+  (pause / resume / stop / open the book). One job runs at a time, the one on
+  screen first
+- **Translate entire series** — queues the other volumes whose titles match
+  once volume numbering is stripped (unrelated books in the same folder are
+  left out); the panel names what it will queue before it starts
+- **Webtoon-aware** — in vertical scroll the pages are read as one strip, so a
+  balloon cut across image slices comes back whole; tall strips are read in
+  overlapping bands
+- **Visible progress** — balloons appear as soon as OCR finds them and fill in
+  one by one (pending ones pulse); a progress pill with a time estimate, a
+  first-run notice while models load, page badges in the thumbnail sidebar
+  and a bar under the page slider
+- **Sound effects** (スッ, パチパチ…) are left untranslated by default
+  (**Settings → Experimental** to include them)
+- **Limits are shown where they apply** — a book inside an archive pauses
+  instead of continuing in the background; quitting stops translating
+  (finished pages are kept); a background failure stays listed until dismissed
+- Results are cached per page and language under
+  `~/Library/Caches/panely-translation-cache/`; size and clearing live in
+  **Settings → Experimental**
+
 ### State persistence
 - **Resume where you left off** — per-book page memory with a stable key that
   survives temp-directory extractions. A secondary key derived from the
@@ -229,6 +272,7 @@ pages.
 ## Requirements
 
 - **macOS 14** (Sonoma) or later
+- **macOS 26** or later for the experimental translation assist
 - **Xcode 16** or later (for building from source)
 
 ## Installing a release
@@ -264,6 +308,17 @@ open Panely.xcodeproj
 ```
 
 Select the **Panely** scheme and press **⌘R**.
+
+To build the Release configuration and install it for hands-on testing:
+
+```bash
+scripts/install-local.sh            # Release → /Applications/Panely.app, then launch
+scripts/install-local.sh --debug    # Debug build with its own settings → "Panely Debug.app"
+scripts/install-local.sh --help     # also --test, --dest DIR, --no-open, --reveal
+```
+
+A local Release build shares settings and caches with an official install and
+replaces `/Applications/Panely.app`; use `--debug` to keep them apart.
 
 ### Dependency
 
@@ -335,6 +390,9 @@ Terminal) and move the result straight to `/Applications`.
 | `⌃⌘S` | Pin / unpin library sidebar |
 | `⌃⌘T` | Pin / unpin toolbar (and bottom slider) |
 | `⌃⌘P` | Show / hide thumbnail sidebar |
+| `⇧⌘T` | Translation assist: switch between the original and the translation |
+| `⌥⌘T` | Translation assist: translate this book / pause |
+| Click a speech balloon | Translation assist: the translation, other languages and the original |
 | Hover left edge | Reveal sidebar as overlay (auto-hide mode) |
 | `ESC` | Dismiss sidebar overlay (when unpinned) |
 | Double-click on image | Toggle 1× ↔ 2× zoom |
@@ -353,7 +411,7 @@ xcodebuild test \
   CODE_SIGN_IDENTITY="-"
 ```
 
-**577 tests across 74 suites** cover:
+**705 tests across 93 suites** cover:
 
 `SnapshotGalleryTests` is discovered in normal runs but gated off unless
 `scripts/generate-snapshots.sh` enables snapshot generation, so the default
@@ -475,12 +533,20 @@ xcodebuild test \
 - **Source change & diagnostics** — `SourceChangeMonitor` file/folder
   watching, `AppLog` / `DiagnosticLogStore` file logging, and
   `DiagnosticReportExporter` zip contents
+- **Translation assist** — OCR tiling and seam handling, balloon grouping,
+  sound-effect and language classification, page / strip work planning, the
+  job manager (one job per book × language, background jobs, reattach,
+  queueing, books that must stay open), cache keys and storage, overlay
+  geometry and hit testing, series volume matching, and the reader wiring
+  (per-series languages, original ↔ translation, overlays following the
+  images on screen)
 - **`EntitlementsTests` / `FileAssociationTests`** — sandbox entitlement for
   save-panel destinations, and the Info.plist document types / exported UTIs
   (folders, CBZ/ZIP, CBR/RAR)
 
 Tests mirror the source tree: `PanelyTests/Core/{Comic, Diagnostics,
-Extensions}/`, `PanelyTests/Features/Library/`, `PanelyTests/Features/Settings/`, and
+Extensions}/`, `PanelyTests/Features/Library/`, `PanelyTests/Features/Settings/`,
+`PanelyTests/Features/Translation/`, and
 `PanelyTests/Features/Reader/{Model, Viewer, Thumbnails, ViewModel,
 ViewModel/Collaborators}`. Shared fixtures (including a real PNG generator)
 live in `PanelyTests/TestFixtures.swift`; persistence tests use
@@ -553,7 +619,8 @@ Panely/
 │   │   │   │   ├── ReaderViewModel+Volumes.swift      # sibling counters + volume cards
 │   │   │   │   ├── ReaderViewModel+ImageLoading.swift # facade over ReaderImageLoader
 │   │   │   │   ├── ReaderViewModel+Bookmarks.swift    # favorites + page bookmarks integration
-│   │   │   │   └── ReaderViewModel+ReadingProgress.swift # progress records → sidebar badges + Continue Reading
+│   │   │   │   ├── ReaderViewModel+ReadingProgress.swift # progress records → sidebar badges + Continue Reading
+│   │   │   │   └── ReaderViewModel+Translation.swift  # translation assist: languages, jobs, overlays
 │   │   │   └── Collaborators/                  # composed by ReaderViewModel; each single-responsibility
 │   │   │       ├── ReaderPreferences.swift     # KeyValueStoring-backed layout / fit / pins
 │   │   │       ├── ReaderPositionStore.swift   # debounced per-book page memory
@@ -588,8 +655,20 @@ Panely/
 │   │   └── Thumbnails/
 │   │       ├── ThumbnailSidebar.swift  # right-side thumbnail panel (LazyVStack)
 │   │       └── ThumbnailLoader.swift   # Image I/O thumbnails + NSCache
+│   ├── Translation/                    # experimental translation assist (macOS 26+)
+│   │   ├── TranslationManager.swift    # app-wide jobs: one per book × language, background + queue
+│   │   ├── TranslationController.swift # one book into one language: plan, OCR → translate, progress
+│   │   ├── TranslationStore.swift      # per-page JSON cache (page id + languages + scope)
+│   │   ├── SeriesVolumeMatcher.swift   # which neighbours are volumes of the same series
+│   │   ├── Model/                      # TranslationLanguage, TranslatedPage / TranslatedBubble
+│   │   ├── Pipeline/                   # OCRTiling, TranslationPlan (page / strip), PageAnalyzer,
+│   │   │                               # PageTextRecognizer (Vision), PageTranslator (Translation),
+│   │   │                               # BubbleGrouper, BubbleBackgroundSampler, TextClassifiers
+│   │   ├── Viewer/                     # TranslationOverlayView (+ layout), balloon popover
+│   │   └── UI/                         # TranslationPanel, language rows, progress pill, job list
 │   ├── Settings/
-│   │   ├── SettingsView.swift          # General + Library + Storage + Diagnostics tabs
+│   │   ├── SettingsView.swift          # General + Library + Storage + Diagnostics + Experimental tabs
+│   │   ├── ExperimentalSettingsView.swift # translation assist: on/off, default language, sound effects, cache
 │   │   ├── GeneralSettingsView.swift   # interface language picker (live)
 │   │   ├── LibrarySettingsView.swift   # reopen-last-folder toggle + Forget Now
 │   │   ├── StorageSettingsView.swift   # Storage settings UI + cache size / clear controls
@@ -657,6 +736,8 @@ PanelyTests/                            # mirrors the source tree
 │                                       # ReadingProgressStore, LastLibraryRootStore,
 │                                       # LibrarySidebarModel, SecurityScopedBookmark
 ├── Features/Settings/                  # CacheMaintenance, Settings UI, diagnostic report export
+├── Features/Translation/               # OCR tiling, grouping, classifiers, plan, manager, store,
+│                                       # overlay hit testing, series matching, reader wiring
 └── Features/Reader/
     ├── Model/                          # FitCalculator, PositionKey, ReaderEnum, SidebarMode,
     │                                   # SpreadCalculator
@@ -686,6 +767,7 @@ docs/
 scripts/
 ├── generate-app-icon.sh                # SVG → .icns pipeline
 ├── generate-snapshots.sh               # rebuild docs/screenshots/*.png from SnapshotGalleryTests
+├── install-local.sh                    # build + install locally for hands-on testing (--debug, --test…)
 └── release.sh                          # bump + tag + push automation
 
 .github/workflows/
@@ -711,6 +793,19 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   Per-concern logic is split across extensions (`+Navigation`, `+Source`,
   `+LoadPipeline`, `+Cache`, `+Toolbar`, `+Volumes`, `+ImageLoading`,
   `+Bookmarks`, `+ReadingProgress`).
+- **Translation assist** — `TranslationManager` (app-wide, main-actor) owns
+  one `TranslationController` per book × target language, so jobs survive book
+  switches and several languages coexist; it runs one job at a time, the one
+  on screen first. A controller cuts the book into units (`TranslationPlan`:
+  one page each, or overlapping bands of the vertical strip so balloons split
+  across image slices are read whole), OCRs the next unit while translating the
+  current one balloon by balloon (Apple Translation takes ~1 s per sentence
+  however it's called — measured), and always picks the next unit at or after
+  the page being read. Work runs in a detached task and reports back to the
+  main actor under a generation counter. The viewer only reads
+  `TranslatedPage`s: `ImageStackView` hosts a `TranslationOverlayView` per live
+  page, above every image so strip balloons can cross slice boundaries.
+  Finished pages are cached per page id + languages + scope (`TranslationStore`).
 - **Dependency-injected app services** — production uses `AppDependencies.live`,
   while tests can inject protocol-backed services (`ExtractionCacheManaging`,
   `SecurityScopedBookmarking`, `LibraryTreeLoading`, `KeyValueStoring`,

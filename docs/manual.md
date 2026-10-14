@@ -107,7 +107,7 @@ Left to right, the toolbar groups are:
 1. **Chrome** — Open file (`⌘O`), pin library (`⌃⌘S`), pin toolbar (`⌃⌘T`)
 2. **Layout** — Single / Double / Vertical, reading direction toggle, and (in double-page mode) the standalone-cover offset toggle
 3. **Fit & Zoom** — Fit screen / width / height (`⌘1` / `⌘2` / `⌘3`), zoom in/out (`⌘+` / `⌘−`), view-size lock (`⌘L`)
-4. **Bookmarks** — Favorite book (`⌘⇧D`), bookmark page (`⌘D`), bookmark list menu, toggle thumbnail sidebar (`⌃⌘P`)
+4. **Bookmarks** — Favorite book (`⌘⇧D`), bookmark page (`⌘D`), bookmark list menu, toggle thumbnail sidebar (`⌃⌘P`), and — with the experimental translation assist on — the translation panel
 5. **Navigation** (right edge) — Previous/next volume (`[` / `]`), previous/next page (`←` / `→`)
 
 Hover any icon to see its name and shortcut right away.
@@ -364,6 +364,86 @@ The same list is available without the sidebar:
 
 ---
 
+## Translation assist (experimental)
+
+For comics in a language you don't read. Panely reads the text in the speech
+balloons and shows an on-device machine translation over the page. It's meant
+to help you follow the story — not to replace a real translation — so the
+original is always one click away. Nothing leaves your Mac, and your files
+are never changed.
+
+Requires **macOS 26** or later. It's off by default.
+
+### Turning it on
+
+Open **File → Settings… → Experimental** and switch on **Translation
+Assist**. The same tab sets:
+
+- **Default Language** — the language new series are shown in. **System
+  Default** follows Panely's interface language.
+- **Translate Sound Effects** — off by default; onomatopoeia like スッ or
+  パチパチ is left as drawn.
+- **Translation Cache** — how much space finished translations take, and a
+  button to clear them.
+
+### Translating a book
+
+Click the **translate** button in the toolbar to open the translation panel,
+then **Translate This Book** (`⌥⌘T`). Translation starts at the page you're
+on and keeps ahead of you as you read:
+
+- Balloons appear with a pulsing outline and "…" as soon as they're found, and
+  fill in one by one.
+- A pill over the page shows progress and the time left, with pause and stop.
+  The first translation after installing takes a minute or two while the
+  models load — the pill says so.
+- Finished pages get a badge in the thumbnail sidebar and a mark under the
+  page slider.
+
+The first time you translate a series, Panely works out which language the
+book is in and remembers it for the series. If it guessed wrong, change
+**Book's Language** in the panel. If a language pack is missing, the panel
+and the status banner offer to download it.
+
+In **Vertical scroll** the pages are read as one strip, so a webtoon cut into
+many images still gets whole balloons.
+
+### Choosing what to view
+
+The panel's **View** list holds **Original (translation off)** and each
+language the book has been translated into, with its progress. Pick one to
+show it — the choice is remembered for the series. `⇧⌘T` switches between the
+original and the translation.
+
+To read in another language too, choose **Translate into Another Language**.
+Each language is translated and stored separately, so you can read in Korean
+while an English translation runs.
+
+Click any balloon to see its translation, the book's other languages and the
+original together. The text is selectable, so you can copy it or look a word up.
+
+### Other books and whole series
+
+Translating continues when you open another book. While it runs, a small pill
+over the page says which book and how far along it is; click it for the list
+of jobs, where you can pause, resume, stop, or jump back to the book. One job
+runs at a time, and whatever you're looking at goes first.
+
+**Translate Entire Series** queues the other volumes of the series — only
+those whose titles match once volume numbers are ignored, and the panel lists
+them before you start.
+
+A few limits are shown where they apply:
+
+- A book inside an archive (zip-in-zip) pauses when you open another book and
+  continues when you come back.
+- Quitting Panely stops translating. Finished pages are kept, and the rest
+  continues when you start again.
+- If a job in the background stops on an error, it stays in the list with the
+  reason until you dismiss it.
+
+---
+
 ## Keyboard shortcuts
 
 The full list lives in
@@ -385,3 +465,5 @@ The most-used:
 | Zoom in / out / reset | `⌘+` / `⌘−` / `⌘0` |
 | Pin library / toolbar / thumbnails | `⌃⌘S` / `⌃⌘T` / `⌃⌘P` |
 | Lock view size | `⌘L` |
+| Translation: original ↔ translation | `⇧⌘T` |
+| Translation: translate this book / pause | `⌥⌘T` |

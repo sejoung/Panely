@@ -78,6 +78,7 @@ struct ReaderScene: View {
         .animation(PanelyMotion.uiReveal, value: viewModel.sourceChangedOnDisk)
         .animation(PanelyMotion.uiReveal, value: viewModel.errorMessage)
         .animation(PanelyMotion.uiReveal, value: viewModel.volumeNotice)
+        .animation(PanelyMotion.uiReveal, value: viewModel.translation.notice)
         .frame(minWidth: 800, minHeight: 600)
         .task {
             await viewModel.refreshContinueReadingAvailability()
@@ -153,6 +154,21 @@ private struct ReaderStatusBanner: View {
                     Button("Dismiss") {
                         viewModel.dismissVolumeNotice()
                     }
+                }
+            }
+        } else if let notice = viewModel.translation.notice, !viewModel.isLoading {
+            banner(
+                systemImage: "character.bubble",
+                message: notice.message(locale: viewModel.localization.locale)
+            ) {
+                if #available(macOS 26.0, *), case let .needsLanguageDownload(source, target) = notice {
+                    LanguagePackDownloadButton(source: source, target: target) {
+                        viewModel.dismissTranslationNotice()
+                        viewModel.startTranslatingCurrentBook()
+                    }
+                }
+                Button("Dismiss") {
+                    viewModel.dismissTranslationNotice()
                 }
             }
         }

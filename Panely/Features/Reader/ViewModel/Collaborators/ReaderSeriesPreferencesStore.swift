@@ -11,9 +11,18 @@ struct SeriesReaderPreferences: Codable, Equatable {
     var direction: String? = nil
     var layout: String? = nil
     var fitMode: String? = nil
+    /// Translation assist: the language the series is written in (detected
+    /// or chosen) and whether opening its books starts translating.
+    var translationSource: String? = nil
+    /// The language the series is shown in, when chosen for it.
+    var translationTarget: String? = nil
+    var autoTranslate: Bool? = nil
     var updatedAt: Date
 
-    var isEmpty: Bool { direction == nil && layout == nil && fitMode == nil }
+    var isEmpty: Bool {
+        direction == nil && layout == nil && fitMode == nil
+            && translationSource == nil && translationTarget == nil && autoTranslate == nil
+    }
 }
 
 /// Remembers `direction` / `layout` / `fitMode` per series so opening a manga
@@ -71,6 +80,18 @@ final class ReaderSeriesPreferencesStore {
         prefs(forSeries: id)?.fitMode.flatMap(FitMode.init(rawValue:))
     }
 
+    func translationSource(forSeries id: String) -> TranslationLanguage? {
+        prefs(forSeries: id)?.translationSource.flatMap(TranslationLanguage.init(rawValue:))
+    }
+
+    func translationTarget(forSeries id: String) -> TranslationLanguage? {
+        prefs(forSeries: id)?.translationTarget.flatMap(TranslationLanguage.init(rawValue:))
+    }
+
+    func autoTranslate(forSeries id: String) -> Bool {
+        prefs(forSeries: id)?.autoTranslate ?? false
+    }
+
     func prefs(forSeries id: String) -> SeriesReaderPreferences? {
         guard !id.isEmpty else { return nil }
         return entries[id]
@@ -88,6 +109,18 @@ final class ReaderSeriesPreferencesStore {
 
     func setFitMode(_ value: FitMode, forSeries id: String) {
         mutate(id) { $0.fitMode = value.rawValue }
+    }
+
+    func setTranslationSource(_ value: TranslationLanguage, forSeries id: String) {
+        mutate(id) { $0.translationSource = value.rawValue }
+    }
+
+    func setTranslationTarget(_ value: TranslationLanguage, forSeries id: String) {
+        mutate(id) { $0.translationTarget = value.rawValue }
+    }
+
+    func setAutoTranslate(_ value: Bool, forSeries id: String) {
+        mutate(id) { $0.autoTranslate = value }
     }
 
     // MARK: - Internals

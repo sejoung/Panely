@@ -44,6 +44,27 @@ struct KoreanLocalizationTests {
         #expect(String(localized: "Remove all bookmarks in “\(title)”?", bundle: ko) == "“Series”의 북마크를 모두 삭제할까요?")
     }
 
+    @Test func translationAssistStringsResolveToKorean() throws {
+        let ko = try koreanBundle()
+        #expect(String(localized: "Translate This Book", bundle: ko) == "이 책 번역하기")
+        #expect(String(localized: "Machine translation", bundle: ko) == "기계 번역")
+        let done = 3
+        let total = 20
+        #expect(String(localized: "Translating · \(done)/\(total) pages", bundle: ko) == "번역 중 · 3/20페이지")
+        let minutes = 4
+        #expect(
+            String(localized: "Translating · \(done)/\(total) pages · about \(minutes) min left", bundle: ko)
+                == "번역 중 · 3/20페이지 · 약 4분 남음"
+        )
+        #expect(String(localized: "\(done) of \(total) pages translated", bundle: ko) == "20페이지 중 3페이지 번역됨")
+        let from = "일본어"
+        let to = "한국어"
+        #expect(
+            String(localized: "Download the \(from) → \(to) language pack to translate.", bundle: ko)
+                == "번역하려면 일본어 → 한국어 언어팩을 다운로드하세요."
+        )
+    }
+
     @Test func userFacingNoticesAreTranslated() throws {
         let ko = try koreanBundle()
         // Every notice must differ from its English source — i.e. be in the catalog.

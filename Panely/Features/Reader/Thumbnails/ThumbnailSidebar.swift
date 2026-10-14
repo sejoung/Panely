@@ -7,6 +7,8 @@ struct ThumbnailSidebar: View {
     let pages: [ComicPage]
     let pageDimensions: [CGSize]
     let currentPageIndex: Int
+    /// Pages with a finished translation, marked with a small badge.
+    var translatedPages: Set<Int> = []
     let onJump: (Int) -> Void
     let onClose: () -> Void
 
@@ -56,6 +58,7 @@ struct ThumbnailSidebar: View {
                             cellSize: cellSize(forPageAt: idx),
                             pageNumber: idx + 1,
                             isActive: idx == currentPageIndex,
+                            isTranslated: translatedPages.contains(idx),
                             onTap: { onJump(idx) }
                         )
                         .id(idx)
@@ -121,6 +124,7 @@ private struct ThumbnailCell: View {
     let cellSize: CGSize
     let pageNumber: Int
     let isActive: Bool
+    var isTranslated = false
     let onTap: () -> Void
 
     @State private var image: NSImage?
@@ -147,6 +151,17 @@ private struct ThumbnailCell: View {
                             lineWidth: 2
                         )
                 )
+                .overlay(alignment: .topTrailing) {
+                    if isTranslated {
+                        Image(systemName: "character.bubble.fill")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(3)
+                            .background(PanelyColor.accentPrimary, in: Circle())
+                            .padding(4)
+                            .accessibilityLabel(Text("Translated"))
+                    }
+                }
 
                 Text("\(pageNumber)")
                     .font(PanelyTypography.caption)

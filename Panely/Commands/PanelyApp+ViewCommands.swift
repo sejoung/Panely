@@ -117,6 +117,30 @@ extension PanelyApp {
             }
 
             Divider()
+
+            if viewModel.translationFeatureAvailable {
+                Button(
+                    viewModel.translationOverlayVisible
+                        ? String(localized: "Hide Translation", bundle: .localized)
+                        : String(localized: "Show Translation", bundle: .localized)
+                ) {
+                    viewModel.toggleTranslationOverlay()
+                }
+                .keyboardShortcut("t", modifiers: [.command, .shift])
+                .disabled(!viewModel.hasSource)
+
+                Button(
+                    viewModel.translation.isWorking
+                        ? String(localized: "Pause Translating", bundle: .localized)
+                        : String(localized: "Translate This Book", bundle: .localized)
+                ) {
+                    viewModel.toggleTranslatingCurrentBook()
+                }
+                .keyboardShortcut("t", modifiers: [.command, .option])
+                .disabled(!viewModel.hasSource)
+
+                Divider()
+            }
         }
     }
 }

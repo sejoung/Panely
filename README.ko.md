@@ -26,6 +26,7 @@
   <a href="https://github.com/sejoung/Panely/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/sejoung/Panely?label=latest&color=brightgreen"></a>
   <a href="https://github.com/sejoung/Panely/releases/latest"><img alt="Release date" src="https://img.shields.io/github/release-date/sejoung/Panely?color=blue"></a>
   <a href="https://github.com/sejoung/Panely/releases"><img alt="Total downloads" src="https://img.shields.io/github/downloads/sejoung/Panely/total?color=brightgreen"></a>
+  <a href="https://github.com/sponsors/sejoung"><img alt="Sponsor" src="https://img.shields.io/badge/sponsor-%E2%9D%A4-ea4aaa?logo=githubsponsors&logoColor=white"></a>
 </p>
 
 ---
@@ -184,6 +185,40 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   네이티브 드래그 이동과 더블클릭 확대(시스템 `AppleActionOnDoubleClick`
   환경설정 존중) 지원. 드래그 영역은 open-hand 커서로 표시
 
+### 번역 보조 (실험적 기능, macOS 26 이상)
+읽지 못하는 언어로 된 만화의 내용 이해를 돕는 기능: 말풍선의 글자를 기기
+안에서 읽어 기계 번역을 페이지 위에 보여줌. 기본은 꺼져 있고
+**설정 → 실험적 기능**에서 켬. 줄거리를 따라가도록 돕는 용도이며 정식 번역을
+대신하지 않음. 원문은 언제나 클릭 한 번(또는 `⇧⌘T`)으로 볼 수 있고, 어떤
+데이터도 Mac 밖으로 나가지 않으며 원본 파일도 건드리지 않음.
+
+- **기기 내 처리** — Vision 문서 인식(OCR, 세로쓰기 일본어 포함) + Apple
+  Translation. 언어팩이 없으면 번역 패널이나 상태 배너에서 시스템 안내로 한 번
+  다운로드
+- **번역 패널**(툴바 → 번역 버튼) — 무엇을 **볼지** 선택: 원문(번역 끄기) 또는
+  책의 번역 언어 중 하나. 언어마다 진행률과 시작 / 일시정지 / 중지가 따로 있고,
+  선택은 시리즈별로 기억. 책의 언어는 처음 쓸 때 자동 감지되어 역시 시리즈별로
+  기억
+- **책 하나에 여러 언어** — 언어마다 작업과 캐시가 따로이며, 말풍선을 클릭하면
+  번역·다른 언어 번역·원문을 함께 보여줌(텍스트 선택 가능, 사전 찾기 지원)
+- **백그라운드 작업** — 다른 책을 열어도 번역이 계속됨. 페이지 위 표시로 다른
+  책의 진행률을 보여주고, 누르면 작업 목록(일시정지 / 재개 / 중지 / 책 열기)이
+  열림. 작업은 한 번에 하나씩, 지금 보는 것부터 실행
+- **시리즈 전체 번역** — 권 번호를 뺀 제목이 같은 다른 권만 대기열에 넣음(같은
+  폴더의 다른 작품은 제외). 시작 전에 패널에 넣을 권 이름을 보여줌
+- **웹툰 대응** — 세로 스크롤에서는 페이지를 하나의 스트립으로 읽어, 이미지
+  조각 경계에서 잘린 말풍선도 하나로 인식. 긴 스트립은 겹치는 구간으로 나눠 읽음
+- **눈에 보이는 진행** — OCR이 찾은 말풍선이 바로 나타나고 번역이 하나씩
+  채워짐(대기 중인 말풍선은 깜빡임). 남은 시간이 표시되는 진행 표시, 모델을
+  처음 불러올 때의 안내, 썸네일 사이드바 배지, 페이지 슬라이더 아래 막대
+- **효과음**(スッ, パチパチ…)은 기본적으로 번역하지 않음(**설정 → 실험적
+  기능**에서 포함 가능)
+- **제약은 해당 위치에 표시** — 압축 파일 안의 책은 백그라운드로 이어가지 않고
+  일시정지, 앱을 종료하면 번역이 멈춤(완료된 페이지는 저장), 백그라운드 실패는
+  확인할 때까지 목록에 남음
+- 결과는 페이지·언어별로 `~/Library/Caches/panely-translation-cache/`에
+  캐시되며, 용량 확인과 삭제는 **설정 → 실험적 기능**에서
+
 ### 상태 유지
 - **읽던 위치에서 이어보기** — 임시 디렉터리 추출을 버티는 안정적인 키로
   책별 페이지 기억. 외장 디스크의 mount 경로가 바뀌어도 위치를 복구할 수
@@ -202,6 +237,7 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
 ## 요구 사항
 
 - **macOS 14** (Sonoma) 이상
+- 실험적 기능인 번역 보조는 **macOS 26** 이상
 - **Xcode 16** 이상 (소스 빌드 시)
 
 ## 릴리스 설치
@@ -236,6 +272,17 @@ open Panely.xcodeproj
 ```
 
 **Panely** 스킴을 선택하고 **⌘R**을 눌러 실행.
+
+Release 구성으로 빌드해 직접 써 보려면:
+
+```bash
+scripts/install-local.sh            # Release → /Applications/Panely.app 설치 후 실행
+scripts/install-local.sh --debug    # 설정이 분리된 Debug 빌드 → "Panely Debug.app"
+scripts/install-local.sh --help     # 그 밖에 --test, --dest DIR, --no-open, --reveal
+```
+
+로컬 Release 빌드는 정식 설치본과 설정·캐시를 공유하고
+`/Applications/Panely.app`을 교체합니다. 분리하려면 `--debug`를 쓰세요.
 
 ### 의존성
 
@@ -304,6 +351,9 @@ LaunchServices 캐시에 남을 수 있으니, 우클릭 → "다음으로 압�
 | `⌃⌘S` | 라이브러리 사이드바 고정 / 해제 |
 | `⌃⌘T` | 툴바(하단 슬라이더 포함) 고정 / 해제 |
 | `⌃⌘P` | 썸네일 사이드바 표시 / 숨김 |
+| `⇧⌘T` | 번역 보조: 원문 ↔ 번역 전환 |
+| `⌥⌘T` | 번역 보조: 이 책 번역하기 / 일시정지 |
+| 말풍선 클릭 | 번역 보조: 번역·다른 언어 번역·원문 보기 |
 | 왼쪽 가장자리 호버 | 사이드바 오버레이로 나타냄 (자동 숨김 모드에서) |
 | `ESC` | 사이드바 오버레이 해제 (고정 안 된 상태) |
 | 이미지 위 더블클릭 | 1× ↔ 2× 줌 토글 |
@@ -322,7 +372,7 @@ xcodebuild test \
   CODE_SIGN_IDENTITY="-"
 ```
 
-**74 스위트에 걸친 577개 테스트**가 다음을 커버:
+**93 스위트에 걸친 705개 테스트**가 다음을 커버:
 
 `SnapshotGalleryTests`는 기본 테스트에서 발견은 되지만
 `scripts/generate-snapshots.sh`가 스냅샷 생성을 활성화할 때만 실행됩니다.
@@ -432,11 +482,17 @@ xcodebuild test \
 - **소스 변경 & 진단** — `SourceChangeMonitor` 파일/폴더 감시,
   `AppLog` / `DiagnosticLogStore` 파일 로깅, `DiagnosticReportExporter`
   zip 내용
+- **번역 보조** — OCR 구간 분할과 경계 처리, 말풍선 묶기, 효과음·언어 판별,
+  페이지/스트립 작업 계획, 작업 매니저(책 × 언어당 작업 하나, 백그라운드 작업,
+  재연결, 대기열, 열려 있어야 하는 책), 캐시 키와 저장, 오버레이 위치와 클릭
+  판정, 시리즈 권 판별, 리더 연동(시리즈별 언어, 원문 ↔ 번역, 화면 이미지를
+  따라가는 오버레이)
 - **`EntitlementsTests` / `FileAssociationTests`** — 저장 패널 대상용 샌드박스
   entitlement, Info.plist 문서 타입 / exported UTI(폴더, CBZ/ZIP, CBR/RAR)
 
 테스트는 소스 트리를 그대로 반영합니다: `PanelyTests/Core/{Comic, Diagnostics,
-Extensions}/`, `PanelyTests/Features/Library/`, `PanelyTests/Features/Settings/`, 그리고
+Extensions}/`, `PanelyTests/Features/Library/`, `PanelyTests/Features/Settings/`,
+`PanelyTests/Features/Translation/`, 그리고
 `PanelyTests/Features/Reader/{Model, Viewer, Thumbnails, ViewModel,
 ViewModel/Collaborators}`. 공유 픽스처(실제 PNG 생성기 포함)는
 `PanelyTests/TestFixtures.swift`에 있고, persistence 테스트는
@@ -508,7 +564,8 @@ Panely/
 │   │   │   │   ├── ReaderViewModel+Volumes.swift      # 형제 권 카운터 + 볼륨 카드
 │   │   │   │   ├── ReaderViewModel+ImageLoading.swift # ReaderImageLoader 위 얇은 facade
 │   │   │   │   ├── ReaderViewModel+Bookmarks.swift    # 즐겨찾기 + 페이지 북마크 연동
-│   │   │   │   └── ReaderViewModel+ReadingProgress.swift # 진행도 기록 → 사이드바 배지 + 이어보기
+│   │   │   │   ├── ReaderViewModel+ReadingProgress.swift # 진행도 기록 → 사이드바 배지 + 이어보기
+│   │   │   │   └── ReaderViewModel+Translation.swift  # 번역 보조: 언어, 작업, 오버레이
 │   │   │   └── Collaborators/                  # ReaderViewModel이 합성, 각각 단일 책임
 │   │   │       ├── ReaderPreferences.swift     # KeyValueStoring 기반 레이아웃 / 맞춤 / 고정
 │   │   │       ├── ReaderPositionStore.swift   # 디바운스된 책별 페이지 메모리
@@ -543,8 +600,20 @@ Panely/
 │   │   └── Thumbnails/
 │   │       ├── ThumbnailSidebar.swift  # 우측 썸네일 패널 (LazyVStack)
 │   │       └── ThumbnailLoader.swift   # Image I/O 썸네일 + NSCache
+│   ├── Translation/                    # 실험적 기능: 번역 보조 (macOS 26 이상)
+│   │   ├── TranslationManager.swift    # 앱 전체 작업: 책 × 언어당 하나, 백그라운드 + 대기열
+│   │   ├── TranslationController.swift # 책 하나를 한 언어로: 작업 계획, OCR → 번역, 진행 상황
+│   │   ├── TranslationStore.swift      # 페이지별 JSON 캐시 (페이지 id + 언어 + 범위)
+│   │   ├── SeriesVolumeMatcher.swift   # 같은 시리즈의 다른 권 판별
+│   │   ├── Model/                      # TranslationLanguage, TranslatedPage / TranslatedBubble
+│   │   ├── Pipeline/                   # OCRTiling, TranslationPlan (page / strip), PageAnalyzer,
+│   │   │                               # PageTextRecognizer (Vision), PageTranslator (Translation),
+│   │   │                               # BubbleGrouper, BubbleBackgroundSampler, TextClassifiers
+│   │   ├── Viewer/                     # TranslationOverlayView (+ 레이아웃), 말풍선 팝오버
+│   │   └── UI/                         # 번역 패널, 언어 행, 진행 표시, 작업 목록
 │   ├── Settings/
-│   │   ├── SettingsView.swift          # General + Library + Storage + Diagnostics 탭
+│   │   ├── SettingsView.swift          # General + Library + Storage + Diagnostics + Experimental 탭
+│   │   ├── ExperimentalSettingsView.swift # 번역 보조: 켜기, 기본 언어, 효과음, 캐시
 │   │   ├── GeneralSettingsView.swift   # 인터페이스 언어 선택(즉시 적용)
 │   │   ├── LibrarySettingsView.swift   # 마지막 폴더 다시 열기 토글 + Forget Now
 │   │   ├── StorageSettingsView.swift   # Storage 설정 UI + 캐시 용량 / 삭제 컨트롤
@@ -612,6 +681,8 @@ PanelyTests/                            # 소스 트리를 미러링
 │                                       # ReadingProgressStore, LastLibraryRootStore,
 │                                       # LibrarySidebarModel, SecurityScopedBookmark
 ├── Features/Settings/                  # CacheMaintenance, Settings UI, diagnostic report export
+├── Features/Translation/               # OCR 구간 분할, 말풍선 묶기, 판별기, 작업 계획, 매니저, 캐시,
+│                                       # 오버레이 클릭 판정, 시리즈 판별, 리더 연동
 └── Features/Reader/
     ├── Model/                          # FitCalculator, PositionKey, ReaderEnum, SidebarMode,
     │                                   # SpreadCalculator
@@ -641,6 +712,7 @@ docs/
 scripts/
 ├── generate-app-icon.sh                # SVG → .icns 파이프라인
 ├── generate-snapshots.sh               # SnapshotGalleryTests로 docs/screenshots/*.png 재생성
+├── install-local.sh                    # 로컬에서 빌드 + 설치해 직접 테스트 (--debug, --test…)
 └── release.sh                          # 버전 범프 + 태그 + 푸시 자동화
 
 .github/workflows/
@@ -665,6 +737,19 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북�
   상태를 소유합니다. 관심사별 로직은 extension(`+Navigation`,
   `+Source`, `+LoadPipeline`, `+Cache`, `+Toolbar`, `+Volumes`,
   `+ImageLoading`, `+Bookmarks`, `+ReadingProgress`)에 분할됩니다.
+- **번역 보조** — `TranslationManager`(앱 전체, 메인 액터)가 책 × 번역 언어마다
+  `TranslationController`를 하나씩 가지므로, 책을 바꿔도 작업이 유지되고 여러
+  언어가 공존합니다. 작업은 한 번에 하나, 화면에 보이는 것부터 실행합니다.
+  컨트롤러는 책을 작업 단위로 나누고(`TranslationPlan`: 페이지 하나씩, 또는
+  세로 스트립을 겹치는 구간으로 나눠 이미지 조각 경계에서 잘린 말풍선도
+  하나로 읽음), 현재 단위를 말풍선 하나씩 번역하는 동안 다음 단위를 OCR하며
+  (Apple Translation은 호출 방식과 무관하게 문장당 약 1초 — 측정값), 항상
+  읽고 있는 페이지 이후의 첫 단위를 다음으로 고릅니다. 작업은 detached task에서
+  돌고 generation 카운터로 보호된 채 메인 액터에 결과를 전달합니다. 뷰어는
+  `TranslatedPage`만 읽습니다: `ImageStackView`가 화면에 있는 페이지마다
+  `TranslationOverlayView`를 모든 이미지 위에 두어, 스트립의 말풍선이 조각
+  경계를 넘어 그려질 수 있습니다. 완료된 페이지는 페이지 id + 언어 + 범위
+  기준으로 캐시됩니다(`TranslationStore`).
 - **Dependency-injected 앱 서비스** — production은 `AppDependencies.live`를
   쓰고, 테스트는 protocol 기반 서비스(`ExtractionCacheManaging`,
   `SecurityScopedBookmarking`, `LibraryTreeLoading`, `KeyValueStoring`,

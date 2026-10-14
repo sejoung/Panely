@@ -25,6 +25,7 @@ import UniformTypeIdentifiers
 /// - `ReaderViewModel+Bookmarks` — favorites + per-page bookmarks.
 /// - `ReaderViewModel+Toolbar` — toolbar state/actions wiring.
 /// - `ReaderViewModel+Cache` — extraction-cache management.
+/// - `ReaderViewModel+Translation` — experimental translation assist wiring.
 ///
 /// **State separation:** domain state lives directly on this class (`source`,
 /// `currentPageIndex`, `siblings`, error/loading flags). UI state lives on
@@ -60,13 +61,19 @@ final class ReaderViewModel {
     let libraryAutoRefreshEnabled: Bool
     let filePicker: any FilePicking
     let localization: AppLocalization
+    /// Experimental translation assist: one job per book, kept running in the
+    /// background when another book is opened (see `ReaderViewModel+Translation`).
+    let translationManager: TranslationManager
 
     // MARK: - Source state
 
-    var source: ComicSource = .empty
+    var source: ComicSource = .empty {
+        didSet { translationSourceDidChange() }
+    }
     var currentPageIndex: Int = 0 {
         didSet {
             savePosition()
+            translation.setFocus(currentPageIndex)
             // Any page-change clears the "show prev-volume card" cue. The
             // backward path re-sets it immediately after the assignment when
             // landing on page 0, so we don't lose intent there.
@@ -142,6 +149,10 @@ final class ReaderViewModel {
     /// one (race in `currentImages` / `currentSourceURL` assignments).
     var loadEpoch: Int = 0
 
+    /// Volumes the last "translate entire series" couldn't queue (archives
+    /// inside archives), shown in the translation panel.
+    var seriesTranslationSkipped: [String] = []
+
     // MARK: - UI-state forwarding to `ReaderPreferences`
     //
     // These properties keep the historical `viewModel.layout` / `.direction`
@@ -166,6 +177,10 @@ final class ReaderViewModel {
             seriesPreferences.setLayout(newValue, forSeries: seriesIdentity)
             if oldValue != newValue {
                 handleLayoutChange(from: oldValue)
+                // Paged ↔ vertical changes how pages are read (page vs strip).
+                if oldValue.isContinuous != newValue.isContinuous {
+                    reloadTranslations()
+                }
             }
         }
     }
@@ -231,6 +246,10 @@ final class ReaderViewModel {
         set {
             preferences.appLanguage = newValue
             localization.apply(newValue)
+            // An unset translation target follows the interface language.
+            if preferences.translationTargetLanguage == nil {
+                reloadTranslations()
+            }
         }
     }
 
@@ -314,6 +333,7 @@ final class ReaderViewModel {
         self.libraryAutoRefreshEnabled = dependencies.libraryAutoRefreshEnabled
         self.filePicker = dependencies.filePickerFactory()
         self.localization = dependencies.localization
+        self.translationManager = TranslationManager(store: dependencies.translationStore, defaults: dependencies.keyValueStore)
         localization.apply(preferences.appLanguage)
         preferences.refreshAppleLanguagesOverride()
 

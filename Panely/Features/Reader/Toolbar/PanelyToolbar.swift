@@ -33,6 +33,15 @@ struct PanelyToolbarState: Equatable {
     var canGoNextBookmark = false
     /// Bookmarked books other than the open one, most recent first.
     var otherBookmarkedBooks: [BookmarkedBook] = []
+    /// Experimental translation assist; `nil` hides its control entirely
+    /// (feature off, or macOS < 26).
+    var translation: ToolbarTranslationState?
+}
+
+struct ToolbarTranslationState: Equatable {
+    var showsTranslation = true
+    var isWorking = false
+    var hasTranslations = false
 }
 
 struct PanelyToolbarActions {
@@ -76,18 +85,24 @@ struct PanelyToolbarActions {
 struct PanelyToolbar: View {
     let state: PanelyToolbarState
     let actions: PanelyToolbarActions
+    /// Content of the translation popover (the toolbar stays presentation-only;
+    /// the panel brings its own state).
+    let translationPanel: AnyView?
 
     @State private var hoveredHint: ToolbarHint?
+    @State private var showsTranslationPanel = false
 
     /// `previewHint` shows a control's hint as if it were hovered — for
     /// previews and manual screenshots, where there is no pointer.
     init(
         state: PanelyToolbarState,
         actions: PanelyToolbarActions,
+        translationPanel: AnyView? = nil,
         previewHint: ToolbarHint? = nil
     ) {
         self.state = state
         self.actions = actions
+        self.translationPanel = translationPanel
         _hoveredHint = State(initialValue: previewHint)
     }
 
@@ -345,6 +360,29 @@ struct PanelyToolbar: View {
                 isEnabled: state.hasSource,
                 action: actions.onToggleThumbnailSidebar
             )
+
+            if let translation = state.translation {
+                translationButton(translation)
+            }
+        }
+    }
+
+    /// Experimental translation assist: opens the translation panel. Lit
+    /// while translations are showing; pulses while a job is running.
+    @ViewBuilder
+    private func translationButton(_ translation: ToolbarTranslationState) -> some View {
+        iconButton(
+            "translation",
+            // One glyph in every state (there is no `translate.circle`); a
+            // running job pulses it instead.
+            "translate",
+            hint: translation.isWorking ? "Translating… (Experimental)" : "Translation (Experimental)",
+            isActive: translation.showsTranslation && translation.hasTranslations,
+            action: { showsTranslationPanel.toggle() }
+        )
+        .symbolEffect(.pulse, isActive: translation.isWorking)
+        .popover(isPresented: $showsTranslationPanel, arrowEdge: .bottom) {
+            translationPanel
         }
     }
 

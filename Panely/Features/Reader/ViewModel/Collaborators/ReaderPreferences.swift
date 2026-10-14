@@ -26,6 +26,10 @@ final class ReaderPreferences {
     static let reopenLastFolderOnLaunchKey = "panely.reopenLastFolderOnLaunch"
     static let wheelPageTurnKey = "panely.wheelPageTurn"
     static let appLanguageKey = "panely.appLanguage"
+    static let translationEnabledKey = "panely.translation.enabled"
+    static let translationIncludeSoundEffectsKey = "panely.translation.includeSoundEffects"
+    static let translationTargetLanguageKey = "panely.translation.targetLanguage"
+    static let translationOverlayVisibleKey = "panely.translation.overlayVisible"
     /// Read by AppKit at launch to pick the app's localization. Written into
     /// Panely's own defaults only — the system-wide list is never touched.
     static let appleLanguagesKey = "AppleLanguages"
@@ -119,6 +123,40 @@ final class ReaderPreferences {
         }
     }
 
+    /// Experimental translation assist (macOS 26+). Off by default: it runs
+    /// OCR and on-device translation over the user's pages, which is heavy and
+    /// only useful to people reading comics in a language they don't read.
+    var translationEnabled: Bool = false {
+        didSet {
+            defaults.set(translationEnabled, forKey: Self.translationEnabledKey)
+        }
+    }
+
+    /// Translate onomatopoeia too. Off by default: sound effects are drawn
+    /// art more than dialogue, and each costs a second of translation time.
+    /// (The book's own language is per series — see `ReaderSeriesPreferencesStore`.)
+    var translationIncludeSoundEffects: Bool = false {
+        didSet {
+            defaults.set(translationIncludeSoundEffects, forKey: Self.translationIncludeSoundEffectsKey)
+        }
+    }
+
+    /// Language to translate into; `nil` follows the interface language
+    /// (see `ReaderViewModel.translationTargetLanguage`).
+    var translationTargetLanguage: TranslationLanguage? {
+        didSet {
+            defaults.set(translationTargetLanguage?.rawValue, forKey: Self.translationTargetLanguageKey)
+        }
+    }
+
+    /// Whether translated text is painted over the page. When off, balloons
+    /// still open their original + translation popover on click.
+    var translationOverlayVisible: Bool = true {
+        didSet {
+            defaults.set(translationOverlayVisible, forKey: Self.translationOverlayVisibleKey)
+        }
+    }
+
     /// Re-derive the `AppleLanguages` override. Also run at launch: under
     /// "System Default" the right value depends on the Mac's language, which
     /// may have changed since it was last written.
@@ -182,6 +220,19 @@ final class ReaderPreferences {
         if let raw = storedDefaults[Self.appLanguageKey] as? String,
            let stored = AppLanguage(rawValue: raw) {
             appLanguage = stored
+        }
+        if let value = storedDefaults[Self.translationEnabledKey] as? Bool {
+            translationEnabled = value
+        }
+        if let value = storedDefaults[Self.translationIncludeSoundEffectsKey] as? Bool {
+            translationIncludeSoundEffects = value
+        }
+        if let raw = storedDefaults[Self.translationTargetLanguageKey] as? String,
+           let stored = TranslationLanguage(rawValue: raw) {
+            translationTargetLanguage = stored
+        }
+        if let value = storedDefaults[Self.translationOverlayVisibleKey] as? Bool {
+            translationOverlayVisible = value
         }
     }
 }

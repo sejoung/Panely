@@ -17,6 +17,8 @@ nonisolated struct AppDependencies {
     /// `Bundle.localized`. Tests get their own so switching languages in one
     /// test can't leak into another's strings.
     let localization: AppLocalization
+    /// On-disk cache for the translation assist. Tests point it at a temp dir.
+    let translationStore: TranslationStore
 
     // Reader collaborators are surfaced as factories so tests can swap in
     // doubles without subclassing `ReaderViewModel`. The live implementations
@@ -43,6 +45,7 @@ nonisolated struct AppDependencies {
             libraryAutoRefreshEnabled: true,
             filePickerFactory: { LiveFilePicker() },
             localization: .shared,
+            translationStore: TranslationStore(),
             makeReaderPreferences: { ReaderPreferences(defaults: keyValueStore) },
             makeReaderPositions: { ReaderPositionStore(defaults: keyValueStore) },
             makeReadingProgress: { ReadingProgressStore(defaults: keyValueStore) },

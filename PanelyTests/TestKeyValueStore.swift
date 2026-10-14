@@ -250,6 +250,10 @@ func makeTestDependencies(
     libraryAutoRefreshEnabled: Bool = true,
     filePicker: any FilePicking = TestFilePicker(),
     localization: AppLocalization = AppLocalization(language: "en"),
+    translationStore: TranslationStore = TranslationStore(
+        root: FileManager.default.temporaryDirectory
+            .appendingPathComponent("panely-translation-tests-\(UUID().uuidString)", isDirectory: true)
+    ),
     readerLibraryScopeFactory: @MainActor @escaping () -> ReaderLibraryScope = { ReaderLibraryScope() }
 ) -> AppDependencies {
     AppDependencies(
@@ -263,6 +267,7 @@ func makeTestDependencies(
         libraryAutoRefreshEnabled: libraryAutoRefreshEnabled,
         filePickerFactory: { filePicker },
         localization: localization,
+        translationStore: translationStore,
         makeReaderPreferences: { ReaderPreferences(defaults: keyValueStore) },
         makeReaderPositions: { ReaderPositionStore(defaults: keyValueStore) },
         makeReadingProgress: { ReadingProgressStore(defaults: keyValueStore) },

@@ -23,6 +23,12 @@ final class ReaderImageLoader {
     /// real (non-placeholder) images.
     var pageDimensions: [CGSize] = []
 
+    /// `ComicPage.id` of each slot in `currentImages`, same order. Lets
+    /// per-page overlays (translation) follow exactly what's on screen —
+    /// paged mode swaps `currentImages` only once a spread has decoded, so
+    /// deriving this from `currentPageIndex` would run ahead of the pixels.
+    private(set) var currentPageIDs: [String] = []
+
     private(set) var loadedPageIndices: Set<Int> = []
 
     /// Pages whose decode failed and are currently showing an error
@@ -68,6 +74,7 @@ final class ReaderImageLoader {
         lazyLoadTask = nil
         generation &+= 1
         currentImages = []
+        currentPageIDs = []
         pageDimensions = []
         loadedPageIndices.removeAll()
         failedPageIndices.removeAll()
@@ -77,6 +84,7 @@ final class ReaderImageLoader {
     /// calling `refresh(...)` immediately after to repopulate.
     func prepareForLayoutRebuild() {
         currentImages = []
+        currentPageIDs = []
     }
 
     /// Drop the previous book's strip before a new `load(url:)` starts.
@@ -90,6 +98,7 @@ final class ReaderImageLoader {
     /// scroll). `refresh(...)` repopulates immediately after.
     func prepareForBookSwitch() {
         currentImages = []
+        currentPageIDs = []
         pageDimensions = []
     }
 
@@ -148,6 +157,7 @@ final class ReaderImageLoader {
         pageDimensions = []
         guard !pages.isEmpty else {
             currentImages = []
+            currentPageIDs = []
             return
         }
 
@@ -157,6 +167,7 @@ final class ReaderImageLoader {
         // decode was cancelled; whoever cancelled it owns the next refresh.
         guard let images, generation == self.generation else { return }
         currentImages = images
+        currentPageIDs = pages.map(\.id)
         schedulePreload()
     }
 
@@ -211,6 +222,7 @@ final class ReaderImageLoader {
         let pages = source.pages
         guard !pages.isEmpty else {
             currentImages = []
+            currentPageIDs = []
             pageDimensions = []
             return
         }
@@ -247,6 +259,7 @@ final class ReaderImageLoader {
         //    Use a visible neutral gray so unloaded slots look intentional
         //    instead of empty black voids during the brief load window.
         currentImages = dims.map { Self.makePlaceholder(size: $0) }
+        currentPageIDs = pages.map(\.id)
 
         // 3. Load the window around the restored page index.
         await ensureWindowLoaded(around: currentPageIndex, source: source, generation: generation, onError: onError)

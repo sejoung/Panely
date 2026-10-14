@@ -11,7 +11,8 @@ struct ReaderToolbarOverlay: View {
     var body: some View {
         PanelyToolbar(
             state: viewModel.toolbarState(isAtFit: viewerController.isAtFit),
-            actions: viewModel.toolbarActions(viewerController: viewerController)
+            actions: viewModel.toolbarActions(viewerController: viewerController),
+            translationPanel: AnyView(TranslationPanel().environment(viewModel))
         )
         .padding(PanelySpacing.md)
         .opacity(shown ? 1 : 0)
