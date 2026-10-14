@@ -28,6 +28,7 @@ final class ReaderPreferences {
     static let appLanguageKey = "panely.appLanguage"
     static let translationEnabledKey = "panely.translation.enabled"
     static let translationIncludeSoundEffectsKey = "panely.translation.includeSoundEffects"
+    static let translationModeKey = "panely.translation.mode"
     static let translationTargetLanguageKey = "panely.translation.targetLanguage"
     static let translationOverlayVisibleKey = "panely.translation.overlayVisible"
     /// Read by AppKit at launch to pick the app's localization. Written into
@@ -141,6 +142,15 @@ final class ReaderPreferences {
         }
     }
 
+    /// Which translation model runs. Fast by default: the assist is for
+    /// following the story, and the accurate model takes ~20× as long (see
+    /// `TranslationMode`).
+    var translationMode: TranslationMode = .fast {
+        didSet {
+            defaults.set(translationMode.rawValue, forKey: Self.translationModeKey)
+        }
+    }
+
     /// Language to translate into; `nil` follows the interface language
     /// (see `ReaderViewModel.translationTargetLanguage`).
     var translationTargetLanguage: TranslationLanguage? {
@@ -226,6 +236,10 @@ final class ReaderPreferences {
         }
         if let value = storedDefaults[Self.translationIncludeSoundEffectsKey] as? Bool {
             translationIncludeSoundEffects = value
+        }
+        if let raw = storedDefaults[Self.translationModeKey] as? String,
+           let stored = TranslationMode(rawValue: raw) {
+            translationMode = stored
         }
         if let raw = storedDefaults[Self.translationTargetLanguageKey] as? String,
            let stored = TranslationLanguage(rawValue: raw) {

@@ -20,10 +20,50 @@ nonisolated enum SoundEffectClassifier {
             return endsWithCatch(string) || endsWithSmallVowel(string) || hasLongVowelMark(string, letters: letters.count)
                 || isRepetition(string, minimumUnit: 2) || isShortNasalBeat(string)
         case .korean:
-            return isRepetition(string, minimumUnit: 1)
+            // "비켜, 비켜!", "꿈이 없다… 흠흠" — punctuation inside the text
+            // means it's spoken, however much it repeats.
+            guard !hasInnerPunctuation(text) else { return false }
+            return isRepetition(string, minimumUnit: 1) || endsWithDoubledSyllable(string)
+                || isVowelAlternation(string) || isLoneSyllable(text, letters: string)
         case .chineseSimplified, .chineseTraditional, .english:
             return false
         }
+    }
+
+    /// 타박박, 트두두, 물불불 — a sound that trails off in a doubled syllable.
+    private static func endsWithDoubledSyllable(_ s: String) -> Bool {
+        let characters = Array(s)
+        return characters.count >= 3 && characters[characters.count - 1] == characters[characters.count - 2]
+    }
+
+    /// 푸벅푸백, 아장어정 — a two-syllable sound repeated with only its vowel
+    /// changed (same initial and final consonants), the usual way Korean
+    /// varies a sound.
+    private static func isVowelAlternation(_ s: String) -> Bool {
+        let syllables = s.unicodeScalars.compactMap(HangulSyllable.init)
+        guard syllables.count == 4, s.unicodeScalars.count == 4 else { return false }
+        func sameConsonants(_ a: HangulSyllable, _ b: HangulSyllable) -> Bool {
+            a.initial == b.initial && a.final == b.final
+        }
+        return sameConsonants(syllables[0], syllables[2]) && sameConsonants(syllables[1], syllables[3])
+            && (syllables[0] != syllables[2] || syllables[1] != syllables[3])
+    }
+
+    /// 쿵, 꿀, 투 — one syllable on its own with no punctuation is drawn
+    /// lettering (or a piece of it that OCR split off). Lone replies keep
+    /// their meaning and stay.
+    private static func isLoneSyllable(_ text: String, letters: String) -> Bool {
+        guard letters.count == 1, !koreanLoneWords.contains(letters) else { return false }
+        return !text.contains { "?!.…~,".contains($0) }
+    }
+
+    private static let koreanLoneWords: Set<String> = ["응", "예", "네", "뭐", "왜"]
+
+    /// Punctuation followed by more text; trailing "!", "…" and the like are
+    /// part of how sound effects are lettered.
+    private static func hasInnerPunctuation(_ text: String) -> Bool {
+        let body = text.trimmingCharacters(in: CharacterSet(charactersIn: "?!.…~,·•:- ").union(.whitespaces))
+        return body.contains { "?!.…,".contains($0) }
     }
 
     /// スッ, ドサッ, ぽすっ — a small tsu marks a cut-off sound.
@@ -59,6 +99,21 @@ nonisolated enum SoundEffectClassifier {
             }
         }
         return false
+    }
+}
+
+/// A precomposed hangul syllable split into its jamo indices.
+private nonisolated struct HangulSyllable: Equatable {
+    let initial: UInt32
+    let vowel: UInt32
+    let final: UInt32
+
+    init?(_ scalar: Unicode.Scalar) {
+        guard (0xAC00...0xD7A3).contains(scalar.value) else { return nil }
+        let index = scalar.value - 0xAC00
+        initial = index / 588
+        vowel = (index % 588) / 28
+        final = index % 28
     }
 }
 

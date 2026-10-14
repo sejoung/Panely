@@ -55,7 +55,12 @@ struct TranslationPanel: View {
             }
 
             if #available(macOS 26.0, *), let source = viewModel.translationSourceLanguage, source != viewModel.translationDisplayLanguage {
-                TranslationLanguagePackRow(source: source, target: viewModel.translationDisplayLanguage, hidesWhenInstalled: true)
+                TranslationLanguagePackRow(
+                    source: source,
+                    target: viewModel.translationDisplayLanguage,
+                    mode: viewModel.translationMode,
+                    hidesWhenInstalled: true
+                )
             }
 
             if viewModel.currentBookLivesInTemporaryFolder {
@@ -395,10 +400,13 @@ struct TranslatedPagesBar: View {
 struct TranslationLanguagePackRow: View {
     let source: TranslationLanguage
     let target: TranslationLanguage
+    let mode: TranslationMode
     var hidesWhenInstalled = false
 
     @State private var status: TranslationLanguageStatus?
     @State private var downloadConfiguration: TranslationSession.Configuration?
+    /// Which pair and model `downloadConfiguration` asks for.
+    @State private var downloadRequest: String?
 
     var body: some View {
         Group {
@@ -420,9 +428,9 @@ struct TranslationLanguagePackRow: View {
                 }
             }
         }
-        .task(id: "\(source.rawValue)>\(target.rawValue)") {
+        .task(id: "\(source.rawValue)>\(target.rawValue)|\(mode.effective.rawValue)") {
             status = nil
-            status = await TranslationAvailability.status(from: source, to: target)
+            status = await TranslationAvailability.status(from: source, to: target, mode: mode)
         }
         .translationTask(downloadConfiguration) { session in
             do {
@@ -430,19 +438,19 @@ struct TranslationLanguagePackRow: View {
             } catch {
                 AppLog.error(.reader, "Translation language download failed", metadata: ["error": "\(error)"])
             }
-            let refreshed = await TranslationAvailability.status(from: source, to: target)
+            let refreshed = await TranslationAvailability.status(from: source, to: target, mode: mode)
             await MainActor.run { status = refreshed }
         }
     }
 
     private func requestDownload() {
-        let configuration = TranslationSession.Configuration(source: source.localeLanguage, target: target.localeLanguage)
-        if downloadConfiguration?.source == configuration.source,
-           downloadConfiguration?.target == configuration.target {
-            // Same pair again (e.g. the first prompt was dismissed): re-run.
+        let request = "\(source.rawValue)>\(target.rawValue)|\(mode.effective.rawValue)"
+        if downloadConfiguration != nil, downloadRequest == request {
+            // Same pack again (e.g. the first prompt was dismissed): re-run.
             downloadConfiguration?.invalidate()
         } else {
-            downloadConfiguration = configuration
+            downloadRequest = request
+            downloadConfiguration = TranslationAvailability.configuration(from: source, to: target, mode: mode)
         }
     }
 }
@@ -453,6 +461,7 @@ struct TranslationLanguagePackRow: View {
 struct LanguagePackDownloadButton: View {
     let source: TranslationLanguage
     let target: TranslationLanguage
+    let mode: TranslationMode
     let onInstalled: () -> Void
 
     @State private var configuration: TranslationSession.Configuration?
@@ -460,7 +469,7 @@ struct LanguagePackDownloadButton: View {
     var body: some View {
         Button("Download…") {
             if configuration == nil {
-                configuration = TranslationSession.Configuration(source: source.localeLanguage, target: target.localeLanguage)
+                configuration = TranslationAvailability.configuration(from: source, to: target, mode: mode)
             } else {
                 configuration?.invalidate()
             }
@@ -471,7 +480,7 @@ struct LanguagePackDownloadButton: View {
             } catch {
                 AppLog.error(.reader, "Translation language download failed", metadata: ["error": "\(error)"])
             }
-            if await TranslationAvailability.status(from: source, to: target) == .installed {
+            if await TranslationAvailability.status(from: source, to: target, mode: mode) == .installed {
                 await MainActor.run { onInstalled() }
             }
         }

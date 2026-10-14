@@ -108,6 +108,16 @@ extension ReaderViewModel {
         }
     }
 
+    /// Fast or accurate model (Settings). Running jobs restart in the new mode.
+    var translationMode: TranslationMode {
+        get { preferences.translationMode }
+        set {
+            guard preferences.translationMode != newValue else { return }
+            preferences.translationMode = newValue
+            reloadTranslations()
+        }
+    }
+
     /// Start translating whenever a book of this series opens.
     var translationAutoTranslatesSeries: Bool {
         get { seriesPreferences.autoTranslate(forSeries: seriesIdentity) }
@@ -264,6 +274,7 @@ extension ReaderViewModel {
                 source: seriesPreferences.translationSource(forSeries: seriesID),
                 target: target,
                 includeSoundEffects: translationIncludeSoundEffects,
+                mode: translationMode,
                 enabled: true,
                 autoStart: true,
                 focusPage: 0
@@ -350,6 +361,7 @@ extension ReaderViewModel {
             source: seriesPreferences.translationSource(forSeries: seriesIdentity),
             target: target,
             includeSoundEffects: translationIncludeSoundEffects,
+            mode: translationMode,
             enabled: enabled,
             autoStart: enabled && (wasActive || autoStart),
             focusPage: currentPageIndex

@@ -133,6 +133,22 @@
         }
       }
     },
+    "Accurate" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accurate"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "정확하게"
+          }
+        }
+      }
+    },
     "Add Page Bookmark" : {
       "localizations" : {
         "en" : {
@@ -1578,6 +1594,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "압축을 풀지 못했습니다: %@"
+          }
+        }
+      }
+    },
+    "Fast" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fast"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "빠르게"
+          }
+        }
+      }
+    },
+    "Fast translates a volume in about a minute. Accurate reads idioms and nuance better but takes about 20 times as long. Each mode downloads its own language packs." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fast translates a volume in about a minute. Accurate reads idioms and nuance better but takes about 20 times as long. Each mode downloads its own language packs."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "빠르게는 한 권을 1분 정도에 번역합니다. 정확하게는 관용 표현과 뉘앙스를 더 잘 옮기지만 20배 정도 오래 걸립니다. 방식마다 언어팩을 따로 내려받습니다."
+          }
+        }
+      }
+    },
+    "Fast translation requires macOS 26.4 or later." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fast translation requires macOS 26.4 or later."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "빠른 번역은 macOS 26.4 이상이 필요합니다."
           }
         }
       }
@@ -5246,6 +5310,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "번역 캐시"
+          }
+        }
+      }
+    },
+    "Translation Mode" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Translation Mode"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "번역 방식"
           }
         }
       }

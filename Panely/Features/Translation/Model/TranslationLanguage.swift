@@ -25,9 +25,24 @@ nonisolated enum TranslationLanguage: String, CaseIterable, Identifiable, Codabl
     }
 
     /// Joins text recognized on separate lines/columns of one balloon.
-    /// CJK runs straight on; English needs the word break back.
+    /// Japanese and Chinese run straight on; Korean and English break lines
+    /// between words, so the space has to come back ("되면" + "새차" →
+    /// "되면 새차", not "되면새차").
     var lineJoiner: String {
-        self == .english ? " " : ""
+        switch self {
+        case .korean, .english: " "
+        case .japanese, .chineseSimplified, .chineseTraditional: ""
+        }
+    }
+
+    /// Whether comics in this language set balloons in vertical columns.
+    /// Korean and English editions letter horizontally, even in the narrow
+    /// balloons of a translated manga.
+    var isWrittenVertically: Bool {
+        switch self {
+        case .japanese, .chineseSimplified, .chineseTraditional: true
+        case .korean, .english: false
+        }
     }
 
     /// Whether `text` contains this language's own script. OCR also picks up

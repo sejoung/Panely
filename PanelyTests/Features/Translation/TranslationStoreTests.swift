@@ -42,6 +42,9 @@ struct TranslationStoreTests {
         #expect(base != TranslationStore.key(pageID: "p2", from: .japanese, to: .korean))
         #expect(base != TranslationStore.key(pageID: "p1", from: .japanese, to: .english))
         #expect(base != TranslationStore.key(pageID: "p1", from: .chineseSimplified, to: .korean))
+        // Accurate keeps the key from before modes existed; fast has its own.
+        #expect(base == TranslationStore.key(pageID: "p1", from: .japanese, to: .korean, mode: .accurate))
+        #expect(base != TranslationStore.key(pageID: "p1", from: .japanese, to: .korean, mode: .fast))
     }
 
     @Test func missingOrCorruptEntriesLoadAsNil() throws {

@@ -81,6 +81,30 @@ struct BubbleGrouperTests {
         #expect(bubbles.map(\.source) == ["As Mayor of Komona, I declare the contest open!"])
     }
 
+    @Test func koreanLinesJoinWithSpaces() {
+        // One balloon that Vision returned a paragraph per line.
+        let bubbles = BubbleGrouper.group([
+            horizontal("그거 되면", x: 217, y: 1540, width: 108, height: 36),
+            horizontal("새차", x: 239, y: 1585, width: 68, height: 36),
+            horizontal("뽑을 거야.", x: 212, y: 1630, width: 118, height: 37),
+        ], language: .korean)
+
+        #expect(bubbles.map(\.source) == ["그거 되면 새차 뽑을 거야."])
+    }
+
+    @Test func koreanSoundEffectsAreRecognized() {
+        for sound in ["짝짝", "웅성웅성,", "타 박박", "트두두", "푸벅 푸백", "쿵", "꿀", "투", "하하하…"] {
+            #expect(SoundEffectClassifier.isSoundEffect(sound, language: .korean), "\(sound)")
+        }
+    }
+
+    @Test func koreanSpeechIsNotASoundEffect() {
+        // Replies, punctuated speech, and words that only look repetitive.
+        for speech in ["응", "네", "왜", "쿵?", "비켜, 비켜!", "꿈이 없다… 흠흠", "2화 작화중.", "좋아", "찾았다", "하치켄", "그렇지"] {
+            #expect(!SoundEffectClassifier.isSoundEffect(speech, language: .korean), "\(speech)")
+        }
+    }
+
     @Test func normalizerCollapsesEllipsisVariants() {
         #expect(TranslationTextNormalizer.normalize("行わ・なければ・・。", language: .japanese) == "行わ・なければ…")
         #expect(TranslationTextNormalizer.normalize("見つめていた••。", language: .japanese) == "見つめていた…")

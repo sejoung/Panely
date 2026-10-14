@@ -24,6 +24,13 @@ struct ExperimentalSettingsView: View {
         )
     }
 
+    private var mode: Binding<TranslationMode> {
+        Binding(
+            get: { viewModel.translationMode.effective },
+            set: { viewModel.translationMode = $0 }
+        )
+    }
+
     var body: some View {
         Form {
             Section("Experimental") {
@@ -42,6 +49,16 @@ struct ExperimentalSettingsView: View {
             if viewModel.translationFeatureAvailable {
                 Section("Translation") {
                     TranslationTargetPicker(viewModel: viewModel)
+                    Picker("Translation Mode", selection: mode) {
+                        Text("Fast").tag(TranslationMode.fast)
+                        Text("Accurate").tag(TranslationMode.accurate)
+                    }
+                    .disabled(!TranslationMode.isFastAvailable)
+                    Text(TranslationMode.isFastAvailable
+                        ? "Fast translates a volume in about a minute. Accurate reads idioms and nuance better but takes about 20 times as long. Each mode downloads its own language packs."
+                        : "Fast translation requires macOS 26.4 or later.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     Toggle("Translate Sound Effects", isOn: includeSoundEffects)
                     Text("The default language is what new series are shown in. Each series can be shown in another language, and each book's own language is detected the first time it's translated — both from the translation button in the toolbar, remembered per series.")
                         .font(.caption)

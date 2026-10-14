@@ -40,7 +40,6 @@ nonisolated struct PageTextRecognizer {
             observation.document.paragraphs.compactMap { paragraph -> TextRegion? in
                 let lines = paragraph.lines
                 guard !lines.isEmpty else { return nil }
-                let isVertical = lines.contains { $0.textDirection == .topToBottom }
                 // Vision rects are normalized with a bottom-left origin.
                 let box = paragraph.boundingRegion.boundingBox.cgRect
                 let rect = CGRect(
@@ -49,6 +48,13 @@ nonisolated struct PageTextRecognizer {
                     width: box.width * width,
                     height: box.height * height
                 )
+                // Vision calls short horizontal Korean lines in narrow
+                // balloons top-to-bottom (a third of a Korean volume's
+                // balloons), which keeps them from merging with the rest of
+                // their balloon. Outside Japanese and Chinese, only text that
+                // is clearly taller than wide (a vertical sign) is vertical.
+                let isVertical = lines.contains { $0.textDirection == .topToBottom }
+                    && (language.isWrittenVertically || rect.height > rect.width * 1.5)
                 let glyphSize = lines.map { line in
                     let lineBox = line.boundingBox.cgRect
                     return isVertical ? lineBox.width * width : lineBox.height * height

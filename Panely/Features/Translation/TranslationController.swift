@@ -122,6 +122,8 @@ final class TranslationController {
     @ObservationIgnored private(set) var isConfigured = false
     @ObservationIgnored private var scope: TranslationScope = .page
     @ObservationIgnored private var includeSoundEffects = false
+    /// Already `effective` for this Mac.
+    @ObservationIgnored private(set) var mode: TranslationMode = .accurate
     @ObservationIgnored private var enabled = false
     @ObservationIgnored private var plan: TranslationPlan?
     @ObservationIgnored private var finishedUnits: Set<Int> = []
@@ -135,6 +137,9 @@ final class TranslationController {
     @ObservationIgnored private var pagesCompletedThisJob = 0
 
     nonisolated static let maxConsecutiveFailures = 3
+    /// Pages read ahead in fast mode. Three keep translation fed on an M1
+    /// Pro without OCR running far ahead of a reader who jumps around.
+    nonisolated static let fastLookahead = 3
     nonisolated static let warmedUpBuildKey = "panely.translation.warmedUpBuild"
 
     init(
@@ -211,6 +216,7 @@ final class TranslationController {
         source: TranslationLanguage?,
         target: TranslationLanguage,
         includeSoundEffects: Bool,
+        mode: TranslationMode = .accurate,
         enabled: Bool,
         autoStart: Bool,
         focusPage: Int
@@ -223,6 +229,7 @@ final class TranslationController {
         self.source = source
         self.target = target
         self.includeSoundEffects = includeSoundEffects
+        self.mode = mode.effective
         self.enabled = enabled
         self.focusPage = focusPage
         guard enabled, !bookPages.isEmpty else { return }
@@ -255,6 +262,7 @@ final class TranslationController {
             source: language,
             target: target,
             includeSoundEffects: includeSoundEffects,
+            mode: mode,
             enabled: enabled,
             autoStart: wasWorking,
             focusPage: focusPage
@@ -319,13 +327,13 @@ final class TranslationController {
     /// Delete every cached translation (all books). The open book's overlays
     /// go too — they'd otherwise outlive their cache entries.
     func clearCache() async -> UInt64 {
-        let snapshot = (bookPages, pageSizes, scope, source, target, includeSoundEffects, enabled, focusPage)
+        let snapshot = (bookPages, pageSizes, scope, source, target, includeSoundEffects, enabled, focusPage, mode)
         clear()
         let store = store
         let removed = await Task.detached(priority: .utility) { store.clear() }.value
         reload(
             pages: snapshot.0, pageSizes: snapshot.1, scope: snapshot.2, source: snapshot.3, target: snapshot.4,
-            includeSoundEffects: snapshot.5, enabled: snapshot.6, autoStart: false, focusPage: snapshot.7
+            includeSoundEffects: snapshot.5, mode: snapshot.8, enabled: snapshot.6, autoStart: false, focusPage: snapshot.7
         )
         return removed
     }
@@ -368,10 +376,11 @@ final class TranslationController {
         let knownSource = source
         let target = target
         let includeSoundEffects = includeSoundEffects
+        let mode = mode
         let focus = focusPage
         phase = knownSource == nil ? .detectingLanguage : .preparing
         AppLog.info(.reader, "Translation started", metadata: [
-            "pages": "\(bookPages.count)", "scope": "\(scope.rawValue)", "target": "\(target.rawValue)",
+            "pages": "\(bookPages.count)", "scope": "\(scope.rawValue)", "target": "\(target.rawValue)", "mode": "\(mode.rawValue)",
         ])
 
         // Detached: decoding, OCR and sampling are CPU work that must stay
@@ -391,7 +400,7 @@ final class TranslationController {
             guard let source, !Task.isCancelled else { return }
 
             // 2. Language pack
-            let status = await TranslationAvailability.status(from: source, to: target)
+            let status = await TranslationAvailability.status(from: source, to: target, mode: mode)
             guard status == .installed else {
                 await self?.finishJob(
                     generation: generation,
@@ -418,53 +427,79 @@ final class TranslationController {
 
             // 4. Work: OCR the next unit while translating the current one.
             let analyzer = PageAnalyzer(pages: bookPages, language: source, includeSoundEffects: includeSoundEffects)
-            let translator = PageTranslator(from: source, to: target)
+            let translator = PageTranslator(from: source, to: target, mode: mode)
             var consecutiveFailures = 0
             var lastError: (any Error)?
+            // Each balloon costs the translator ~0.5 s whatever else runs, so
+            // text seen earlier in the book ("하치켄!", a recurring sign) is
+            // reused instead of translated again.
+            var translatedTexts: [String: String] = [:]
+            var stats = TranslationJobStats()
+            defer { AppLog.info(.reader, "Translation job stats", metadata: stats.metadata) }
 
-            func analysis(of unit: TranslationUnit?) -> Task<[PageAnalysis], any Error>? {
-                unit.map { unit in Task { try await analyzer.analyze(unit, plan: plan) } }
+            // OCR runs ahead of translation. Accurate translation (~6 s a
+            // page) hides one page of OCR; fast translation (~0.3 s a page)
+            // would wait on it, so several pages are read at once — Vision
+            // runs them in parallel.
+            let lookaheadDepth = mode == .fast ? Self.fastLookahead : 1
+            var lookahead: [(unit: TranslationUnit, analysis: Task<[PageAnalysis], any Error>)] = []
+            func fillLookahead(excluding current: Int?) async {
+                while lookahead.count < lookaheadDepth {
+                    let inFlight = Set(lookahead.map(\.unit.id) + [current].compactMap { $0 })
+                    guard let unit = await self?.claimNextUnit(excluding: inFlight, generation: generation) else { return }
+                    lookahead.append((unit, Task { try await analyzer.analyze(unit, plan: plan) }))
+                }
+            }
+            func cancelLookahead() {
+                for entry in lookahead { entry.analysis.cancel() }
             }
 
-            var current = await self?.claimNextUnit(excluding: [], generation: generation)
-            var pending = analysis(of: current)
-            while let unit = current, let analysisTask = pending {
-                var next: TranslationUnit?
-                var nextAnalysis: Task<[PageAnalysis], any Error>?
+            await fillLookahead(excluding: nil)
+            while !lookahead.isEmpty {
+                let (unit, analysisTask) = lookahead.removeFirst()
                 var unitFailed = false
                 do {
+                    let waitStart = ContinuousClock.now
                     let analyses = try await analysisTask.value
+                    stats.analysisWait += waitStart.duration(to: .now)
                     let queue = await self?.merge(analyses, generation: generation) ?? []
-                    // Prefetch: the next unit's OCR overlaps this unit's translation.
-                    next = await self?.claimNextUnit(excluding: [unit.id], generation: generation)
-                    nextAnalysis = analysis(of: next)
+                    // Prefetch: the next units' OCR overlaps this unit's translation.
+                    await fillLookahead(excluding: unit.id)
                     for item in queue {
                         try Task.checkCancellation()
-                        let translation = try await translator.translate(item.source)
+                        let translation: String
+                        if let known = translatedTexts[item.source] {
+                            translation = known
+                            stats.reused += 1
+                        } else {
+                            let start = ContinuousClock.now
+                            translation = try await translator.translate(item.source)
+                            stats.translating += start.duration(to: .now)
+                            stats.translated += 1
+                            translatedTexts[item.source] = translation
+                        }
+                        let start = ContinuousClock.now
                         await self?.setTranslation(translation, pageIndex: item.pageIndex, bubbleID: item.bubbleID, generation: generation)
+                        stats.publishing += start.duration(to: .now)
                     }
                 } catch {
                     if Task.isCancelled || error is CancellationError {
-                        nextAnalysis?.cancel()
+                        cancelLookahead()
                         return
                     }
                     AppLog.error(.reader, "Translation unit failed", metadata: ["unit": "\(unit.id)", "error": "\(error)"])
                     lastError = error
                     unitFailed = true
-                    if next == nil {
-                        next = await self?.claimNextUnit(excluding: [unit.id], generation: generation)
-                        nextAnalysis = analysis(of: next)
-                    }
+                    await fillLookahead(excluding: unit.id)
                 }
                 await self?.finishUnit(unit.id, failed: unitFailed, generation: generation)
+                stats.units += 1
                 consecutiveFailures = unitFailed ? consecutiveFailures + 1 : 0
                 if consecutiveFailures >= Self.maxConsecutiveFailures {
-                    nextAnalysis?.cancel()
+                    cancelLookahead()
                     await self?.finishJob(generation: generation, notice: .failed(lastError?.localizedDescription ?? ""))
                     return
                 }
-                current = next
-                pending = nextAnalysis
             }
             if !Task.isCancelled {
                 await self?.finishJob(generation: generation, notice: nil)
@@ -478,13 +513,20 @@ final class TranslationController {
         let store = store
         let target = target
         let scope = scope
-        let keyed = bookPages.enumerated().map {
-            ($0.offset, $0.element.id, TranslationStore.key(pageID: $0.element.id, from: source, to: target, scope: scope))
+        // A fast job takes accurate translations already made over its own;
+        // an accurate job only reads its own.
+        let modes: [TranslationMode] = mode == .fast ? [.accurate, .fast] : [.accurate]
+        let keyed = bookPages.enumerated().map { page in
+            (page.offset, page.element.id, modes.map {
+                TranslationStore.key(pageID: page.element.id, from: source, to: target, scope: scope, mode: $0)
+            })
         }
         let cached = await Task.detached(priority: .utility) {
             var found: [(Int, String, TranslatedPage)] = []
-            for (index, id, key) in keyed {
-                if let page = store.load(key: key), page.isComplete { found.append((index, id, page)) }
+            for (index, id, keys) in keyed {
+                if let page = keys.lazy.compactMap(store.load(key:)).first(where: \.isComplete) {
+                    found.append((index, id, page))
+                }
             }
             return found
         }.value
@@ -593,7 +635,7 @@ final class TranslationController {
             completedPageIndices.insert(index)
             pagesCompletedThisJob += 1
             if !failedPages.contains(index), let source, page.imageWidth > 0 {
-                toSave.append((TranslationStore.key(pageID: id, from: source, to: target, scope: scope), page))
+                toSave.append((TranslationStore.key(pageID: id, from: source, to: target, scope: scope, mode: mode), page))
             }
         }
         if let translatingSince, pagesCompletedThisJob > 0 {
@@ -615,5 +657,32 @@ final class TranslationController {
         self.notice = notice
         AppLog.info(.reader, "Translation finished", metadata: ["notice": "\(String(describing: notice))"])
         onJobEnded?()
+    }
+}
+
+/// Where a job's time went, logged when it ends — translating should be
+/// nearly all of it; the rest is waiting for OCR or for the main actor.
+private nonisolated struct TranslationJobStats {
+    let started = ContinuousClock.now
+    var units = 0
+    var translated = 0
+    var reused = 0
+    var translating: Duration = .zero
+    var analysisWait: Duration = .zero
+    var publishing: Duration = .zero
+
+    var metadata: AppLog.Metadata {
+        func seconds(_ duration: Duration) -> Double {
+            Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1e18
+        }
+        func format(_ value: Double, _ digits: Int = 1) -> String { String(format: "%.\(digits)f", value) }
+        return [
+            "units": "\(units)", "translated": "\(translated)", "reused": "\(reused)",
+            "wallSeconds": "\(format(seconds(started.duration(to: .now))))",
+            "translatingSeconds": "\(format(seconds(translating)))",
+            "analysisWaitSeconds": "\(format(seconds(analysisWait)))",
+            "publishingSeconds": "\(format(seconds(publishing)))",
+            "secondsPerBalloon": "\(format(translated > 0 ? seconds(translating) / Double(translated) : 0, 2))",
+        ]
     }
 }
