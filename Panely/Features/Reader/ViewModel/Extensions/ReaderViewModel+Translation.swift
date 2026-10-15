@@ -15,7 +15,8 @@ import Foundation
 ///   "Original" in the panel), global.
 /// - **The book's own language** — per series, detected the first time and
 ///   correctable in the panel.
-/// - Sound effects — global.
+/// - Sound effects are never translated: OCR reads few of the drawn ones,
+///   and only as fragments (11 on 48 pages measured, mostly one syllable).
 ///
 /// A book can have several translations; each language is its own job with
 /// its own progress and cache, and the balloon popover shows them side by side.
@@ -106,11 +107,13 @@ extension ReaderViewModel {
             }
     }
 
-    var translationIncludeSoundEffects: Bool {
-        get { preferences.translationIncludeSoundEffects }
+    /// Match translations' speech levels to the originals' (Settings) —
+    /// Japanese ↔ Korean, with Apple Intelligence.
+    var translationMatchesSpeechLevel: Bool {
+        get { preferences.translationMatchesSpeechLevel }
         set {
-            guard preferences.translationIncludeSoundEffects != newValue else { return }
-            preferences.translationIncludeSoundEffects = newValue
+            guard preferences.translationMatchesSpeechLevel != newValue else { return }
+            preferences.translationMatchesSpeechLevel = newValue
             reloadTranslations()
         }
     }
@@ -151,6 +154,23 @@ extension ReaderViewModel {
     /// switched to. The rest can only be started.
     var translationLanguagesWithResults: [TranslationController] {
         translationLanguagesForBook.filter { !$0.pages.isEmpty || $0.hasActiveJob }
+    }
+
+    /// A language with nothing of it to show in this book — never
+    /// translated, or its cache cleared. Picking it has to translate first.
+    func translationNeedsStarting(_ controller: TranslationController) -> Bool {
+        controller.pages.isEmpty && !controller.hasActiveJob
+    }
+
+    /// Pick a language in the panel's View list: show it, translating the
+    /// book into it first when there's nothing of it yet — otherwise picking
+    /// it would only turn on a translation that isn't there.
+    func chooseTranslationLanguage(_ language: TranslationLanguage) {
+        showTranslation(in: language)
+        let controller = translationManager.openBook.first { $0.target == language && $0.isConfigured }
+        if controller.map(translationNeedsStarting) ?? true {
+            startTranslating(into: language)
+        }
     }
 
     func toggleTranslationOverlay() {
@@ -425,8 +445,8 @@ extension ReaderViewModel {
                 scope: scope,
                 source: seriesPreferences.translationSource(forSeries: seriesID),
                 target: target,
-                includeSoundEffects: translationIncludeSoundEffects,
                 mode: translationMode,
+                matchSpeechLevel: translationMatchesSpeechLevel,
                 enabled: true,
                 autoStart: true,
                 focusPage: 0
@@ -516,8 +536,8 @@ extension ReaderViewModel {
             scope: translationScope,
             source: seriesPreferences.translationSource(forSeries: seriesIdentity),
             target: target,
-            includeSoundEffects: translationIncludeSoundEffects,
             mode: translationMode,
+            matchSpeechLevel: translationMatchesSpeechLevel,
             enabled: enabled,
             autoStart: enabled && (wasActive || autoStart),
             focusPage: currentPageIndex

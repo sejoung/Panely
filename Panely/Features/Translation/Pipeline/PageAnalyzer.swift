@@ -12,7 +12,9 @@ nonisolated struct PageAnalysis: Sendable {
 }
 
 /// OCR side of the pipeline: turns a `TranslationUnit` into balloons per page
-/// (text, position in page pixels, background tone). An actor so the decoded
+/// (text, position in page pixels, background tone). Text is grouped into
+/// balloons with the help of `BalloonDetector`, which also tells real text
+/// from artwork OCR misread. An actor so the decoded
 /// pages it keeps between strip bands are touched by one task at a time.
 ///
 /// Strip bands overlap and a tall page spans several bands, so the last few
@@ -21,14 +23,12 @@ nonisolated struct PageAnalysis: Sendable {
 actor PageAnalyzer {
     private let pages: [ComicPage]
     private let language: TranslationLanguage
-    private let includeSoundEffects: Bool
     private var decoded: [(index: Int, image: CGImage)] = []
     private static let decodedCacheSize = 4
 
-    init(pages: [ComicPage], language: TranslationLanguage, includeSoundEffects: Bool) {
+    init(pages: [ComicPage], language: TranslationLanguage) {
         self.pages = pages
         self.language = language
-        self.includeSoundEffects = includeSoundEffects
     }
 
     func analyze(_ unit: TranslationUnit, plan: TranslationPlan) async throws -> [PageAnalysis] {
@@ -43,8 +43,9 @@ actor PageAnalyzer {
 
     private func analyzePage(_ index: Int) async throws -> PageAnalysis {
         let image = try await decodedImage(index)
-        let regions = try await PageTextRecognizer(language: language).recognize(image)
-        let bubbles = makeBubbles(from: BubbleGrouper.group(regions, language: language), sampling: image) { $0 }
+        let (regions, detections) = try await recognize(image)
+        let drafts = BubbleGrouper.group(regions, language: language, detections: detections)
+        let bubbles = makeBubbles(from: drafts, sampling: image) { $0 }
         return PageAnalysis(pageIndex: index, imageSize: CGSize(width: image.width, height: image.height), bubbles: bubbles)
     }
 
@@ -52,9 +53,10 @@ actor PageAnalyzer {
 
     private func analyzeBand(_ band: StripBand, layout: StripLayout) async throws -> [PageAnalysis] {
         let image = try await renderBand(band, layout: layout)
-        let regions = try await PageTextRecognizer(language: language).recognize(image)
+        let (recognized, detections) = try await recognize(image)
+        let regions = recognized
             .filter { OCRTiling.isWhole($0.rect, bandHeight: Int(band.height), isFirst: band.isFirst, isLast: band.isLast) }
-        let drafts = BubbleGrouper.group(regions, language: language)
+        let drafts = BubbleGrouper.group(regions, language: language, detections: detections)
             .filter { band.ownedRange.contains($0.rect.midY + band.top) }
 
         var byPage: [Int: [TranslatedBubble]] = [:]
@@ -100,13 +102,23 @@ actor PageAnalyzer {
 
     // MARK: - Shared
 
+    /// The text on `image` and the balloons around it, found side by side —
+    /// detection (~0.1 s) finishes well within OCR (~3 s). `nil` detections
+    /// when the detector can't run: the text is then grouped by its layout.
+    private func recognize(_ image: CGImage) async throws -> ([TextRegion], [DetectedRegion]?) {
+        async let detections = BalloonDetector.shared.detect(image)
+        let regions = try await PageTextRecognizer(language: language).recognize(image)
+        return (regions, await detections)
+    }
+
     private func makeBubbles(
         from drafts: [BubbleDraft],
         sampling image: CGImage,
         toPageCoordinates: (CGRect) -> CGRect
     ) -> [TranslatedBubble] {
         drafts
-            .filter { includeSoundEffects || !SoundEffectClassifier.isSoundEffect($0.source, language: language) }
+            // Sound effects stay as drawn — see `SoundEffectClassifier`.
+            .filter { !SoundEffectClassifier.isSoundEffect($0.source, language: language) }
             .map { draft in
                 let padding = draft.glyphSize * 0.3
                 return TranslatedBubble(

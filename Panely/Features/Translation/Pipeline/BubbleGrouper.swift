@@ -20,15 +20,78 @@ nonisolated struct BubbleDraft: Equatable, Sendable {
 /// - horizontal lines stacked closely with overlapping extents.
 /// Merging is deliberately conservative — two balloons fused into one is worse
 /// than one balloon left in two pieces.
+///
+/// With balloons from `BalloonDetector`, the detector decides instead: text in
+/// the same detected balloon is one balloon, whatever its layout, and text in
+/// two balloons stays apart however close. Text the detector put in no balloon
+/// or text box is artwork OCR misread (a drawn "조잘조잘", a pattern) and is
+/// dropped — unless it's a sentence's worth, which the detector more likely
+/// missed. A page where the detector found nothing at all is grouped by the
+/// rules, as if there were no detector. (Measured on 48 pages of three
+/// books: all eight dropped blocks were sound effects or noise.)
 nonisolated enum BubbleGrouper {
-    static func group(_ regions: [TextRegion], language: TranslationLanguage) -> [BubbleDraft] {
+    /// Text outside every detection this long is kept anyway.
+    static let keptOutsideLength = 8
+
+    static func group(_ regions: [TextRegion], language: TranslationLanguage, detections: [DetectedRegion]? = nil) -> [BubbleDraft] {
         let candidates = regions.compactMap { region -> TextRegion? in
             var cleaned = region
             cleaned.text = TranslationTextNormalizer.normalize(region.text, language: language)
             guard !cleaned.text.isEmpty, language.containsOwnScript(cleaned.text) else { return nil }
             return cleaned
         }
+        guard let detections, !detections.isEmpty else { return groupByLayout(candidates, language: language) }
 
+        var byContainer: [Int: [TextRegion]] = [:]
+        var outside: [TextRegion] = []
+        for region in candidates {
+            if let container = container(of: region.rect, in: detections) {
+                byContainer[container, default: []].append(region)
+            } else if region.text.filter(\.isLetter).count >= keptOutsideLength {
+                outside.append(region)
+            }
+        }
+        let detected = byContainer.values.map { makeDraft(from: $0, language: language) }
+        return sortedInReadingOrder(detected + groupByLayout(outside, language: language))
+    }
+
+    /// The detection a text region belongs to, as an index into
+    /// `detections`. The text box covering it most decides: text inside a
+    /// balloon goes with the balloon holding that box, text outside balloons
+    /// with its own box — so an aside drawn beside a round balloon, inside
+    /// its bounding box, stays apart. Without a text box, the smallest
+    /// balloon covering it.
+    static func container(of rect: CGRect, in detections: [DetectedRegion]) -> Int? {
+        func smallest(_ indices: [Int]) -> Int? {
+            indices.min { area(detections[$0].rect) < area(detections[$1].rect) }
+        }
+        let textBoxes = detections.indices.filter {
+            detections[$0].kind != .balloon && coverage(of: rect, by: detections[$0].rect) >= 0.5
+        }
+        if let box = textBoxes.max(by: { coverage(of: rect, by: detections[$0].rect) < coverage(of: rect, by: detections[$1].rect) }) {
+            guard detections[box].kind == .textInBalloon else { return box }
+            let holder = smallest(detections.indices.filter {
+                detections[$0].kind == .balloon && coverage(of: detections[box].rect, by: detections[$0].rect) >= 0.5
+            })
+            return holder ?? box
+        }
+        return smallest(detections.indices.filter {
+            detections[$0].kind == .balloon && coverage(of: rect, by: detections[$0].rect) >= 0.5
+        })
+    }
+
+    /// The share of `rect`'s area inside `container`.
+    private static func coverage(of rect: CGRect, by container: CGRect) -> CGFloat {
+        let intersection = rect.intersection(container)
+        guard !intersection.isNull, area(rect) > 0 else { return 0 }
+        return area(intersection) / area(rect)
+    }
+
+    private static func area(_ rect: CGRect) -> CGFloat {
+        rect.width * rect.height
+    }
+
+    private static func groupByLayout(_ candidates: [TextRegion], language: TranslationLanguage) -> [BubbleDraft] {
         var parent = Array(candidates.indices)
         func root(_ i: Int) -> Int {
             var i = i
@@ -49,12 +112,14 @@ nonisolated enum BubbleGrouper {
             groups[root(i), default: []].append(candidates[i])
         }
 
-        return groups.values
-            .map { makeDraft(from: $0, language: language) }
-            .sorted { a, b in
-                if abs(a.rect.minY - b.rect.minY) > 1 { return a.rect.minY < b.rect.minY }
-                return a.rect.midX > b.rect.midX
-            }
+        return sortedInReadingOrder(groups.values.map { makeDraft(from: $0, language: language) })
+    }
+
+    private static func sortedInReadingOrder(_ drafts: [BubbleDraft]) -> [BubbleDraft] {
+        drafts.sorted { a, b in
+            if abs(a.rect.minY - b.rect.minY) > 1 { return a.rect.minY < b.rect.minY }
+            return a.rect.midX > b.rect.midX
+        }
     }
 
     static func belongTogether(_ a: TextRegion, _ b: TextRegion) -> Bool {
@@ -76,12 +141,22 @@ nonisolated enum BubbleGrouper {
     }
 
     private static func makeDraft(from parts: [TextRegion], language: TranslationLanguage) -> BubbleDraft {
-        let isVertical = parts[0].isVertical
-        // Reading order inside the balloon: tategaki columns run right to
-        // left; horizontal lines top to bottom.
-        let ordered = isVertical
-            ? parts.sorted { $0.rect.midX > $1.rect.midX }
-            : parts.sorted { $0.rect.minY < $1.rect.minY }
+        // Detected balloons can hold both (a vertical line beside a
+        // horizontal aside); the balloon reads the way most of it does.
+        let isVertical = parts.filter(\.isVertical).count * 2 > parts.count
+        // Reading order inside the balloon, from where the parts sit: one
+        // above the other, top to bottom; side by side (overlapping in
+        // height, like columns), right to left in Japanese and Chinese,
+        // left to right otherwise. Not from OCR's direction, which flips for
+        // the same columns from one read to the next.
+        let rightToLeft = isVertical || language.isWrittenVertically
+        let ordered = parts.sorted { a, b in
+            let overlapY = min(a.rect.maxY, b.rect.maxY) - max(a.rect.minY, b.rect.minY)
+            if overlapY > 0.3 * min(a.rect.height, b.rect.height) {
+                return rightToLeft ? a.rect.midX > b.rect.midX : a.rect.midX < b.rect.midX
+            }
+            return a.rect.minY < b.rect.minY
+        }
         let rect = ordered.dropFirst().reduce(ordered[0].rect) { $0.union($1.rect) }
         let source = TranslationTextNormalizer.normalize(
             ordered.map(\.text).joined(separator: language.lineJoiner),

@@ -396,7 +396,7 @@ struct SnapshotGalleryTests {
                 ExperimentalSettingsView(viewModel: vm)
             }
             .environment(\.locale, Locale(identifier: "en")),
-            size: CGSize(width: 620, height: 532),
+            size: CGSize(width: 620, height: 600),
             named: "23-experimental-settings.png"
         )
     }

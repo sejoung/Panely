@@ -280,11 +280,12 @@ struct TranslationLanguageRow: View {
         let done = controller.completedPageCount
         let total = controller.bookPageCount
         let isComplete = total > 0 && done >= total
+        let needsStarting = viewModel.translationNeedsStarting(controller)
 
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: PanelySpacing.sm) {
                 Button {
-                    viewModel.showTranslation(in: controller.target)
+                    viewModel.chooseTranslationLanguage(controller.target)
                 } label: {
                     HStack(spacing: PanelySpacing.sm) {
                         Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
@@ -298,13 +299,21 @@ struct TranslationLanguageRow: View {
                             ProgressView()
                                 .controlSize(.mini)
                         }
-                        Text(verbatim: "\(done)/\(total)")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(PanelyColor.textSecondary)
+                        if needsStarting {
+                            // Nothing of it yet: picking it translates.
+                            Label("Translate", systemImage: "play.fill")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(PanelyColor.accentPrimary)
+                        } else {
+                            Text(verbatim: "\(done)/\(total)")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(PanelyColor.textSecondary)
+                        }
                     }
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .help(needsStarting ? Text("Not translated yet — click to translate this book into it") : Text(verbatim: ""))
 
                 if !isShown {
                     jobMenu(isComplete: isComplete, hasProgress: done > 0)
@@ -631,6 +640,9 @@ struct TranslationPrimaryAction: View {
         case let notice?:
             return Text(verbatim: notice.message(locale: viewModel.localization.locale)) + separator
         case nil:
+            if !controller.hasActiveJob, let progress = controller.speechLevelProgress {
+                return Text("Matching speech levels · \(progress.done)/\(progress.total) pages") + separator
+            }
             guard controller.hasActiveJob else { return Text(verbatim: "") }
             return TranslationStatusText.text(for: controller) + separator
         }

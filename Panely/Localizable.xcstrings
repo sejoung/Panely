@@ -389,6 +389,22 @@
         }
       }
     },
+    "Apple Intelligence is still getting ready. Try again in a little while." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence is still getting ready. Try again in a little while."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence가 아직 준비 중입니다. 잠시 후 다시 시도하세요."
+          }
+        }
+      }
+    },
     "Archive expanded past the safety limit (%lld MB)." : {
       "localizations" : {
         "en" : {
@@ -3146,6 +3162,22 @@
         }
       }
     },
+    "Japanese ↔ Korean: Apple Translation tends to make every line polite. Apple Intelligence rewrites the endings to match the original — casual stays casual — on your Mac. A rewrite is used only if it keeps the same words." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Japanese ↔ Korean: Apple Translation tends to make every line polite. Apple Intelligence rewrites the endings to match the original — casual stays casual — on your Mac. A rewrite is used only if it keeps the same words."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일본어 ↔ 한국어: Apple 번역은 모든 대사를 존댓말로 바꾸는 경향이 있습니다. Apple Intelligence가 Mac 안에서 원문 말투에 맞게 어미를 고칩니다(반말은 반말로). 단어와 뜻이 그대로일 때만 고친 문장을 씁니다."
+          }
+        }
+      }
+    },
     "Jobs" : {
       "localizations" : {
         "en" : {
@@ -3540,6 +3572,38 @@
         }
       }
     },
+    "Match Speech Level" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Match Speech Level"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "말투 맞추기"
+          }
+        }
+      }
+    },
+    "Matching speech levels · %lld/%lld pages" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Matching speech levels · %lld/%lld pages"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "말투 맞추는 중 · %lld/%lld페이지"
+          }
+        }
+      }
+    },
     "Minimize" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3621,6 +3685,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "윈도우를 데스크탑으로 이동"
+          }
+        }
+      }
+    },
+    "Needs Apple Intelligence — turn it on in System Settings › Apple Intelligence & Siri." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Needs Apple Intelligence — turn it on in System Settings › Apple Intelligence & Siri."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence가 필요합니다 — 시스템 설정 › Apple Intelligence 및 Siri에서 켜세요."
+          }
+        }
+      }
+    },
+    "Needs Apple Intelligence, which this Mac doesn't support." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Needs Apple Intelligence, which this Mac doesn't support."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple Intelligence가 필요하지만 이 Mac은 지원하지 않습니다."
           }
         }
       }
@@ -3893,6 +3989,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "지원되지 않음"
+          }
+        }
+      }
+    },
+    "Not translated yet — click to translate this book into it" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not translated yet — click to translate this book into it"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아직 번역되지 않음 — 클릭하면 이 언어로 번역을 시작합니다"
           }
         }
       }
@@ -6754,6 +6866,22 @@
         }
       }
     },
+    "Translate" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Translate"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "번역"
+          }
+        }
+      }
+    },
     "Translate Again" : {
       "localizations" : {
         "en" : {
@@ -6798,22 +6926,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "다른 언어로 번역"
-          }
-        }
-      }
-    },
-    "Translate Sound Effects" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Translate Sound Effects"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "효과음도 번역"
           }
         }
       }

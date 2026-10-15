@@ -21,6 +21,9 @@ nonisolated struct AppDependencies {
     let translationStore: TranslationStore
     /// The reader's balloon edits. Tests point it at a temp dir.
     let translationEditStore: TranslationEditStore
+    /// Matches translations' speech levels (Apple Intelligence). Tests get
+    /// none, so they never run the on-device model.
+    let makeSpeechLevelCorrector: @Sendable (TranslationLanguage, TranslationLanguage) -> (any SpeechLevelCorrecting)?
 
     // Reader collaborators are surfaced as factories so tests can swap in
     // doubles without subclassing `ReaderViewModel`. The live implementations
@@ -49,6 +52,7 @@ nonisolated struct AppDependencies {
             localization: .shared,
             translationStore: TranslationStore(),
             translationEditStore: TranslationEditStore(),
+            makeSpeechLevelCorrector: { SpeechLevelCorrectors.make(from: $0, to: $1) },
             makeReaderPreferences: { ReaderPreferences(defaults: keyValueStore) },
             makeReaderPositions: { ReaderPositionStore(defaults: keyValueStore) },
             makeReadingProgress: { ReadingProgressStore(defaults: keyValueStore) },

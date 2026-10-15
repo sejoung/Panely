@@ -13,7 +13,7 @@ struct TranslationControllerTests {
     ) {
         controller.reload(
             pages: pages, pageSizes: [], scope: .page, source: source, target: target,
-            includeSoundEffects: false, enabled: enabled, autoStart: false, focusPage: 0
+            enabled: enabled, autoStart: false, focusPage: 0
         )
     }
 
@@ -106,7 +106,6 @@ struct ReaderViewModelTranslationTests {
         #expect(vm.translationOverlayPages.isEmpty)
         #expect(vm.translatedPageIndices.isEmpty)
         #expect(vm.toolbarState().translation == nil)
-        #expect(vm.translationIncludeSoundEffects == false)
         #expect(vm.translationMode == .fast)
     }
 
@@ -115,13 +114,11 @@ struct ReaderViewModelTranslationTests {
         let vm = makeTestViewModel(keyValueStore: defaults)
         vm.translationEnabled = true
         vm.translationTargetLanguage = .english
-        vm.translationIncludeSoundEffects = true
         vm.translationMode = .accurate
 
         let reloaded = makeTestViewModel(keyValueStore: defaults)
         #expect(reloaded.translationEnabled)
         #expect(reloaded.translationTargetLanguage == .english)
-        #expect(reloaded.translationIncludeSoundEffects)
         #expect(reloaded.translationMode == .accurate)
     }
 
@@ -154,6 +151,36 @@ struct ReaderViewModelTranslationTests {
         #expect(vm.translationScope == .page)
         vm.layout = .vertical
         #expect(vm.translationScope == .strip)
+    }
+
+    /// Clearing the cache leaves the shown language with nothing in it;
+    /// picking it in the panel then has to translate, not just turn on a
+    /// translation that isn't there.
+    @Test(.enabled(if: TranslationController.isSupportedOnThisMac))
+    func aLanguageEmptiedByClearingTheCacheIsTranslatedWhenPicked() async throws {
+        let vm = makeTestViewModel()
+        vm.translationEnabled = true
+        vm.translationTargetLanguage = .korean
+        let pages = Fixture.makeImagePages(count: 2)
+        try vm.translation.store.save(
+            makeTranslatedPage("하나"),
+            key: TranslationStore.key(pageID: pages[0].id, from: .japanese, to: .korean)
+        )
+        vm.currentSourceURL = URL(fileURLWithPath: "/books/test")
+        vm.source = ComicSource(title: "Test", pages: pages)
+        try await waitUntil { vm.translation.bookPageCount == 2 }
+        vm.translation.setSource(.japanese)
+        try await waitUntil { !vm.translation.pages.isEmpty }
+        #expect(!vm.translationNeedsStarting(vm.translation))
+        #expect(vm.translationIsShowing)
+
+        _ = await vm.translationManager.clearCache()
+
+        #expect(vm.translation.pages.isEmpty)
+        #expect(vm.translationNeedsStarting(vm.translation))
+        #expect(!vm.translationIsShowing)
+        // Still offered — as a language to translate into, first in the menu.
+        #expect(vm.toolbarState().translation?.suggestedLanguage?.language == .korean)
     }
 
     @Test(.enabled(if: TranslationController.isSupportedOnThisMac))

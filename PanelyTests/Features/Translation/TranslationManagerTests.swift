@@ -17,7 +17,7 @@ struct TranslationManagerTests {
         let controller = manager.controller(for: target).controller
         controller.reload(
             pages: Fixture.makeImagePages(count: 2), pageSizes: [], scope: .page, source: .japanese, target: target,
-            includeSoundEffects: false, enabled: true, autoStart: false, focusPage: 0
+            enabled: true, autoStart: false, focusPage: 0
         )
         return controller
     }
@@ -99,7 +99,7 @@ struct TranslationManagerTests {
         let made = manager.backgroundController(bookKey: "/books/v2.cbz", title: "v2", bookURL: nil, target: .korean)
         made.controller.reload(
             pages: Fixture.makeImagePages(count: 1), pageSizes: [], scope: .page, source: .japanese, target: .korean,
-            includeSoundEffects: false, enabled: true, autoStart: false, focusPage: 0
+            enabled: true, autoStart: false, focusPage: 0
         )
         let again = manager.backgroundController(bookKey: "/books/v2.cbz", title: "v2", bookURL: nil, target: .korean)
         let otherLanguage = manager.backgroundController(bookKey: "/books/v2.cbz", title: "v2", bookURL: nil, target: .english)

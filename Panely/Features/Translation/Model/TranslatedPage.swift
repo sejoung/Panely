@@ -22,6 +22,10 @@ nonisolated struct TranslatedPage: Codable, Sendable, Equatable {
     /// The `ComicPage.id` this page belongs to, filled in for display so a
     /// balloon edit can name its page — never cached.
     var pageID: String? = nil
+    /// The translations' speech levels were matched to the original's
+    /// (`SpeechLevel`). Pages cached before that existed are matched when
+    /// next loaded.
+    var speechLevelChecked: Bool? = nil
 
     var pendingCount: Int { bubbles.filter { $0.translation == nil }.count }
 }

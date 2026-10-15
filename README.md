@@ -265,8 +265,20 @@ written into your files.
   one by one (pending ones pulse); a progress pill with a time estimate, a
   first-run notice while models load, page badges in the thumbnail sidebar
   and a bar under the page slider
-- **Sound effects** (スッ, パチパチ…) are left untranslated by default
-  (**Settings → Experimental** to include them)
+- **Balloons found by a detector** — a model trained on comics (bundled,
+  run on the GPU, ~0.1 s a page alongside OCR) tells which OCR lines share a
+  balloon and which "text" is really artwork: columns of one balloon are
+  joined in reading order, neighbouring balloons stay apart, and drawn sound
+  effects or patterns OCR misread are dropped. Without it (or where it finds
+  nothing) the layout rules group the text as before
+- **Speech level matched** (Japanese ↔ Korean, Apple Intelligence) — Apple
+  Translation leans polite whatever the original says; Panely reads the
+  original's level from its endings and has the on-device model rewrite only
+  the endings, keeping a rewrite only if the words, tense, negation and
+  sentence type survive (checked in code). Cached pages are matched when
+  opened
+- **Sound effects** (スッ, パチパチ…) are left untranslated — OCR reads few
+  of the drawn ones, and only as fragments (11 on 48 pages measured)
 - **Limits are shown where they apply** — a book inside an archive pauses
   instead of continuing in the background; quitting stops translating
   (finished pages are kept); a background failure stays listed until dismissed
@@ -355,6 +367,15 @@ Panely uses Swift Package Manager:
   Vendored as a local package in `Packages/UnrarKit` (upstream ships no
   SwiftPM manifest) and built against RARLAB's current UnRAR source; see
   `Packages/UnrarKit/README.md` for versions and local patches
+
+Bundled model (translation assist):
+
+- **[comic-text-and-bubble-detector](https://huggingface.co/ogkalu/comic-text-and-bubble-detector)**
+  by ogkalu (Apache-2.0) — an RT-DETR-v2 detector for speech balloons and
+  text, trained on manga, webtoons and western comics. Converted to Core ML
+  as `Panely/Resources/ComicTextDetector.mlpackage` (8-bit, ~42 MB) by
+  `scripts/convert-text-detector.py`; the script's header explains the
+  workarounds and how its boxes were checked against the original
 
 Xcode resolves them automatically on first build.
 
@@ -693,7 +714,8 @@ Panely/
 │   │   │                               # TranslationExportWriter (CBZ / ZIP / folder), TranslatedPageRenderer
 │   │   ├── Pipeline/                   # OCRTiling, TranslationPlan (page / strip), PageAnalyzer,
 │   │   │                               # PageTextRecognizer (Vision), PageTranslator (Translation),
-│   │   │                               # BubbleGrouper, BubbleBackgroundSampler, TextClassifiers
+│   │   │                               # BubbleGrouper, BalloonDetector (Core ML), SpeechLevel,
+│   │   │                               # BubbleBackgroundSampler, TextClassifiers
 │   │   ├── Viewer/                     # TranslationOverlayView (+ layout, TranslationPatchPainter), balloon popover
 │   │   └── UI/                         # TranslationPanel, language rows, progress pill, job list, edit-mode bar,
 │   │                                   # export sheet, Jobs window
@@ -798,6 +820,7 @@ docs/
 scripts/
 ├── generate-app-icon.sh                # SVG → .icns pipeline
 ├── generate-snapshots.sh               # rebuild docs/screenshots/*.png from SnapshotGalleryTests
+├── convert-text-detector.py            # rebuild Resources/ComicTextDetector.mlpackage (Core ML)
 ├── install-local.sh                    # build + install locally for hands-on testing (--debug, --test…)
 └── release.sh                          # bump + tag + push automation
 

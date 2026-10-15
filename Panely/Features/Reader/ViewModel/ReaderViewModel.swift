@@ -347,7 +347,11 @@ final class ReaderViewModel {
         self.libraryAutoRefreshEnabled = dependencies.libraryAutoRefreshEnabled
         self.filePicker = dependencies.filePickerFactory()
         self.localization = dependencies.localization
-        self.translationManager = TranslationManager(store: dependencies.translationStore, defaults: dependencies.keyValueStore)
+        self.translationManager = TranslationManager(
+            store: dependencies.translationStore,
+            defaults: dependencies.keyValueStore,
+            makeSpeechLevelCorrector: dependencies.makeSpeechLevelCorrector
+        )
         self.translationEdits = TranslationEdits(store: dependencies.translationEditStore)
         self.translationExports = TranslationExportManager(defaults: dependencies.keyValueStore)
         localization.apply(preferences.appLanguage)

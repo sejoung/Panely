@@ -381,16 +381,26 @@ Requires **macOS 26** or later. It's off by default.
 Open **File → Settings… → Experimental** and switch on **Translation
 Assist**. The same tab sets:
 
-![Experimental settings: Translation Assist, default language, mode and sound effects](screenshots/23-experimental-settings.png)
+![Experimental settings: Translation Assist, default language, mode and speech level](screenshots/23-experimental-settings.png)
 
 - **Default Language** — the language new series are shown in. **System
   Default** follows Panely's interface language.
-- **Translate Sound Effects** — off by default; onomatopoeia like スッ or
-  パチパチ is left as drawn.
+- **Match Speech Level** — on by default (Japanese ↔ Korean, needs Apple
+  Intelligence). Apple Translation tends to make every line polite, so a
+  king's commands come out as requests and "안 돼" as "だめです". Panely reads
+  the original's level from its own endings and has the on-device model
+  rewrite just the endings to match. A rewrite is used only if it keeps the
+  words, tense, negation and sentence type; otherwise the translation stays
+  as it was. Pages translated before are matched the next time the book
+  opens.
 - **Your Edits** — how many pages you've corrected, and a button to delete
   the edits. They're stored apart from the cache.
 - **Translation Cache** — how much space finished translations take, and a
   button to clear them.
+
+Sound effects (スッ, パチパチ, 쾅) are left as drawn. OCR reads few of the drawn
+ones, and those only as fragments, so translating them added noise rather
+than meaning.
 
 ### Where things are
 
@@ -422,6 +432,10 @@ Open the panel from the translate button (or the language menu's
 
 Translation starts at the page you're on and keeps ahead of you as you read:
 
+- A detector trained on comics finds the balloons, so all the lines of one
+  balloon are translated together, and artwork that looks like text to OCR (a
+  drawn sound effect, a pattern) is left alone. **Hide** is for whatever still
+  slips through (see below).
 - Balloons appear with a pulsing outline and "…" as soon as they're found, and
   fill in one by one.
 - The line under the button, and the pill over the page, show progress and the

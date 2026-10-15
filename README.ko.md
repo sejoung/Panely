@@ -227,8 +227,16 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
 - **눈에 보이는 진행** — OCR이 찾은 말풍선이 바로 나타나고 번역이 하나씩
   채워짐(대기 중인 말풍선은 깜빡임). 남은 시간이 표시되는 진행 표시, 모델을
   처음 불러올 때의 안내, 썸네일 사이드바 배지, 페이지 슬라이더 아래 막대
-- **효과음**(スッ, パチパチ…)은 기본적으로 번역하지 않음(**설정 → 실험적
-  기능**에서 포함 가능)
+- **말풍선 감지 모델** — 만화로 학습한 모델(앱에 포함, GPU에서 페이지당 약 0.1초,
+  OCR과 동시에 실행)이 어떤 글자 줄이 같은 말풍선인지, 어떤 "글자"가 사실은 그림인지
+  판단. 한 말풍선의 여러 줄은 읽는 순서대로 합치고, 붙어 있는 말풍선은 나누고, OCR이
+  글자로 잘못 읽은 그림 효과음·무늬는 버림. 모델이 없거나 아무것도 못 찾은 페이지는
+  기존 규칙으로 묶음
+- **말투 맞추기**(일본어 ↔ 한국어, Apple Intelligence) — Apple 번역은 원문과 상관없이
+  존댓말로 기우는데, 원문 어미로 말투를 판단해 기기 내 모델이 어미만 고침. 단어·시제·
+  부정·문장 종류가 그대로인지 코드로 확인한 뒤에만 반영. 캐시된 페이지는 열 때 맞춰짐
+- **효과음**(スッ, パチパチ…)은 번역하지 않음 — 그려진 효과음은 OCR이 거의 읽지 못하고
+  읽어도 조각뿐(48페이지 측정 시 11개, 대부분 한 글자)
 - **제약은 해당 위치에 표시** — 압축 파일 안의 책은 백그라운드로 이어가지 않고
   일시정지, 앱을 종료하면 번역이 멈춤(완료된 페이지는 저장), 백그라운드 실패는
   확인할 때까지 목록에 남음
@@ -311,6 +319,14 @@ Panely는 Swift Package Manager를 사용합니다:
   업스트림에 SwiftPM 매니페스트가 없어 `Packages/UnrarKit`에 로컬 패키지로
   vendoring했고, RARLAB의 최신 UnRAR 소스로 빌드. 버전과 로컬 패치는
   `Packages/UnrarKit/README.md` 참고
+
+포함된 모델(번역 보조):
+
+- **[comic-text-and-bubble-detector](https://huggingface.co/ogkalu/comic-text-and-bubble-detector)**
+  (ogkalu, Apache-2.0) — 만화·웹툰·서양 코믹으로 학습한 말풍선·글자 감지 모델
+  (RT-DETR-v2). `scripts/convert-text-detector.py`로 Core ML(8비트, 약 42MB)로 변환해
+  `Panely/Resources/ComicTextDetector.mlpackage`에 둠. 변환 시 우회한 부분과 원본과의
+  비교 방법은 스크립트 머리말 참고
 
 Xcode가 첫 빌드에서 자동 해결합니다.
 
@@ -630,13 +646,14 @@ Panely/
 │   │   │                               # TranslationExportWriter(CBZ / ZIP / 폴더), TranslatedPageRenderer
 │   │   ├── Pipeline/                   # OCRTiling, TranslationPlan (page / strip), PageAnalyzer,
 │   │   │                               # PageTextRecognizer (Vision), PageTranslator (Translation),
-│   │   │                               # BubbleGrouper, BubbleBackgroundSampler, TextClassifiers
+│   │   │                               # BubbleGrouper, BalloonDetector(Core ML), SpeechLevel,
+│   │   │                               # BubbleBackgroundSampler, TextClassifiers
 │   │   ├── Viewer/                     # TranslationOverlayView (+ 레이아웃, TranslationPatchPainter), 말풍선 팝오버
 │   │   └── UI/                         # 번역 패널, 언어 행, 진행 표시, 작업 목록, 편집 모드 막대,
 │   │                                   # 내보내기 시트, 작업 창
 │   ├── Settings/
 │   │   ├── SettingsView.swift          # General + Library + Storage + Diagnostics + Experimental 탭
-│   │   ├── ExperimentalSettingsView.swift # 번역 보조: 켜기, 기본 언어, 효과음, 캐시
+│   │   ├── ExperimentalSettingsView.swift # 번역 보조: 켜기, 기본 언어, 말투 맞추기, 캐시
 │   │   ├── GeneralSettingsView.swift   # 인터페이스 언어 선택(즉시 적용)
 │   │   ├── LibrarySettingsView.swift   # 마지막 폴더 다시 열기 토글 + Forget Now
 │   │   ├── StorageSettingsView.swift   # Storage 설정 UI + 캐시 용량 / 삭제 컨트롤
@@ -735,6 +752,7 @@ docs/
 scripts/
 ├── generate-app-icon.sh                # SVG → .icns 파이프라인
 ├── generate-snapshots.sh               # SnapshotGalleryTests로 docs/screenshots/*.png 재생성
+├── convert-text-detector.py            # Resources/ComicTextDetector.mlpackage(Core ML) 다시 만들기
 ├── install-local.sh                    # 로컬에서 빌드 + 설치해 직접 테스트 (--debug, --test…)
 └── release.sh                          # 버전 범프 + 태그 + 푸시 자동화
 

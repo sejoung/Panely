@@ -258,6 +258,7 @@ func makeTestDependencies(
         root: FileManager.default.temporaryDirectory
             .appendingPathComponent("panely-translation-edit-tests-\(UUID().uuidString)", isDirectory: true)
     ),
+    makeSpeechLevelCorrector: @escaping @Sendable (TranslationLanguage, TranslationLanguage) -> (any SpeechLevelCorrecting)? = { _, _ in nil },
     readerLibraryScopeFactory: @MainActor @escaping () -> ReaderLibraryScope = { ReaderLibraryScope() }
 ) -> AppDependencies {
     AppDependencies(
@@ -273,6 +274,7 @@ func makeTestDependencies(
         localization: localization,
         translationStore: translationStore,
         translationEditStore: translationEditStore,
+        makeSpeechLevelCorrector: makeSpeechLevelCorrector,
         makeReaderPreferences: { ReaderPreferences(defaults: keyValueStore) },
         makeReaderPositions: { ReaderPositionStore(defaults: keyValueStore) },
         makeReadingProgress: { ReadingProgressStore(defaults: keyValueStore) },

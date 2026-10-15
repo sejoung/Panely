@@ -37,9 +37,17 @@ final class TranslationManager {
     /// starting the next one before the manager's own choice.
     @ObservationIgnored private var isScheduling = false
 
-    init(store: TranslationStore, defaults: any KeyValueStoring) {
+    /// Matches speech levels for each new controller (`SpeechLevel`).
+    @ObservationIgnored private let makeSpeechLevelCorrector: (TranslationLanguage, TranslationLanguage) -> (any SpeechLevelCorrecting)?
+
+    init(
+        store: TranslationStore,
+        defaults: any KeyValueStoring,
+        makeSpeechLevelCorrector: @escaping (TranslationLanguage, TranslationLanguage) -> (any SpeechLevelCorrecting)? = SpeechLevelCorrectors.make
+    ) {
         self.store = store
         self.defaults = defaults
+        self.makeSpeechLevelCorrector = makeSpeechLevelCorrector
         placeholder = TranslationController(store: store, defaults: defaults)
         languagePacks.onInstalled = { [weak self] pack in
             self?.languagePackInstalled(pack)
@@ -186,6 +194,7 @@ final class TranslationManager {
 
     private func makeController(bookKey: String, title: String, bookURL: URL?) -> TranslationController {
         let controller = TranslationController(store: store, defaults: defaults, bookKey: bookKey, title: title, bookURL: bookURL)
+        controller.makeSpeechLevelCorrector = makeSpeechLevelCorrector
         controller.onJobEnded = { [weak self] in self?.jobEnded() }
         controller.requestStart = { [weak self, weak controller] in
             guard let self, let controller else { return }

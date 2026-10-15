@@ -27,7 +27,7 @@ final class ReaderPreferences {
     static let wheelPageTurnKey = "panely.wheelPageTurn"
     static let appLanguageKey = "panely.appLanguage"
     static let translationEnabledKey = "panely.translation.enabled"
-    static let translationIncludeSoundEffectsKey = "panely.translation.includeSoundEffects"
+    static let translationMatchesSpeechLevelKey = "panely.translation.matchSpeechLevel"
     static let translationModeKey = "panely.translation.mode"
     static let translationTargetLanguageKey = "panely.translation.targetLanguage"
     static let translationOverlayVisibleKey = "panely.translation.overlayVisible"
@@ -134,12 +134,13 @@ final class ReaderPreferences {
         }
     }
 
-    /// Translate onomatopoeia too. Off by default: sound effects are drawn
-    /// art more than dialogue, and each costs a second of translation time.
-    /// (The book's own language is per series — see `ReaderSeriesPreferencesStore`.)
-    var translationIncludeSoundEffects: Bool = false {
+    /// Match each translation's speech level to the original's with the
+    /// on-device model (`SpeechLevel`). On by default: it only ever changes
+    /// a balloon when the rewrite checks out, and only where Apple
+    /// Intelligence is available.
+    var translationMatchesSpeechLevel: Bool = true {
         didSet {
-            defaults.set(translationIncludeSoundEffects, forKey: Self.translationIncludeSoundEffectsKey)
+            defaults.set(translationMatchesSpeechLevel, forKey: Self.translationMatchesSpeechLevelKey)
         }
     }
 
@@ -242,8 +243,8 @@ final class ReaderPreferences {
         if let value = storedDefaults[Self.translationEnabledKey] as? Bool {
             translationEnabled = value
         }
-        if let value = storedDefaults[Self.translationIncludeSoundEffectsKey] as? Bool {
-            translationIncludeSoundEffects = value
+        if let value = storedDefaults[Self.translationMatchesSpeechLevelKey] as? Bool {
+            translationMatchesSpeechLevel = value
         }
         if let raw = storedDefaults[Self.translationModeKey] as? String,
            let stored = TranslationMode(rawValue: raw) {

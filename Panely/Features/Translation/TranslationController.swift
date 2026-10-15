@@ -75,6 +75,9 @@ final class TranslationController {
     private(set) var source: TranslationLanguage?
     /// Measured pace of the running job, for the time estimate.
     private(set) var secondsPerPage: Double?
+    /// Cached pages getting their speech levels matched (`SpeechLevel`) —
+    /// pages done and to do — while that runs.
+    private(set) var speechLevelProgress: SpeechLevelProgress?
     /// True until a job has produced its first OCR result under this build —
     /// the case where model loading takes a minute or two.
     private(set) var isFirstRunForThisBuild: Bool
@@ -121,7 +124,6 @@ final class TranslationController {
     /// Set by the first `reload`; until then `target` is only a default.
     @ObservationIgnored private(set) var isConfigured = false
     @ObservationIgnored private(set) var scope: TranslationScope = .page
-    @ObservationIgnored private var includeSoundEffects = false
     /// Already `effective` for this Mac.
     @ObservationIgnored private(set) var mode: TranslationMode = .accurate
     @ObservationIgnored private var enabled = false
@@ -136,6 +138,17 @@ final class TranslationController {
     @ObservationIgnored private(set) var cacheTask: Task<Void, Never>?
     @ObservationIgnored private var translatingSince: Date?
     @ObservationIgnored private var pagesCompletedThisJob = 0
+    /// Match each translation's speech level to the original's (Settings).
+    @ObservationIgnored private var matchSpeechLevel = false
+    /// Set by a job that matches speech levels, so its pages are saved as checked.
+    @ObservationIgnored private var jobMatchesSpeechLevel = false
+    /// Where each cached page was found, so matching its speech level later
+    /// saves it back to the same entry.
+    @ObservationIgnored private var cacheKeys: [String: String] = [:]
+    @ObservationIgnored private var speechLevelTask: Task<Void, Never>?
+    /// Makes the corrector for a pair (`nil` when it doesn't apply). Tests
+    /// swap in a stand-in for the on-device model.
+    @ObservationIgnored var makeSpeechLevelCorrector: (TranslationLanguage, TranslationLanguage) -> (any SpeechLevelCorrecting)? = SpeechLevelCorrectors.make
 
     nonisolated static let maxConsecutiveFailures = 3
     /// Pages read ahead in fast mode. Three keep translation fed on an M1
@@ -196,6 +209,10 @@ final class TranslationController {
         stopJob(to: .idle)
         cacheTask?.cancel()
         cacheTask = nil
+        speechLevelTask?.cancel()
+        speechLevelTask = nil
+        speechLevelProgress = nil
+        cacheKeys = [:]
         generation &+= 1
         bookPages = []
         pageSizes = []
@@ -216,20 +233,20 @@ final class TranslationController {
         scope: TranslationScope,
         source: TranslationLanguage?,
         target: TranslationLanguage,
-        includeSoundEffects: Bool,
         mode: TranslationMode = .accurate,
+        matchSpeechLevel: Bool = false,
         enabled: Bool,
         autoStart: Bool,
         focusPage: Int
     ) {
         clear()
         isConfigured = true
+        self.matchSpeechLevel = matchSpeechLevel
         self.bookPages = enabled ? bookPages : []
         self.pageSizes = pageSizes.count == bookPages.count ? pageSizes : []
         self.scope = scope
         self.source = source
         self.target = target
-        self.includeSoundEffects = includeSoundEffects
         self.mode = mode.effective
         self.enabled = enabled
         self.focusPage = focusPage
@@ -244,6 +261,7 @@ final class TranslationController {
             if autoStart {
                 if let requestStart = self.requestStart { requestStart() } else { self.start() }
             }
+            self.matchCachedSpeechLevels()
         }
     }
 
@@ -262,8 +280,8 @@ final class TranslationController {
             scope: scope,
             source: language,
             target: target,
-            includeSoundEffects: includeSoundEffects,
             mode: mode,
+            matchSpeechLevel: matchSpeechLevel,
             enabled: enabled,
             autoStart: wasWorking,
             focusPage: focusPage
@@ -328,13 +346,14 @@ final class TranslationController {
     /// Delete every cached translation (all books). The open book's overlays
     /// go too — they'd otherwise outlive their cache entries.
     func clearCache() async -> UInt64 {
-        let snapshot = (bookPages, pageSizes, scope, source, target, includeSoundEffects, enabled, focusPage, mode)
+        let snapshot = (bookPages, pageSizes, scope, source, target, enabled, focusPage, mode, matchSpeechLevel)
         clear()
         let store = store
         let removed = await Task.detached(priority: .utility) { store.clear() }.value
         reload(
             pages: snapshot.0, pageSizes: snapshot.1, scope: snapshot.2, source: snapshot.3, target: snapshot.4,
-            includeSoundEffects: snapshot.5, mode: snapshot.8, enabled: snapshot.6, autoStart: false, focusPage: snapshot.7
+            mode: snapshot.7, matchSpeechLevel: snapshot.8, enabled: snapshot.5,
+            autoStart: false, focusPage: snapshot.6
         )
         return removed
     }
@@ -376,7 +395,6 @@ final class TranslationController {
         let scope = scope
         let knownSource = source
         let target = target
-        let includeSoundEffects = includeSoundEffects
         let mode = mode
         let focus = focusPage
         phase = knownSource == nil ? .detectingLanguage : .preparing
@@ -427,8 +445,9 @@ final class TranslationController {
             guard await self?.adopt(plan, generation: generation) == true else { return }
 
             // 4. Work: OCR the next unit while translating the current one.
-            let analyzer = PageAnalyzer(pages: bookPages, language: source, includeSoundEffects: includeSoundEffects)
+            let analyzer = PageAnalyzer(pages: bookPages, language: source)
             let translator = PageTranslator(from: source, to: target, mode: mode)
+            let speechLevel = await self?.beginMatchingSpeechLevel(source: source, generation: generation)
             var consecutiveFailures = 0
             var lastError: (any Error)?
             // Each balloon costs the translator ~0.5 s whatever else runs, so
@@ -474,9 +493,18 @@ final class TranslationController {
                             stats.reused += 1
                         } else {
                             let start = ContinuousClock.now
-                            translation = try await translator.translate(item.source)
+                            var text = try await translator.translate(item.source)
                             stats.translating += start.duration(to: .now)
                             stats.translated += 1
+                            if let speechLevel {
+                                let start = ContinuousClock.now
+                                if let matched = await speechLevel.correct(text, source: item.source) {
+                                    text = matched
+                                    stats.speechLevelMatched += 1
+                                }
+                                stats.matchingSpeechLevel += start.duration(to: .now)
+                            }
+                            translation = text
                             translatedTexts[item.source] = translation
                         }
                         let start = ContinuousClock.now
@@ -523,19 +551,95 @@ final class TranslationController {
             })
         }
         let cached = await Task.detached(priority: .utility) {
-            var found: [(Int, String, TranslatedPage)] = []
+            var found: [(Int, String, TranslatedPage, String)] = []
             for (index, id, keys) in keyed {
-                if let page = keys.lazy.compactMap(store.load(key:)).first(where: \.isComplete) {
-                    found.append((index, id, page))
+                for key in keys {
+                    if let page = store.load(key: key), page.isComplete {
+                        found.append((index, id, page, key))
+                        break
+                    }
                 }
             }
             return found
         }.value
         guard self.generation == generation else { return }
-        for (index, id, page) in cached where pages[id]?.isComplete != true {
+        for (index, id, page, key) in cached where pages[id]?.isComplete != true {
             pages[id] = page
+            cacheKeys[id] = key
             completedPageIndices.insert(index)
         }
+    }
+
+    // MARK: - Speech level
+
+    /// The corrector for this book's pair, when matching is on and applies.
+    private func speechLevelCorrector(source: TranslationLanguage?) -> (any SpeechLevelCorrecting)? {
+        guard matchSpeechLevel, enabled, let source else { return nil }
+        return makeSpeechLevelCorrector(source, target)
+    }
+
+    /// A job's corrector, noted so its pages are saved as matched.
+    private func beginMatchingSpeechLevel(source: TranslationLanguage, generation: Int) -> (any SpeechLevelCorrecting)? {
+        guard self.generation == generation else { return nil }
+        let corrector = speechLevelCorrector(source: source)
+        jobMatchesSpeechLevel = corrector != nil
+        return corrector
+    }
+
+    /// Match the speech levels of finished pages that haven't been — cached
+    /// before matching existed, or while it was off — from the page being
+    /// read outward. Each page is saved back once matched, so it's done once.
+    func matchCachedSpeechLevels() {
+        guard speechLevelTask == nil, let corrector = speechLevelCorrector(source: source) else { return }
+        let todo = Self.translationOrder(count: bookPages.count, startingAt: focusPage).compactMap { index -> (String, TranslatedPage)? in
+            let id = bookPages[index].id
+            guard let page = pages[id], page.isComplete, page.speechLevelChecked != true else { return nil }
+            return (id, page)
+        }
+        guard !todo.isEmpty else { return }
+        let generation = generation
+        speechLevelProgress = SpeechLevelProgress(done: 0, total: todo.count)
+        speechLevelTask = Task.detached(priority: .utility) { [weak self] in
+            var matched = 0
+            for (done, (id, page)) in todo.enumerated() {
+                guard !Task.isCancelled else { return }
+                var page = page
+                for index in page.bubbles.indices {
+                    guard let text = page.bubbles[index].translation, !text.isEmpty else { continue }
+                    if let corrected = await corrector.correct(text, source: page.bubbles[index].source) {
+                        page.bubbles[index].translation = corrected
+                        matched += 1
+                    }
+                }
+                page.speechLevelChecked = true
+                guard await self?.speechLevelMatched(page, id: id, done: done + 1, generation: generation) == true else { return }
+            }
+            await self?.endMatchingSpeechLevel(generation: generation, matched: matched)
+        }
+    }
+
+    private func speechLevelMatched(_ page: TranslatedPage, id: String, done: Int, generation: Int) -> Bool {
+        guard self.generation == generation else { return false }
+        // Left alone if it changed meanwhile (cleared, or retranslated).
+        if pages[id]?.isComplete == true, pages[id]?.speechLevelChecked != true {
+            pages[id] = page
+            if let source {
+                let key = cacheKeys[id] ?? TranslationStore.key(pageID: id, from: source, to: target, scope: scope, mode: mode)
+                let store = store
+                Task.detached(priority: .utility) { try? store.save(page, key: key) }
+            }
+        }
+        speechLevelProgress?.done = done
+        return true
+    }
+
+    private func endMatchingSpeechLevel(generation: Int, matched: Int) {
+        guard self.generation == generation else { return }
+        AppLog.info(.reader, "Speech levels matched", metadata: [
+            "pages": "\(speechLevelProgress?.total ?? 0)", "balloons": "\(matched)",
+        ])
+        speechLevelTask = nil
+        speechLevelProgress = nil
     }
 
     private func didDetect(_ language: TranslationLanguage, generation: Int) {
@@ -632,6 +736,7 @@ final class TranslationController {
             )
             guard page.pendingCount == 0 else { continue }
             page.isComplete = true
+            if jobMatchesSpeechLevel { page.speechLevelChecked = true }
             pages[id] = page
             completedPageIndices.insert(index)
             pagesCompletedThisJob += 1
@@ -656,8 +761,12 @@ final class TranslationController {
         translatingSince = nil
         releaseAccess()
         self.notice = notice
+        jobMatchesSpeechLevel = false
         AppLog.info(.reader, "Translation finished", metadata: ["notice": "\(String(describing: notice))"])
         onJobEnded?()
+        // Pages a cache load brought in meanwhile (a language detected
+        // mid-job) still need matching.
+        matchCachedSpeechLevels()
     }
 }
 
@@ -669,6 +778,8 @@ private nonisolated struct TranslationJobStats {
     var translated = 0
     var reused = 0
     var translating: Duration = .zero
+    var speechLevelMatched = 0
+    var matchingSpeechLevel: Duration = .zero
     var analysisWait: Duration = .zero
     var publishing: Duration = .zero
 
@@ -681,9 +792,17 @@ private nonisolated struct TranslationJobStats {
             "units": "\(units)", "translated": "\(translated)", "reused": "\(reused)",
             "wallSeconds": "\(format(seconds(started.duration(to: .now))))",
             "translatingSeconds": "\(format(seconds(translating)))",
+            "speechLevelMatched": "\(speechLevelMatched)",
+            "speechLevelSeconds": "\(format(seconds(matchingSpeechLevel)))",
             "analysisWaitSeconds": "\(format(seconds(analysisWait)))",
             "publishingSeconds": "\(format(seconds(publishing)))",
             "secondsPerBalloon": "\(format(translated > 0 ? seconds(translating) / Double(translated) : 0, 2))",
         ]
     }
+}
+
+/// Progress of matching cached pages' speech levels.
+nonisolated struct SpeechLevelProgress: Equatable, Sendable {
+    var done: Int
+    let total: Int
 }
