@@ -199,6 +199,11 @@ struct TranslationBubblePopover: View {
     private var footerText: String {
         guard let edit else { return L("Machine translation") }
         if edit.translationIsReaders { return L("Your translation") }
+        if edit.isAdded {
+            if source.isEmpty && edit.correctedSource == nil { return L("Balloon you added — no text was read; type it with Fix Original") }
+            if edit.needsRetranslation { return L("Balloon you added — not translated into this language yet") }
+            return L("Balloon you added — machine translation of its text")
+        }
         if edit.needsRetranslation { return L("Original corrected — not translated again yet") }
         return L("Machine translation of your corrected original")
     }
@@ -210,7 +215,8 @@ struct TranslationBubblePopover: View {
             } label: {
                 Label(L("Edit"), systemImage: "pencil")
             }
-            .disabled(translation == nil)
+            // An added balloon can be given a translation outright.
+            .disabled(translation == nil && edit?.isAdded != true)
             .help(L("Rewrite this translation"))
             Button {
                 startEditing(.editingSource, text: shownSource)
@@ -219,12 +225,21 @@ struct TranslationBubblePopover: View {
             }
             .help(L("Correct the recognized text and translate it again"))
             Spacer(minLength: 0)
-            Button {
-                onEdit?(.hide)
-            } label: {
-                Label(L("Hide"), systemImage: "eye.slash")
+            if edit?.isAdded == true {
+                Button {
+                    onEdit?(.remove)
+                } label: {
+                    Label(L("Remove"), systemImage: "trash")
+                }
+                .help(L("Remove this balloon you added"))
+            } else {
+                Button {
+                    onEdit?(.hide)
+                } label: {
+                    Label(L("Hide"), systemImage: "eye.slash")
+                }
+                .help(L("Hide this balloon — for text that isn't really there. Show it again from the translation panel."))
             }
-            .help(L("Hide this balloon — for text that isn't really there. Show it again from the translation panel."))
         }
         .buttonStyle(.bordered)
         .controlSize(.small)

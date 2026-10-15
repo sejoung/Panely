@@ -103,12 +103,47 @@ actor PageAnalyzer {
     // MARK: - Shared
 
     /// The text on `image` and the balloons around it, found side by side —
-    /// detection (~0.1 s) finishes well within OCR (~3 s). `nil` detections
-    /// when the detector can't run: the text is then grouped by its layout.
+    /// detection (~0.1 s) finishes well within OCR (~3 s) — plus whatever a
+    /// second look at text boxes OCR left empty reads (`MissedText`). `nil`
+    /// detections when the detector can't run: the text is then grouped by
+    /// its layout.
     private func recognize(_ image: CGImage) async throws -> ([TextRegion], [DetectedRegion]?) {
         async let detections = BalloonDetector.shared.detect(image)
         let regions = try await PageTextRecognizer(language: language).recognize(image)
-        return (regions, await detections)
+        guard let found = await detections else { return (regions, nil) }
+        return (regions + (try await reread(MissedText.boxesToReread(found, regions: regions), in: image)), found)
+    }
+
+    /// Each box cut out, enlarged and read on its own.
+    private func reread(_ boxes: [DetectedRegion], in image: CGImage) async throws -> [TextRegion] {
+        let imageSize = CGSize(width: image.width, height: image.height)
+        var found: [TextRegion] = []
+        for box in boxes {
+            try Task.checkCancellation()
+            let crop = MissedText.cropRect(for: box.rect, in: imageSize)
+            let scale = MissedText.scale(for: crop)
+            guard crop.width >= 4, crop.height >= 4, let enlarged = Self.enlarge(image, crop: crop, scale: scale) else { continue }
+            let regions = try await PageTextRecognizer(language: language).recognize(enlarged)
+            found += regions
+                .filter { !MissedText.isNoise($0.text) }
+                .map { MissedText.mapBack($0, crop: crop, scale: scale) }
+        }
+        if !found.isEmpty {
+            AppLog.debug(.reader, "Second look read missed text", metadata: ["boxes": "\(boxes.count)", "regions": "\(found.count)"])
+        }
+        return found
+    }
+
+    private static func enlarge(_ image: CGImage, crop: CGRect, scale: CGFloat) -> CGImage? {
+        guard let cut = image.cropping(to: crop) else { return nil }
+        let width = Int(crop.width * scale), height = Int(crop.height * scale)
+        guard let context = CGContext(
+            data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+        ) else { return nil }
+        context.interpolationQuality = .high
+        context.draw(cut, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return context.makeImage()
     }
 
     private func makeBubbles(

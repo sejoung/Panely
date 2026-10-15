@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Testing
 @testable import Panely
@@ -181,6 +182,26 @@ struct ReaderViewModelTranslationTests {
         #expect(!vm.translationIsShowing)
         // Still offered — as a language to translate into, first in the menu.
         #expect(vm.toolbarState().translation?.suggestedLanguage?.language == .korean)
+    }
+
+    /// Removing an added balloon — or hiding it, which for a balloon the
+    /// reader made means the same — takes it away.
+    @Test func anAddedBalloonIsRemovedNotHidden() async throws {
+        let vm = makeTestViewModel()
+        await vm.translationEdits.load(pageIDs: ["p1"], scope: .page)
+        let area = CGRect(x: 1, y: 1, width: 5, height: 5)
+        for change in [TranslationEditChange.remove, .hide] {
+            vm.translationEdits.add(pageID: "p1", edit: BubbleEdit(recognizedSource: "はあ…", rect: area, added: AddedBalloon(glyphSize: 2, isVertical: false, background: .white)))
+            let shown = TranslatedBubble(
+                id: PageEdits.addedBubbleID(0), rect: area, glyphSize: 2, isVertical: false, source: "はあ…", translation: "하아…",
+                background: .white, edit: BubbleEditState(correctedSource: nil, translationIsReaders: false, needsRetranslation: false, isAdded: true)
+            )
+
+            vm.applyTranslationEdit(TranslationEditRequest(pageID: "p1", bubble: shown, change: change))
+
+            #expect(vm.translationEdits.addedCount == 0)
+            #expect(vm.translationEdits.hiddenCount == 0)
+        }
     }
 
     @Test(.enabled(if: TranslationController.isSupportedOnThisMac))

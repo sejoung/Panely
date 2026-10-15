@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import Foundation
 
@@ -317,6 +318,8 @@ extension ReaderViewModel {
             translationEdits.update(pageID: request.pageID, bubble: bubble) { edit in
                 edit.translations[target.rawValue] = nil
             }
+        case .hide where bubble.edit?.isAdded == true, .remove:
+            translationEdits.remove(pageID: request.pageID, source: bubble.source, rect: bubble.rect)
         case .hide:
             translationEdits.hide(pageID: request.pageID, bubble: bubble)
         case let .correctSource(text):
@@ -347,14 +350,53 @@ extension ReaderViewModel {
                 edit.retranslations = [:]
             }
         case .retranslate:
-            guard let corrected = bubble.edit?.correctedSource else { return }
-            retranslate(bubble, correctedSource: corrected, pageID: request.pageID, into: target)
+            // A correction, or an added balloon's text as read.
+            let text = bubble.edit?.correctedSource ?? (bubble.edit?.isAdded == true && !bubble.source.isEmpty ? bubble.source : nil)
+            guard let text else { return }
+            retranslate(bubble, correctedSource: text, pageID: request.pageID, into: target)
         case .show:
             translationEdits.update(pageID: request.pageID, bubble: bubble) { edit in
                 edit.isHidden = false
             }
         case .enterEditMode:
             setEditingTranslations(true)
+        case let .addBalloon(area):
+            addTranslationBalloon(pageID: request.pageID, area: area)
+        }
+    }
+
+    /// Add a balloon over `area` (page pixels) of a page, where the analysis
+    /// found no text: read what's there, keep it as the reader's edit, and
+    /// translate it into the shown language. When nothing's readable the
+    /// balloon waits, outlined, for its text to be typed ("Fix Original").
+    func addTranslationBalloon(pageID: String, area: CGRect) {
+        guard #available(macOS 26.0, *), let language = translationSourceLanguage,
+              let page = source.pages.first(where: { $0.id == pageID }) else { return }
+        let target = translation.target
+        Task { [weak self] in
+            let marked: MarkedArea? = await Task.detached(priority: .userInitiated) {
+                guard let image = try? await ImageLoader.load(page),
+                      let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+                return await MarkedArea.read(area, in: cgImage, language: language)
+            }.value
+            guard let self, let marked else { return }
+            // The patch around a balloon's text is padded by a third of a
+            // glyph; this keeps it to the area marked.
+            let padding = marked.glyphSize * 0.3
+            let rect = area.insetBy(dx: min(padding, area.width / 4), dy: min(padding, area.height / 4))
+            let edit = BubbleEdit(
+                recognizedSource: marked.text,
+                rect: rect,
+                added: AddedBalloon(glyphSize: marked.glyphSize, isVertical: marked.isVertical, background: marked.background)
+            )
+            self.translationEdits.add(pageID: pageID, edit: edit)
+            AppLog.info(.reader, "Balloon added by the reader", metadata: ["read": "\(!marked.text.isEmpty)"])
+            guard !marked.text.isEmpty else { return }
+            let bubble = TranslatedBubble(
+                id: 0, rect: rect, glyphSize: marked.glyphSize, isVertical: marked.isVertical,
+                source: marked.text, translation: nil, background: marked.background
+            )
+            self.retranslate(bubble, correctedSource: marked.text, pageID: pageID, into: target)
         }
     }
 

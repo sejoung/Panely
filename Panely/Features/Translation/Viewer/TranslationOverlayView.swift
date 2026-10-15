@@ -22,6 +22,11 @@ import SwiftUI
 /// transparent to the mouse, so scrolling, panning and double-click zoom work
 /// exactly as without it. When the overlay is switched off (⇧⌘T) nothing is
 /// drawn, but balloons still highlight on hover and open on click.
+///
+/// In edit mode the rest of the page takes drags too: dragging over text
+/// the analysis missed marks it out, and a balloon is added there
+/// (`.addBalloon`). The page doesn't pan by dragging while editing; scrolling
+/// and double-click zoom still work.
 final class TranslationOverlayView: NSView {
     private(set) var page: TranslatedPage?
     private(set) var showsTranslation = false
@@ -35,6 +40,12 @@ final class TranslationOverlayView: NSView {
     private var scale: CGFloat = 1
 
     private var hoveredBubbleID: Int?
+    /// Where a drag marking out a new balloon started, and the area so far
+    /// (view coordinates).
+    private var markStart: NSPoint?
+    private var markedArea: CGRect?
+    /// Smaller than this (view points) is a click, not an area.
+    static let minimumMarkSide: CGFloat = 12
     private var popover: NSPopover?
     private var pendingPopover: Task<Void, Never>?
     private var trackingArea: NSTrackingArea?
@@ -102,6 +113,18 @@ final class TranslationOverlayView: NSView {
         page?.bubbles.first { patchInView($0).contains(point) }
     }
 
+    /// The page itself, in this view.
+    private var pageInView: CGRect {
+        guard let page else { return .zero }
+        return CGRect(x: pageOrigin.x, y: pageOrigin.y, width: page.imageWidth * scale, height: page.imageHeight * scale)
+    }
+
+    /// Edit mode, over the page but not a balloon: a drag here marks out a
+    /// balloon to add.
+    private func canMark(at point: NSPoint) -> Bool {
+        isEditing && page?.pageID != nil && pageInView.contains(point) && bubble(at: point) == nil
+    }
+
     private func pendingRects() -> [CGRect] {
         guard let page else { return [] }
         return page.bubbles.filter { $0.translation == nil && $0.edit?.isHidden != true }.map(patchInView)
@@ -116,7 +139,8 @@ final class TranslationOverlayView: NSView {
 
     override func hitTest(_ point: NSPoint) -> NSView? {
         guard !isHidden, let superview else { return nil }
-        return bubble(at: convert(point, from: superview)) == nil ? nil : self
+        let local = convert(point, from: superview)
+        return bubble(at: local) != nil || canMark(at: local) ? self : nil
     }
 
     override func updateTrackingAreas() {
@@ -132,7 +156,9 @@ final class TranslationOverlayView: NSView {
     }
 
     override func mouseMoved(with event: NSEvent) {
-        setHovered(bubble(at: convert(event.locationInWindow, from: nil))?.id)
+        let point = convert(event.locationInWindow, from: nil)
+        setHovered(bubble(at: point)?.id)
+        if hoveredBubbleID == nil, canMark(at: point) { NSCursor.crosshair.set() }
     }
 
     override func mouseExited(with event: NSEvent) {
@@ -147,8 +173,14 @@ final class TranslationOverlayView: NSView {
             superview?.mouseDown(with: event)
             return
         }
-        guard let bubble = bubble(at: convert(event.locationInWindow, from: nil)) else {
-            superview?.mouseDown(with: event)
+        let point = convert(event.locationInWindow, from: nil)
+        guard let bubble = bubble(at: point) else {
+            if canMark(at: point) {
+                markStart = point
+                markedArea = nil
+            } else {
+                superview?.mouseDown(with: event)
+            }
             return
         }
         // Wait out the double-click interval so a zoom double-click on a
@@ -166,6 +198,52 @@ final class TranslationOverlayView: NSView {
                 self.showPopover(forBubbleID: bubbleID)
             }
         }
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let markStart else {
+            super.mouseDragged(with: event)
+            return
+        }
+        let point = convert(event.locationInWindow, from: nil)
+        let area = CGRect(
+            x: min(markStart.x, point.x), y: min(markStart.y, point.y),
+            width: abs(point.x - markStart.x), height: abs(point.y - markStart.y)
+        ).intersection(pageInView)
+        markedArea = area.isNull ? nil : area
+        needsDisplay = true
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        defer {
+            markStart = nil
+            if markedArea != nil {
+                markedArea = nil
+                needsDisplay = true
+            }
+        }
+        guard markStart != nil else {
+            super.mouseUp(with: event)
+            return
+        }
+        guard let area = markedArea, let pageID = page?.pageID,
+              area.width >= Self.minimumMarkSide, area.height >= Self.minimumMarkSide else { return }
+        markBalloon(area, pageID: pageID)
+    }
+
+    /// Ask for a balloon over `area` (view coordinates).
+    func markBalloon(_ area: CGRect, pageID: String) {
+        let inPage = CGRect(
+            x: (area.minX - pageOrigin.x) / scale,
+            y: (area.minY - pageOrigin.y) / scale,
+            width: area.width / scale,
+            height: area.height / scale
+        )
+        // No balloon yet: one stands in for the area.
+        let placeholder = TranslatedBubble(
+            id: -1, rect: inPage, glyphSize: 0, isVertical: false, source: "", translation: nil, background: .white
+        )
+        onEdit?(TranslationEditRequest(pageID: pageID, bubble: placeholder, change: .addBalloon(inPage)))
     }
 
     private func setHovered(_ id: Int?) {
@@ -251,6 +329,20 @@ final class TranslationOverlayView: NSView {
                 drawHoverHighlight(around: patch, glyph: CGFloat(bubble.glyphSize) * scale)
             }
         }
+        if let markedArea {
+            drawMarkedArea(markedArea)
+        }
+    }
+
+    /// The area being dragged out for a new balloon.
+    private func drawMarkedArea(_ area: CGRect) {
+        NSColor.controlAccentColor.withAlphaComponent(0.12).setFill()
+        area.fill()
+        let path = NSBezierPath(rect: area.insetBy(dx: 0.5, dy: 0.5))
+        path.lineWidth = 1.5
+        path.setLineDash([6, 4], count: 2, phase: 0)
+        NSColor.controlAccentColor.setStroke()
+        path.stroke()
     }
 
     private func drawTranslation(_ translation: String, of bubble: TranslatedBubble, in patch: CGRect) {

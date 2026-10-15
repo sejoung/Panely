@@ -115,3 +115,39 @@ struct TranslationOverlayViewTests {
     }
 }
 
+
+/// Marking out a balloon to add, in edit mode.
+@MainActor
+struct TranslationOverlayMarkingTests {
+    private let imageSize = CGSize(width: 1000, height: 2000)
+
+    private func makeOverlay(editing: Bool) -> (ImageStackView, TranslationOverlayView) {
+        var page = TranslatedPage(imageWidth: 1000, imageHeight: 2000, bubbles: [])
+        page.pageID = "p1"
+        let stack = ImageStackView()
+        stack.setImages([NSImage(size: imageSize)], axis: .horizontal)
+        stack.setTranslationOverlay([page], showsTranslation: true, isEditing: editing)
+        let overlay = stack.subviews.compactMap { $0 as? TranslationOverlayView }.first!
+        return (stack, overlay)
+    }
+
+    @Test func onlyEditModeTakesTheMouseAwayFromBalloons() {
+        let (reading, _) = makeOverlay(editing: false)
+        #expect(!(reading.hitTest(reading.convert(NSPoint(x: 100, y: 100), to: nil)) is TranslationOverlayView))
+
+        let (editing, overlay) = makeOverlay(editing: true)
+        #expect(editing.hitTest(editing.convert(NSPoint(x: 100, y: 100), to: nil)) === overlay)
+    }
+
+    @Test func aMarkedAreaIsAskedForInPagePixels() {
+        let (_, overlay) = makeOverlay(editing: true)
+        var request: TranslationEditRequest?
+        overlay.onEdit = { request = $0 }
+
+        overlay.markBalloon(CGRect(x: 100, y: 200, width: 60, height: 120), pageID: "p1")
+
+        #expect(request?.pageID == "p1")
+        // The stack shows the page at its pixel size here.
+        #expect(request?.change == .addBalloon(CGRect(x: 100, y: 200, width: 60, height: 120)))
+    }
+}

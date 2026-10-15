@@ -18,9 +18,15 @@ enum TranslationEditChange: Equatable {
     case show
     /// Switch to edit mode, from a balloon's popover while reading.
     case enterEditMode
+    /// Add a balloon over this area of the page (in page pixels), dragged
+    /// out in edit mode where the analysis found no text.
+    case addBalloon(CGRect)
+    /// Take away a balloon the reader added.
+    case remove
 }
 
 /// A balloon edit from the viewer: which page, which balloon (as shown), what.
+/// For `.addBalloon` there's no balloon yet; `bubble` only stands in.
 struct TranslationEditRequest {
     let pageID: String
     let bubble: TranslatedBubble
@@ -43,10 +49,12 @@ struct HiddenBalloon: Identifiable {
 @Observable
 @MainActor
 final class TranslationEdits {
-    /// A corrected original being translated into one language.
+    /// A corrected original — or an added balloon's text — being translated
+    /// into one language.
     struct Retranslation: Hashable {
         let pageID: String
         let recognizedSource: String
+        /// The text translated (`BubbleEdit.sourceToTranslate`).
         let correctedSource: String
         let target: TranslationLanguage
     }
@@ -55,6 +63,16 @@ final class TranslationEdits {
         let pageID: String
         let bubble: TranslatedBubble
         let id = UUID()
+    }
+
+    /// A balloon just added, offered back for a few seconds — and, when
+    /// nothing could be read in it, the hint to type its text.
+    struct RecentlyAdded: Equatable {
+        let pageID: String
+        let edit: BubbleEdit
+        let id = UUID()
+
+        var foundNoText: Bool { edit.recognizedSource.isEmpty }
     }
 
     /// How long the "balloon hidden" banner stays.
@@ -67,6 +85,7 @@ final class TranslationEdits {
     /// The balloon just hidden, offered back for a few seconds (status banner)
     /// — the moment it's easiest to learn that hiding can be undone.
     private(set) var recentlyHidden: RecentlyHidden?
+    private(set) var recentlyAdded: RecentlyAdded?
     @ObservationIgnored private(set) var scope: TranslationScope = .page
     @ObservationIgnored private var loadedPageIDs: [String] = []
     @ObservationIgnored private var generation = 0
@@ -82,7 +101,12 @@ final class TranslationEdits {
         pages.values.reduce(0) { $0 + $1.hiddenCount }
     }
 
-    /// Balloons with any edit in the open book, hidden ones included.
+    /// Balloons the reader added in the open book.
+    var addedCount: Int {
+        pages.values.reduce(0) { $0 + $1.bubbles.filter { $0.added != nil }.count }
+    }
+
+    /// Balloons with any edit in the open book, hidden and added ones included.
     var editedCount: Int {
         pages.values.reduce(0) { $0 + $1.bubbles.count }
     }
@@ -105,6 +129,7 @@ final class TranslationEdits {
         pages = [:]
         retranslating = []
         recentlyHidden = nil
+        recentlyAdded = nil
         guard !pageIDs.isEmpty else { return }
         let store = store
         let loaded = await Task.detached(priority: .utility) {
@@ -136,6 +161,41 @@ final class TranslationEdits {
         edits.update(bubble, change)
         pages[pageID] = edits.isEmpty ? nil : edits
         save(edits, pageID: pageID)
+    }
+
+    /// Add a balloon the reader marked out.
+    func add(pageID: String, edit: BubbleEdit) {
+        var edits = pages[pageID] ?? PageEdits()
+        edits.add(edit)
+        pages[pageID] = edits
+        save(edits, pageID: pageID)
+        let added = RecentlyAdded(pageID: pageID, edit: edit)
+        recentlyAdded = added
+        // Longer when there's something to do: type the text.
+        let seconds = added.foundNoText ? Self.recentlyHiddenSeconds * 2 : Self.recentlyHiddenSeconds
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            if self?.recentlyAdded == added { self?.recentlyAdded = nil }
+        }
+    }
+
+    /// Take away a balloon the reader added.
+    func remove(pageID: String, source: String, rect: CGRect) {
+        if recentlyAdded?.pageID == pageID, recentlyAdded?.edit.rect == rect { recentlyAdded = nil }
+        guard var edits = pages[pageID] else { return }
+        edits.bubbles.removeAll { $0.added != nil && $0.recognizedSource == source && $0.rect == rect }
+        pages[pageID] = edits.isEmpty ? nil : edits
+        save(edits, pageID: pageID)
+    }
+
+    /// Take back the balloon just added.
+    func undoAdd() {
+        guard let added = recentlyAdded else { return }
+        remove(pageID: added.pageID, source: added.edit.recognizedSource, rect: added.edit.rect)
+    }
+
+    func dismissRecentlyAdded() {
+        recentlyAdded = nil
     }
 
     func hide(pageID: String, bubble: TranslatedBubble) {
@@ -173,6 +233,7 @@ final class TranslationEdits {
     /// Drop every edit in the open book — the rest of the library keeps its own.
     func revertAllInBook() {
         recentlyHidden = nil
+        recentlyAdded = nil
         retranslating = []
         for pageID in Array(pages.keys) {
             pages[pageID] = nil
@@ -202,7 +263,7 @@ final class TranslationEdits {
         guard let text else { return }
         update(pageID: retranslation.pageID, bubble: bubble) { edit in
             // The correction may have been reverted or changed meanwhile.
-            guard edit.correctedSource == retranslation.correctedSource else { return }
+            guard edit.sourceToTranslate == retranslation.correctedSource else { return }
             edit.retranslations[retranslation.target.rawValue] = text
         }
     }

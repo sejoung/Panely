@@ -433,8 +433,7 @@ Open the panel from the translate button (or the language menu's
 Translation starts at the page you're on and keeps ahead of you as you read:
 
 - A detector trained on comics finds the balloons, so all the lines of one
-  balloon are translated together, and artwork that looks like text to OCR (a
-  drawn sound effect, a pattern) is left alone. A translation can use the
+  balloon are translated together and neighbouring balloons stay apart. A translation can use the
   room inside its balloon — when nothing else is drawn there — so a long one
   isn't squeezed into the original's narrow lines. **Hide** is for whatever still
   slips through (see below).
@@ -499,6 +498,16 @@ Edited balloons carry a small pencil in their corner, and hidden balloons show
 as dashed outlines — click one to bring it back. The bar counts what's edited,
 lists hidden balloons by page (pick one to go there, or show them all), and
 **Revert This Book…** undoes everything changed in this book only.
+
+**Text that wasn't translated** — a line OCR passed over, a title in
+decorative lettering — can be added: in edit mode, drag a box over it. Panely
+reads that area on its own, enlarged (which often works where the whole page
+didn't), and translates it into a balloon of yours. If nothing can be read
+there, the balloon is added empty: click its dashed outline and type the text
+with **Fix Original** — or write the translation with **Edit**. A balloon
+you added has **Remove** instead of Hide, and is kept, reverted and exported
+like any other edit. (Panely already takes a second, enlarged look by itself
+at text boxes the detector found but OCR left empty.)
 
 `↩` saves, `⇧↩` starts a new line (`⌥↩` and `⌃↩` work too), `esc` cancels.
 Edits are stored apart from the translation cache, so clearing the cache or

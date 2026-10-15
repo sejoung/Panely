@@ -29,7 +29,7 @@ struct TranslationEditBar: View {
                     }
                 } else {
                     if edited == 0 {
-                        Text("Click a balloon to correct or hide it")
+                        Text("Click a balloon to correct it — drag over text that was missed to add one")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(.white.opacity(0.75))
                     } else {
@@ -59,7 +59,7 @@ struct TranslationEditBar: View {
             .overlay(Capsule().stroke(PanelyColor.accentPrimary.opacity(0.6), lineWidth: 1))
             .shadow(color: .black.opacity(0.25), radius: 10, y: 3)
             .environment(\.colorScheme, .dark)
-            .help("Click a balloon to correct it, or a dashed outline to bring a hidden balloon back.")
+            .help("Click a balloon to correct it, or a dashed outline to bring a hidden balloon back. Drag over text that wasn't translated to add a balloon there.")
             .transition(.opacity.combined(with: .move(edge: .bottom)))
             .onChange(of: viewModel.isEditingTranslations) { _, _ in
                 confirmsRevert = false

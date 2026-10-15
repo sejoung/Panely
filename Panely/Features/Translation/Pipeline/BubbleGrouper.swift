@@ -27,15 +27,12 @@ nonisolated struct BubbleDraft: Equatable, Sendable {
 /// With balloons from `BalloonDetector`, the detector decides instead: text in
 /// the same detected balloon is one balloon, whatever its layout, and text in
 /// two balloons stays apart however close. Text the detector put in no balloon
-/// or text box is artwork OCR misread (a drawn "조잘조잘", a pattern) and is
-/// dropped — unless it's a sentence's worth, which the detector more likely
-/// missed. A page where the detector found nothing at all is grouped by the
-/// rules, as if there were no detector. (Measured on 48 pages of three
-/// books: all eight dropped blocks were sound effects or noise.)
+/// or text box is grouped by the rules above and kept: across a whole webtoon
+/// that included a title in decorative lettering and the last column of a
+/// balloon, and dropping a real line is worse than letting noise through
+/// (sound effects are still left out, by `SoundEffectClassifier`; anything
+/// else can be hidden).
 nonisolated enum BubbleGrouper {
-    /// Text outside every detection this long is kept anyway.
-    static let keptOutsideLength = 8
-
     static func group(_ regions: [TextRegion], language: TranslationLanguage, detections: [DetectedRegion]? = nil) -> [BubbleDraft] {
         let candidates = regions.compactMap { region -> TextRegion? in
             var cleaned = region
@@ -50,7 +47,7 @@ nonisolated enum BubbleGrouper {
         for region in candidates {
             if let container = container(of: region.rect, in: detections) {
                 byContainer[container, default: []].append(region)
-            } else if region.text.filter(\.isLetter).count >= keptOutsideLength {
+            } else {
                 outside.append(region)
             }
         }

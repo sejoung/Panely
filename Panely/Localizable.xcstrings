@@ -470,6 +470,38 @@
         }
       }
     },
+    "Balloon added, but no text could be read there. Click its dashed outline and choose Fix Original to type the text." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Balloon added, but no text could be read there. Click its dashed outline and choose Fix Original to type the text."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "말풍선을 추가했지만 그 자리에서 읽을 수 있는 글자가 없었습니다. 점선 윤곽을 클릭하고 원문 고치기로 글자를 입력하세요."
+          }
+        }
+      }
+    },
+    "Balloon added. It's translated now; click it to correct the text or remove it." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Balloon added. It's translated now; click it to correct the text or remove it."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "말풍선을 추가했습니다. 지금 번역 중이며, 클릭하면 글자를 고치거나 지울 수 있습니다."
+          }
+        }
+      }
+    },
     "Balloon hidden. While editing, hidden balloons show as dashed outlines — click one to bring it back." : {
       "localizations" : {
         "en" : {
@@ -482,6 +514,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "말풍선을 숨겼습니다. 편집 중에는 숨긴 말풍선이 점선으로 보이며, 클릭하면 다시 나타납니다."
+          }
+        }
+      }
+    },
+    "Balloon you added — machine translation of its text" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Balloon you added — machine translation of its text"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "직접 추가한 말풍선 — 그 글자의 기계 번역"
+          }
+        }
+      }
+    },
+    "Balloon you added — no text was read; type it with Fix Original" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Balloon you added — no text was read; type it with Fix Original"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "직접 추가한 말풍선 — 읽힌 글자가 없음, 원문 고치기로 입력하세요"
+          }
+        }
+      }
+    },
+    "Balloon you added — not translated into this language yet" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Balloon you added — not translated into this language yet"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "직접 추가한 말풍선 — 아직 이 언어로 번역되지 않음"
           }
         }
       }
@@ -1153,34 +1233,34 @@
         }
       }
     },
-    "Click a balloon to correct it, or a dashed outline to bring a hidden balloon back." : {
+    "Click a balloon to correct it — drag over text that was missed to add one" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Click a balloon to correct it, or a dashed outline to bring a hidden balloon back."
+            "value" : "Click a balloon to correct it — drag over text that was missed to add one"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "말풍선을 클릭해 고치고, 점선 윤곽을 클릭해 숨긴 말풍선을 되살립니다."
+            "value" : "말풍선을 클릭해 고치세요 — 번역되지 않은 글자는 드래그해서 추가"
           }
         }
       }
     },
-    "Click a balloon to correct or hide it" : {
+    "Click a balloon to correct it, or a dashed outline to bring a hidden balloon back. Drag over text that wasn't translated to add a balloon there." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Click a balloon to correct or hide it"
+            "value" : "Click a balloon to correct it, or a dashed outline to bring a hidden balloon back. Drag over text that wasn't translated to add a balloon there."
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "말풍선을 클릭해 고치거나 숨기세요"
+            "value" : "말풍선을 클릭해 고치거나, 점선 윤곽을 클릭해 숨긴 말풍선을 다시 보이게 합니다. 번역되지 않은 글자 위를 드래그하면 그 자리에 말풍선을 추가합니다."
           }
         }
       }
@@ -5027,6 +5107,22 @@
         }
       }
     },
+    "Remove" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지우기"
+          }
+        }
+      }
+    },
     "Remove All" : {
       "localizations" : {
         "en" : {
@@ -5231,6 +5327,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "이 페이지 북마크 제거 (⌘D)"
+          }
+        }
+      }
+    },
+    "Remove this balloon you added" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove this balloon you added"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "직접 추가한 이 말풍선을 지웁니다"
           }
         }
       }

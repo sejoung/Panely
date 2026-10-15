@@ -246,3 +246,115 @@ struct TranslationEditsModelTests {
         #expect(reopened.edits(forPage: "p1")?.edit(for: bubble)?.translations[TranslationLanguage.korean.rawValue] == "내 번역")
     }
 }
+
+/// Balloons the reader adds over text the analysis missed.
+struct AddedBalloonTests {
+    private let page = makeTranslatedPage("기계 번역")
+    private let area = CGRect(x: 4, y: 5, width: 3, height: 2)
+
+    private func added(_ text: String = "はあ…") -> BubbleEdit {
+        BubbleEdit(recognizedSource: text, rect: area, added: AddedBalloon(glyphSize: 2, isVertical: true, background: .white))
+    }
+
+    @Test func anAddedBalloonShowsWithItsTranslation() {
+        var edits = PageEdits()
+        var edit = added()
+        edit.retranslations[TranslationLanguage.korean.rawValue] = "하아…"
+        edits.add(edit)
+
+        let shown = edits.apply(to: page, target: .korean).bubbles
+        #expect(shown.count == 2)
+        let balloon = try? #require(shown.last)
+        #expect(balloon?.translation == "하아…")
+        #expect(balloon?.edit?.isAdded == true)
+        #expect(balloon?.id == PageEdits.addedBubbleID(0))
+        // The page's own balloon is untouched.
+        #expect(shown.first == page.bubbles.first)
+    }
+
+    @Test func withNothingToShowItsOutlinedWhileEditingAndLeftOutWhileReading() {
+        var edits = PageEdits()
+        edits.add(added(""))
+
+        #expect(edits.apply(to: page, target: .korean).bubbles.count == 1)
+        let editing = edits.apply(to: page, target: .korean, includeHidden: true).bubbles
+        #expect(editing.count == 2)
+        #expect(editing.last?.translation == nil)
+        // Nothing read: nothing to translate until the text is typed.
+        #expect(editing.last?.edit?.needsRetranslation == false)
+    }
+
+    @Test func anotherLanguageAsksToBeTranslatedAndTheReadersOwnWins() {
+        var edits = PageEdits()
+        var edit = added()
+        edit.retranslations[TranslationLanguage.korean.rawValue] = "하아…"
+        edits.add(edit)
+
+        #expect(edits.apply(to: page, target: .english, includeHidden: true).bubbles.last?.edit?.needsRetranslation == true)
+
+        edits.update(source: edit.recognizedSource, rect: edit.rect) { $0.translations[TranslationLanguage.korean.rawValue] = "후우…" }
+        #expect(edits.apply(to: page, target: .korean).bubbles.last?.translation == "후우…")
+        #expect(edits.bubbles.count == 1)
+    }
+
+    @Test func editsToThePagesOwnBalloonNeverLandOnAnAddedOne() {
+        var edits = PageEdits()
+        // Same text, overlapping place.
+        let pageBubble = page.bubbles[0]
+        edits.add(BubbleEdit(recognizedSource: pageBubble.source, rect: pageBubble.rect.insetBy(dx: 1, dy: 1), added: AddedBalloon(glyphSize: 2, isVertical: true, background: .white)))
+
+        edits.update(pageBubble) { $0.isHidden = true }
+
+        #expect(edits.bubbles.count == 2)
+        #expect(edits.edit(for: pageBubble)?.isHidden == true)
+        #expect(edits.bubbles.first?.isHidden == false)
+    }
+
+    @Test func whatGetsTranslated() {
+        #expect(added().sourceToTranslate == "はあ…")
+        #expect(added("").sourceToTranslate == nil)
+        var corrected = added("")
+        corrected.correctedSource = "はあ"
+        #expect(corrected.sourceToTranslate == "はあ")
+        // A page balloon's own text isn't retranslated unless corrected.
+        #expect(BubbleEdit(recognizedSource: "原文", rect: area).sourceToTranslate == nil)
+    }
+}
+
+@MainActor
+struct AddedBalloonModelTests {
+    private func makeModel() throws -> TranslationEdits {
+        TranslationEdits(store: TranslationEditStore(root: try Fixture.makeTempDir().appendingPathComponent("edits", isDirectory: true)))
+    }
+
+    private func added(_ text: String) -> BubbleEdit {
+        BubbleEdit(recognizedSource: text, rect: CGRect(x: 1, y: 1, width: 5, height: 5), added: AddedBalloon(glyphSize: 2, isVertical: false, background: .white))
+    }
+
+    @Test func addingOffersUndoAndSaysWhenNothingWasRead() async throws {
+        let model = try makeModel()
+        await model.load(pageIDs: ["p1"], scope: .page)
+
+        model.add(pageID: "p1", edit: added(""))
+        #expect(model.recentlyAdded?.foundNoText == true)
+        #expect(model.addedCount == 1)
+
+        model.undoAdd()
+        #expect(model.addedCount == 0)
+        #expect(model.recentlyAdded == nil)
+    }
+
+    @Test func itsTranslationLandsOnIt() async throws {
+        let model = try makeModel()
+        await model.load(pageIDs: ["p1"], scope: .page)
+        let edit = added("はあ…")
+        model.add(pageID: "p1", edit: edit)
+        let bubble = TranslatedBubble(id: 0, rect: edit.rect, glyphSize: 2, isVertical: false, source: edit.recognizedSource, translation: nil, background: .white)
+        let retranslation = TranslationEdits.Retranslation(pageID: "p1", recognizedSource: edit.recognizedSource, correctedSource: "はあ…", target: .korean)
+        model.beginRetranslation(retranslation)
+
+        model.finishRetranslation(retranslation, bubble: bubble, text: "하아…")
+
+        #expect(model.edits(forPage: "p1")?.bubbles.first?.retranslations[TranslationLanguage.korean.rawValue] == "하아…")
+    }
+}

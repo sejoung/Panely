@@ -173,6 +173,20 @@ private struct ReaderStatusBanner: View {
                     viewModel.dismissTranslationNotice()
                 }
             }
+        } else if let added = viewModel.translationEdits.recentlyAdded {
+            banner(
+                systemImage: added.foundNoText ? "text.badge.plus" : "plus.bubble",
+                message: added.foundNoText
+                    ? String(localized: "Balloon added, but no text could be read there. Click its dashed outline and choose Fix Original to type the text.", bundle: .localized)
+                    : String(localized: "Balloon added. It's translated now; click it to correct the text or remove it.", bundle: .localized)
+            ) {
+                Button("Undo") {
+                    viewModel.translationEdits.undoAdd()
+                }
+                Button("Dismiss") {
+                    viewModel.translationEdits.dismissRecentlyAdded()
+                }
+            }
         } else if viewModel.translationEdits.recentlyHidden != nil {
             banner(
                 systemImage: "eye.slash",

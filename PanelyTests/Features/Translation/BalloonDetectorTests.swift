@@ -99,16 +99,21 @@ struct BubbleGrouperDetectionTests {
         #expect(BubbleGrouper.group([main, aside], language: .japanese, detections: detections).count == 2)
     }
 
-    @Test func textOutsideEveryBalloonIsDroppedUnlessItsASentence() {
+    /// Text the detector missed is kept, short or not: a title in decorative
+    /// lettering, the last column of a balloon ("ですか…") — real webtoon
+    /// cases a "drop it" rule lost.
+    @Test func textOutsideEveryBalloonIsKept() {
         let speech = region("無理だよ", CGRect(x: 100, y: 100, width: 30, height: 100))
-        let drawnSound = region("조잘조잘", CGRect(x: 400, y: 400, width: 60, height: 60), vertical: false)
-        let missedLine = region("이건 정말로 아무도 몰랐던 이야기야", CGRect(x: 10, y: 600, width: 300, height: 30), vertical: false)
+        let missedColumn = region("ですか…", CGRect(x: 400, y: 400, width: 30, height: 130))
+        let title = region("世界一", CGRect(x: 80, y: 600, width: 296, height: 165), vertical: false)
         let detections = [balloon(CGRect(x: 80, y: 80, width: 80, height: 150))]
 
-        let japanese = BubbleGrouper.group([speech], language: .japanese, detections: detections)
-        #expect(japanese.map(\.source) == ["無理だよ"])
-        let korean = BubbleGrouper.group([drawnSound, missedLine], language: .korean, detections: detections)
-        #expect(korean.map(\.source) == ["이건 정말로 아무도 몰랐던 이야기야"])
+        let drafts = BubbleGrouper.group([speech, missedColumn, title], language: .japanese, detections: detections)
+
+        #expect(Set(drafts.map(\.source)) == ["無理だよ", "ですか…", "世界一"])
+        // Only text in a detected balloon gets its room.
+        #expect(drafts.first { $0.source == "無理だよ" }?.balloonRect != nil)
+        #expect(drafts.first { $0.source == "ですか…" }?.balloonRect == nil)
     }
 
     @Test func nothingDetectedFallsBackToTheLayoutRules() {

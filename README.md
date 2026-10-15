@@ -233,6 +233,10 @@ written into your files.
 - **Several languages per book** — each language is a separate job and cache;
   clicking a balloon shows its translation, the other languages and the
   original side by side (selectable, so Look Up works)
+- **Missed text** — text boxes the detector found but OCR left empty get a
+  second, enlarged read automatically; anything still missed can be added in
+  edit mode by dragging a box over it (read enlarged and translated, or typed
+  with Fix Original when it can't be read)
 - **Reading / edit mode** — reading shows nothing but the translation. In
   edit mode (`⇧⌘E`, the panel, the language menu, or **Edit…** in a balloon's popover)
   the popover rewrites a translation, fixes the recognised original and
@@ -267,9 +271,9 @@ written into your files.
   and a bar under the page slider
 - **Balloons found by a detector** — a model trained on comics (bundled,
   run on the GPU, ~0.1 s a page alongside OCR) tells which OCR lines share a
-  balloon and which "text" is really artwork: columns of one balloon are
-  joined in reading order, neighbouring balloons stay apart, and drawn sound
-  effects or patterns OCR misread are dropped. A translation also gets the
+  balloon: columns of one balloon are joined in reading order and
+  neighbouring balloons stay apart. Text it misses is still translated,
+  grouped the old way. A translation also gets the
   room inside its balloon instead of only the original's lines — when that
   room is empty, so a line OCR missed is never painted over. Without the
   detector (or where it finds nothing) the layout rules group the text as
