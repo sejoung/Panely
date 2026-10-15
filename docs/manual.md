@@ -374,10 +374,14 @@ are never changed.
 
 Requires **macOS 26** or later. It's off by default.
 
+![A page before and after translation](screenshots/18-translation-before-after.png)
+
 ### Turning it on
 
 Open **File → Settings… → Experimental** and switch on **Translation
 Assist**. The same tab sets:
+
+![Experimental settings: Translation Assist, default language, mode and sound effects](screenshots/23-experimental-settings.png)
 
 - **Default Language** — the language new series are shown in. **System
   Default** follows Panely's interface language.
@@ -404,12 +408,18 @@ Translation is spread over a few places, each for one job:
   which language to view, and the book's own settings.
 - **The pill over the page** shows progress while a job runs.
 - **Edit mode** (`⇧⌘E`) is for correcting balloons, right on the page.
+- **Window → Jobs** (`⌥⌘J`) lists everything running in the background —
+  other books' translations and exports — and the books you've exported.
+  The pill over the page opens it.
 - **Settings → Experimental** holds app-wide choices; the panel's ⚙︎ opens it.
 
 ### Translating a book
 
 Open the panel from the translate button (or the language menu's
 **Translation Panel…**) and press the big **Translate This Book** button (`⌥⌘T`).
+
+![The translation panel](screenshots/19-translation-panel.png)
+
 Translation starts at the page you're on and keeps ahead of you as you read:
 
 - Balloons appear with a pulsing outline and "…" as soon as they're found, and
@@ -432,6 +442,8 @@ In **Vertical scroll** the pages are read as one strip, so a webtoon cut into
 many images still gets whole balloons.
 
 ### Choosing what to view
+
+![Reading with the translation on — the toolbar names the language shown](screenshots/17-translation-reading.png)
 
 Use the language menu next to the translate button, or the panel's **View**
 list: **Original
@@ -456,6 +468,8 @@ you're editing; `esc` or **Done** goes back to reading.
 
 In edit mode a balloon's popover offers:
 
+![A balloon's popover in edit mode](screenshots/20-translation-balloon-popover.png)
+
 - **Edit** — rewrite the translation. Your translation applies to that
   language only.
 - **Fix Original** — when OCR misread the text, correct it and it's
@@ -477,8 +491,8 @@ switching modes keeps them.
 ### Other books and whole series
 
 Translating continues when you open another book. While it runs, a small pill
-over the page says which book and how far along it is; click it for the list
-of jobs, where you can pause, resume, stop, or jump back to the book. One job
+over the page says which book and how far along it is; click it to open
+**Window → Jobs**, where you can pause, resume, stop, or jump back to the book. One job
 runs at a time, and whatever you're looking at goes first.
 
 **Translate Entire Series** (under **This Book & Series**) queues the other
@@ -489,10 +503,50 @@ A few limits are shown where they apply:
 
 - A book inside an archive (zip-in-zip) pauses when you open another book and
   continues when you come back.
-- Quitting Panely stops translating. Finished pages are kept, and the rest
-  continues when you start again.
+- Quitting Panely stops translating and exporting. Finished pages are kept,
+  and the rest continues when you start again.
 - If a job in the background stops on an error, it stays in the list with the
   reason until you dismiss it.
+
+### Exporting a translated copy
+
+To keep a translation, or read it in another app, export the book: Panely
+saves a copy with the translation painted into the pages — your edits
+included, hidden balloons left out — as a **CBZ**, a **ZIP** or a **folder of
+images**. CBZ and ZIP are the same archive; pick ZIP for an app or service
+that only takes `.zip`.
+The original is left as it is.
+
+Start it from:
+
+- the language menu in the toolbar — **Export Translated Book…**, and
+  **Export Translated Series…** when the book has other volumes;
+- **File → Export Translated Book…**;
+- the panel's **This Book & Series**, under **Translate Entire Series**;
+- the library: right-click a book for **Export Translated Book…**, or a
+  folder of volumes for **Export Translated Series (N Volumes)…**. The book
+  needn't be open.
+
+![The export sheet](screenshots/21-translation-export-sheet.png)
+
+A short sheet asks for the language, the format, what to do with **Pages Not
+Translated Yet** (**Translate Them First**, or **Export As They Are**) and
+where to save — chosen once and remembered, like the rest of the sheet.
+
+![Window → Jobs: an export running, one stopped, and exported books](screenshots/22-jobs-window.png)
+
+Exporting runs in the background: keep reading, or open another book. Each
+book is its own job in **Window → Jobs** (`⌥⌘J`) — first translating what's
+left (through the same queue as other translations), then writing the pages —
+and can be cancelled there. A job that stops (a missing language pack, say)
+stays listed with the reason and **Try Again**. Finished books stay listed,
+across launches, with **Show in Finder** and **Open**; the pill over the page
+says when one is done.
+
+Pages come out numbered in reading order (`001.jpg`, `002.jpg`…). Pages with
+nothing translated are copied unchanged; translated ones keep their format
+(PNG stays PNG, the rest become high-quality JPEG). A name that's taken gets a
+number ("… [Korean] 2.cbz").
 
 ---
 
@@ -520,3 +574,4 @@ The most-used:
 | Translation: original ↔ translation | `⇧⌘T` |
 | Translation: translate this book / pause | `⌥⌘T` |
 | Translation: edit balloons / done | `⇧⌘E` |
+| Jobs window (translations, exports) | `⌥⌘J` |

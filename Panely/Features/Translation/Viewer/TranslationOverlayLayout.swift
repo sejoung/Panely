@@ -47,7 +47,6 @@ nonisolated enum TranslationOverlayLayout {
     /// negative stroke width) traces those inner overlaps too — stray light
     /// lines through "e", "A", "t". Filled on top, the inner strokes vanish
     /// and only the halo around each letter shows.
-    @MainActor
     static func fittedText(
         _ text: String,
         in size: CGSize,
@@ -75,6 +74,17 @@ nonisolated enum TranslationOverlayLayout {
             ).size
         }
 
+        // Measured against the width it's wrapped to, a word too long for a
+        // line is broken mid-word ("dreamin / g.") and still reports as
+        // fitting — so each word must fit a line on its own. Only for text
+        // that breaks at spaces: Japanese or Chinese wraps anywhere.
+        let words = text.split(whereSeparator: \.isWhitespace).map(String.init)
+        func wordsFit(_ fontSize: CGFloat) -> Bool {
+            guard words.count > 1 else { return true }
+            let font = NSFont.systemFont(ofSize: fontSize, weight: .semibold)
+            return words.allSatisfy { (($0 as NSString).size(withAttributes: [.font: font]).width) <= size.width + 0.5 }
+        }
+
         var low = minFontSize
         var high = max(minFontSize, maxFontSize)
         var best = make(low)
@@ -83,7 +93,7 @@ nonisolated enum TranslationOverlayLayout {
             let mid = (low + high) / 2
             let candidate = make(mid)
             let candidateSize = measure(candidate)
-            if candidateSize.height <= size.height && candidateSize.width <= size.width + 0.5 {
+            if candidateSize.height <= size.height && candidateSize.width <= size.width + 0.5 && wordsFit(mid) {
                 best = candidate
                 bestSize = candidateSize
                 low = mid
@@ -111,4 +121,87 @@ nonisolated enum TranslationOverlayLayout {
 
 extension TranslatedPage {
     nonisolated var imageSize: CGSize { CGSize(width: imageWidth, height: imageHeight) }
+}
+
+/// Paints one balloon's translation: the patch in the balloon's own tone
+/// (feathered over artwork) and the fitted text on it. Shared by the overlay
+/// on screen and the exporter, so an exported page looks the way it read.
+///
+/// Draws into the current `NSGraphicsContext`, which must be flipped (top-
+/// left origin). Safe off the main thread — the exporter runs it in the
+/// background, one page per context.
+nonisolated enum TranslationPatchPainter {
+    /// The text as fitted to a patch, worth keeping while neither changes.
+    struct Fitted {
+        let text: String
+        let string: NSAttributedString
+        let outline: NSAttributedString?
+        let size: CGSize
+    }
+
+    /// - Parameters:
+    ///   - glyph: the balloon's glyph size at the drawing scale.
+    ///   - fitted: a previous fit of the same text to the same patch size.
+    /// - Returns: the fit used, for the caller to cache; `nil` when the patch
+    ///   is too small for text.
+    @discardableResult
+    static func draw(
+        _ translation: String,
+        background: BubbleBackground,
+        glyph: CGFloat,
+        in patch: CGRect,
+        fitted: Fitted? = nil
+    ) -> Fitted? {
+        let fill = NSColor(srgbRed: background.red, green: background.green, blue: background.blue, alpha: 1)
+        let path = NSBezierPath(roundedRect: patch, xRadius: max(4, glyph * 0.5), yRadius: max(4, glyph * 0.5))
+
+        if background.isUniform {
+            // A balloon or caption box: a solid patch in its own tone is invisible.
+            fill.setFill()
+            path.fill()
+        } else {
+            // Over artwork a hard box looks pasted on — feather its edge into
+            // the drawing instead.
+            NSGraphicsContext.saveGraphicsState()
+            let shadow = NSShadow()
+            shadow.shadowColor = fill
+            shadow.shadowBlurRadius = max(6, glyph * 0.8)
+            shadow.shadowOffset = .zero
+            shadow.set()
+            fill.withAlphaComponent(0.92).setFill()
+            path.fill()
+            NSGraphicsContext.restoreGraphicsState()
+        }
+
+        let inner = patch.insetBy(dx: glyph * 0.3, dy: glyph * 0.3)
+        guard inner.width > 4, inner.height > 4 else { return nil }
+        let text: Fitted
+        if let fitted, fitted.text == translation {
+            text = fitted
+        } else {
+            let made = TranslationOverlayLayout.fittedText(
+                translation,
+                in: inner.size,
+                maxFontSize: max(glyph * 0.95, 8),
+                color: background.isDark ? .white : .black,
+                outline: background.isUniform ? nil : (background.isDark ? .black : .white)
+            )
+            text = Fitted(text: translation, string: made.string, outline: made.outline, size: made.size)
+        }
+        let textRect = CGRect(
+            x: inner.minX,
+            y: inner.midY - text.size.height / 2,
+            width: inner.width,
+            height: text.size.height + 1
+        )
+        if let outline = text.outline {
+            // Round joins: mitred corners spike out of "A", "M", "V".
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current?.cgContext.setLineJoin(.round)
+            outline.draw(with: textRect, options: [.usesLineFragmentOrigin, .usesFontLeading])
+            NSGraphicsContext.restoreGraphicsState()
+        }
+        text.string.draw(with: textRect, options: [.usesLineFragmentOrigin, .usesFontLeading])
+        return text
+    }
 }

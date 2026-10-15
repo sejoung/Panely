@@ -60,6 +60,9 @@ struct ToolbarTranslationState: Equatable {
     var otherLanguages: [Language] = []
     var isEditing = false
     var canEdit = false
+    /// The book can be exported; `canExportSeries` when it has other volumes.
+    var canExport = false
+    var canExportSeries = false
 
     /// Something to switch to: before that, the button opens the panel.
     var canToggle: Bool { hasTranslations || isWorking }
@@ -93,6 +96,8 @@ struct PanelyToolbarActions {
     var onShowTranslation: (TranslationLanguage) -> Void = { _ in }
     var onToggleTranslationEditing: () -> Void = {}
     var onTranslateInto: (TranslationLanguage) -> Void = { _ in }
+    var onExportBook: () -> Void = {}
+    var onExportSeries: () -> Void = {}
 }
 
 /// The translation menu's face: the language on screen ("Original" when
@@ -514,6 +519,17 @@ struct PanelyToolbar: View {
                 actions.onToggleTranslationEditing()
             }
             .disabled(!translation.isEditing && !translation.canEdit)
+            if translation.canExport {
+                Divider()
+                Button("Export Translated Book…") {
+                    actions.onExportBook()
+                }
+                if translation.canExportSeries {
+                    Button("Export Translated Series…") {
+                        actions.onExportSeries()
+                    }
+                }
+            }
         } label: {
             ToolbarLanguageLabel(
                 title: translation.showsTranslation ? translation.shownLanguageName : nil

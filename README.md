@@ -226,8 +226,8 @@ written into your files.
   single status line, the **View** list (the original or the book's
   languages; other languages start and stop from their **⋯** menu), and a
   collapsed **This Book & Series** (the book's language, auto-translate,
-  translate the whole series). Progress is the pill over the page, other
-  books' jobs their own list, app-wide choices ⚙︎ → Settings. The language
+  translate the whole series). Progress is the pill over the page, everything
+  in the background **Window → Jobs** (`⌥⌘J`), app-wide choices ⚙︎ → Settings. The language
   shown and the book's own language (detected on first use) are remembered per
   series
 - **Several languages per book** — each language is a separate job and cache;
@@ -244,9 +244,17 @@ written into your files.
   Application Support, so clearing the cache or translating again keeps them;
   **Settings → Experimental** deletes them
 - **Background jobs** — translating continues when you open another book; a
-  pill over the page shows other books' progress and opens the job list
-  (pause / resume / stop / open the book). One job runs at a time, the one on
-  screen first
+  pill over the page shows other books' progress and opens **Window → Jobs**
+  (`⌥⌘J`: pause / resume / stop / open the book, exports, exported books). One
+  translation runs at a time, the one on screen first
+- **Export a translated copy** — saves a book with its translation painted
+  into the pages (your edits in, hidden balloons out) as a CBZ, a ZIP or a folder of
+  images, without touching the original. From the language menu, **File →
+  Export Translated Book…**, the panel (whole series) or the library's
+  context menu (a book, or a folder of volumes — no need to open it). Runs in
+  the background: untranslated pages are translated first (or exported as they
+  are), then the pages are written; the jobs window follows it, keeps the
+  finished books across launches and offers **Show in Finder** / **Open**
 - **Translate entire series** — queues the other volumes whose titles match
   once volume numbering is stripped (unrelated books in the same folder are
   left out); the panel names what it will queue before it starts
@@ -409,6 +417,7 @@ Terminal) and move the result straight to `/Applications`.
 | `⇧⌘T` | Translation assist: switch between the original and the translation |
 | `⌥⌘T` | Translation assist: translate this book / pause |
 | `⇧⌘E` | Translation assist: balloon edit mode on / off |
+| `⌥⌘J` | Jobs window: background translations and exports, exported books |
 | Click a speech balloon | Translation assist: the translation, other languages and the original (in edit mode: edit, fix the original, hide, revert) |
 | Hover left edge | Reveal sidebar as overlay (auto-hide mode) |
 | `ESC` | Dismiss sidebar overlay (when unpinned) |
@@ -680,11 +689,14 @@ Panely/
 │   │   ├── LanguagePackDownloads.swift # app-wide language pack status and downloads
 │   │   ├── SeriesVolumeMatcher.swift   # which neighbours are volumes of the same series
 │   │   ├── Model/                      # TranslationLanguage, TranslatedPage / TranslatedBubble, PageEdits
+│   │   ├── Export/                     # translated copies: TranslationExportManager (jobs, history, folder),
+│   │   │                               # TranslationExportWriter (CBZ / ZIP / folder), TranslatedPageRenderer
 │   │   ├── Pipeline/                   # OCRTiling, TranslationPlan (page / strip), PageAnalyzer,
 │   │   │                               # PageTextRecognizer (Vision), PageTranslator (Translation),
 │   │   │                               # BubbleGrouper, BubbleBackgroundSampler, TextClassifiers
-│   │   ├── Viewer/                     # TranslationOverlayView (+ layout), balloon popover
-│   │   └── UI/                         # TranslationPanel, language rows, progress pill, job list, edit-mode bar
+│   │   ├── Viewer/                     # TranslationOverlayView (+ layout, TranslationPatchPainter), balloon popover
+│   │   └── UI/                         # TranslationPanel, language rows, progress pill, job list, edit-mode bar,
+│   │                                   # export sheet, Jobs window
 │   ├── Settings/
 │   │   ├── SettingsView.swift          # General + Library + Storage + Diagnostics + Experimental tabs
 │   │   ├── ExperimentalSettingsView.swift # translation assist: on/off, default language, sound effects, cache
@@ -825,6 +837,10 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   `TranslatedPage`s: `ImageStackView` hosts a `TranslationOverlayView` per live
   page, above every image so strip balloons can cross slice boundaries.
   Finished pages are cached per page id + languages + scope (`TranslationStore`).
+  Exports (`TranslationExportManager`) wait on a book's controller through the
+  same queue, then render one book at a time off the main actor
+  (`TranslationExportWriter` → `TranslatedPageRenderer`, sharing
+  `TranslationPatchPainter` with the on-screen overlay) into a CBZ, ZIP or folder.
 - **Dependency-injected app services** — production uses `AppDependencies.live`,
   while tests can inject protocol-backed services (`ExtractionCacheManaging`,
   `SecurityScopedBookmarking`, `LibraryTreeLoading`, `KeyValueStoring`,

@@ -59,7 +59,9 @@ extension ReaderViewModel {
                 .filter { !listed.contains($0) && $0 != source && $0 != suggested }
                 .map { ToolbarTranslationState.Language(language: $0, name: $0.displayName(in: locale)) },
             isEditing: isEditingTranslations,
-            canEdit: canEditTranslations
+            canEdit: canEditTranslations,
+            canExport: canExportCurrentBook,
+            canExportSeries: canExportCurrentBook && !translatableSeriesVolumes.isEmpty
         )
     }
 
@@ -109,7 +111,9 @@ extension ReaderViewModel {
             onTranslateInto: { [self] language in
                 showTranslation(in: language)
                 startTranslating(into: language)
-            }
+            },
+            onExportBook: { [self] in requestExportOfCurrentBook() },
+            onExportSeries: { [self] in requestExportOfCurrentSeries() }
         )
     }
 }

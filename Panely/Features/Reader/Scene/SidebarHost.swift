@@ -88,7 +88,13 @@ struct SidebarHost: View {
                 guard let suggestion = viewModel.continueReadingSuggestion else { return }
                 viewModel.removeContinueReading(suggestion)
             },
-            onRequestFolderAccess: { viewModel.requestFolderAccess() }
+            onRequestFolderAccess: { viewModel.requestFolderAccess() },
+            onExportTranslation: viewModel.canExportTranslations
+                ? { books, title, isSeries in
+                    viewModel.requestTranslationExport(books: books, title: title, isSeries: isSeries)
+                    viewModel.dismissSidebarOverlay()
+                }
+                : nil
         )
     }
 }

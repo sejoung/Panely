@@ -114,6 +114,22 @@ struct TranslationOverlayLayoutTests {
         #expect(fitted.outline == nil)
     }
 
+    /// A word is never broken across lines to fit a bigger size: the font
+    /// shrinks until the longest word fits a line.
+    @Test func fittedTextKeepsWordsWhole() {
+        let size = CGSize(width: 140, height: 160)
+        let fitted = TranslationOverlayLayout.fittedText(
+            "I feel like I was dreaming.",
+            in: size,
+            maxFontSize: 40,
+            color: .black,
+            outline: nil
+        )
+        let font = fitted.string.attribute(.font, at: 0, effectiveRange: nil) as? NSFont ?? .systemFont(ofSize: 99)
+        let longest = ("dreaming." as NSString).size(withAttributes: [.font: font]).width
+        #expect(longest <= size.width + 0.5)
+    }
+
     /// Stroking the filled text traces the system font's overlapping inner
     /// contours as stray lines; the outline is its own stroke-only pass,
     /// drawn under a plain fill.

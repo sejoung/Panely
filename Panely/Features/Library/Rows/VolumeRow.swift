@@ -22,6 +22,13 @@ struct VolumeRow: View {
         self.displayName = isDir ? url.lastPathComponent : url.deletingPathExtension().lastPathComponent
     }
 
+    /// The name shown for `url`: a folder's name, an archive's without its
+    /// extension.
+    static func displayName(of url: URL) -> String {
+        let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
+        return isDir ? url.lastPathComponent : url.deletingPathExtension().lastPathComponent
+    }
+
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: PanelySpacing.sm) {

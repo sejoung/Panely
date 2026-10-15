@@ -79,6 +79,11 @@ struct ReaderScene: View {
         .animation(PanelyMotion.uiReveal, value: viewModel.errorMessage)
         .animation(PanelyMotion.uiReveal, value: viewModel.volumeNotice)
         .animation(PanelyMotion.uiReveal, value: viewModel.translation.notice)
+        .sheet(item: Bindable(viewModel).translationExportRequest) { request in
+            TranslationExportSheet(request: request)
+                .environment(viewModel)
+                .environment(\.locale, viewModel.localization.locale)
+        }
         .frame(minWidth: 800, minHeight: 600)
         .task {
             await viewModel.refreshContinueReadingAvailability()

@@ -63,6 +63,12 @@ final class TranslationManager {
         openBook.filter { $0 !== current && $0.hasActiveJob } + background.filter(Self.isWorthKeeping)
     }
 
+    /// Every job the jobs window lists: running, waiting, paused, or stopped
+    /// on an error — the open book's included.
+    var allJobs: [TranslationController] {
+        (openBook + background).filter(Self.isWorthKeeping)
+    }
+
     // MARK: - Open book
 
     /// A book is being opened. Its controllers still running in the
@@ -130,6 +136,12 @@ final class TranslationManager {
     /// Run `controller`'s job now if nothing else is running, or queue it.
     /// The job for what's on screen jumps the queue.
     func start(_ controller: TranslationController) {
+        // A background controller dropped while idle (an export holds on to
+        // it between loading its cache and starting) has to be tracked again,
+        // or a queued start would never be picked up.
+        if !(openBook + background).contains(where: { $0 === controller }) {
+            background.append(controller)
+        }
         let others = (openBook + background).filter { $0 !== controller }
         if let running = others.first(where: \.isWorking) {
             guard controller === current else {

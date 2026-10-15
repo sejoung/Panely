@@ -61,6 +61,7 @@ struct ViewerArea: View {
                 .padding(.bottom, 76)
                 .animation(PanelyMotion.uiReveal, value: viewModel.translation.phase)
                 .animation(PanelyMotion.uiReveal, value: viewModel.translationManager.backgroundJobs.count)
+                .animation(PanelyMotion.uiReveal, value: viewModel.translationExports.activeJobs.count)
                 .animation(PanelyMotion.uiReveal, value: viewModel.isEditingTranslations)
             }
             .overlay(alignment: .bottom) { EndOfVolumeCardOverlay(requestFocus: requestFocus) }

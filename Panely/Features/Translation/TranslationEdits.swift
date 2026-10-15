@@ -67,7 +67,7 @@ final class TranslationEdits {
     /// The balloon just hidden, offered back for a few seconds (status banner)
     /// — the moment it's easiest to learn that hiding can be undone.
     private(set) var recentlyHidden: RecentlyHidden?
-    @ObservationIgnored private var scope: TranslationScope = .page
+    @ObservationIgnored private(set) var scope: TranslationScope = .page
     @ObservationIgnored private var loadedPageIDs: [String] = []
     @ObservationIgnored private var generation = 0
     /// Saves run one after another, so quick edits land in order.

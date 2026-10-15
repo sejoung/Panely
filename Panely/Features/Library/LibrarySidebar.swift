@@ -21,6 +21,10 @@ struct LibrarySidebarActions {
     var onContinueReading: () -> Void = {}
     var onRemoveContinueReading: () -> Void = {}
     var onRequestFolderAccess: () -> Void = {}
+    /// Export translated copies of books (one, or a series' volumes in
+    /// order), titled for the sheet. `nil` while translation is off, which
+    /// hides the menu items.
+    var onExportTranslation: ((_ books: [URL], _ title: String, _ isSeries: Bool) -> Void)? = nil
 }
 
 struct LibrarySidebar: View {
@@ -180,7 +184,7 @@ struct LibrarySidebar: View {
     @ViewBuilder
     private func volumesSection(activeStdURL: URL?) -> some View {
         if volumes.count > 1 {
-            Section(header: sectionHeader("Volumes", systemImage: "books.vertical.fill")) {
+            Section(header: volumesHeader) {
                 ForEach(volumes, id: \.self) { url in
                     VolumeRow(
                         url: url,
@@ -189,9 +193,27 @@ struct LibrarySidebar: View {
                         onTap: { actions.onSelectVolume(url) }
                     )
                     .listRowBackground(Color.clear)
+                    .contextMenu {
+                        if let export = actions.onExportTranslation {
+                            Button("Export Translated Book…") {
+                                export([url], VolumeRow.displayName(of: url), false)
+                            }
+                        }
+                    }
                 }
             }
         }
+    }
+
+    private var volumesHeader: some View {
+        sectionHeader("Volumes", systemImage: "books.vertical.fill")
+            .contextMenu {
+                if let export = actions.onExportTranslation, let first = volumes.first {
+                    Button("Export Translated Series…") {
+                        export(volumes, first.deletingLastPathComponent().deletingPathExtension().lastPathComponent, true)
+                    }
+                }
+            }
     }
 
     private func isActiveVolume(_ volumeURL: URL, activeURL: URL?) -> Bool {
@@ -332,7 +354,8 @@ struct LibrarySidebar: View {
                         activeStdURL: activeStdURL,
                         expandedNodeIDs: $model.expandedNodeIDs,
                         readingBadge: readingBadge,
-                        onSelect: actions.onSelect
+                        onSelect: actions.onSelect,
+                        onExport: actions.onExportTranslation
                     )
                     .listRowBackground(Color.clear)
                 }
@@ -416,6 +439,7 @@ private struct FileTreeNodeRow: View {
     @Binding var expandedNodeIDs: Set<URL>
     let readingBadge: (URL) -> ReadingBadge?
     let onSelect: (URL) -> Void
+    var onExport: ((_ books: [URL], _ title: String, _ isSeries: Bool) -> Void)?
 
     var body: some View {
         if let children = node.children, !children.isEmpty {
@@ -426,7 +450,8 @@ private struct FileTreeNodeRow: View {
                         activeStdURL: activeStdURL,
                         expandedNodeIDs: $expandedNodeIDs,
                         readingBadge: readingBadge,
-                        onSelect: onSelect
+                        onSelect: onSelect,
+                        onExport: onExport
                     )
                 }
             } label: {
@@ -444,6 +469,29 @@ private struct FileTreeNodeRow: View {
             badge: readingBadge(node.url),
             onTap: { onSelect(node.url) }
         )
+        .contextMenu {
+            if let onExport {
+                let volumes = seriesVolumes
+                if !volumes.isEmpty {
+                    Button("Export Translated Series (\(volumes.count) Volumes)…") {
+                        onExport(volumes, node.name, true)
+                    }
+                } else {
+                    Button("Export Translated Book…") {
+                        onExport([node.url], node.name, false)
+                    }
+                }
+            }
+        }
+    }
+
+    /// A folder holding books is a series: its archives and its folders that
+    /// hold no further folders (books of loose images), in name order.
+    private var seriesVolumes: [URL] {
+        guard node.kind == .folder, let children = node.children else { return [] }
+        return children
+            .filter { $0.kind == .archive || $0.children == nil }
+            .map(\.url)
     }
 
     private func expansionBinding(for id: URL) -> Binding<Bool> {

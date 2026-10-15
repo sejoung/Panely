@@ -251,6 +251,14 @@
     container.querySelectorAll("img").forEach(function (img) {
       img.setAttribute("loading", "lazy");
     });
+    // Linkable sections (marked doesn't add heading ids): "Translation
+    // assist (experimental)" → #translation-assist-experimental.
+    container.querySelectorAll("h2, h3").forEach(function (h) {
+      if (h.id) return;
+      h.id = h.textContent.toLowerCase().trim()
+        .replace(/[^\p{L}\p{N}\s-]/gu, "")
+        .replace(/\s+/g, "-");
+    });
     document.documentElement.lang = lang;
     document.title = lang === "ko" ? "Panely — 사용 설명서" : "Panely — User Manual";
   }
@@ -272,6 +280,11 @@
       .then(function (md) {
         doc.innerHTML = marked.parse(md);
         rewrite(doc, lang);
+        // The page was empty when the browser looked for the #section.
+        if (location.hash) {
+          var target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+          if (target) target.scrollIntoView();
+        }
       })
       .catch(function () {
         doc.innerHTML =

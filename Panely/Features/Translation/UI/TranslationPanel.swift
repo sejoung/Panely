@@ -15,8 +15,10 @@ import Translation
 /// - **Edit Balloons** — into edit mode, where correcting happens on the page.
 ///
 /// Elsewhere on purpose: on/off and switching languages (toolbar, ⇧⌘T),
-/// running progress (the pill over the page), other books' jobs (their own
-/// pill), editing (edit mode's bar) and app-wide choices (Settings, ⚙︎).
+/// running progress (the pill over the page), other books' jobs and exports
+/// (their own pill, opening Window › Jobs), editing (edit mode's bar) and
+/// app-wide choices (Settings, ⚙︎). Exporting the book is in the toolbar's
+/// language menu; the whole series is here, beside translating it.
 struct TranslationPanel: View {
     @Environment(ReaderViewModel.self) private var viewModel
     @Environment(\.dismiss) private var dismiss
@@ -163,6 +165,12 @@ struct TranslationPanel: View {
                         .foregroundStyle(PanelyColor.textSecondary)
                         .lineLimit(2)
                         .truncationMode(.tail)
+                    Button("Export Translated Series…") {
+                        dismiss()
+                        viewModel.requestExportOfCurrentSeries()
+                    }
+                    .padding(.top, PanelySpacing.xs)
+                    .help("Saves a copy of every volume with its translation painted in, as CBZ or ZIP files or folders of images. Volumes not translated yet are translated first.")
                 }
             }
 
@@ -797,38 +805,21 @@ struct TranslationCaveat: View {
     }
 }
 
-/// Shown over the page while books other than the open one are being
-/// translated, so background progress stays visible wherever you are.
-/// Opens the jobs list.
+/// Over the page while anything runs in the background — another book's
+/// translation, an export — so it stays visible wherever you are, and once an
+/// export finishes until it's been seen. Opens the jobs window.
 struct BackgroundTranslationsIndicator: View {
     @Environment(ReaderViewModel.self) private var viewModel
-    @State private var showsJobs = false
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        let jobs = viewModel.translationManager.backgroundJobs
-        if viewModel.translationFeatureAvailable, let lead = jobs.first(where: \.isWorking) ?? jobs.first {
+        if let content {
             Button {
-                showsJobs.toggle()
+                openWindow(id: JobsWindowView.windowID)
             } label: {
                 HStack(spacing: PanelySpacing.xs) {
-                    let stopped = jobs.filter { $0.notice != nil }
-                    if lead.isWorking {
-                        ProgressView()
-                            .controlSize(.mini)
-                    } else if !stopped.isEmpty {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
-                    } else {
-                        Image(systemName: "pause.circle")
-                    }
-                    let name = lead.label(locale: viewModel.localization.locale)
-                    if !lead.isWorking && !stopped.isEmpty {
-                        Text("Translation stopped in another book — click for details")
-                    } else if jobs.count > 1 {
-                        Text("Translating \(jobs.count) other books · \(name) \(lead.completedPageCount)/\(lead.bookPageCount)")
-                    } else {
-                        Text("Translating another book · \(name) \(lead.completedPageCount)/\(lead.bookPageCount)")
-                    }
+                    content.icon
+                    content.text
                 }
                 .font(.system(size: 11, weight: .medium))
                 .lineLimit(1)
@@ -841,16 +832,64 @@ struct BackgroundTranslationsIndicator: View {
                 .contentShape(Capsule())
             }
             .buttonStyle(.plain)
-            .popover(isPresented: $showsJobs, arrowEdge: .top) {
-                TranslationJobsList(jobs: jobs)
-                    .padding(PanelySpacing.md)
-                    .frame(width: 320)
-                    .environment(viewModel)
-                    // Popovers don't inherit the window's `\.locale`.
-                    .environment(\.locale, viewModel.localization.locale)
-            }
+            .help("Show Jobs (⌥⌘J)")
             .transition(.opacity)
         }
+    }
+
+    /// Exports first (the reader started them to get a file), then other
+    /// books' translations, then a finished export not yet looked at.
+    private var content: (icon: AnyView, text: Text)? {
+        guard viewModel.translationFeatureAvailable else { return nil }
+        let exports = viewModel.translationExports
+        let exporting = exports.activeJobs
+        if let lead = exporting.first(where: { if case .exporting = $0.stage { true } else { false } }) ?? exporting.first {
+            let progress: Text
+            if case let .exporting(done, total) = lead.stage {
+                progress = Text(verbatim: " \(done)/\(total)")
+            } else if let translation = lead.translation {
+                progress = Text(verbatim: " \(translation.completedPageCount)/\(translation.bookPageCount)")
+            } else {
+                progress = Text(verbatim: "")
+            }
+            let text = exporting.count > 1
+                ? Text("Exporting \(exporting.count) books · \(lead.title)") + progress
+                : Text("Exporting · \(lead.title)") + progress
+            return (AnyView(ProgressView().controlSize(.mini)), text)
+        }
+
+        let jobs = viewModel.translationManager.backgroundJobs
+        if let lead = jobs.first(where: \.isWorking) ?? jobs.first {
+            let stopped = jobs.filter { $0.notice != nil }
+            let name = lead.label(locale: viewModel.localization.locale)
+            if !lead.isWorking && !stopped.isEmpty {
+                return (
+                    AnyView(Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)),
+                    Text("Translation stopped in another book — click for details")
+                )
+            }
+            let icon = lead.isWorking
+                ? AnyView(ProgressView().controlSize(.mini))
+                : AnyView(Image(systemName: "pause.circle"))
+            let text = jobs.count > 1
+                ? Text("Translating \(jobs.count) other books · \(name) \(lead.completedPageCount)/\(lead.bookPageCount)")
+                : Text("Translating another book · \(name) \(lead.completedPageCount)/\(lead.bookPageCount)")
+            return (icon, text)
+        }
+
+        if exports.stoppedJobs.contains(where: { if case .failed = $0.stage { true } else { false } }) {
+            return (
+                AnyView(Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)),
+                Text("An export stopped — click for details")
+            )
+        }
+        if exports.unseenFinishedCount > 0 {
+            return (
+                AnyView(Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)),
+                Text("Export finished — click to see")
+            )
+        }
+        return nil
     }
 }
 

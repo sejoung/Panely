@@ -38,6 +38,13 @@ extension PanelyApp {
 
             Divider()
 
+            Button(String(localized: "Export Translated Book…", bundle: .localized)) {
+                viewModel.requestExportOfCurrentBook()
+            }
+            .disabled(!viewModel.canExportCurrentBook)
+
+            Divider()
+
             SettingsLink {
                 Text(String(localized: "Settings…", bundle: .localized))
             }

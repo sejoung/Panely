@@ -66,6 +66,11 @@ final class ReaderViewModel {
     let translationManager: TranslationManager
     /// The reader's balloon edits for the open book, laid over every language.
     let translationEdits: TranslationEdits
+    /// Translated copies of books being written, and the finished ones
+    /// (see `ReaderViewModel+TranslationExport`).
+    let translationExports: TranslationExportManager
+    /// The export sheet's subject while it's up.
+    var translationExportRequest: TranslationExportRequest?
     /// Balloon edit mode: edited balloons are marked, hidden ones show as
     /// outlines, and a balloon's popover offers its edits. Off = reading,
     /// with nothing on the page but the translation.
@@ -344,6 +349,7 @@ final class ReaderViewModel {
         self.localization = dependencies.localization
         self.translationManager = TranslationManager(store: dependencies.translationStore, defaults: dependencies.keyValueStore)
         self.translationEdits = TranslationEdits(store: dependencies.translationEditStore)
+        self.translationExports = TranslationExportManager(defaults: dependencies.keyValueStore)
         localization.apply(preferences.appLanguage)
         preferences.refreshAppleLanguagesOverride()
 

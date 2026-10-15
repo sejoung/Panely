@@ -38,6 +38,13 @@ EXPECTED_SNAPSHOTS=(
   "14-toolbar-spread-offset.png"
   "15-library-settings.png"
   "16-general-settings.png"
+  "17-translation-reading.png"
+  "18-translation-before-after.png"
+  "19-translation-panel.png"
+  "20-translation-balloon-popover.png"
+  "21-translation-export-sheet.png"
+  "22-jobs-window.png"
+  "23-experimental-settings.png"
 )
 
 cd "$PROJECT_ROOT"

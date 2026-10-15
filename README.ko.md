@@ -199,8 +199,8 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   ("한국어 ▾")은 언어 전환·추가와 패널·편집 모드를 여는 메뉴. **번역 패널**은 이 책 번역에만 집중: 큰 버튼 하나
   (번역 / 언어팩 다운로드 / 일시정지 / 이어서)와 상태 한 줄, **보기** 목록(원문
   또는 책의 번역 언어, 다른 언어는 **⋯** 메뉴로 시작·중지), 접혀 있는 **이 책과
-  시리즈**(책의 언어, 자동 번역, 시리즈 전체 번역). 진행은 페이지 위 표시, 다른
-  책 작업은 작업 목록, 앱 전체 설정은 ⚙︎ → 설정. 언어 선택과 책의 언어(자동 감지)는
+  시리즈**(책의 언어, 자동 번역, 시리즈 전체 번역). 진행은 페이지 위 표시,
+  백그라운드의 모든 일은 **윈도우 → 작업**(`⌥⌘J`), 앱 전체 설정은 ⚙︎ → 설정. 언어 선택과 책의 언어(자동 감지)는
   시리즈별로 기억
 - **책 하나에 여러 언어** — 언어마다 작업과 캐시가 따로이며, 말풍선을 클릭하면
   번역·다른 언어 번역·원문을 함께 보여줌(텍스트 선택 가능, 사전 찾기 지원)
@@ -212,8 +212,14 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   말풍선·**이 책 되돌리기**. 고친 내용은 캐시와 따로 Application Support에
   저장되어 캐시를 지우거나 다시 번역해도 유지되며, **설정 → 실험적 기능**에서 삭제
 - **백그라운드 작업** — 다른 책을 열어도 번역이 계속됨. 페이지 위 표시로 다른
-  책의 진행률을 보여주고, 누르면 작업 목록(일시정지 / 재개 / 중지 / 책 열기)이
-  열림. 작업은 한 번에 하나씩, 지금 보는 것부터 실행
+  책의 진행률을 보여주고, 누르면 **윈도우 → 작업**(`⌥⌘J`: 일시정지 / 재개 / 중지 /
+  책 열기, 내보내기, 내보낸 책)이 열림. 번역은 한 번에 하나씩, 지금 보는 것부터 실행
+- **번역본 내보내기** — 번역이 페이지에 입혀진 사본을 CBZ, ZIP 또는 이미지 폴더로
+  저장(편집 내용 반영, 숨긴 말풍선 제외, 원본은 그대로). 언어 메뉴, **파일 →
+  번역본 내보내기…**, 패널(시리즈 전체), 라이브러리 우클릭 메뉴(책 하나 또는 권들이
+  든 폴더 — 열지 않아도 됨)에서 시작. 백그라운드에서 번역 안 된 페이지를 먼저
+  번역하고(또는 그대로 두고) 페이지를 씀. 작업 창에서 진행을 보고, 완료된 책은 앱을
+  다시 켜도 남아 **Finder에서 보기** / **열기**를 바로 누를 수 있음
 - **시리즈 전체 번역** — 권 번호를 뺀 제목이 같은 다른 권만 대기열에 넣음(같은
   폴더의 다른 작품은 제외). 시작 전에 패널에 넣을 권 이름을 보여줌
 - **웹툰 대응** — 세로 스크롤에서는 페이지를 하나의 스트립으로 읽어, 이미지
@@ -364,6 +370,7 @@ LaunchServices 캐시에 남을 수 있으니, 우클릭 → "다음으로 압�
 | `⇧⌘T` | 번역 보조: 원문 ↔ 번역 전환 |
 | `⌥⌘T` | 번역 보조: 이 책 번역하기 / 일시정지 |
 | `⇧⌘E` | 번역 보조: 말풍선 편집 모드 켜기 / 끄기 |
+| `⌥⌘J` | 작업 창: 백그라운드 번역·내보내기, 내보낸 책 |
 | 말풍선 클릭 | 번역 보조: 번역·다른 언어 번역·원문 보기 (편집 모드에서는 고치기·숨기기·원래대로) |
 | 왼쪽 가장자리 호버 | 사이드바 오버레이로 나타냄 (자동 숨김 모드에서) |
 | `ESC` | 사이드바 오버레이 해제 (고정 안 된 상태) |
@@ -619,11 +626,14 @@ Panely/
 │   │   ├── LanguagePackDownloads.swift # 앱 전체 언어팩 상태와 다운로드
 │   │   ├── SeriesVolumeMatcher.swift   # 같은 시리즈의 다른 권 판별
 │   │   ├── Model/                      # TranslationLanguage, TranslatedPage / TranslatedBubble, PageEdits
+│   │   ├── Export/                     # 번역본 내보내기: TranslationExportManager(작업, 기록, 저장 폴더),
+│   │   │                               # TranslationExportWriter(CBZ / ZIP / 폴더), TranslatedPageRenderer
 │   │   ├── Pipeline/                   # OCRTiling, TranslationPlan (page / strip), PageAnalyzer,
 │   │   │                               # PageTextRecognizer (Vision), PageTranslator (Translation),
 │   │   │                               # BubbleGrouper, BubbleBackgroundSampler, TextClassifiers
-│   │   ├── Viewer/                     # TranslationOverlayView (+ 레이아웃), 말풍선 팝오버
-│   │   └── UI/                         # 번역 패널, 언어 행, 진행 표시, 작업 목록, 편집 모드 막대
+│   │   ├── Viewer/                     # TranslationOverlayView (+ 레이아웃, TranslationPatchPainter), 말풍선 팝오버
+│   │   └── UI/                         # 번역 패널, 언어 행, 진행 표시, 작업 목록, 편집 모드 막대,
+│   │                                   # 내보내기 시트, 작업 창
 │   ├── Settings/
 │   │   ├── SettingsView.swift          # General + Library + Storage + Diagnostics + Experimental 탭
 │   │   ├── ExperimentalSettingsView.swift # 번역 보조: 켜기, 기본 언어, 효과음, 캐시
@@ -762,7 +772,10 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북�
   `TranslatedPage`만 읽습니다: `ImageStackView`가 화면에 있는 페이지마다
   `TranslationOverlayView`를 모든 이미지 위에 두어, 스트립의 말풍선이 조각
   경계를 넘어 그려질 수 있습니다. 완료된 페이지는 페이지 id + 언어 + 범위
-  기준으로 캐시됩니다(`TranslationStore`).
+  기준으로 캐시됩니다(`TranslationStore`). 내보내기(`TranslationExportManager`)는
+  같은 대기열로 책의 번역을 기다린 뒤, 메인 액터 밖에서 한 번에 한 권씩
+  렌더링해(`TranslationExportWriter` → `TranslatedPageRenderer`, 화면 오버레이와
+  `TranslationPatchPainter`를 공유) CBZ, ZIP이나 폴더로 씁니다.
 - **Dependency-injected 앱 서비스** — production은 `AppDependencies.live`를
   쓰고, 테스트는 protocol 기반 서비스(`ExtractionCacheManaging`,
   `SecurityScopedBookmarking`, `LibraryTreeLoading`, `KeyValueStoring`,

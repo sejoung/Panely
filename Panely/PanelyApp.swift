@@ -50,6 +50,17 @@ struct PanelyApp: App {
             goCommands
         }
 
+        // Background translations and exports, and the exported books.
+        // SwiftUI lists it in the Window menu by its title.
+        Window(Text(String(localized: "Jobs", bundle: .localized)), id: JobsWindowView.windowID) {
+            JobsWindowView()
+                .environment(viewModel)
+                .environment(\.locale, viewModel.localization.locale)
+                .preferredColorScheme(.dark)
+        }
+        .defaultSize(width: 500, height: 560)
+        .keyboardShortcut("j", modifiers: [.command, .option])
+
         Settings {
             SettingsView(viewModel: viewModel)
                 .environment(\.locale, viewModel.localization.locale)

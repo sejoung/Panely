@@ -501,7 +501,7 @@ extension ReaderViewModel {
 
     /// Point `controller` at the open book in `target`. `restart` keeps a job
     /// that was running (a settings change shouldn't silently drop it).
-    private func setUp(_ controller: TranslationController, target: TranslationLanguage, autoStart: Bool, restart: Bool) {
+    func setUp(_ controller: TranslationController, target: TranslationLanguage, autoStart: Bool, restart: Bool) {
         let wasActive = restart && (controller.isWorking || controller.phase == .queued)
         controller.requiresOpenBook = currentBookLivesInTemporaryFolder
         configure(
@@ -524,7 +524,7 @@ extension ReaderViewModel {
         )
     }
 
-    private func loadVolumeForTranslation(_ url: URL) async -> ComicSource? {
+    func loadVolumeForTranslation(_ url: URL) async -> ComicSource? {
         if isDirectory(url) {
             return try? await Task.detached(priority: .utility) { try FolderLoader.load(from: url) }.value
         }
@@ -536,7 +536,7 @@ extension ReaderViewModel {
     /// detected language is remembered for the series and handed to the
     /// book's other languages, and a volume queued before detection picks it
     /// up when its turn comes.
-    private func configure(_ controller: TranslationController, seriesID: String, accessURLs: [URL]) {
+    func configure(_ controller: TranslationController, seriesID: String, accessURLs: [URL]) {
         controller.accessURLs = accessURLs
         controller.onSourceDetected = { [weak self] language in
             guard let self else { return }

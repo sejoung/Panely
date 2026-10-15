@@ -258,6 +258,162 @@ struct SnapshotGalleryTests {
         )
     }
 
+    // MARK: - Translation assist
+
+    @Test func translationReading() async throws {
+        let vm = try await TranslationSnapshotContent.translatedViewModel()
+        try await render(MockReaderScene().environment(vm).environment(\.locale, Locale(identifier: "en")),
+                   size: SnapshotRenderer.heroSize,
+                   named: "17-translation-reading.png")
+    }
+
+    @Test func translationBeforeAfter() async throws {
+        let page = TranslationSnapshotContent.pages[0]
+        try await render(
+            HStack(spacing: 28) {
+                labelled("Original", TranslationSnapshotContent.original(page))
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(PanelyColor.textSecondary)
+                labelled("Translation", TranslationSnapshotContent.translatedImage(page))
+            }
+            .padding(32)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(PanelyColor.bgPrimary),
+            size: CGSize(width: 1040, height: 760),
+            named: "18-translation-before-after.png"
+        )
+    }
+
+    @Test func translationPanel() async throws {
+        let vm = try await TranslationSnapshotContent.translatedViewModel()
+        try await render(
+            VStack {
+                TranslationPanel()
+                    .environment(vm)
+                    .background(PanelyColor.bgSecondary, in: RoundedRectangle(cornerRadius: 10))
+                Spacer(minLength: 0)
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(PanelyColor.bgPrimary)
+            .environment(\.locale, Locale(identifier: "en")),
+            size: CGSize(width: 380, height: 352),
+            named: "19-translation-panel.png"
+        )
+    }
+
+    @Test func translationBalloonPopover() async throws {
+        AppLocalization.shared.apply(.english)
+        try await render(
+            VStack {
+                TranslationBubblePopover(
+                    source: "やっと目が覚めたね",
+                    translation: "You're finally awake.",
+                    alternates: [.korean: "드디어 깼구나."],
+                    isEditing: true,
+                    onEdit: { _ in }
+                )
+                .background(PanelyColor.bgSecondary, in: RoundedRectangle(cornerRadius: 10))
+                Spacer(minLength: 0)
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(PanelyColor.bgPrimary)
+            .environment(\.locale, Locale(identifier: "en")),
+            size: CGSize(width: 340, height: 205),
+            named: "20-translation-balloon-popover.png"
+        )
+    }
+
+    @Test func translationExportSheet() async throws {
+        let library = try LibraryFixture()
+        let vm = try await TranslationSnapshotContent.translatedViewModel()
+        vm.translationExports.setDestination(
+            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Comics/Translated", isDirectory: true)
+        )
+        let series = library.root.appendingPathComponent("Series A", isDirectory: true)
+        let request = TranslationExportRequest(
+            books: (1...3).map { series.appendingPathComponent("Volume 0\($0).cbz") },
+            title: "Series A",
+            isSeries: true,
+            suggestedTarget: .english
+        )
+        try await render(
+            TranslationExportSheet(request: request)
+                .environment(vm)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(PanelyColor.bgSecondary)
+                .environment(\.locale, Locale(identifier: "en")),
+            size: CGSize(width: 460, height: 440),
+            named: "21-translation-export-sheet.png"
+        )
+    }
+
+    @Test func jobsWindow() async throws {
+        let library = try LibraryFixture()
+        let vm = try await TranslationSnapshotContent.translatedViewModel()
+        let exports = vm.translationExports
+        let output = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Comics/Translated", isDirectory: true)
+        let series = library.root.appendingPathComponent("Series A", isDirectory: true)
+        let options = TranslationExportOptions(target: .english, format: .cbz, untranslated: .translateFirst)
+        func job(_ volume: Int) -> TranslationExportJob {
+            let job = TranslationExportJob(bookURL: series.appendingPathComponent("Volume 0\(volume).cbz"), title: "Volume 0\(volume)", options: options)
+            exports.add(job)
+            return job
+        }
+        for volume in [1, 2] {
+            exports.finish(
+                job(volume),
+                result: .init(url: output.appendingPathComponent("Volume 0\(volume) [English].cbz"), bytes: Int64(78_000_000 + volume * 3_100_000)),
+                pageCount: 184 + volume * 6
+            )
+        }
+        job(3).setStage(.exporting(done: 74, total: 192))
+        let oneShot = TranslationExportJob(
+            bookURL: library.root.appendingPathComponent("One-shots/Mysterious Tales.cbz"),
+            title: "Mysterious Tales",
+            options: TranslationExportOptions(target: .korean)
+        )
+        exports.add(oneShot)
+        oneShot.setStage(.failed(
+            TranslationController.Notice.needsLanguageDownload(.japanese, .korean).message(locale: Locale(identifier: "en"))
+        ))
+        try await render(
+            JobsWindowView()
+                .environment(vm)
+                .environment(\.locale, Locale(identifier: "en")),
+            size: CGSize(width: 540, height: 410),
+            named: "22-jobs-window.png"
+        )
+    }
+
+    @Test func experimentalSettings() async throws {
+        let vm = try await TranslationSnapshotContent.translatedViewModel()
+        try await render(
+            ZStack {
+                PanelyColor.bgPrimary
+                ExperimentalSettingsView(viewModel: vm)
+            }
+            .environment(\.locale, Locale(identifier: "en")),
+            size: CGSize(width: 620, height: 532),
+            named: "23-experimental-settings.png"
+        )
+    }
+
+    private func labelled(_ title: LocalizedStringKey, _ image: NSImage) -> some View {
+        VStack(spacing: 12) {
+            Image(nsImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(height: 620)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            Text(title)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(PanelyColor.textPrimary)
+        }
+    }
+
     // MARK: - Helpers
 
     private func render<V: View>(_ view: V, size: CGSize, named name: String) async throws {

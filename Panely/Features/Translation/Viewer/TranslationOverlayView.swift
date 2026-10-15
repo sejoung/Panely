@@ -41,7 +41,7 @@ final class TranslationOverlayView: NSView {
     private let pendingView = PendingBubblesView()
     /// Fitted text per balloon, valid for `fittedForScale`. Fitting is a small
     /// binary search per balloon; redraws (hover, scroll) reuse it.
-    private var fittedText: [Int: (text: String, string: NSAttributedString, outline: NSAttributedString?, size: CGSize)] = [:]
+    private var fittedText: [Int: TranslationPatchPainter.Fitted] = [:]
     private var fittedForScale: CGFloat = 0
 
     override var isFlipped: Bool { true }
@@ -254,59 +254,13 @@ final class TranslationOverlayView: NSView {
     }
 
     private func drawTranslation(_ translation: String, of bubble: TranslatedBubble, in patch: CGRect) {
-        let glyph = CGFloat(bubble.glyphSize) * scale
-        let background = bubble.background
-        let fill = NSColor(srgbRed: background.red, green: background.green, blue: background.blue, alpha: 1)
-        let path = NSBezierPath(roundedRect: patch, xRadius: max(4, glyph * 0.5), yRadius: max(4, glyph * 0.5))
-
-        if background.isUniform {
-            // A balloon or caption box: a solid patch in its own tone is invisible.
-            fill.setFill()
-            path.fill()
-        } else {
-            // Over artwork a hard box looks pasted on — feather its edge into
-            // the drawing instead.
-            NSGraphicsContext.saveGraphicsState()
-            let shadow = NSShadow()
-            shadow.shadowColor = fill
-            shadow.shadowBlurRadius = max(6, glyph * 0.8)
-            shadow.shadowOffset = .zero
-            shadow.set()
-            fill.withAlphaComponent(0.92).setFill()
-            path.fill()
-            NSGraphicsContext.restoreGraphicsState()
-        }
-
-        let inner = patch.insetBy(dx: glyph * 0.3, dy: glyph * 0.3)
-        guard inner.width > 4, inner.height > 4 else { return }
-        let text: (string: NSAttributedString, outline: NSAttributedString?, size: CGSize)
-        if let cached = fittedText[bubble.id], cached.text == translation {
-            text = (cached.string, cached.outline, cached.size)
-        } else {
-            let fitted = TranslationOverlayLayout.fittedText(
-                translation,
-                in: inner.size,
-                maxFontSize: max(glyph * 0.95, 8),
-                color: background.isDark ? .white : .black,
-                outline: background.isUniform ? nil : (background.isDark ? .black : .white)
-            )
-            fittedText[bubble.id] = (translation, fitted.string, fitted.outline, fitted.size)
-            text = fitted
-        }
-        let textRect = CGRect(
-            x: inner.minX,
-            y: inner.midY - text.size.height / 2,
-            width: inner.width,
-            height: text.size.height + 1
+        fittedText[bubble.id] = TranslationPatchPainter.draw(
+            translation,
+            background: bubble.background,
+            glyph: CGFloat(bubble.glyphSize) * scale,
+            in: patch,
+            fitted: fittedText[bubble.id]
         )
-        if let outline = text.outline {
-            // Round joins: mitred corners spike out of "A", "M", "V".
-            NSGraphicsContext.saveGraphicsState()
-            NSGraphicsContext.current?.cgContext.setLineJoin(.round)
-            outline.draw(with: textRect, options: [.usesLineFragmentOrigin, .usesFontLeading])
-            NSGraphicsContext.restoreGraphicsState()
-        }
-        text.string.draw(with: textRect, options: [.usesLineFragmentOrigin, .usesFontLeading])
     }
 
     /// Edit mode: where a hidden balloon is — the original shows through,

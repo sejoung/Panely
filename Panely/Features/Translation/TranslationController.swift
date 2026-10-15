@@ -120,7 +120,7 @@ final class TranslationController {
     @ObservationIgnored private(set) var target: TranslationLanguage = .english
     /// Set by the first `reload`; until then `target` is only a default.
     @ObservationIgnored private(set) var isConfigured = false
-    @ObservationIgnored private var scope: TranslationScope = .page
+    @ObservationIgnored private(set) var scope: TranslationScope = .page
     @ObservationIgnored private var includeSoundEffects = false
     /// Already `effective` for this Mac.
     @ObservationIgnored private(set) var mode: TranslationMode = .accurate
