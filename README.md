@@ -233,12 +233,18 @@ written into your files.
 - **Several languages per book** — each language is a separate job and cache;
   clicking a balloon shows its translation, the other languages and the
   original side by side (selectable, so Look Up works)
+- **Translate again** — a page (edit bar) or the whole book (panel) is read
+  and translated again the current way, so pages done before an improvement
+  get it without clearing the cache
 - **Missed text** — text boxes the detector found but OCR left empty get a
   second, enlarged read automatically; anything still missed can be added in
   edit mode by dragging a box over it (read enlarged and translated, or typed
   with Fix Original when it can't be read)
+- **Fix it where you see it** — a balloon's popover (click) or the page's
+  right-click menu corrects a balloon, hides it, translates the page again or
+  starts adding a balloon, no mode needed
 - **Reading / edit mode** — reading shows nothing but the translation. In
-  edit mode (`⇧⌘E`, the panel, the language menu, or **Edit…** in a balloon's popover)
+  edit mode (`⇧⌘E`, the panel, the language menu, the right-click menu)
   the popover rewrites a translation, fixes the recognised original and
   translates it again, hides a balloon OCR made up out of artwork (with an
   undo right after), or **Revert**s one balloon. While editing, edited

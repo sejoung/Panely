@@ -16,8 +16,13 @@ enum TranslationEditChange: Equatable {
     case retranslate
     /// Bring back a hidden balloon (edit mode shows it as an outline).
     case show
-    /// Switch to edit mode, from a balloon's popover while reading.
+    /// Switch edit mode on or off (a right-click on the page).
     case enterEditMode
+    case leaveEditMode
+    /// Read and translate this balloon's page again (`bubble` stands in).
+    case translatePageAgain
+    /// Edit mode, ready to drag out a balloon over missed text.
+    case startAddingBalloon
     /// Add a balloon over this area of the page (in page pixels), dragged
     /// out in edit mode where the analysis found no text.
     case addBalloon(CGRect)

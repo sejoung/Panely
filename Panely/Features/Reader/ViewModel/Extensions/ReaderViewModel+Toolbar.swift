@@ -60,6 +60,7 @@ extension ReaderViewModel {
                 .map { ToolbarTranslationState.Language(language: $0, name: $0.displayName(in: locale)) },
             isEditing: isEditingTranslations,
             canEdit: canEditTranslations,
+            canTranslateAgain: canTranslateAgain && !translation.isWorking,
             canExport: canExportCurrentBook,
             canExportSeries: canExportCurrentBook && !translatableSeriesVolumes.isEmpty
         )
@@ -112,6 +113,7 @@ extension ReaderViewModel {
                 showTranslation(in: language)
                 startTranslating(into: language)
             },
+            onTranslatePageAgain: { [self] in translateCurrentPagesAgain() },
             onExportBook: { [self] in requestExportOfCurrentBook() },
             onExportSeries: { [self] in requestExportOfCurrentSeries() }
         )

@@ -26,9 +26,8 @@ nonisolated enum TranslatedPageRenderer {
         guard pages.indices.contains(index), let page = pages[index] else {
             return carried(into: index, in: pages, scope: scope)
         }
-        let own = page.bubbles.filter(\.isDrawable).map {
-            Placed(bubble: $0, patch: TranslationOverlayLayout.patchRect(for: $0, imageSize: page.imageSize))
-        }
+        // Laid out as on screen: balloons drawn together come as one.
+        let own = TranslationOverlayLayout.layout(for: page).drawn.map { Placed(bubble: $0.bubble, patch: $0.patch) }
         return own + carried(into: index, in: pages, scope: scope)
     }
 
@@ -37,8 +36,7 @@ nonisolated enum TranslatedPageRenderer {
         // Strip pages are centred on the widest one, so a page's x shifts by
         // half the width difference (none known for a page with no results).
         let dx = pages[index].map { ($0.imageWidth - above.imageWidth) / 2 } ?? 0
-        return above.bubbles.filter(\.isDrawable).compactMap { bubble in
-            let patch = TranslationOverlayLayout.patchRect(for: bubble, imageSize: above.imageSize)
+        return TranslationOverlayLayout.layout(for: above).drawn.compactMap { bubble, patch in
             guard patch.maxY > above.imageHeight else { return nil }
             return Placed(bubble: bubble, patch: patch.offsetBy(dx: dx, dy: -above.imageHeight))
         }
@@ -92,13 +90,5 @@ nonisolated enum TranslatedPageRenderer {
         CGImageDestinationAddImage(destination, image, properties as CFDictionary)
         guard CGImageDestinationFinalize(destination) else { return nil }
         return data as Data
-    }
-}
-
-private extension TranslatedBubble {
-    /// Has a translation to paint (a failed balloon is left empty).
-    nonisolated var isDrawable: Bool {
-        guard let translation else { return false }
-        return !translation.isEmpty
     }
 }

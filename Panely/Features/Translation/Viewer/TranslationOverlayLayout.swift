@@ -45,12 +45,148 @@ nonisolated enum TranslationOverlayLayout {
         return balloon.insetBy(dx: balloon.width * (1 - share) / 2, dy: balloon.height * (1 - share) / 2)
     }
 
+    /// How a page's translations are laid out: one patch per balloon, or
+    /// per group of balloons drawn together, and where each balloon answers
+    /// clicks.
+    struct PageLayout {
+        /// Where each balloon's translation is drawn (page pixels), by id.
+        /// Balloons drawn together share their group's patch.
+        var patches: [Int: CGRect] = [:]
+        /// Where each balloon takes clicks: its own patch, or — drawn in a
+        /// group — the area of its own text, so each can still be opened.
+        var hitAreas: [Int: CGRect] = [:]
+        /// What to paint: each balloon with a translation, or one stand-in per
+        /// group carrying its balloons' translations a line each.
+        var drawn: [(bubble: TranslatedBubble, patch: CGRect)] = []
+    }
+
+    /// Lay out a page's translations so none covers another.
+    ///
+    /// Balloons whose texts overlap — a newspaper headline and the subhead
+    /// printed across it — can't be given separate patches without one
+    /// painting over the other, so they're drawn together: one patch over
+    /// both, their translations (made separately — they're separate
+    /// sentences) a line each, in reading order.
+    ///
+    /// Every other patch reaches past its text (padding, the room a vertical
+    /// original is widened by, the room inside a balloon); two reaches can
+    /// meet, and the later one would paint over the other (67 overlapping
+    /// pairs in one reader's cache, 7 of them texts overlapping). Where two
+    /// patches overlap, their reaches are cut back to the line midway between
+    /// their texts — never into the text itself, so each still hides its
+    /// original — and the translation is fitted to what's left.
+    static func layout(for page: TranslatedPage) -> PageLayout {
+        let bubbles = page.bubbles
+        let own = bubbles.map { patchRect(for: $0, imageSize: page.imageSize) }
+        let cores = bubbles.map { core(of: $0, imageSize: page.imageSize) }
+
+        // Balloons drawn together: shown translations whose texts overlap.
+        let shown = bubbles.indices.filter { bubbles[$0].isShownTranslation }
+        var parent = Array(bubbles.indices)
+        func root(_ i: Int) -> Int {
+            var i = i
+            while parent[i] != i { parent[i] = parent[parent[i]]; i = parent[i] }
+            return i
+        }
+        for i in shown {
+            for j in shown where j > i && cores[i].intersects(cores[j]) {
+                parent[root(j)] = root(i)
+            }
+        }
+        // Units laid out against each other: a group, or a balloon alone.
+        var units: [[Int]] = []
+        var unitOf: [Int: Int] = [:]
+        for i in bubbles.indices {
+            if let unit = unitOf[root(i)] {
+                units[unit].append(i)
+            } else {
+                unitOf[root(i)] = units.count
+                units.append([i])
+            }
+        }
+        var patches = units.map { $0.dropFirst().reduce(own[$0[0]]) { $0.union(own[$1]) } }
+        let unitCores = units.map { $0.dropFirst().reduce(cores[$0[0]]) { $0.union(cores[$1]) } }
+
+        for i in units.indices {
+            for j in units.indices where j > i && patches[i].intersects(patches[j]) && !unitCores[i].intersects(unitCores[j]) {
+                let a = unitCores[i], b = unitCores[j]
+                let gapX = max(b.minX - a.maxX, a.minX - b.maxX)
+                let gapY = max(b.minY - a.maxY, a.minY - b.maxY)
+                if gapX >= gapY {
+                    let (left, right) = a.midX < b.midX ? (i, j) : (j, i)
+                    let boundary = (unitCores[left].maxX + unitCores[right].minX) / 2
+                    patches[left] = trimmed(patches[left], maxX: max(unitCores[left].maxX, boundary))
+                    patches[right] = trimmed(patches[right], minX: min(unitCores[right].minX, boundary))
+                } else {
+                    let (top, bottom) = a.midY < b.midY ? (i, j) : (j, i)
+                    let boundary = (unitCores[top].maxY + unitCores[bottom].minY) / 2
+                    patches[top] = trimmed(patches[top], maxY: max(unitCores[top].maxY, boundary))
+                    patches[bottom] = trimmed(patches[bottom], minY: min(unitCores[bottom].minY, boundary))
+                }
+            }
+        }
+
+        var layout = PageLayout()
+        for (unit, members) in units.enumerated() {
+            for index in members {
+                let id = bubbles[index].id
+                layout.patches[id] = layout.patches[id] ?? patches[unit]
+                let glyph = CGFloat(bubbles[index].glyphSize)
+                layout.hitAreas[id] = layout.hitAreas[id]
+                    ?? (members.count > 1 ? bubbles[index].rect.insetBy(dx: -glyph * 0.3, dy: -glyph * 0.3) : patches[unit])
+            }
+            let painted = members.filter { bubbles[$0].isShownTranslation }
+            guard let first = painted.first else { continue }
+            if painted.count == 1 {
+                layout.drawn.append((bubbles[first], patches[unit]))
+                continue
+            }
+            // In the order the page reads (the analysis numbers balloons that way).
+            let ordered = painted.sorted { bubbles[$0].id < bubbles[$1].id }
+            var together = bubbles[ordered[0]]
+            together.translation = ordered.compactMap { bubbles[$0].translation }.joined(separator: "\n")
+            together.glyphSize = ordered.map { bubbles[$0].glyphSize }.min() ?? together.glyphSize
+            // The tone of the largest; flat only if all of them are.
+            let largest = ordered.max { area(bubbles[$0].rect) < area(bubbles[$1].rect) } ?? ordered[0]
+            together.background = bubbles[largest].background
+            together.background.isUniform = ordered.allSatisfy { bubbles[$0].background.isUniform }
+            layout.drawn.append((together, patches[unit]))
+        }
+        return layout
+    }
+
+    /// Every balloon's patch on a page, by balloon id (see `layout(for:)`).
+    static func patches(for page: TranslatedPage) -> [Int: CGRect] {
+        layout(for: page).patches
+    }
+
+    private static func area(_ rect: CGRect) -> CGFloat {
+        rect.width * rect.height
+    }
+
+    /// What a patch must cover whatever its neighbours: the text itself.
+    /// Between two texts close together, each keeps the padding on its side
+    /// of the midline.
+    private static func core(of bubble: TranslatedBubble, imageSize: CGSize) -> CGRect {
+        let clipped = bubble.rect.intersection(CGRect(x: 0, y: bubble.rect.minY, width: imageSize.width, height: bubble.rect.height))
+        return clipped.isNull ? bubble.rect : clipped
+    }
+
+    private static func trimmed(
+        _ rect: CGRect,
+        minX: CGFloat? = nil, maxX: CGFloat? = nil, minY: CGFloat? = nil, maxY: CGFloat? = nil
+    ) -> CGRect {
+        let left = max(rect.minX, minX ?? rect.minX)
+        let right = min(rect.maxX, maxX ?? rect.maxX)
+        let top = max(rect.minY, minY ?? rect.minY)
+        let bottom = min(rect.maxY, maxY ?? rect.maxY)
+        return CGRect(x: left, y: top, width: max(0, right - left), height: max(0, bottom - top))
+    }
+
     /// Everything a page's overlay draws, in page pixels: the page itself plus
     /// any balloon reaching past it.
     static func contentRect(for page: TranslatedPage) -> CGRect {
-        page.bubbles.reduce(CGRect(origin: .zero, size: page.imageSize)) {
-            $0.union(patchRect(for: $1, imageSize: page.imageSize))
-        }
+        patches(for: page).values.reduce(CGRect(origin: .zero, size: page.imageSize)) { $0.union($1) }
     }
 
     /// The translation at the largest font size that fits `size`, capped at
@@ -220,5 +356,14 @@ nonisolated enum TranslationPatchPainter {
         }
         text.string.draw(with: textRect, options: [.usesLineFragmentOrigin, .usesFontLeading])
         return text
+    }
+}
+
+extension TranslatedBubble {
+    /// Has a translation on screen: translated, not left empty by a failed
+    /// unit, not hidden.
+    nonisolated var isShownTranslation: Bool {
+        guard edit?.isHidden != true, let translation else { return false }
+        return !translation.isEmpty
     }
 }

@@ -213,6 +213,22 @@
         }
       }
     },
+    "Add a Balloon Here…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add a Balloon Here…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "여기에 말풍선 추가…"
+          }
+        }
+      }
+    },
     "Add Page Bookmark" : {
       "localizations" : {
         "en" : {
@@ -1977,6 +1993,22 @@
         }
       }
     },
+    "Drag over the text that wasn't translated" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drag over the text that wasn't translated"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "번역되지 않은 글자 위를 드래그하세요"
+          }
+        }
+      }
+    },
     "Edit" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2010,6 +2042,22 @@
         }
       }
     },
+    "Edit Translation…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit Translation…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "번역 고치기…"
+          }
+        }
+      }
+    },
     "Edited pages" : {
       "localizations" : {
         "en" : {
@@ -2038,22 +2086,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "말풍선 편집 중"
-          }
-        }
-      }
-    },
-    "Edit…" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Edit…"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "편집…"
           }
         }
       }
@@ -2153,6 +2185,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "이 책에서 고치거나 숨긴 말풍선이 모두 기계 번역으로 돌아갑니다. 다른 책의 수정은 그대로입니다."
+          }
+        }
+      }
+    },
+    "Every page is read and translated again, the way Panely does it now — balloons a page split in two are joined, speech levels matched. It takes as long as the first time. Your edits stay, but one on a balloon that's now found differently may no longer apply." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Every page is read and translated again, the way Panely does it now — balloons a page split in two are joined, speech levels matched. It takes as long as the first time. Your edits stay, but one on a balloon that's now found differently may no longer apply."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 페이지를 지금 Panely 방식으로 다시 읽고 번역합니다. 둘로 쪼개졌던 말풍선은 합쳐지고 말투도 맞춰집니다. 처음 번역할 때만큼 시간이 걸립니다. 고친 내용은 남지만, 묶음이 달라진 말풍선에서는 적용되지 않을 수 있습니다."
           }
         }
       }
@@ -2769,6 +2817,22 @@
         }
       }
     },
+    "Fix Original…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fix Original…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "원문 고치기…"
+          }
+        }
+      }
+    },
     "Folder is empty or has no supported content" : {
       "localizations" : {
         "en" : {
@@ -3113,18 +3177,34 @@
         }
       }
     },
-    "Hide this balloon — for text that isn't really there. Show it again from the translation panel." : {
+    "Hide This Balloon" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hide this balloon — for text that isn't really there. Show it again from the translation panel."
+            "value" : "Hide This Balloon"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "이 말풍선을 숨깁니다. 글자가 아닌 것을 잘못 인식했을 때 쓰세요. 번역 패널에서 다시 보이게 할 수 있습니다."
+            "value" : "이 말풍선 숨기기"
+          }
+        }
+      }
+    },
+    "Hide this balloon — for text that isn't really there. Edit Balloons (⇧⌘E) shows hidden ones again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide this balloon — for text that isn't really there. Edit Balloons (⇧⌘E) shows hidden ones again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 말풍선을 숨깁니다 — 실제로는 글자가 아닌 곳에 쓰세요. 말풍선 편집(⇧⌘E)에서 숨긴 말풍선을 다시 볼 수 있습니다."
           }
         }
       }
@@ -4930,6 +5010,38 @@
         }
       }
     },
+    "Read and translate every page again, the current way. Your edits stay." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read and translate every page again, the current way. Your edits stay."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 페이지를 지금 방식으로 다시 읽고 번역합니다. 고친 내용은 남습니다."
+          }
+        }
+      }
+    },
+    "Read and translate the page on screen again, the current way — balloons split in two get joined. Your edits stay; one on a balloon found differently may no longer apply." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read and translate the page on screen again, the current way — balloons split in two get joined. Your edits stay; one on a balloon found differently may no longer apply."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "화면의 페이지를 지금 방식으로 다시 읽고 번역합니다. 둘로 쪼개졌던 말풍선이 합쳐집니다. 고친 내용은 남지만, 묶음이 달라진 말풍선에서는 적용되지 않을 수 있습니다."
+          }
+        }
+      }
+    },
     "Read Left to Right" : {
       "localizations" : {
         "en" : {
@@ -5327,6 +5439,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "이 페이지 북마크 제거 (⌘D)"
+          }
+        }
+      }
+    },
+    "Remove This Balloon" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove This Balloon"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 말풍선 지우기"
           }
         }
       }
@@ -6110,6 +6238,22 @@
         }
       }
     },
+    "Show This Balloon" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show This Balloon"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 말풍선 다시 보이기"
+          }
+        }
+      }
+    },
     "Show This Language" : {
       "localizations" : {
         "en" : {
@@ -6485,22 +6629,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "대체"
-          }
-        }
-      }
-    },
-    "Switch to edit mode to correct or hide balloons (⇧⌘E)" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Switch to edit mode to correct or hide balloons (⇧⌘E)"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "편집 모드로 바꿔 말풍선을 고치거나 숨깁니다 (⇧⌘E)"
           }
         }
       }
@@ -7042,6 +7170,22 @@
         }
       }
     },
+    "Translate Page Again" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Translate Page Again"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 페이지 다시 번역"
+          }
+        }
+      }
+    },
     "Translate Them First" : {
       "localizations" : {
         "en" : {
@@ -7074,6 +7218,38 @@
         }
       }
     },
+    "Translate this book again?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Translate this book again?"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 책을 다시 번역할까요?"
+          }
+        }
+      }
+    },
+    "Translate This Book Again…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Translate This Book Again…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 책 다시 번역…"
+          }
+        }
+      }
+    },
     "Translate This Book into %@" : {
       "localizations" : {
         "en" : {
@@ -7086,6 +7262,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "이 책을 %@로 번역"
+          }
+        }
+      }
+    },
+    "Translate This Page Again" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Translate This Page Again"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 페이지 다시 번역"
           }
         }
       }

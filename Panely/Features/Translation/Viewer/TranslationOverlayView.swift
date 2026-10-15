@@ -31,10 +31,7 @@ final class TranslationOverlayView: NSView {
     private(set) var page: TranslatedPage?
     private(set) var showsTranslation = false
     private(set) var isEditing = false
-    /// Set when a reading popover asked for edit mode: that balloon's popover
-    /// reopens, with its edits, once the overlay is in edit mode.
-    private var reopenForEditingBubbleID: Int?
-    /// A correction made in a balloon's popover.
+    /// A correction made in a balloon's popover or the page's right-click menu.
     var onEdit: ((TranslationEditRequest) -> Void)?
     private var pageOrigin: CGPoint = .zero
     private var scale: CGFloat = 1
@@ -54,6 +51,8 @@ final class TranslationOverlayView: NSView {
     /// binary search per balloon; redraws (hover, scroll) reuse it.
     private var fittedText: [Int: TranslationPatchPainter.Fitted] = [:]
     private var fittedForScale: CGFloat = 0
+    /// The page's translations laid out together (page pixels).
+    private var layout = TranslationOverlayLayout.PageLayout()
 
     override var isFlipped: Bool { true }
 
@@ -83,6 +82,11 @@ final class TranslationOverlayView: NSView {
         }
         // The open popover belongs to the other mode.
         if page == nil || modeChanged { closePopover() }
+        if page != self.page {
+            layout = page.map(TranslationOverlayLayout.layout) ?? TranslationOverlayLayout.PageLayout()
+            // Patches can change size with a neighbour; refit.
+            fittedText = [:]
+        }
         self.page = page
         self.showsTranslation = showsTranslation
         self.isEditing = isEditing
@@ -90,18 +94,24 @@ final class TranslationOverlayView: NSView {
         self.scale = scale
         pendingView.update(rects: pendingRects(), glyph: pendingGlyph())
         needsDisplay = true
-        if isEditing, let id = reopenForEditingBubbleID {
-            reopenForEditingBubbleID = nil
-            showPopover(forBubbleID: id)
-        }
     }
 
     // MARK: - Geometry
 
     private func patchInView(_ bubble: TranslatedBubble) -> CGRect {
         guard let page else { return .zero }
-        let rect = TranslationOverlayLayout.patchRect(for: bubble, imageSize: page.imageSize)
-        return CGRect(
+        return inView(layout.patches[bubble.id] ?? TranslationOverlayLayout.patchRect(for: bubble, imageSize: page.imageSize))
+    }
+
+    /// Where the balloon takes clicks — its own text when it's drawn in a
+    /// group, so each one there still opens on its own.
+    private func hitAreaInView(_ bubble: TranslatedBubble) -> CGRect {
+        guard let area = layout.hitAreas[bubble.id] else { return patchInView(bubble) }
+        return inView(area)
+    }
+
+    private func inView(_ rect: CGRect) -> CGRect {
+        CGRect(
             x: pageOrigin.x + rect.minX * scale,
             y: pageOrigin.y + rect.minY * scale,
             width: rect.width * scale,
@@ -110,7 +120,7 @@ final class TranslationOverlayView: NSView {
     }
 
     private func bubble(at point: NSPoint) -> TranslatedBubble? {
-        page?.bubbles.first { patchInView($0).contains(point) }
+        page?.bubbles.first { hitAreaInView($0).contains(point) }
     }
 
     /// The page itself, in this view.
@@ -255,7 +265,7 @@ final class TranslationOverlayView: NSView {
 
     // MARK: - Popover
 
-    private func showPopover(forBubbleID id: Int) {
+    private func showPopover(forBubbleID id: Int, opening: TranslationBubblePopover.StartEditing? = nil) {
         // Look the balloon up again: its translation may have arrived meanwhile.
         guard let bubble = page?.bubbles.first(where: { $0.id == id }) else { return }
         closePopover()
@@ -266,15 +276,14 @@ final class TranslationOverlayView: NSView {
                 translation: bubble.translation,
                 alternates: bubble.alternates ?? [:],
                 edit: bubble.edit,
-                isEditing: isEditing,
                 onEdit: pageID == nil ? nil : { [weak self] change in
                     // Return can reach both the field and the default button;
                     // the first one closes the popover and wins.
                     guard let self, let pageID, self.popover != nil else { return }
                     self.closePopover()
-                    if change == .enterEditMode { self.reopenForEditingBubbleID = bubble.id }
                     self.onEdit?(TranslationEditRequest(pageID: pageID, bubble: bubble, change: change))
                 },
+                opensEditing: opening,
                 onEditingChanged: { [weak self] isEditing in
                     // A stray click outside mustn't throw away what's typed.
                     self?.popover?.behavior = isEditing ? .applicationDefined : .transient
@@ -284,12 +293,65 @@ final class TranslationOverlayView: NSView {
         host.sizingOptions = [.preferredContentSize]
         let popover = NSPopover()
         popover.contentViewController = host
-        popover.behavior = .transient
+        // Opened to type into: a stray click mustn't close it.
+        popover.behavior = opening == nil ? .transient : .applicationDefined
         popover.appearance = NSAppearance(named: .darkAqua)
-        let anchor = patchInView(bubble).intersection(bounds)
+        let anchor = hitAreaInView(bubble).intersection(bounds)
         guard !anchor.isNull, !anchor.isEmpty else { return }
         popover.show(relativeTo: anchor, of: self, preferredEdge: bubble.isVertical ? .maxX : .maxY)
         self.popover = popover
+    }
+
+    // MARK: - Right-click
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        contextMenu(at: convert(event.locationInWindow, from: nil))
+    }
+
+    /// What a right-click on the page offers, right where the problem is:
+    /// a balloon's corrections over a balloon, and for the page, translating
+    /// it again and adding a balloon over missed text — no need to find edit
+    /// mode first. `nil` off the page.
+    func contextMenu(at point: NSPoint) -> NSMenu? {
+        guard let page, let pageID = page.pageID, pageInView.contains(point) || bubble(at: point) != nil else { return nil }
+        func L(_ key: String.LocalizationValue) -> String { String(localized: key, bundle: .localized) }
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        let pageStandIn = TranslatedBubble(id: -1, rect: .zero, glyphSize: 0, isVertical: false, source: "", translation: nil, background: .white)
+        func request(_ bubble: TranslatedBubble, _ change: TranslationEditChange) {
+            onEdit?(TranslationEditRequest(pageID: pageID, bubble: bubble, change: change))
+        }
+
+        if let bubble = bubble(at: point) {
+            if bubble.edit?.isHidden == true {
+                menu.addItem(ClosureMenuItem(L("Show This Balloon")) { request(bubble, .show) })
+            } else {
+                let edit = ClosureMenuItem(L("Edit Translation…")) { [weak self] in
+                    self?.showPopover(forBubbleID: bubble.id, opening: .translation)
+                }
+                edit.isEnabled = bubble.translation != nil || bubble.edit?.isAdded == true
+                menu.addItem(edit)
+                menu.addItem(ClosureMenuItem(L("Fix Original…")) { [weak self] in
+                    self?.showPopover(forBubbleID: bubble.id, opening: .original)
+                })
+                if bubble.edit?.isAdded == true {
+                    menu.addItem(ClosureMenuItem(L("Remove This Balloon")) { request(bubble, .remove) })
+                } else {
+                    menu.addItem(ClosureMenuItem(L("Hide This Balloon")) { request(bubble, .hide) })
+                }
+            }
+            menu.addItem(.separator())
+        }
+        menu.addItem(ClosureMenuItem(L("Translate This Page Again")) { request(pageStandIn, .translatePageAgain) })
+        menu.addItem(ClosureMenuItem(L("Add a Balloon Here…")) { request(pageStandIn, .startAddingBalloon) })
+        menu.addItem(.separator())
+        let mode = ClosureMenuItem(isEditing ? L("Done Editing Balloons") : L("Edit Balloons")) {
+            request(pageStandIn, self.isEditing ? .leaveEditMode : .enterEditMode)
+        }
+        mode.keyEquivalent = "e"
+        mode.keyEquivalentModifierMask = [.command, .shift]
+        menu.addItem(mode)
+        return menu
     }
 
     private func closePopover() {
@@ -312,21 +374,24 @@ final class TranslationOverlayView: NSView {
             fittedText = [:]
             fittedForScale = scale
         }
+        if showsTranslation {
+            // Balloons drawn together come as one, their translations a line each.
+            for (bubble, rect) in layout.drawn {
+                let patch = inView(rect)
+                guard patch.intersects(dirtyRect), let translation = bubble.translation else { continue }
+                drawTranslation(translation, of: bubble, in: patch)
+            }
+        }
         for bubble in page.bubbles {
-            let patch = patchInView(bubble)
-            guard patch.intersects(dirtyRect) else { continue }
+            let area = hitAreaInView(bubble)
+            guard area.intersects(dirtyRect) || patchInView(bubble).intersects(dirtyRect) else { continue }
             if bubble.edit?.isHidden == true {
-                drawHiddenOutline(around: patch, glyph: CGFloat(bubble.glyphSize) * scale)
-            } else {
-                if showsTranslation, let translation = bubble.translation, !translation.isEmpty {
-                    drawTranslation(translation, of: bubble, in: patch)
-                }
-                if showsTranslation, isEditing, bubble.edit != nil {
-                    drawEditBadge(in: patch)
-                }
+                drawHiddenOutline(around: patchInView(bubble), glyph: CGFloat(bubble.glyphSize) * scale)
+            } else if showsTranslation, isEditing, bubble.edit != nil {
+                drawEditBadge(in: area)
             }
             if bubble.id == hoveredBubbleID {
-                drawHoverHighlight(around: patch, glyph: CGFloat(bubble.glyphSize) * scale)
+                drawHoverHighlight(around: area, glyph: CGFloat(bubble.glyphSize) * scale)
             }
         }
         if let markedArea {
@@ -476,5 +541,25 @@ private final class PendingBubblesView: NSView {
             let dotsSize = dots.size()
             dots.draw(at: CGPoint(x: rect.midX - dotsSize.width / 2, y: rect.midY - dotsSize.height / 2))
         }
+    }
+}
+
+/// A menu item that runs a closure.
+final class ClosureMenuItem: NSMenuItem {
+    private let handler: () -> Void
+
+    init(_ title: String, handler: @escaping () -> Void) {
+        self.handler = handler
+        super.init(title: title, action: #selector(run), keyEquivalent: "")
+        target = self
+    }
+
+    @available(*, unavailable)
+    required init(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    @objc private func run() {
+        handler()
     }
 }

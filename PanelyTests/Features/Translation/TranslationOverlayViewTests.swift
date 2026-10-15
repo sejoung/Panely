@@ -151,3 +151,93 @@ struct TranslationOverlayMarkingTests {
         #expect(request?.change == .addBalloon(CGRect(x: 100, y: 200, width: 60, height: 120)))
     }
 }
+
+/// The right-click menu: corrections where the balloon is, page actions
+/// anywhere on the page — without finding edit mode first.
+@MainActor
+struct TranslationOverlayMenuTests {
+    private let imageSize = CGSize(width: 1000, height: 2000)
+    private let balloon = CGRect(x: 600, y: 400, width: 200, height: 300)
+
+    private func makeStack(edit: BubbleEditState? = nil, editing: Bool = false) -> (ImageStackView, TranslationOverlayView) {
+        var page = TranslatedPage(imageWidth: 1000, imageHeight: 2000, bubbles: [
+            TranslatedBubble(id: 0, rect: balloon, glyphSize: 40, isVertical: false, source: "原文", translation: "번역", background: .white, edit: edit),
+        ])
+        page.pageID = "p1"
+        let stack = ImageStackView()
+        stack.setImages([NSImage(size: imageSize)], axis: .horizontal)
+        stack.setTranslationOverlay([page], showsTranslation: true, isEditing: editing)
+        return (stack, stack.subviews.compactMap { $0 as? TranslationOverlayView }.first!)
+    }
+
+    @Test func onABalloonItsCorrectionsComeFirstThenThePage() throws {
+        let (_, overlay) = makeStack()
+        var changes: [TranslationEditChange] = []
+        overlay.onEdit = { changes.append($0.change) }
+
+        let menu = try #require(overlay.contextMenu(at: NSPoint(x: balloon.midX, y: balloon.midY)))
+        // Edit…, Fix Original…, Hide | Translate again, Add here | Edit mode
+        #expect(menu.items.count == 8)
+        for index in [2, 4, 5, 7] { menu.performActionForItem(at: index) }
+
+        #expect(changes == [.hide, .translatePageAgain, .startAddingBalloon, .enterEditMode])
+    }
+
+    @Test func elsewhereOnThePageOnlyThePageActions() throws {
+        let (_, overlay) = makeStack(editing: true)
+        var changes: [TranslationEditChange] = []
+        overlay.onEdit = { changes.append($0.change) }
+
+        let menu = try #require(overlay.contextMenu(at: NSPoint(x: 100, y: 100)))
+        #expect(menu.items.count == 4)
+        menu.performActionForItem(at: 3)
+
+        #expect(changes == [.leaveEditMode])
+        #expect(overlay.contextMenu(at: NSPoint(x: 100, y: 2500)) == nil)
+    }
+
+    @Test func aBalloonTheReaderAddedIsRemovedNotHidden() throws {
+        let (_, overlay) = makeStack(edit: BubbleEditState(correctedSource: nil, translationIsReaders: false, needsRetranslation: false, isAdded: true))
+        var changes: [TranslationEditChange] = []
+        overlay.onEdit = { changes.append($0.change) }
+
+        let menu = try #require(overlay.contextMenu(at: NSPoint(x: balloon.midX, y: balloon.midY)))
+        menu.performActionForItem(at: 2)
+
+        #expect(changes == [.remove])
+    }
+
+    @Test func aRightClickBesideTheBalloonsReachesThePagesMenu() throws {
+        let (stack, _) = makeStack()
+        let location = stack.convert(NSPoint(x: 100, y: 100), to: nil)
+        let event = try #require(NSEvent.mouseEvent(
+            with: .rightMouseDown, location: location, modifierFlags: [], timestamp: 0,
+            windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 1
+        ))
+
+        #expect(stack.menu(for: event)?.items.count == 4)
+    }
+}
+
+/// Balloons drawn together still answer clicks one by one.
+@MainActor
+struct TranslationOverlayGroupedTests {
+    @Test func eachBalloonDrawnInAGroupOpensOnItsOwn() {
+        var page = TranslatedPage(imageWidth: 1000, imageHeight: 1000, bubbles: [
+            TranslatedBubble(id: 0, rect: CGRect(x: 100, y: 100, width: 500, height: 80), glyphSize: 60, isVertical: false, source: "見出し", translation: "제목", background: .white),
+            TranslatedBubble(id: 1, rect: CGRect(x: 520, y: 140, width: 60, height: 300), glyphSize: 40, isVertical: true, source: "小見出し", translation: "부제", background: .white),
+        ])
+        page.pageID = "p1"
+        let stack = ImageStackView()
+        stack.setImages([NSImage(size: CGSize(width: 1000, height: 1000))], axis: .horizontal)
+        stack.setTranslationOverlay([page], showsTranslation: true)
+        let overlay = stack.subviews.compactMap { $0 as? TranslationOverlayView }.first!
+        var hidden: [Int] = []
+        overlay.onEdit = { hidden.append($0.bubble.id) }
+
+        overlay.contextMenu(at: NSPoint(x: 200, y: 140))?.performActionForItem(at: 2)
+        overlay.contextMenu(at: NSPoint(x: 550, y: 400))?.performActionForItem(at: 2)
+
+        #expect(hidden == [0, 1])
+    }
+}

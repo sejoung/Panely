@@ -476,12 +476,21 @@ original together. The text is selectable, so you can copy it or look a word up.
 
 ### Correcting balloons
 
-Reading shows nothing but the translation. To correct balloons, turn on edit
-mode — **Edit Balloons** in the panel or the language menu, the
-**Edit…** link in a balloon's popover, or `⇧⌘E`. A bar over the page shows
-you're editing; `esc` or **Done** goes back to reading.
+Fix a balloon right where you see the problem — no mode to find first:
 
-In edit mode a balloon's popover offers:
+- **Click it**: its popover offers **Edit**, **Fix Original** and **Hide**
+  next to the translation.
+- **Right-click it** (two-finger click): **Edit Translation…**, **Fix
+  Original…** and **Hide This Balloon**, plus, anywhere on the page,
+  **Translate This Page Again** and **Add a Balloon Here…**.
+
+**Edit mode** (`⇧⌘E`, the language menu, the panel or the right-click menu)
+is for looking over a book's edits: edited balloons carry a pencil, hidden
+ones show as dashed outlines, and missed text can be dragged over to add a
+balloon. A bar over the page shows you're editing; `esc` or **Done** goes back
+to reading.
+
+A balloon's popover offers:
 
 ![A balloon's popover in edit mode](screenshots/20-translation-balloon-popover.png)
 
@@ -508,6 +517,15 @@ with **Fix Original** — or write the translation with **Edit**. A balloon
 you added has **Remove** instead of Hide, and is kept, reverted and exported
 like any other edit. (Panely already takes a second, enlarged look by itself
 at text boxes the detector found but OCR left empty.)
+
+**Pages translated before an improvement** — a balloon split into two
+halves, polite speech where the original is casual — can be redone without
+clearing the cache: **Translate This Page Again** — right-click the page, or
+in the language menu or the edit bar — reads and translates it again, the
+current way; **Translate This Book Again…** (under **This Book & Series** in
+the panel) does every page. Your
+edits stay, though one on a balloon that's now found differently may no
+longer apply.
 
 `↩` saves, `⇧↩` starts a new line (`⌥↩` and `⌃↩` work too), `esc` cancels.
 Edits are stored apart from the translation cache, so clearing the cache or

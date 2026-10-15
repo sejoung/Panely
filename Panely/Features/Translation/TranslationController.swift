@@ -343,6 +343,46 @@ final class TranslationController {
         isWaitingForBookToReopen = false
     }
 
+    /// Throw away what `pageIndices` were translated to — on screen and in
+    /// the cache — and translate them again, starting from the first: pages
+    /// translated before an analysis improved (balloons found by the
+    /// detector, speech levels matched) get it without clearing the whole
+    /// cache. In strip scope the bands covering them are read again; pages
+    /// already done that share a band keep their results.
+    func translateAgain(pageIndices: Set<Int>) async {
+        // Results still loading from the cache would land after this.
+        await cacheTask?.value
+        let indices = pageIndices.filter { bookPages.indices.contains($0) }
+        guard enabled, let source, !indices.isEmpty else { return }
+        stopJob(to: .idle)
+        // Work started for the old results mustn't write into the new ones.
+        generation &+= 1
+        speechLevelTask?.cancel()
+        speechLevelTask = nil
+        speechLevelProgress = nil
+        notice = nil
+
+        var keys: [String] = []
+        for index in indices {
+            let id = bookPages[index].id
+            pages[id] = nil
+            cacheKeys[id] = nil
+            completedPageIndices.remove(index)
+            // Either mode's entry: a fast job reads accurate ones too.
+            keys += [TranslationMode.accurate, .fast].map {
+                TranslationStore.key(pageID: id, from: source, to: target, scope: scope, mode: $0)
+            }
+        }
+        plan = nil
+        finishedUnits = []
+        failedUnits = []
+        focusPage = indices.min() ?? focusPage
+        let store = store
+        await Task.detached(priority: .utility) { store.remove(keys: keys) }.value
+        AppLog.info(.reader, "Translating pages again", metadata: ["pages": "\(indices.count)"])
+        if let requestStart { requestStart() } else { start() }
+    }
+
     /// Delete every cached translation (all books). The open book's overlays
     /// go too — they'd otherwise outlive their cache entries.
     func clearCache() async -> UInt64 {

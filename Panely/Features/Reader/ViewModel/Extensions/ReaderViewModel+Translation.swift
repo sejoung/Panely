@@ -198,6 +198,7 @@ extension ReaderViewModel {
         guard !editing || canEditTranslations else { return }
         if editing { preferences.translationOverlayVisible = true }
         isEditingTranslations = editing
+        if !editing { isAddingTranslationBalloon = false }
         if !editing { translationEdits.dismissRecentlyHidden() }
     }
 
@@ -288,6 +289,28 @@ extension ReaderViewModel {
         translationManager.start(controller)
     }
 
+    /// There's a translation to redo: the shown language has results and
+    /// the book's language is known.
+    var canTranslateAgain: Bool {
+        translationFeatureAvailable && hasSource && translation.source != nil && !translation.pages.isEmpty
+    }
+
+    /// Analyze and translate the pages on screen again, the current way.
+    func translateCurrentPagesAgain() {
+        guard canTranslateAgain else { return }
+        let pages = Set(currentSpread)
+        let controller = translation
+        Task { await controller.translateAgain(pageIndices: pages) }
+    }
+
+    /// The whole book again, in the shown language.
+    func translateBookAgain() {
+        guard canTranslateAgain else { return }
+        let controller = translation
+        let pages = Set(0..<controller.bookPageCount)
+        Task { await controller.translateAgain(pageIndices: pages) }
+    }
+
     func pauseTranslating() {
         translationManager.pause(translation)
     }
@@ -360,6 +383,15 @@ extension ReaderViewModel {
             }
         case .enterEditMode:
             setEditingTranslations(true)
+        case .leaveEditMode:
+            setEditingTranslations(false)
+        case .startAddingBalloon:
+            setEditingTranslations(true)
+            isAddingTranslationBalloon = isEditingTranslations
+        case .translatePageAgain:
+            guard canTranslateAgain, let index = source.pages.firstIndex(where: { $0.id == request.pageID }) else { return }
+            let controller = translation
+            Task { await controller.translateAgain(pageIndices: [index]) }
         case let .addBalloon(area):
             addTranslationBalloon(pageID: request.pageID, area: area)
         }
@@ -390,6 +422,7 @@ extension ReaderViewModel {
                 added: AddedBalloon(glyphSize: marked.glyphSize, isVertical: marked.isVertical, background: marked.background)
             )
             self.translationEdits.add(pageID: pageID, edit: edit)
+            self.isAddingTranslationBalloon = false
             AppLog.info(.reader, "Balloon added by the reader", metadata: ["read": "\(!marked.text.isEmpty)"])
             guard !marked.text.isEmpty else { return }
             let bubble = TranslatedBubble(

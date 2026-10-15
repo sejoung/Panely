@@ -75,6 +75,9 @@ final class ReaderViewModel {
     /// outlines, and a balloon's popover offers its edits. Off = reading,
     /// with nothing on the page but the translation.
     var isEditingTranslations = false
+    /// Edit mode was entered to add a balloon ("Add a Balloon Here…"): the
+    /// edit bar says to drag over the text until one is added.
+    var isAddingTranslationBalloon = false
     /// The Settings tab shown next time Settings opens (the translation panel
     /// opens it on Experimental).
     var settingsTab: SettingsTab = .general

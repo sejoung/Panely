@@ -155,6 +155,18 @@ final class ImageStackView: NSView {
         }
     }
 
+    /// A right-click on a page with a translation: its overlay's menu (a
+    /// balloon's corrections, translating the page again, adding a balloon).
+    /// Overlays only take the mouse over balloons, so a right-click elsewhere
+    /// on the page lands here, through the page image.
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let point = convert(event.locationInWindow, from: nil)
+        for overlay in overlayViews.values where overlay.frame.contains(point) {
+            if let menu = overlay.contextMenu(at: overlay.convert(point, from: self)) { return menu }
+        }
+        return super.menu(for: event)
+    }
+
     /// Create, place, update or remove the overlay for a live page.
     private func syncOverlay(index: Int) {
         guard overlayPages.indices.contains(index),

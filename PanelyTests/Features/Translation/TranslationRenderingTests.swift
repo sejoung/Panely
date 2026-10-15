@@ -120,6 +120,83 @@ struct TranslationOverlayLayoutTests {
             == TranslationOverlayLayout.patchRect(for: withoutBalloon, imageSize: image))
     }
 
+    /// Neighbours' patches reach into each other (a vertical original is
+    /// widened for a horizontal translation); laid out together they meet
+    /// midway between the texts instead, each still covering its own.
+    @Test func neighbouringPatchesAreCutBackToMeetMidway() {
+        var left = bubble(rect: CGRect(x: 100, y: 100, width: 30, height: 300), glyph: 30, vertical: true)
+        var right = bubble(rect: CGRect(x: 160, y: 100, width: 30, height: 300), glyph: 30, vertical: true)
+        left.id = 0
+        right.id = 1
+        let page = TranslatedPage(imageWidth: 1000, imageHeight: 1000, bubbles: [left, right])
+        #expect(TranslationOverlayLayout.patchRect(for: left, imageSize: page.imageSize)
+            .intersects(TranslationOverlayLayout.patchRect(for: right, imageSize: page.imageSize)))
+
+        let patches = TranslationOverlayLayout.patches(for: page)
+
+        let a = try? #require(patches[0]), b = try? #require(patches[1])
+        #expect(a.map { $0.maxX <= 145.001 } == true)
+        #expect(b.map { $0.minX >= 144.999 } == true)
+        #expect(a?.contains(left.rect) == true)
+        #expect(b?.contains(right.rect) == true)
+    }
+
+    @Test func stackedLinesSplitTheirPaddingAndOverlappingTextsAreLeftAlone() {
+        var top = bubble(rect: CGRect(x: 100, y: 100, width: 300, height: 40), glyph: 40, vertical: false)
+        var bottom = bubble(rect: CGRect(x: 100, y: 150, width: 300, height: 40), glyph: 40, vertical: false)
+        top.id = 0
+        bottom.id = 1
+        let stacked = TranslationOverlayLayout.patches(for: TranslatedPage(imageWidth: 1000, imageHeight: 1000, bubbles: [top, bottom]))
+        #expect(stacked[0]?.maxY == 145)
+        #expect(stacked[1]?.minY == 145)
+
+        bottom.rect = CGRect(x: 120, y: 120, width: 300, height: 40)
+        let tangled = TranslationOverlayLayout.patches(for: TranslatedPage(imageWidth: 1000, imageHeight: 1000, bubbles: [top, bottom]))
+        #expect(tangled[1] == TranslationOverlayLayout.patchRect(for: bottom, imageSize: CGSize(width: 1000, height: 1000)))
+    }
+
+    /// A headline and the subhead printed across it: their texts overlap, so
+    /// they're drawn in one patch, a line each in reading order — and each
+    /// still opens on its own.
+    @Test func balloonsWhoseTextsOverlapAreDrawnTogether() {
+        var headline = bubble(rect: CGRect(x: 100, y: 100, width: 500, height: 80), glyph: 60, vertical: false)
+        headline.id = 0
+        headline.translation = "젊은 여성들의 자살이 연이어 발생한다"
+        var subhead = bubble(rect: CGRect(x: 520, y: 140, width: 60, height: 300), glyph: 40, vertical: true)
+        subhead.id = 1
+        subhead.translation = "이제 네 번째"
+        var neighbour = bubble(rect: CGRect(x: 100, y: 600, width: 200, height: 60), glyph: 40, vertical: false)
+        neighbour.id = 2
+        neighbour.translation = "옆 말풍선"
+        let page = TranslatedPage(imageWidth: 1000, imageHeight: 1000, bubbles: [subhead, headline, neighbour])
+
+        let layout = TranslationOverlayLayout.layout(for: page)
+
+        #expect(layout.drawn.count == 2)
+        let together = layout.drawn.first { $0.bubble.translation?.contains("\n") == true }
+        #expect(together?.bubble.translation == "젊은 여성들의 자살이 연이어 발생한다\n이제 네 번째")
+        #expect(together.map { $0.patch.contains(headline.rect) && $0.patch.contains(subhead.rect) } == true)
+        #expect(layout.patches[0] == layout.patches[1])
+        // Clicks: each its own text.
+        #expect(layout.hitAreas[0] != layout.hitAreas[1])
+        #expect(layout.hitAreas[1]?.contains(CGPoint(x: 550, y: 400)) == true)
+        #expect(layout.hitAreas[0]?.contains(CGPoint(x: 550, y: 400)) == false)
+    }
+
+    @Test func aHiddenBalloonIsNeverDrawnWithOthers() {
+        var shown = bubble(rect: CGRect(x: 100, y: 100, width: 300, height: 80), glyph: 40, vertical: false)
+        shown.id = 0
+        var hidden = bubble(rect: CGRect(x: 150, y: 120, width: 300, height: 80), glyph: 40, vertical: false)
+        hidden.id = 1
+        hidden.translation = "숨김"
+        hidden.edit = BubbleEditState(correctedSource: nil, translationIsReaders: false, needsRetranslation: false, isHidden: true)
+        shown.translation = "보임"
+
+        let layout = TranslationOverlayLayout.layout(for: TranslatedPage(imageWidth: 1000, imageHeight: 1000, bubbles: [shown, hidden]))
+
+        #expect(layout.drawn.map { $0.bubble.translation } == ["보임"])
+    }
+
     @Test func horizontalPatchIsTheTextPlusPadding() {
         let patch = TranslationOverlayLayout.patchRect(
             for: bubble(rect: CGRect(x: 100, y: 100, width: 400, height: 80), glyph: 40, vertical: false),

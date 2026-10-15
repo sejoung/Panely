@@ -18,6 +18,30 @@ struct TranslationControllerTests {
         )
     }
 
+    /// Translating pages again forgets just those — on screen and in the
+    /// cache — and asks for a job to redo them.
+    @Test func translatingAPageAgainForgetsOnlyThatPage() async throws {
+        let store = try makeTemporaryTranslationStore()
+        let pages = Fixture.makeImagePages(count: 2)
+        let keys = pages.map { TranslationStore.key(pageID: $0.id, from: .japanese, to: .korean) }
+        for key in keys { try store.save(makeTranslatedPage(), key: key) }
+        let controller = TranslationController(store: store, defaults: InMemoryKeyValueStore())
+        var startRequested = false
+        controller.requestStart = { startRequested = true }
+        reload(controller, pages: pages)
+        await controller.cacheTask?.value
+        #expect(controller.completedPageIndices == [0, 1])
+
+        await controller.translateAgain(pageIndices: [0])
+
+        #expect(controller.pages[pages[0].id] == nil)
+        #expect(controller.pages[pages[1].id] != nil)
+        #expect(controller.completedPageIndices == [1])
+        #expect(store.load(key: keys[0]) == nil)
+        #expect(store.load(key: keys[1]) != nil)
+        #expect(startRequested)
+    }
+
     @Test func translationOrderStartsAtTheCurrentPageAndWraps() {
         #expect(TranslationController.translationOrder(count: 5, startingAt: 2) == [2, 3, 4, 0, 1])
         #expect(TranslationController.translationOrder(count: 3, startingAt: 9) == [2, 0, 1])
@@ -182,6 +206,31 @@ struct ReaderViewModelTranslationTests {
         #expect(!vm.translationIsShowing)
         // Still offered — as a language to translate into, first in the menu.
         #expect(vm.toolbarState().translation?.suggestedLanguage?.language == .korean)
+    }
+
+    /// "Add a Balloon Here…" from the right-click menu: edit mode, saying to
+    /// drag, until edit mode is left.
+    @Test(.enabled(if: TranslationController.isSupportedOnThisMac))
+    func addingABalloonFromTheMenuEntersEditModeToDrag() async throws {
+        let vm = makeTestViewModel()
+        vm.translationEnabled = true
+        vm.translationTargetLanguage = .korean
+        let pages = Fixture.makeImagePages(count: 1)
+        try vm.translation.store.save(makeTranslatedPage("하나"), key: TranslationStore.key(pageID: pages[0].id, from: .japanese, to: .korean))
+        vm.currentSourceURL = URL(fileURLWithPath: "/books/test")
+        vm.source = ComicSource(title: "Test", pages: pages)
+        try await waitUntil { vm.translation.bookPageCount == 1 }
+        vm.translation.setSource(.japanese)
+        try await waitUntil { !vm.translation.pages.isEmpty }
+        let standIn = TranslatedBubble(id: -1, rect: .zero, glyphSize: 0, isVertical: false, source: "", translation: nil, background: .white)
+
+        vm.applyTranslationEdit(TranslationEditRequest(pageID: pages[0].id, bubble: standIn, change: .startAddingBalloon))
+        #expect(vm.isEditingTranslations)
+        #expect(vm.isAddingTranslationBalloon)
+
+        vm.applyTranslationEdit(TranslationEditRequest(pageID: pages[0].id, bubble: standIn, change: .leaveEditMode))
+        #expect(!vm.isEditingTranslations)
+        #expect(!vm.isAddingTranslationBalloon)
     }
 
     /// Removing an added balloon — or hiding it, which for a balloon the

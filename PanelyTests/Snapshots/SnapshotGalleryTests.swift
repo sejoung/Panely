@@ -311,7 +311,6 @@ struct SnapshotGalleryTests {
                     source: "やっと目が覚めたね",
                     translation: "You're finally awake.",
                     alternates: [.korean: "드디어 깼구나."],
-                    isEditing: true,
                     onEdit: { _ in }
                 )
                 .background(PanelyColor.bgSecondary, in: RoundedRectangle(cornerRadius: 10))

@@ -28,7 +28,11 @@ struct TranslationEditBar: View {
                         confirmsRevert = false
                     }
                 } else {
-                    if edited == 0 {
+                    if viewModel.isAddingTranslationBalloon {
+                        Label("Drag over the text that wasn't translated", systemImage: "rectangle.dashed")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(PanelyColor.accentPrimary)
+                    } else if edited == 0 {
                         Text("Click a balloon to correct it — drag over text that was missed to add one")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(.white.opacity(0.75))
@@ -38,6 +42,11 @@ struct TranslationEditBar: View {
                             .foregroundStyle(.white.opacity(0.75))
                     }
                     hiddenMenu
+                    Button("Translate Page Again") {
+                        viewModel.translateCurrentPagesAgain()
+                    }
+                    .disabled(!viewModel.canTranslateAgain || viewModel.translation.isWorking)
+                    .help("Read and translate the page on screen again, the current way — balloons split in two get joined. Your edits stay; one on a balloon found differently may no longer apply.")
                     if edited > 0 {
                         Button("Revert This Book…") {
                             confirmsRevert = true

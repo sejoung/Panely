@@ -24,6 +24,7 @@ struct TranslationPanel: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openSettings) private var openSettings
     @State private var showsBookSettings = false
+    @State private var confirmsTranslatingAgain = false
 
     private var locale: Locale { viewModel.localization.locale }
 
@@ -171,6 +172,20 @@ struct TranslationPanel: View {
                     }
                     .padding(.top, PanelySpacing.xs)
                     .help("Saves a copy of every volume with its translation painted in, as CBZ or ZIP files or folders of images. Volumes not translated yet are translated first.")
+                }
+            }
+
+            if viewModel.canTranslateAgain {
+                Button("Translate This Book Again…") {
+                    confirmsTranslatingAgain = true
+                }
+                .help("Read and translate every page again, the current way. Your edits stay.")
+                .confirmationDialog("Translate this book again?", isPresented: $confirmsTranslatingAgain) {
+                    Button("Translate Again") {
+                        viewModel.translateBookAgain()
+                    }
+                } message: {
+                    Text("Every page is read and translated again, the way Panely does it now — balloons a page split in two are joined, speech levels matched. It takes as long as the first time. Your edits stay, but one on a balloon that's now found differently may no longer apply.")
                 }
             }
 

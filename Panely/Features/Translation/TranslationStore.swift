@@ -67,6 +67,13 @@ nonisolated struct TranslationStore: Sendable {
         return removed
     }
 
+    /// Forget these entries (pages to translate again).
+    func remove(keys: [String]) {
+        for key in keys {
+            try? FileManager.default.removeItem(at: fileURL(forKey: key))
+        }
+    }
+
     private func fileURL(forKey key: String) -> URL {
         root.appendingPathComponent(key).appendingPathExtension("json")
     }
