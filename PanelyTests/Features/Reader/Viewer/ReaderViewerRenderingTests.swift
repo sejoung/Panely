@@ -200,8 +200,8 @@ struct ReaderViewerRenderingTests {
 
         /// Where `image` is drawn, in window coordinates (bottom-left origin).
         func rect(of image: NSImage) throws -> NSRect {
-            let view = try #require(view(showing: image), "no image view shows this page")
-            return view.convert(view.bounds, to: nil)
+            let imageView = try #require(self.view(showing: image), "no image view shows this page")
+            return imageView.convert(imageView.bounds, to: nil)
         }
 
         func close() { hosted.close() }
