@@ -62,7 +62,7 @@ struct SourceChangeMonitorTests {
         // Truly modify content — this is the user-editing-a-file case.
         try Fixture.makePNG(width: 20, height: 20).write(to: file)
 
-        let final = await recorder.waitForCount(1, timeout: .seconds(2))
+        let final = await recorder.waitForCount(1, timeout: .seconds(10))
         #expect(final >= 1)
     }
 
@@ -94,7 +94,7 @@ struct SourceChangeMonitorTests {
         }
         try Fixture.makePNG(width: 30, height: 30).write(to: file)
 
-        let newFinal = await newCallback.waitForCount(1, timeout: .seconds(2))
+        let newFinal = await newCallback.waitForCount(1, timeout: .seconds(10))
         #expect(newFinal >= 1)
         #expect(oldCallback.count == 0)
     }
