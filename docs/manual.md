@@ -388,65 +388,91 @@ Assist**. The same tab sets:
 - **Translation Cache** — how much space finished translations take, and a
   button to clear them.
 
+### Where things are
+
+Translation is spread over a few places, each for one job:
+
+- **The toolbar's translate button** switches between the original and the
+  translation (`⇧⌘T`). Before a book has anything translated, it opens the
+  panel.
+- **The language name next to it** ("Korean ▾", or "Original ▾") is a menu:
+  pick the language to show, start another language, or open the panel or
+  edit mode. It names what's actually on screen — a new volume of a series
+  read in Korean says "Original" until it's translated, and the menu's first
+  item translates it into Korean.
+- **The translation panel** is for translating this book: what to do next,
+  which language to view, and the book's own settings.
+- **The pill over the page** shows progress while a job runs.
+- **Edit mode** (`⇧⌘E`) is for correcting balloons, right on the page.
+- **Settings → Experimental** holds app-wide choices; the panel's ⚙︎ opens it.
+
 ### Translating a book
 
-Click the **translate** button in the toolbar to open the translation panel,
-then **Translate This Book** (`⌥⌘T`). Translation starts at the page you're
-on and keeps ahead of you as you read:
+Open the panel from the translate button (or the language menu's
+**Translation Panel…**) and press the big **Translate This Book** button (`⌥⌘T`).
+Translation starts at the page you're on and keeps ahead of you as you read:
 
 - Balloons appear with a pulsing outline and "…" as soon as they're found, and
   fill in one by one.
-- A pill over the page shows progress and the time left, with pause and stop.
-  The first translation after installing takes a minute or two while the
-  models load — the pill says so.
+- The line under the button, and the pill over the page, show progress and the
+  time left. The first translation after installing takes a minute or two
+  while the models load — the pill says so.
 - Finished pages get a badge in the thumbnail sidebar and a mark under the
   page slider.
 
+The same line says whether the language pack is installed. If it's missing,
+the big button becomes **Download Language Pack…**.
+
 The first time you translate a series, Panely works out which language the
-book is in and remembers it for the series. If it guessed wrong, change
-**Book's Language** in the panel. If a language pack is missing, the panel
-and the status banner offer to download it.
+book is in and remembers it for the series. If it guessed wrong, open **This
+Book & Series** in the panel and change **Book's Language**; the same section
+holds **Translate This Series Automatically** and **Translate Entire Series**.
 
 In **Vertical scroll** the pages are read as one strip, so a webtoon cut into
 many images still gets whole balloons.
 
 ### Choosing what to view
 
-The panel's **View** list holds **Original (translation off)** and each
-language the book has been translated into, with its progress. Pick one to
-show it — the choice is remembered for the series. `⇧⌘T` switches between the
-original and the translation.
+Use the language menu next to the translate button, or the panel's **View**
+list: **Original
+(translation off)** or any language the book has been translated into, with
+its progress. The choice is remembered for the series. `⇧⌘T` switches between
+the original and the translation.
 
 To read in another language too, choose **Translate into Another Language**.
 Each language is translated and stored separately, so you can read in Korean
-while an English translation runs.
+while an English translation runs; a language's **⋯** menu starts, pauses or
+stops it.
 
 Click any balloon to see its translation, the book's other languages and the
 original together. The text is selectable, so you can copy it or look a word up.
 
 ### Correcting balloons
 
-The same popover lets you correct a balloon:
+Reading shows nothing but the translation. To correct balloons, turn on edit
+mode — **Edit Balloons** in the panel or the language menu, the
+**Edit…** link in a balloon's popover, or `⇧⌘E`. A bar over the page shows
+you're editing; `esc` or **Done** goes back to reading.
+
+In edit mode a balloon's popover offers:
 
 - **Edit** — rewrite the translation. Your translation applies to that
-  language only; **Use Machine Translation** goes back.
+  language only.
 - **Fix Original** — when OCR misread the text, correct it and it's
   translated again, into every language the book is translated into.
-  **Restore Original** goes back.
 - **Hide** — for a "balloon" OCR made up out of artwork or background. The
-  banner that follows offers **Undo**; later, bring hidden balloons back with
-  **Show N Hidden Balloons** in the translation panel or **View › Show Hidden
-  Balloons**.
+  banner that follows offers **Undo**.
+- **Revert** — undo that balloon alone; when both its translation and its
+  original were changed, pick either or both.
 
-Edited balloons carry a small pencil in their corner. **Revert** in the popover
-undoes that balloon alone — when both its translation and its original were
-changed, pick either or both. In the translation panel, expand the hidden
-balloons to jump to their pages or bring them back one by one with **Show**,
-and **Revert All Edits in This Book** undoes everything changed in this book
-only.
+Edited balloons carry a small pencil in their corner, and hidden balloons show
+as dashed outlines — click one to bring it back. The bar counts what's edited,
+lists hidden balloons by page (pick one to go there, or show them all), and
+**Revert This Book…** undoes everything changed in this book only.
 
-`↩` saves, `⇧↩` starts a new line (`⌥↩` and `⌃↩` work too), `esc` cancels. Edits are stored apart from
-the translation cache, so clearing the cache or switching modes keeps them.
+`↩` saves, `⇧↩` starts a new line (`⌥↩` and `⌃↩` work too), `esc` cancels.
+Edits are stored apart from the translation cache, so clearing the cache or
+switching modes keeps them.
 
 ### Other books and whole series
 
@@ -455,9 +481,9 @@ over the page says which book and how far along it is; click it for the list
 of jobs, where you can pause, resume, stop, or jump back to the book. One job
 runs at a time, and whatever you're looking at goes first.
 
-**Translate Entire Series** queues the other volumes of the series — only
-those whose titles match once volume numbers are ignored, and the panel lists
-them before you start.
+**Translate Entire Series** (under **This Book & Series**) queues the other
+volumes of the series — only those whose titles match once volume numbers are
+ignored, and the panel lists them before you start.
 
 A few limits are shown where they apply:
 
@@ -493,3 +519,4 @@ The most-used:
 | Lock view size | `⌘L` |
 | Translation: original ↔ translation | `⇧⌘T` |
 | Translation: translate this book / pause | `⌥⌘T` |
+| Translation: edit balloons / done | `⇧⌘E` |

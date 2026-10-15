@@ -14,6 +14,10 @@ enum TranslationEditChange: Equatable {
     case revertAll
     /// Translate the corrected original into the shown language.
     case retranslate
+    /// Bring back a hidden balloon (edit mode shows it as an outline).
+    case show
+    /// Switch to edit mode, from a balloon's popover while reading.
+    case enterEditMode
 }
 
 /// A balloon edit from the viewer: which page, which balloon (as shown), what.
@@ -120,11 +124,11 @@ final class TranslationEdits {
         pages[pageID]
     }
 
-    /// `page` in `target` with the reader's edits.
-    func apply(to page: TranslatedPage, pageID: String, target: TranslationLanguage) -> TranslatedPage {
+    /// `page` in `target` with the reader's edits; `includeHidden` for edit mode.
+    func apply(to page: TranslatedPage, pageID: String, target: TranslationLanguage, includeHidden: Bool = false) -> TranslatedPage {
         guard let edits = pages[pageID] else { return page }
         let inFlight = Set(retranslating.filter { $0.pageID == pageID && $0.target == target }.map(\.recognizedSource))
-        return edits.apply(to: page, target: target, retranslating: inFlight)
+        return edits.apply(to: page, target: target, retranslating: inFlight, includeHidden: includeHidden)
     }
 
     func update(pageID: String, bubble: TranslatedBubble, _ change: (inout BubbleEdit) -> Void) {

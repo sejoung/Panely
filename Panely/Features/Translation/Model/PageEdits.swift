@@ -41,14 +41,27 @@ nonisolated struct PageEdits: Codable, Sendable, Equatable {
     /// own translations and corrected originals in place, each edited balloon
     /// marked (`TranslatedBubble.edit`).
     ///
-    /// - Parameter retranslating: originals (as recognised) whose correction
-    ///   is being translated into `target` right now — shown as pending.
-    func apply(to page: TranslatedPage, target: TranslationLanguage, retranslating: Set<String> = []) -> TranslatedPage {
+    /// - Parameters:
+    ///   - retranslating: originals (as recognised) whose correction is being
+    ///     translated into `target` right now — shown as pending.
+    ///   - includeHidden: keep hidden balloons, marked (`edit.isHidden`) —
+    ///     edit mode outlines them so they can be brought back.
+    func apply(
+        to page: TranslatedPage,
+        target: TranslationLanguage,
+        retranslating: Set<String> = [],
+        includeHidden: Bool = false
+    ) -> TranslatedPage {
         guard !bubbles.isEmpty else { return page }
         var result = page
         result.bubbles = page.bubbles.compactMap { bubble in
             guard let edit = edit(for: bubble) else { return bubble }
-            guard !edit.isHidden else { return nil }
+            if edit.isHidden {
+                guard includeHidden else { return nil }
+                var hidden = bubble
+                hidden.edit = BubbleEditState(correctedSource: edit.correctedSource, translationIsReaders: false, needsRetranslation: false, isHidden: true)
+                return hidden
+            }
             var shown = bubble
             let own = edit.translations[target.rawValue]
             let retranslated = edit.retranslations[target.rawValue]
@@ -118,4 +131,6 @@ nonisolated struct BubbleEditState: Codable, Sendable, Equatable {
     /// The corrected original isn't translated into this language yet, so
     /// the machine translation of the recognised text still shows.
     var needsRetranslation: Bool
+    /// Hidden by the reader; only present in edit mode, drawn as an outline.
+    var isHidden = false
 }

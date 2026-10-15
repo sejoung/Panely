@@ -23,6 +23,16 @@ struct PageEditsTests {
         #expect(edits.hiddenCount == 1)
     }
 
+    @Test func editModeKeepsHiddenBalloonsMarked() {
+        var edits = PageEdits()
+        edits.update(bubble) { $0.isHidden = true }
+
+        let editing = edits.apply(to: page, target: .korean, includeHidden: true)
+        #expect(editing.bubbles.count == 1)
+        #expect(editing.bubbles[0].edit?.isHidden == true)
+        #expect(edits.apply(to: page, target: .korean).bubbles.isEmpty)
+    }
+
     @Test func ownTranslationBelongsToItsLanguage() {
         var edits = PageEdits()
         edits.update(bubble) { $0.translations[TranslationLanguage.korean.rawValue] = "내 번역" }

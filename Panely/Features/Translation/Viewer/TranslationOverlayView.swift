@@ -3,8 +3,12 @@ import QuartzCore
 import SwiftUI
 
 /// Draws one page's translations over the original and makes each balloon
-/// clickable: a click opens the original next to its translation, where the
-/// balloon can also be corrected (`onEdit`).
+/// clickable: a click opens the original next to its translation.
+///
+/// In edit mode (`isEditing`) the popover also corrects the balloon
+/// (`onEdit`), edited balloons carry a pencil badge, and hidden balloons are
+/// drawn as dashed outlines — a click brings one back. Reading shows none of
+/// that, only the translation.
 ///
 /// Hosted by `ImageStackView` above all page images (not inside the page's
 /// image view), positioned over the page and extended past it when a balloon
@@ -21,6 +25,10 @@ import SwiftUI
 final class TranslationOverlayView: NSView {
     private(set) var page: TranslatedPage?
     private(set) var showsTranslation = false
+    private(set) var isEditing = false
+    /// Set when a reading popover asked for edit mode: that balloon's popover
+    /// reopens, with its edits, once the overlay is in edit mode.
+    private var reopenForEditingBubbleID: Int?
     /// A correction made in a balloon's popover.
     var onEdit: ((TranslationEditRequest) -> Void)?
     private var pageOrigin: CGPoint = .zero
@@ -55,19 +63,26 @@ final class TranslationOverlayView: NSView {
     /// - Parameters:
     ///   - pageOrigin: where page pixel (0, 0) sits in this view.
     ///   - scale: view points per page pixel.
-    func update(page: TranslatedPage?, showsTranslation: Bool, pageOrigin: CGPoint, scale: CGFloat) {
+    func update(page: TranslatedPage?, showsTranslation: Bool, isEditing: Bool = false, pageOrigin: CGPoint, scale: CGFloat) {
         let geometryChanged = pageOrigin != self.pageOrigin || scale != self.scale
-        guard page != self.page || showsTranslation != self.showsTranslation || geometryChanged else { return }
+        let modeChanged = isEditing != self.isEditing
+        guard page != self.page || showsTranslation != self.showsTranslation || modeChanged || geometryChanged else { return }
         if page?.bubbles.map(\.id) != self.page?.bubbles.map(\.id) {
             hoveredBubbleID = nil
         }
-        if page == nil { closePopover() }
+        // The open popover belongs to the other mode.
+        if page == nil || modeChanged { closePopover() }
         self.page = page
         self.showsTranslation = showsTranslation
+        self.isEditing = isEditing
         self.pageOrigin = pageOrigin
         self.scale = scale
         pendingView.update(rects: pendingRects(), glyph: pendingGlyph())
         needsDisplay = true
+        if isEditing, let id = reopenForEditingBubbleID {
+            reopenForEditingBubbleID = nil
+            showPopover(forBubbleID: id)
+        }
     }
 
     // MARK: - Geometry
@@ -89,7 +104,7 @@ final class TranslationOverlayView: NSView {
 
     private func pendingRects() -> [CGRect] {
         guard let page else { return [] }
-        return page.bubbles.filter { $0.translation == nil }.map(patchInView)
+        return page.bubbles.filter { $0.translation == nil && $0.edit?.isHidden != true }.map(patchInView)
     }
 
     private func pendingGlyph() -> CGFloat {
@@ -142,8 +157,14 @@ final class TranslationOverlayView: NSView {
         let bubbleID = bubble.id
         pendingPopover = Task { [weak self] in
             try? await Task.sleep(for: .seconds(NSEvent.doubleClickInterval))
-            guard !Task.isCancelled else { return }
-            self?.showPopover(forBubbleID: bubbleID)
+            guard !Task.isCancelled, let self else { return }
+            if bubble.edit?.isHidden == true {
+                // A hidden balloon's outline: clicking it brings it back.
+                guard let pageID = self.page?.pageID else { return }
+                self.onEdit?(TranslationEditRequest(pageID: pageID, bubble: bubble, change: .show))
+            } else {
+                self.showPopover(forBubbleID: bubbleID)
+            }
         }
     }
 
@@ -167,11 +188,13 @@ final class TranslationOverlayView: NSView {
                 translation: bubble.translation,
                 alternates: bubble.alternates ?? [:],
                 edit: bubble.edit,
+                isEditing: isEditing,
                 onEdit: pageID == nil ? nil : { [weak self] change in
                     // Return can reach both the field and the default button;
                     // the first one closes the popover and wins.
                     guard let self, let pageID, self.popover != nil else { return }
                     self.closePopover()
+                    if change == .enterEditMode { self.reopenForEditingBubbleID = bubble.id }
                     self.onEdit?(TranslationEditRequest(pageID: pageID, bubble: bubble, change: change))
                 },
                 onEditingChanged: { [weak self] isEditing in
@@ -214,11 +237,15 @@ final class TranslationOverlayView: NSView {
         for bubble in page.bubbles {
             let patch = patchInView(bubble)
             guard patch.intersects(dirtyRect) else { continue }
-            if showsTranslation, let translation = bubble.translation, !translation.isEmpty {
-                drawTranslation(translation, of: bubble, in: patch)
-            }
-            if showsTranslation, bubble.edit != nil {
-                drawEditBadge(in: patch)
+            if bubble.edit?.isHidden == true {
+                drawHiddenOutline(around: patch, glyph: CGFloat(bubble.glyphSize) * scale)
+            } else {
+                if showsTranslation, let translation = bubble.translation, !translation.isEmpty {
+                    drawTranslation(translation, of: bubble, in: patch)
+                }
+                if showsTranslation, isEditing, bubble.edit != nil {
+                    drawEditBadge(in: patch)
+                }
             }
             if bubble.id == hoveredBubbleID {
                 drawHoverHighlight(around: patch, glyph: CGFloat(bubble.glyphSize) * scale)
@@ -282,9 +309,28 @@ final class TranslationOverlayView: NSView {
         text.string.draw(with: textRect, options: [.usesLineFragmentOrigin, .usesFontLeading])
     }
 
-    /// A small pencil in the corner of a balloon the reader changed, so
-    /// edits can be told apart (and found again to revert) without opening
-    /// every balloon.
+    /// Edit mode: where a hidden balloon is — the original shows through,
+    /// framed by a dashed line with an eye-slash, and a click brings it back.
+    private func drawHiddenOutline(around patch: CGRect, glyph: CGFloat) {
+        let radius = max(4, glyph * 0.5)
+        let path = NSBezierPath(roundedRect: patch.insetBy(dx: 1, dy: 1), xRadius: radius, yRadius: radius)
+        path.lineWidth = 1.5
+        path.setLineDash([5, 4], count: 2, phase: 0)
+        NSColor.systemGray.withAlphaComponent(0.9).setStroke()
+        path.stroke()
+        let size = min(max(12, patch.height * 0.16), 18)
+        guard patch.width > size * 2, patch.height > size * 1.5 else { return }
+        let configuration = NSImage.SymbolConfiguration(pointSize: size * 0.7, weight: .semibold)
+            .applying(NSImage.SymbolConfiguration(paletteColors: [.systemGray]))
+        guard let eye = NSImage(systemSymbolName: "eye.slash", accessibilityDescription: nil)?
+            .withSymbolConfiguration(configuration) else { return }
+        let rect = CGRect(x: patch.maxX - eye.size.width - 4, y: patch.minY + 4, width: eye.size.width, height: eye.size.height)
+        eye.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+    }
+
+    /// Edit mode: a small pencil in the corner of a balloon the reader
+    /// changed, so edits can be told apart (and found again to revert)
+    /// without opening every balloon.
     private func drawEditBadge(in patch: CGRect) {
         let size = min(max(12, patch.height * 0.16), 18)
         guard patch.width > size * 2, patch.height > size * 1.5 else { return }

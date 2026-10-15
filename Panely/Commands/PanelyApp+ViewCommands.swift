@@ -139,6 +139,17 @@ extension PanelyApp {
                 .keyboardShortcut("t", modifiers: [.command, .option])
                 .disabled(!viewModel.hasSource)
 
+                Button(
+                    viewModel.isEditingTranslations
+                        ? String(localized: "Done Editing Balloons", bundle: .localized)
+                        : String(localized: "Edit Balloons", bundle: .localized)
+                ) {
+                    viewModel.toggleEditingTranslations()
+                }
+                // Not ⌘E: that's the system's Use Selection for Find.
+                .keyboardShortcut("e", modifiers: [.command, .shift])
+                .disabled(!viewModel.isEditingTranslations && !viewModel.canEditTranslations)
+
                 Button(String(localized: "Show Hidden Balloons", bundle: .localized)) {
                     viewModel.translationEdits.showAllHidden()
                 }

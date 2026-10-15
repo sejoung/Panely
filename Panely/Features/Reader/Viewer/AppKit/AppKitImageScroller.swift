@@ -29,6 +29,8 @@ struct AppKitImageScroller: NSViewRepresentable {
     /// Translation assist results aligned with `images` (empty when off).
     var translationPages: [TranslatedPage?] = []
     var showsTranslation: Bool = false
+    /// Balloon edit mode (see `TranslationOverlayView`).
+    var isEditingTranslation: Bool = false
     var onTranslationEdit: (TranslationEditRequest) -> Void = { _ in }
 
     /// Looser than `ViewerController.fitTolerance` (10×) on purpose: a tiny
@@ -154,7 +156,7 @@ struct AppKitImageScroller: NSViewRepresentable {
             return
         }
         let ordered = (direction.isRTL && !layout.isContinuous) ? translationPages.reversed() : translationPages
-        content.setTranslationOverlay(ordered, showsTranslation: showsTranslation)
+        content.setTranslationOverlay(ordered, showsTranslation: showsTranslation, isEditing: isEditingTranslation)
     }
 
     /// Compares incoming props against the coordinator's last-seen snapshot,

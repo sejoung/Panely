@@ -7,10 +7,11 @@ import SwiftUI
 /// menu) — the original matters as much as the translation for following
 /// along.
 ///
-/// It's also where a balloon is corrected: rewrite the translation, fix the
-/// recognised original and translate it again, or hide a balloon OCR made up
-/// out of artwork. Each change goes out through `onEdit` and closes the
-/// popover; the page redraws with it.
+/// In edit mode it's also where a balloon is corrected: rewrite the
+/// translation, fix the recognised original and translate it again, hide a
+/// balloon OCR made up out of artwork, or revert. Each change goes out through
+/// `onEdit` and closes the popover; the page redraws with it. While reading it
+/// stays a plain look-up, with one link into edit mode.
 ///
 /// Hosted in an `NSPopover` outside the main SwiftUI tree, so it doesn't
 /// inherit the app's `\.locale`; its UI strings are resolved through
@@ -22,6 +23,8 @@ struct TranslationBubblePopover: View {
     /// The same balloon in the book's other translated languages.
     var alternates: [TranslationLanguage: String] = [:]
     var edit: BubbleEditState?
+    /// Edit mode: the editing controls show. Reading: an "Edit…" link.
+    var isEditing = false
     /// `nil` hides the editing controls (previews).
     var onEdit: ((TranslationEditChange) -> Void)?
     /// While editing the popover mustn't close on a stray click outside.
@@ -72,8 +75,22 @@ struct TranslationBubblePopover: View {
 
             if mode == .viewing {
                 footer
-                if onEdit != nil {
-                    actions
+                if let onEdit {
+                    if isEditing {
+                        actions
+                    } else {
+                        HStack {
+                            Spacer(minLength: 0)
+                            Button {
+                                onEdit(.enterEditMode)
+                            } label: {
+                                Label(L("Edit…"), systemImage: "pencil")
+                            }
+                            .buttonStyle(.link)
+                            .font(.caption)
+                            .help(L("Switch to edit mode to correct or hide balloons (⇧⌘E)"))
+                        }
+                    }
                 }
             }
         }
@@ -135,7 +152,7 @@ struct TranslationBubblePopover: View {
             .foregroundStyle(edit == nil ? PanelyColor.textSecondary.opacity(0.8) : PanelyColor.accentPrimary)
             .fixedSize(horizontal: false, vertical: true)
 
-            if let onEdit, let edit {
+            if isEditing, let onEdit, let edit {
                 HStack(spacing: PanelySpacing.xs) {
                     Spacer(minLength: 0)
                     if edit.needsRetranslation {
@@ -323,6 +340,7 @@ private struct BalloonTextEditor: NSViewRepresentable {
     TranslationBubblePopover(
         source: "あの方のお導きに誤りなどあるはずがございません",
         translation: "그 분의 인도에 오류 등이 있을 리가 없습니다.",
+        isEditing: true,
         onEdit: { _ in }
     )
     .preferredColorScheme(.dark)

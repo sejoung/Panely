@@ -23,6 +23,7 @@ struct ViewerContainer: View {
     var viewerController: ViewerController? = nil
     var translationPages: [TranslatedPage?] = []
     var showsTranslation: Bool = false
+    var isEditingTranslation: Bool = false
     var onTranslationEdit: (TranslationEditRequest) -> Void = { _ in }
 
     var body: some View {
@@ -49,6 +50,7 @@ struct ViewerContainer: View {
                     viewerController: viewerController,
                     translationPages: translationPages,
                     showsTranslation: showsTranslation,
+                    isEditingTranslation: isEditingTranslation,
                     onTranslationEdit: onTranslationEdit
                 )
             }

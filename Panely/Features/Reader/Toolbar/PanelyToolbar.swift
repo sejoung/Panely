@@ -39,9 +39,30 @@ struct PanelyToolbarState: Equatable {
 }
 
 struct ToolbarTranslationState: Equatable {
+    /// One of the open book's languages, for the ▾ menu.
+    struct Language: Equatable {
+        let language: TranslationLanguage
+        let name: String
+    }
+
     var showsTranslation = true
     var isWorking = false
     var hasTranslations = false
+    /// The language shown when translation is on.
+    var shownLanguage: TranslationLanguage?
+    var shownLanguageName = ""
+    /// The book's languages, to switch between.
+    var languages: [Language] = []
+    /// The series' language when this book has none of it yet (a new
+    /// volume) — offered first, to translate this book into it.
+    var suggestedLanguage: Language?
+    /// Languages the book isn't translated into yet, to start one.
+    var otherLanguages: [Language] = []
+    var isEditing = false
+    var canEdit = false
+
+    /// Something to switch to: before that, the button opens the panel.
+    var canToggle: Bool { hasTranslations || isWorking }
 }
 
 struct PanelyToolbarActions {
@@ -67,6 +88,47 @@ struct PanelyToolbarActions {
     var onNextBookmark: () -> Void = {}
     var onOpenBookmark: (PageBookmark, BookmarkedBook) -> Void = { _, _ in }
     var onRemoveAllPageBookmarks: () -> Void = {}
+    var onToggleTranslation: () -> Void = {}
+    var onShowOriginal: () -> Void = {}
+    var onShowTranslation: (TranslationLanguage) -> Void = { _ in }
+    var onToggleTranslationEditing: () -> Void = {}
+    var onTranslateInto: (TranslationLanguage) -> Void = { _ in }
+}
+
+/// The translation menu's face: the language on screen ("Original" when
+/// translation is off) and a chevron, highlighted on hover like the icon
+/// buttons beside it.
+private struct ToolbarLanguageLabel: View {
+    /// `nil` = the original.
+    let title: String?
+    @State private var isHovering = false
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Group {
+                if let title {
+                    Text(verbatim: title)
+                } else {
+                    Text("Original")
+                }
+            }
+            .font(.system(size: 12, weight: .medium))
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(maxWidth: 110)
+            Image(systemName: "chevron.down")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(PanelyColor.textSecondary)
+        }
+        .foregroundStyle(PanelyColor.textPrimary)
+        .padding(.horizontal, 8)
+        .frame(height: 32)
+        .background(isHovering ? PanelyColor.bgTertiary : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .contentShape(Rectangle())
+        .onHover { isHovering = $0 }
+        .animation(PanelyMotion.uiReveal, value: isHovering)
+    }
 }
 
 /// The floating reader toolbar. Presentation-only — every action is a
@@ -367,23 +429,102 @@ struct PanelyToolbar: View {
         }
     }
 
-    /// Experimental translation assist: opens the translation panel. Lit
-    /// while translations are showing; pulses while a job is running.
+    /// Experimental translation assist. The button switches between the
+    /// original and the translation — the thing done most while reading — and
+    /// opens the translation panel until there's a translation to switch to.
+    /// Its ▾ picks the language and holds the rest. Lit while translations
+    /// are showing; pulses while a job is running.
     @ViewBuilder
     private func translationButton(_ translation: ToolbarTranslationState) -> some View {
-        iconButton(
-            "translation",
-            // One glyph in every state (there is no `translate.circle`); a
-            // running job pulses it instead.
-            "translate",
-            hint: translation.isWorking ? "Translating… (Experimental)" : "Translation (Experimental)",
-            isActive: translation.showsTranslation && translation.hasTranslations,
-            action: { showsTranslationPanel.toggle() }
-        )
-        .symbolEffect(.pulse, isActive: translation.isWorking)
-        .popover(isPresented: $showsTranslationPanel, arrowEdge: .bottom) {
-            translationPanel
+        HStack(spacing: 0) {
+            iconButton(
+                "translation",
+                // One glyph in every state (there is no `translate.circle`); a
+                // running job pulses it instead.
+                "translate",
+                hint: translationHint(translation),
+                isActive: translation.showsTranslation && translation.hasTranslations,
+                action: {
+                    if translation.canToggle {
+                        actions.onToggleTranslation()
+                    } else {
+                        showsTranslationPanel.toggle()
+                    }
+                }
+            )
+            .symbolEffect(.pulse, isActive: translation.isWorking)
+            .popover(isPresented: $showsTranslationPanel, arrowEdge: .bottom) {
+                translationPanel
+            }
+
+            translationMenu(translation)
         }
+    }
+
+    private func translationHint(_ translation: ToolbarTranslationState) -> LocalizedStringKey {
+        guard translation.canToggle else { return "Translation (Experimental)" }
+        if translation.isWorking && !translation.showsTranslation { return "Show Translation (⇧⌘T) · Translating…" }
+        if translation.isWorking { return "Show Original (⇧⌘T) · Translating…" }
+        return translation.showsTranslation ? "Show Original (⇧⌘T)" : "Show Translation (⇧⌘T)"
+    }
+
+    /// Next to the translation button, the language on screen by name —
+    /// "Korean ▾", "Original ▾" — so changing it is in plain sight. The menu
+    /// switches what's shown, starts another language, and holds the panel
+    /// and edit mode.
+    private func translationMenu(_ translation: ToolbarTranslationState) -> some View {
+        Menu {
+            if let suggested = translation.suggestedLanguage {
+                Button {
+                    actions.onTranslateInto(suggested.language)
+                } label: {
+                    Label("Translate This Book into \(suggested.name)", systemImage: "play.fill")
+                }
+                Divider()
+            }
+            Section("View") {
+                menuItem("Original", isSelected: !translation.showsTranslation) {
+                    actions.onShowOriginal()
+                }
+                ForEach(translation.languages, id: \.language) { item in
+                    Toggle(isOn: Binding(
+                        get: { translation.showsTranslation && translation.shownLanguage == item.language },
+                        set: { _ in actions.onShowTranslation(item.language) }
+                    )) {
+                        Text(verbatim: item.name)
+                    }
+                }
+            }
+            if !translation.otherLanguages.isEmpty {
+                Menu("Translate into Another Language") {
+                    ForEach(translation.otherLanguages, id: \.language) { item in
+                        Button {
+                            actions.onTranslateInto(item.language)
+                        } label: {
+                            Text(verbatim: item.name)
+                        }
+                    }
+                }
+            }
+            Divider()
+            Button("Translation Panel…") {
+                showsTranslationPanel = true
+            }
+            Button(translation.isEditing ? "Done Editing Balloons" : "Edit Balloons") {
+                actions.onToggleTranslationEditing()
+            }
+            .disabled(!translation.isEditing && !translation.canEdit)
+        } label: {
+            ToolbarLanguageLabel(
+                title: translation.showsTranslation ? translation.shownLanguageName : nil
+            )
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .accessibilityLabel(Text("Choose Language"))
+        .toolbarHint("translationLanguage", "Choose Language", hovered: $hoveredHint)
     }
 
     /// Every bookmark one click away: the open book's pages, stepping between

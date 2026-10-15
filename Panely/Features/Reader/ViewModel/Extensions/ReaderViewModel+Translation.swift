@@ -22,10 +22,11 @@ import Foundation
 /// Jobs outlive the open book: opening another book leaves them running in the
 /// background, and reopening the book reattaches to them.
 ///
-/// Balloons can be corrected from their popover — a translation rewritten, the
-/// recognised original fixed and translated again, a misread balloon hidden.
-/// Those edits (`TranslationEdits`) are kept apart from the machine
-/// translations and laid over them for display.
+/// Balloons can be corrected in edit mode (⇧⌘E) — a translation rewritten,
+/// the recognised original fixed and translated again, a misread balloon
+/// hidden. Reading stays clean: edit marks and hidden-balloon outlines only
+/// show while editing. Edits (`TranslationEdits`) are kept apart from the
+/// machine translations and laid over them for display.
 ///
 /// It's a comprehension aid: originals stay one click (or ⇧⌘T) away, and
 /// nothing is written back into the user's files.
@@ -133,18 +134,60 @@ extension ReaderViewModel {
     // MARK: - Showing
 
     /// Whether a translation is painted over the page (off = the original).
+    /// A setting: it stays on for a book with nothing translated yet.
     var translationOverlayVisible: Bool {
         preferences.translationOverlayVisible
+    }
+
+    /// What's actually on screen: translation on *and* this book has some of
+    /// the shown language (or is getting it). The toolbar and panel mark the
+    /// language as selected only then — the series remembers its language,
+    /// so a new volume would otherwise show one ticked with nothing of it.
+    var translationIsShowing: Bool {
+        translationOverlayVisible && (!translation.pages.isEmpty || translation.hasActiveJob)
+    }
+
+    /// The open book's languages with something to show — what can be
+    /// switched to. The rest can only be started.
+    var translationLanguagesWithResults: [TranslationController] {
+        translationLanguagesForBook.filter { !$0.pages.isEmpty || $0.hasActiveJob }
     }
 
     func toggleTranslationOverlay() {
         guard translationFeatureAvailable else { return }
         preferences.translationOverlayVisible.toggle()
+        if !preferences.translationOverlayVisible { isEditingTranslations = false }
     }
 
     /// Show the original pages (translation off).
     func showOriginal() {
         preferences.translationOverlayVisible = false
+        isEditingTranslations = false
+    }
+
+    // MARK: - Edit mode
+
+    /// Edit mode needs a translation on screen to edit.
+    var canEditTranslations: Bool {
+        translationFeatureAvailable && hasSource && !translation.pages.isEmpty
+    }
+
+    /// Enter or leave balloon edit mode. Entering shows the translation.
+    func setEditingTranslations(_ editing: Bool) {
+        guard !editing || canEditTranslations else { return }
+        if editing { preferences.translationOverlayVisible = true }
+        isEditingTranslations = editing
+        if !editing { translationEdits.dismissRecentlyHidden() }
+    }
+
+    func toggleEditingTranslations() {
+        setEditingTranslations(!isEditingTranslations)
+    }
+
+    /// Whether the translation panel's "click a balloon" tip still shows.
+    var showsTranslationBalloonTip: Bool {
+        get { !preferences.translationBalloonTipDismissed }
+        set { preferences.translationBalloonTipDismissed = !newValue }
     }
 
     /// Show the book in `language` (translation on).
@@ -171,7 +214,7 @@ extension ReaderViewModel {
         let others = translationManager.openBook.filter { $0 !== shown && !$0.pages.isEmpty }
         return imageLoader.currentPageIDs.map { id in
             guard let machine = shown.pages[id] else { return nil }
-            var page = translationEdits.apply(to: machine, pageID: id, target: shown.target)
+            var page = translationEdits.apply(to: machine, pageID: id, target: shown.target, includeHidden: isEditingTranslations)
             page.pageID = id
             guard !others.isEmpty else { return page }
             let edits = translationEdits.edits(forPage: id)
@@ -286,6 +329,12 @@ extension ReaderViewModel {
         case .retranslate:
             guard let corrected = bubble.edit?.correctedSource else { return }
             retranslate(bubble, correctedSource: corrected, pageID: request.pageID, into: target)
+        case .show:
+            translationEdits.update(pageID: request.pageID, bubble: bubble) { edit in
+                edit.isHidden = false
+            }
+        case .enterEditMode:
+            setEditingTranslations(true)
         }
     }
 
@@ -407,6 +456,7 @@ extension ReaderViewModel {
     /// layout — which decides page vs strip — later in the same main-actor turn.
     func translationSourceDidChange() {
         seriesTranslationSkipped = []
+        isEditingTranslations = false
         translationManager.detachOpenBook()
         Task { @MainActor [weak self] in
             self?.reloadTranslations(autoStart: true, bookChanged: true)

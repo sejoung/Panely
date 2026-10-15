@@ -171,7 +171,7 @@ private struct ReaderStatusBanner: View {
         } else if viewModel.translationEdits.recentlyHidden != nil {
             banner(
                 systemImage: "eye.slash",
-                message: String(localized: "Balloon hidden. Hidden balloons come back from the translation panel or View › Show Hidden Balloons.", bundle: .localized)
+                message: String(localized: "Balloon hidden. While editing, hidden balloons show as dashed outlines — click one to bring it back.", bundle: .localized)
             ) {
                 Button("Undo") {
                     viewModel.translationEdits.undoHide()

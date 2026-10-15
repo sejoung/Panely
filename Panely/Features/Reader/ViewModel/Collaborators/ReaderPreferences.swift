@@ -31,6 +31,7 @@ final class ReaderPreferences {
     static let translationModeKey = "panely.translation.mode"
     static let translationTargetLanguageKey = "panely.translation.targetLanguage"
     static let translationOverlayVisibleKey = "panely.translation.overlayVisible"
+    static let translationBalloonTipDismissedKey = "panely.translation.balloonTipDismissed"
     /// Read by AppKit at launch to pick the app's localization. Written into
     /// Panely's own defaults only — the system-wide list is never touched.
     static let appleLanguagesKey = "AppleLanguages"
@@ -167,6 +168,13 @@ final class ReaderPreferences {
         }
     }
 
+    /// The translation panel's "click a balloon" tip was dismissed.
+    var translationBalloonTipDismissed: Bool = false {
+        didSet {
+            defaults.set(translationBalloonTipDismissed, forKey: Self.translationBalloonTipDismissedKey)
+        }
+    }
+
     /// Re-derive the `AppleLanguages` override. Also run at launch: under
     /// "System Default" the right value depends on the Mac's language, which
     /// may have changed since it was last written.
@@ -247,6 +255,9 @@ final class ReaderPreferences {
         }
         if let value = storedDefaults[Self.translationOverlayVisibleKey] as? Bool {
             translationOverlayVisible = value
+        }
+        if let value = storedDefaults[Self.translationBalloonTipDismissedKey] as? Bool {
+            translationBalloonTipDismissed = value
         }
     }
 }

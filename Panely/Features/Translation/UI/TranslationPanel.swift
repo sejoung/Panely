@@ -1,17 +1,27 @@
 import SwiftUI
 import Translation
 
-/// The translation assist's controls for the open book, opened from the
-/// toolbar.
+/// The translation panel: translating the open book, nothing else. Opened
+/// from the toolbar's ▾ menu (or the button itself before there's anything
+/// to show).
 ///
-/// - **View**: the original (translation off) or one of the book's
-///   languages. Each language row shows its own progress and runs its own job;
-///   picking one shows it, and the choice is remembered for the series.
-/// - The book's own language (detected, remembered per series, correctable).
-/// - Series translation, background jobs for other books, and caveats where
-///   they apply.
+/// Top to bottom, by how often each is needed:
+/// - **What to do next** — one big button (translate, download the pack,
+///   pause, resume) and one status line (progress, the pack).
+/// - **View** — the original or one of the book's languages; other languages
+///   start, pause or stop from their `⋯` menu.
+/// - **This book & series** — collapsed: the book's language, auto-translate,
+///   translating the whole series, and the limits that apply.
+/// - **Edit Balloons** — into edit mode, where correcting happens on the page.
+///
+/// Elsewhere on purpose: on/off and switching languages (toolbar, ⇧⌘T),
+/// running progress (the pill over the page), other books' jobs (their own
+/// pill), editing (edit mode's bar) and app-wide choices (Settings, ⚙︎).
 struct TranslationPanel: View {
     @Environment(ReaderViewModel.self) private var viewModel
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.openSettings) private var openSettings
+    @State private var showsBookSettings = false
 
     private var locale: Locale { viewModel.localization.locale }
 
@@ -31,18 +41,11 @@ struct TranslationPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: PanelySpacing.md) {
-            HStack(spacing: PanelySpacing.xs) {
-                Text("Translation")
-                    .font(.headline)
-                Text("Experimental")
-                    .font(.caption2.weight(.semibold))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(PanelyColor.bgTertiary, in: Capsule())
-                    .foregroundStyle(PanelyColor.textSecondary)
-            }
+            header
 
-            sourceRow
+            if #available(macOS 26.0, *), viewModel.translationSourceLanguage != viewModel.translationDisplayLanguage {
+                TranslationPrimaryAction()
+            }
 
             VStack(alignment: .leading, spacing: PanelySpacing.xs) {
                 Text("View")
@@ -54,18 +57,98 @@ struct TranslationPanel: View {
                 addLanguageMenu
             }
 
-            if #available(macOS 26.0, *), viewModel.translationSourceLanguage != viewModel.translationDisplayLanguage {
-                TranslationPrimaryAction()
+            DisclosureGroup(isExpanded: $showsBookSettings) {
+                bookSettings
+                    .padding(.top, PanelySpacing.xs)
+            } label: {
+                HStack(spacing: PanelySpacing.xs) {
+                    Text("This Book & Series")
+                        .font(.subheadline.weight(.semibold))
+                    if let source = viewModel.translationSourceLanguage {
+                        Text(verbatim: "· " + source.displayName(in: locale))
+                            .font(.caption)
+                            .foregroundStyle(PanelyColor.textSecondary)
+                    }
+                    if hasBookCaveat {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                }
+                .contentShape(Rectangle())
+                .onTapGesture { showsBookSettings.toggle() }
             }
 
-            TranslationEditsSection()
-
-            if viewModel.currentBookLivesInTemporaryFolder {
-                TranslationCaveat(
-                    systemImage: "exclamationmark.triangle",
-                    text: "This book is an archive inside an archive. Its translation pauses when you open another book and continues when you come back."
-                )
+            if viewModel.showsTranslationBalloonTip {
+                HStack(alignment: .top, spacing: PanelySpacing.xs) {
+                    TranslationCaveat(
+                        systemImage: "lightbulb",
+                        text: "Click a balloon to see the original next to its translations."
+                    )
+                    Spacer(minLength: 0)
+                    Button {
+                        viewModel.showsTranslationBalloonTip = false
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.caption2)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(PanelyColor.textSecondary)
+                    .help("Don't Show Again")
+                }
             }
+
+            Divider()
+
+            Button {
+                viewModel.setEditingTranslations(true)
+                dismiss()
+            } label: {
+                Label("Edit Balloons", systemImage: "pencil")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .disabled(!viewModel.canEditTranslations)
+            .help("Correct translations, fix misread originals and hide balloons, right on the page (⇧⌘E)")
+        }
+        .padding(PanelySpacing.md)
+        .frame(width: 340, alignment: .leading)
+    }
+
+    private var header: some View {
+        HStack(spacing: PanelySpacing.xs) {
+            Text("Translation")
+                .font(.headline)
+            Text("Experimental")
+                .font(.caption2.weight(.semibold))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(PanelyColor.bgTertiary, in: Capsule())
+                .foregroundStyle(PanelyColor.textSecondary)
+            Spacer(minLength: 0)
+            Button {
+                viewModel.settingsTab = .experimental
+                dismiss()
+                openSettings()
+            } label: {
+                Image(systemName: "gearshape")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(PanelyColor.textSecondary)
+            .help("Translation Settings")
+        }
+    }
+
+    // MARK: - This book & series
+
+    private var hasBookCaveat: Bool {
+        viewModel.currentBookLivesInTemporaryFolder || !viewModel.seriesTranslationSkipped.isEmpty
+    }
+
+    private var bookSettings: some View {
+        VStack(alignment: .leading, spacing: PanelySpacing.sm) {
+            sourceRow
+            Toggle("Translate This Series Automatically", isOn: autoBinding)
 
             let volumes = viewModel.translatableSeriesVolumes
             if !volumes.isEmpty {
@@ -90,31 +173,13 @@ struct TranslationPanel: View {
                 )
             }
 
-            let others = viewModel.translationManager.backgroundJobs.filter { $0.bookKey != viewModel.translationManager.openBookKey }
-            if !others.isEmpty {
-                Divider()
-                Text("Other Books")
-                    .font(.subheadline.weight(.semibold))
-                TranslationJobsList(jobs: others, showsQuitNote: false)
-            }
-
-            if !viewModel.translationManager.activeJobs.isEmpty {
+            if viewModel.currentBookLivesInTemporaryFolder {
                 TranslationCaveat(
-                    systemImage: "info.circle",
-                    text: "Quitting Panely stops translating. Finished pages are kept, and the rest continues when you start again."
+                    systemImage: "exclamationmark.triangle",
+                    text: "This book is an archive inside an archive. Its translation pauses when you open another book and continues when you come back."
                 )
             }
-
-            Divider()
-
-            Toggle("Translate This Series Automatically", isOn: autoBinding)
-            Text("Click a balloon to see the original next to its translations, and to correct or hide it.")
-                .font(.caption)
-                .foregroundStyle(PanelyColor.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(PanelySpacing.md)
-        .frame(width: 340, alignment: .leading)
     }
 
     private var sourceRow: some View {
@@ -144,9 +209,11 @@ struct TranslationPanel: View {
         }
     }
 
+    // MARK: - View
+
     /// "Original" — translation off (⇧⌘T toggles back to the language).
     private var originalRow: some View {
-        let isSelected = !viewModel.translationOverlayVisible
+        let isSelected = !viewModel.translationIsShowing
         return Button {
             viewModel.showOriginal()
         } label: {
@@ -192,112 +259,19 @@ struct TranslationPanel: View {
     }
 }
 
-/// The open book's balloon edits: hidden balloons listed to bring back one at
-/// a time (or all at once), and a way to revert everything changed in this
-/// book. Edits in other books stay as they are; Settings deletes them all.
-struct TranslationEditsSection: View {
-    @Environment(ReaderViewModel.self) private var viewModel
-    @State private var showsHidden = false
-    @State private var confirmsRevert = false
-
-    var body: some View {
-        let edits = viewModel.translationEdits
-        let edited = edits.editedCount
-        if edited > 0 {
-            VStack(alignment: .leading, spacing: PanelySpacing.xs) {
-                let hidden = viewModel.translationHiddenBalloons
-                if !hidden.isEmpty {
-                    DisclosureGroup(isExpanded: $showsHidden) {
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: PanelySpacing.xs) {
-                                ForEach(hidden) { balloon in
-                                    hiddenRow(balloon)
-                                }
-                            }
-                            .padding(.vertical, 2)
-                        }
-                        .frame(maxHeight: 150)
-                    } label: {
-                        HStack(spacing: PanelySpacing.xs) {
-                            Label("\(hidden.count) Hidden Balloons", systemImage: "eye.slash")
-                            Spacer(minLength: 0)
-                            Button("Show All") {
-                                edits.showAllHidden()
-                            }
-                            .controlSize(.small)
-                            .help("Balloons you hid in this book appear again.")
-                        }
-                    }
-                }
-
-                if confirmsRevert {
-                    VStack(alignment: .leading, spacing: PanelySpacing.xs) {
-                        Text("Revert all \(edited) edited balloons in this book to the machine translation? Hidden balloons appear again.")
-                            .font(.caption)
-                            .foregroundStyle(PanelyColor.textSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        HStack(spacing: PanelySpacing.xs) {
-                            Spacer(minLength: 0)
-                            Button("Cancel") {
-                                confirmsRevert = false
-                            }
-                            Button("Revert All", role: .destructive) {
-                                edits.revertAllInBook()
-                                confirmsRevert = false
-                            }
-                        }
-                        .controlSize(.small)
-                    }
-                } else {
-                    Button {
-                        confirmsRevert = true
-                    } label: {
-                        Label("Revert All Edits in This Book…", systemImage: "arrow.uturn.backward")
-                    }
-                    .buttonStyle(.link)
-                    .font(.caption)
-                }
-            }
-        }
-    }
-
-    /// Page (click to go there), the balloon's text, and "Show".
-    private func hiddenRow(_ balloon: HiddenBalloon) -> some View {
-        HStack(spacing: PanelySpacing.xs) {
-            Button {
-                viewModel.jump(to: balloon.pageIndex)
-            } label: {
-                Text("p. \(balloon.pageIndex + 1)")
-                    .monospacedDigit()
-            }
-            .buttonStyle(.link)
-            .help("Go to this page")
-            Text(verbatim: balloon.edit.correctedSource ?? balloon.edit.recognizedSource)
-                .lineLimit(1)
-                .truncationMode(.tail)
-                .foregroundStyle(PanelyColor.textSecondary)
-            Spacer(minLength: 0)
-            Button("Show") {
-                viewModel.translationEdits.showHidden(pageID: balloon.pageID, edit: balloon.edit)
-            }
-            .controlSize(.small)
-        }
-        .font(.caption)
-    }
-}
-
-/// One of the open book's languages: pick it to show it, see its progress,
-/// and start, pause or stop its job.
+/// One of the open book's languages: pick it to show it. Its count shows how
+/// far along it is; a language other than the shown one is started, paused or
+/// stopped from its `⋯` menu (the shown one from the panel's big button).
 struct TranslationLanguageRow: View {
     @Environment(ReaderViewModel.self) private var viewModel
     let controller: TranslationController
 
     var body: some View {
-        let isSelected = viewModel.translationOverlayVisible && controller.target == viewModel.translationDisplayLanguage
+        let isShown = controller.target == viewModel.translationDisplayLanguage
+        let isSelected = viewModel.translationIsShowing && isShown
         let done = controller.completedPageCount
         let total = controller.bookPageCount
         let isComplete = total > 0 && done >= total
-        let isRunning = controller.isWorking || controller.phase == .queued
 
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: PanelySpacing.sm) {
@@ -324,35 +298,12 @@ struct TranslationLanguageRow: View {
                 }
                 .buttonStyle(.plain)
 
-                // The shown language's controls are the panel's main button.
-                if controller.target != viewModel.translationDisplayLanguage {
-                    if !isComplete {
-                        Button {
-                            if isRunning {
-                                viewModel.translationManager.pause(controller)
-                            } else {
-                                viewModel.startTranslating(into: controller.target)
-                            }
-                        } label: {
-                            Image(systemName: isRunning ? "pause.fill" : "play.fill")
-                        }
-                        .help(isRunning ? "Pause" : (done > 0 ? "Resume" : "Translate This Book"))
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                    }
-                    if controller.hasActiveJob {
-                        Button {
-                            viewModel.translationManager.stop(controller)
-                        } label: {
-                            Image(systemName: "xmark")
-                        }
-                        .help("Stop")
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                    }
+                if !isShown {
+                    jobMenu(isComplete: isComplete, hasProgress: done > 0)
                 }
             }
-            if controller.hasActiveJob || controller.notice != nil {
+            // The shown language's status is the panel's status line.
+            if !isShown, controller.hasActiveJob || controller.notice != nil {
                 Group {
                     if let notice = controller.notice {
                         Text(verbatim: notice.message(locale: viewModel.localization.locale))
@@ -367,6 +318,31 @@ struct TranslationLanguageRow: View {
             }
         }
     }
+
+    private func jobMenu(isComplete: Bool, hasProgress: Bool) -> some View {
+        let isRunning = controller.isWorking || controller.phase == .queued
+        return Menu {
+            if !isComplete {
+                if isRunning {
+                    Button("Pause") { viewModel.translationManager.pause(controller) }
+                } else {
+                    Button(hasProgress ? "Resume" : "Translate This Book") {
+                        viewModel.startTranslating(into: controller.target)
+                    }
+                }
+            }
+            if controller.hasActiveJob {
+                Button("Stop") { viewModel.translationManager.stop(controller) }
+            }
+            Button("Show This Language") { viewModel.showTranslation(in: controller.target) }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Translate, pause or stop this language")
+    }
 }
 
 /// One line describing where the job is: detecting, preparing (with the
@@ -375,40 +351,45 @@ struct TranslationStatusText: View {
     let translation: TranslationController
 
     var body: some View {
+        Self.text(for: translation)
+    }
+
+    /// As `Text`, to run on with other text (the panel's status line).
+    static func text(for translation: TranslationController) -> Text {
         let done = translation.completedPageCount
         let total = translation.bookPageCount
         switch translation.phase {
         case .detectingLanguage:
-            Text("Detecting the book's language…")
+            return Text("Detecting the book's language…")
         case .preparing:
             if translation.isFirstRunForThisBuild {
-                Text("Preparing translation models — the first time takes 1–2 minutes…")
+                return Text("Preparing translation models — the first time takes 1–2 minutes…")
             } else {
-                Text("Preparing…")
+                return Text("Preparing…")
             }
         case .translating:
             if let remaining = translation.remainingSeconds {
                 if remaining < 60 {
-                    Text("Translating · \(done)/\(total) pages · less than a minute left")
+                    return Text("Translating · \(done)/\(total) pages · less than a minute left")
                 } else {
-                    Text("Translating · \(done)/\(total) pages · about \(Int((remaining / 60).rounded(.up))) min left")
+                    return Text("Translating · \(done)/\(total) pages · about \(Int((remaining / 60).rounded(.up))) min left")
                 }
             } else {
-                Text("Translating · \(done)/\(total) pages")
+                return Text("Translating · \(done)/\(total) pages")
             }
         case .paused:
             if translation.isWaitingForBookToReopen {
-                Text("Paused · open this book to continue · \(done)/\(total) pages")
+                return Text("Paused · open this book to continue · \(done)/\(total) pages")
             } else {
-                Text("Paused · \(done)/\(total) pages")
+                return Text("Paused · \(done)/\(total) pages")
             }
         case .queued:
-            Text("Waiting for another book · \(done)/\(total) pages")
+            return Text("Waiting for another book · \(done)/\(total) pages")
         case .idle:
             if total > 0 && done >= total {
-                Text("All \(total) pages translated")
+                return Text("All \(total) pages translated")
             } else {
-                Text("\(done) of \(total) pages translated")
+                return Text("\(done) of \(total) pages translated")
             }
         }
     }
@@ -491,7 +472,8 @@ struct TranslatedPagesBar: View {
 
 /// The one thing to do next for the language the book is shown in, as a
 /// full-width button — translate, download the language pack, pause or
-/// resume — with the pack's status under it, so neither has to be hunted for.
+/// resume — with one status line under it (progress, the pack), so neither
+/// has to be hunted for.
 ///
 /// Downloading needs SwiftUI's `translationTask` — the only API that may
 /// prompt for a language pack — so it starts here, not in the background job;
@@ -547,7 +529,7 @@ struct TranslationPrimaryAction: View {
     var body: some View {
         VStack(alignment: .leading, spacing: PanelySpacing.xs) {
             actionButton
-            packRow
+            statusLine
             if let pack, downloads.isDownloading(pack) {
                 TranslationCaveat(systemImage: "clock", text: LanguagePackDownloadingLabel.note)
             }
@@ -622,32 +604,39 @@ struct TranslationPrimaryAction: View {
         .controlSize(.large)
     }
 
-    /// Always shown, installed or not, so it's clear the pack exists and
-    /// where it's handled.
-    private var packRow: some View {
-        LabeledContent("Language Pack") {
-            if let pack {
-                if downloads.isDownloading(pack) {
-                    LanguagePackDownloadingLabel()
-                } else {
-                    switch downloads.status(of: pack) {
-                    case nil:
-                        ProgressView()
-                            .controlSize(.small)
-                    case .installed:
-                        Label("Installed", systemImage: "checkmark.circle.fill")
-                    case .needsDownload:
-                        Text("Not Installed")
-                    case .unsupported:
-                        Text("Not Supported")
-                    }
-                }
-            } else {
-                Text("Checked once the book's language is known")
-            }
+    /// Where things stand, in one line: the job (or why it stopped) and the
+    /// language pack — always mentioned, so it's clear it exists.
+    private var statusLine: some View {
+        (jobStatus + packStatus)
+            .font(.caption)
+            .foregroundStyle(PanelyColor.textSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var jobStatus: Text {
+        let controller = viewModel.translation
+        let separator = Text(verbatim: " · ")
+        switch controller.notice {
+        case .needsLanguageDownload?:
+            // The big button says it.
+            return Text(verbatim: "")
+        case let notice?:
+            return Text(verbatim: notice.message(locale: viewModel.localization.locale)) + separator
+        case nil:
+            guard controller.hasActiveJob else { return Text(verbatim: "") }
+            return TranslationStatusText.text(for: controller) + separator
         }
-        .font(.caption)
-        .foregroundStyle(PanelyColor.textSecondary)
+    }
+
+    private var packStatus: Text {
+        guard let pack else { return Text("Language pack checked once the book's language is known") }
+        if downloads.isDownloading(pack) { return Text("Downloading Language Pack…") }
+        switch downloads.status(of: pack) {
+        case nil: return Text("Checking the language pack…")
+        case .installed: return Text("Language pack installed")
+        case .needsDownload: return Text("Language pack not installed")
+        case .unsupported: return Text("This language pair isn't supported")
+        }
     }
 
     private func requestDownload(_ pack: LanguagePackDownloads.Pack) {
@@ -718,7 +707,7 @@ struct LanguagePackDownloadingLabel: View {
 struct TranslationJobsList: View {
     @Environment(ReaderViewModel.self) private var viewModel
     let jobs: [TranslationController]
-    /// The panel shows its own copy of the quit note.
+    /// Whether to end with the note that quitting stops translating.
     var showsQuitNote = true
 
     var body: some View {

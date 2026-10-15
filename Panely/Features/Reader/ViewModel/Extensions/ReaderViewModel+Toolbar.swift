@@ -38,10 +38,28 @@ extension ReaderViewModel {
 
     private var toolbarTranslationState: ToolbarTranslationState? {
         guard translationFeatureAvailable else { return nil }
+        let locale = localization.locale
+        let listed = translationLanguagesWithResults.map(\.target)
+        let source = translationSourceLanguage
+        let display = translationDisplayLanguage
+        let suggested = listed.contains(display) || display == source ? nil : display
         return ToolbarTranslationState(
-            showsTranslation: translationOverlayVisible,
+            showsTranslation: translationIsShowing,
             isWorking: translationManager.openBook.contains(where: \.isWorking),
-            hasTranslations: !translation.pages.isEmpty
+            hasTranslations: !translation.pages.isEmpty,
+            shownLanguage: translationDisplayLanguage,
+            shownLanguageName: translationDisplayLanguage.displayName(in: locale),
+            languages: listed.map {
+                ToolbarTranslationState.Language(language: $0, name: $0.displayName(in: locale))
+            },
+            suggestedLanguage: suggested.map {
+                ToolbarTranslationState.Language(language: $0, name: $0.displayName(in: locale))
+            },
+            otherLanguages: TranslationLanguage.allCases
+                .filter { !listed.contains($0) && $0 != source && $0 != suggested }
+                .map { ToolbarTranslationState.Language(language: $0, name: $0.displayName(in: locale)) },
+            isEditing: isEditingTranslations,
+            canEdit: canEditTranslations
         )
     }
 
@@ -83,7 +101,15 @@ extension ReaderViewModel {
             onPreviousBookmark: { [self] in jumpToPreviousBookmark() },
             onNextBookmark: { [self] in jumpToNextBookmark() },
             onOpenBookmark: { [self] bookmark, book in openBookmark(bookmark, in: book) },
-            onRemoveAllPageBookmarks: { [self] in BookmarkAlerts.removeAllInCurrentBook(self) }
+            onRemoveAllPageBookmarks: { [self] in BookmarkAlerts.removeAllInCurrentBook(self) },
+            onToggleTranslation: { [self] in toggleTranslationOverlay() },
+            onShowOriginal: { [self] in showOriginal() },
+            onShowTranslation: { [self] in showTranslation(in: $0) },
+            onToggleTranslationEditing: { [self] in toggleEditingTranslations() },
+            onTranslateInto: { [self] language in
+                showTranslation(in: language)
+                startTranslating(into: language)
+            }
         )
     }
 }

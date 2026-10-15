@@ -41,6 +41,7 @@ struct ViewerArea: View {
                 viewerController: viewerController,
                 translationPages: viewModel.translationOverlayPages,
                 showsTranslation: viewModel.translationOverlayVisible,
+                isEditingTranslation: viewModel.isEditingTranslations,
                 onTranslationEdit: { viewModel.applyTranslationEdit($0) }
             )
             .overlay(alignment: .top) {
@@ -55,10 +56,12 @@ struct ViewerArea: View {
                 VStack(spacing: PanelySpacing.xs) {
                     BackgroundTranslationsIndicator()
                     TranslationProgressHUD()
+                    TranslationEditBar()
                 }
                 .padding(.bottom, 76)
                 .animation(PanelyMotion.uiReveal, value: viewModel.translation.phase)
                 .animation(PanelyMotion.uiReveal, value: viewModel.translationManager.backgroundJobs.count)
+                .animation(PanelyMotion.uiReveal, value: viewModel.isEditingTranslations)
             }
             .overlay(alignment: .bottom) { EndOfVolumeCardOverlay(requestFocus: requestFocus) }
             .overlay(alignment: .top) { PreviousVolumeCardOverlay(requestFocus: requestFocus) }
@@ -102,6 +105,10 @@ struct ViewerArea: View {
                 return .handled
             }
             .onKeyPress(.escape) {
+                if viewModel.isEditingTranslations {
+                    viewModel.setEditingTranslations(false)
+                    return .handled
+                }
                 if viewModel.sidebarOverlayVisible {
                     viewModel.dismissSidebarOverlay()
                     return .handled

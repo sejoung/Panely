@@ -219,22 +219,30 @@ written into your files.
 - **On-device** — Vision's document recognizer (OCR, including vertical
   Japanese) + Apple Translation. A missing language pack is downloaded once
   through the system prompt, from the translation panel or the status banner
-- **Translation panel** (toolbar → translate button) — choose what to **view**:
-  the original (translation off) or any of the book's languages. Each language
-  has its own progress and its own start / pause / stop, and the choice is
-  remembered per series. The book's own language is detected on first use and
-  remembered per series too
+- **One place per job** — the toolbar's translate button switches original ↔
+  translation (`⇧⌘T`); the language name beside it ("Korean ▾") is a menu to
+  switch or add languages and open the panel or edit mode. The **translation panel** is only about translating this book:
+  one big button (translate / download the pack / pause / resume) with a
+  single status line, the **View** list (the original or the book's
+  languages; other languages start and stop from their **⋯** menu), and a
+  collapsed **This Book & Series** (the book's language, auto-translate,
+  translate the whole series). Progress is the pill over the page, other
+  books' jobs their own list, app-wide choices ⚙︎ → Settings. The language
+  shown and the book's own language (detected on first use) are remembered per
+  series
 - **Several languages per book** — each language is a separate job and cache;
   clicking a balloon shows its translation, the other languages and the
   original side by side (selectable, so Look Up works)
-- **Correct balloons** — from the same popover: rewrite a translation, fix
-  the recognised original and translate it again, or hide a balloon OCR made
-  up out of artwork (undo from the banner, or bring hidden ones back from the
-  panel or View › Show Hidden Balloons). Edited balloons carry a pencil
-  badge; **Revert** undoes one balloon, and the panel lists hidden balloons
-  and reverts a whole book. Edits are kept
-  apart from the cache under Application Support, so clearing the cache or
-  translating again keeps them; **Settings → Experimental** deletes them
+- **Reading / edit mode** — reading shows nothing but the translation. In
+  edit mode (`⇧⌘E`, the panel, the language menu, or **Edit…** in a balloon's popover)
+  the popover rewrites a translation, fixes the recognised original and
+  translates it again, hides a balloon OCR made up out of artwork (with an
+  undo right after), or **Revert**s one balloon. While editing, edited
+  balloons carry a pencil, hidden ones show as dashed outlines (click to bring
+  back), and a bar over the page counts edits, lists hidden balloons by page
+  and reverts the whole book. Edits are kept apart from the cache under
+  Application Support, so clearing the cache or translating again keeps them;
+  **Settings → Experimental** deletes them
 - **Background jobs** — translating continues when you open another book; a
   pill over the page shows other books' progress and opens the job list
   (pause / resume / stop / open the book). One job runs at a time, the one on
@@ -400,7 +408,8 @@ Terminal) and move the result straight to `/Applications`.
 | `⌃⌘P` | Show / hide thumbnail sidebar |
 | `⇧⌘T` | Translation assist: switch between the original and the translation |
 | `⌥⌘T` | Translation assist: translate this book / pause |
-| Click a speech balloon | Translation assist: the translation, other languages and the original; edit, fix the original, hide |
+| `⇧⌘E` | Translation assist: balloon edit mode on / off |
+| Click a speech balloon | Translation assist: the translation, other languages and the original (in edit mode: edit, fix the original, hide, revert) |
 | Hover left edge | Reveal sidebar as overlay (auto-hide mode) |
 | `ESC` | Dismiss sidebar overlay (when unpinned) |
 | Double-click on image | Toggle 1× ↔ 2× zoom |
@@ -675,7 +684,7 @@ Panely/
 │   │   │                               # PageTextRecognizer (Vision), PageTranslator (Translation),
 │   │   │                               # BubbleGrouper, BubbleBackgroundSampler, TextClassifiers
 │   │   ├── Viewer/                     # TranslationOverlayView (+ layout), balloon popover
-│   │   └── UI/                         # TranslationPanel, language rows, progress pill, job list
+│   │   └── UI/                         # TranslationPanel, language rows, progress pill, job list, edit-mode bar
 │   ├── Settings/
 │   │   ├── SettingsView.swift          # General + Library + Storage + Diagnostics + Experimental tabs
 │   │   ├── ExperimentalSettingsView.swift # translation assist: on/off, default language, sound effects, cache

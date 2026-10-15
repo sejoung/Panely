@@ -66,6 +66,13 @@ final class ReaderViewModel {
     let translationManager: TranslationManager
     /// The reader's balloon edits for the open book, laid over every language.
     let translationEdits: TranslationEdits
+    /// Balloon edit mode: edited balloons are marked, hidden ones show as
+    /// outlines, and a balloon's popover offers its edits. Off = reading,
+    /// with nothing on the page but the translation.
+    var isEditingTranslations = false
+    /// The Settings tab shown next time Settings opens (the translation panel
+    /// opens it on Experimental).
+    var settingsTab: SettingsTab = .general
 
     // MARK: - Source state
 

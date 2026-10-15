@@ -36,6 +36,7 @@ final class ImageStackView: NSView {
     /// that runs into the next slice of a strip isn't covered by it.
     private var overlayPages: [TranslatedPage?] = []
     private var showsTranslation = false
+    private var isEditingTranslation = false
     private var overlayViews: [Int: TranslationOverlayView] = [:]
     /// A balloon corrected in one of the overlays' popovers.
     var onTranslationEdit: ((TranslationEditRequest) -> Void)? {
@@ -142,9 +143,10 @@ final class ImageStackView: NSView {
 
     /// Update the translation overlays. `pages` is aligned with the images
     /// last passed to `setImages` (same order, including RTL reversal).
-    func setTranslationOverlay(_ pages: [TranslatedPage?], showsTranslation: Bool) {
+    func setTranslationOverlay(_ pages: [TranslatedPage?], showsTranslation: Bool, isEditing: Bool = false) {
         overlayPages = pages
         self.showsTranslation = showsTranslation
+        isEditingTranslation = isEditing
         for index in Array(overlayViews.keys) where liveViews[index] == nil {
             overlayViews.removeValue(forKey: index)?.removeFromSuperview()
         }
@@ -188,6 +190,7 @@ final class ImageStackView: NSView {
         overlay.update(
             page: page,
             showsTranslation: showsTranslation,
+            isEditing: isEditingTranslation,
             pageOrigin: CGPoint(x: pageFrame.minX - frame.minX, y: pageFrame.minY - frame.minY),
             scale: scale
         )

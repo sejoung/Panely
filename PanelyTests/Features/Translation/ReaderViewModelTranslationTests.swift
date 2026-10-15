@@ -188,6 +188,33 @@ struct ReaderViewModelTranslationTests {
         #expect(overlays[1]?.bubbles.first?.translation == "셋")
         #expect(vm.translatedPageIndices == [3])
         #expect(vm.toolbarState().translation?.hasTranslations == true)
+        #expect(vm.toolbarState().translation?.showsTranslation == true)
+        #expect(vm.toolbarState().translation?.languages.map(\.language) == [.korean])
+    }
+
+    /// The series remembers its language, but a volume with nothing of it
+    /// translated mustn't show that language as selected or switchable —
+    /// only as one to start.
+    @Test(.enabled(if: TranslationController.isSupportedOnThisMac))
+    func languageWithNothingTranslatedIsOnlyOfferedToStart() async throws {
+        let vm = makeTestViewModel()
+        vm.translationEnabled = true
+        vm.translationTargetLanguage = .korean
+        let pages = Fixture.makeImagePages(count: 2)
+        vm.currentSourceURL = URL(fileURLWithPath: "/books/volume-2")
+        vm.source = ComicSource(title: "Volume 2", pages: pages)
+        try await waitUntil { vm.translation.bookPageCount == 2 }
+        vm.translation.setSource(.japanese)
+
+        #expect(vm.translationOverlayVisible)
+        #expect(!vm.translationIsShowing)
+        let toolbar = try #require(vm.toolbarState().translation)
+        #expect(!toolbar.showsTranslation)
+        #expect(toolbar.languages.isEmpty)
+        // The series' language comes first, as "translate this book into it".
+        #expect(toolbar.suggestedLanguage?.language == .korean)
+        #expect(!toolbar.otherLanguages.map(\.language).contains(.korean))
+        #expect(!toolbar.otherLanguages.map(\.language).contains(.japanese)) // the book's own
     }
 
     @Test(.enabled(if: TranslationController.isSupportedOnThisMac))
