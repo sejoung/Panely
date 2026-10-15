@@ -90,7 +90,7 @@ struct AppMenuLocalizationTests {
         #expect(app.items.first?.title == "서비스")
     }
 
-    @Test func languageChangesAndRebuiltMenusAreAppliedAutomatically() async {
+    @Test func languageChangesAndRebuiltMenusAreAppliedAutomatically() async throws {
         let localization = AppLocalization(language: "en")
         let menu = NSMenu()
         let edit = addMenu("Edit", to: menu)
@@ -100,24 +100,24 @@ struct AppMenuLocalizationTests {
         defer { localizer.stop() }
 
         localization.apply(.korean)
-        await settleMenuUpdates()
+        try await waitUntil { copy.title == "복사" }
         #expect(menu.items.first?.title == "편집")
         #expect(copy.title == "복사")
 
         copy.title = "Copy"
         let paste = edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-        await settleMenuUpdates()
+        try await waitUntil { paste.title == "붙여넣기" }
         #expect(copy.title == "복사")
         #expect(paste.title == "붙여넣기")
 
         localization.apply(.english)
-        await settleMenuUpdates()
+        try await waitUntil { paste.title == "Paste" && copy.title == "Copy" }
         #expect(menu.items.first?.title == "Edit")
         #expect(copy.title == "Copy")
         #expect(paste.title == "Paste")
     }
 
-    @Test func menuCreatedAfterLaunchUsesTheSelectedLanguage() async {
+    @Test func menuCreatedAfterLaunchUsesTheSelectedLanguage() async throws {
         let localization = AppLocalization(language: "ko")
         let menu = NSMenu()
         let localizer = AppMenuLocalizer(localization: localization, mainMenu: { menu })
@@ -126,7 +126,8 @@ struct AppMenuLocalizationTests {
 
         let window = addMenu("Window", to: menu)
         let minimize = window.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
-        await settleMenuUpdates()
+        // Observation and NSMenu notifications apply it on a later main-actor turn.
+        try await waitUntil { minimize.title == "최소화" }
 
         #expect(menu.items.first?.title == "윈도우")
         #expect(minimize.title == "최소화")
@@ -138,11 +139,5 @@ struct AppMenuLocalizationTests {
         let item = parent.addItem(withTitle: title, action: nil, keyEquivalent: "")
         item.submenu = submenu
         return submenu
-    }
-
-    private func settleMenuUpdates() async {
-        // Both Observation and NSMenu notifications schedule work on the
-        // main actor; let the run loop finish those deferred updates.
-        try? await Task.sleep(for: .milliseconds(50))
     }
 }

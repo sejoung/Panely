@@ -16,6 +16,9 @@ final class Debouncer {
         self.delay = delay
     }
 
+    /// An action is waiting for the quiet period to end.
+    var isPending: Bool { pending != nil }
+
     /// Run `action` after the delay, cancelling any still-pending one. The
     /// action captures its own `[weak self]` of the owning store, so a fired
     /// straggler after the owner is gone is a no-op.

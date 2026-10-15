@@ -1,6 +1,7 @@
 import Foundation
 import CoreGraphics
 import ImageIO
+import Testing
 import UniformTypeIdentifiers
 import ZIPFoundation
 @testable import Panely
@@ -96,3 +97,24 @@ enum Fixture {
 }
 
 private final class FixtureBundleToken {}
+
+/// Poll `condition` on the main actor until it holds, failing the test after
+/// `timeout`. For work that hops through a background task and has no handle
+/// to await. The timeout is generous on purpose: a passing test returns as
+/// soon as the condition holds, so it only costs time when the test would
+/// fail anyway — and a loaded CI runner can keep the main actor busy for
+/// seconds. Never wait out a fixed sleep instead.
+@MainActor
+func waitUntil(
+    timeout: Duration = .seconds(10),
+    _ condition: () -> Bool
+) async throws {
+    let deadline = ContinuousClock.now + timeout
+    while !condition() {
+        guard ContinuousClock.now < deadline else {
+            Issue.record("condition not met within \(timeout)")
+            return
+        }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+}

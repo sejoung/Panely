@@ -146,9 +146,7 @@ struct ReaderImageLoaderTests {
             }
             try await Task.sleep(for: .milliseconds(2))
         }
-        for _ in 0..<200 where !loader.loadedPageIndices.isSuperset(of: [28, 29]) {
-            try await Task.sleep(for: .milliseconds(10))
-        }
+        try await waitUntil { loader.loadedPageIndices.isSuperset(of: [28, 29]) }
 
         // Cancellation is not a decode failure…
         #expect(errors.isEmpty)

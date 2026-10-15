@@ -46,15 +46,15 @@ struct TranslationControllerTests {
         let controller = TranslationController(store: store, defaults: InMemoryKeyValueStore())
 
         reload(controller, pages: pages, target: .english)
-        try await Task.sleep(for: .milliseconds(100))
+        await controller.cacheTask?.value
         #expect(controller.pages.isEmpty)
 
         reload(controller, pages: pages, source: nil)
-        try await Task.sleep(for: .milliseconds(100))
+        await controller.cacheTask?.value
         #expect(controller.pages.isEmpty)
 
         reload(controller, pages: pages, enabled: false)
-        try await Task.sleep(for: .milliseconds(100))
+        await controller.cacheTask?.value
         #expect(controller.pages.isEmpty)
         #expect(controller.bookPageCount == 0)
     }
@@ -317,14 +317,4 @@ struct ReaderViewModelTranslationLanguageTests {
         vm.showTranslation(in: .english)
         #expect(vm.translationOverlayPages.first??.bubbles.first?.translation == "One")
     }
-}
-
-/// Poll `condition` on the main actor until it holds (or fail after ~2 s).
-@MainActor
-func waitUntil(_ condition: () -> Bool) async throws {
-    for _ in 0..<200 {
-        if condition() { return }
-        try await Task.sleep(for: .milliseconds(10))
-    }
-    Issue.record("Timed out waiting for condition")
 }

@@ -25,7 +25,9 @@ final class ReadingProgressStore {
     /// an observation dependency — instead of re-scanning thousands of keys.
     private(set) var revision = 0
 
-    private let saveDebouncer = Debouncer()
+    /// Module-internal so tests can flush the pending write instead of
+    /// waiting out the delay.
+    let saveDebouncer = Debouncer()
     /// Key of the write waiting in `saveDebouncer`. One debouncer serves every
     /// book, so a write for a different key must flush this one first instead
     /// of replacing it — otherwise finishing Vol 1 and immediately opening

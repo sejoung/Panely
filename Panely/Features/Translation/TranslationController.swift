@@ -132,7 +132,8 @@ final class TranslationController {
     @ObservationIgnored private var focusPage = 0
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var jobTask: Task<Void, Never>?
-    @ObservationIgnored private var cacheTask: Task<Void, Never>?
+    /// Readable so tests can await the cache load instead of sleeping.
+    @ObservationIgnored private(set) var cacheTask: Task<Void, Never>?
     @ObservationIgnored private var translatingSince: Date?
     @ObservationIgnored private var pagesCompletedThisJob = 0
 

@@ -26,7 +26,9 @@ final class ReaderPositionStore {
     /// MRU order mirror (most-recently-written key first). Persisted under
     /// `orderKey` so eviction survives relaunch.
     private var orderCache: [String]?
-    private let saveDebouncer = Debouncer()
+    /// Module-internal so tests can flush the pending write instead of
+    /// waiting out the delay.
+    let saveDebouncer = Debouncer()
     /// Key of the write waiting in `saveDebouncer`. The debouncer is shared by
     /// every book, so a write for a different key flushes this one first
     /// rather than replacing it (see `ReadingProgressStore.pendingKey`).

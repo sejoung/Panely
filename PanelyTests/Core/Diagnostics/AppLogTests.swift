@@ -30,12 +30,15 @@ struct AppLogTests {
     }
 
     private func recentLogText(containing token: String) async throws -> String {
-        for _ in 0..<20 {
+        // Writing goes through the logger's own queue; poll with a generous
+        // deadline (see `waitUntil`) — a passing run returns on the first hit.
+        let deadline = ContinuousClock.now + .seconds(10)
+        while ContinuousClock.now < deadline {
             let log = await DiagnosticLogStore.shared.recentLogText()
             if log.contains(token) {
                 return log
             }
-            try await Task.sleep(for: .milliseconds(50))
+            try await Task.sleep(for: .milliseconds(20))
         }
         return await DiagnosticLogStore.shared.recentLogText()
     }

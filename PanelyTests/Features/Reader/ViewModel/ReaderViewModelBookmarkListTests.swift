@@ -139,18 +139,4 @@ struct ReaderViewModelBookmarkListTests {
         }
         return library
     }
-
-    private func waitUntil(
-        timeout: Duration = .seconds(5),
-        _ condition: () -> Bool
-    ) async throws {
-        let deadline = ContinuousClock.now + timeout
-        while !condition() {
-            guard ContinuousClock.now < deadline else {
-                Issue.record("condition not met within \(timeout)")
-                return
-            }
-            try await Task.sleep(for: .milliseconds(20))
-        }
-    }
 }

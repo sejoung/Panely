@@ -65,18 +65,18 @@ struct ReadingProgressStoreTests {
         #expect(store.progress(forKey: "reading", fileIdentityKey: nil)?.page == 4)
     }
 
-    @Test func removingABookDropsItsOwnPendingWrite() async throws {
+    @Test func removingABookDropsItsOwnPendingWrite() {
         let store = ReadingProgressStore(defaults: InMemoryKeyValueStore(), storeKey: "rp-\(UUID())")
 
         store.record(forKey: "gone", fileIdentityKey: nil, page: 4, total: 10, finished: false)
         store.remove(forKey: "gone", fileIdentityKey: nil)
-        try await Task.sleep(for: .milliseconds(500))
+        store.saveDebouncer.flush()
 
         // The debounced write must not resurrect the removed record.
         #expect(store.progress(forKey: "gone", fileIdentityKey: nil) == nil)
     }
 
-    @Test func debouncedRecordEventuallyPersists() async throws {
+    @Test func debouncedRecordEventuallyPersists() {
         let defaults = InMemoryKeyValueStore()
         let key = "rp-\(UUID())"
         let store = ReadingProgressStore(defaults: defaults, storeKey: key)
@@ -84,8 +84,10 @@ struct ReadingProgressStoreTests {
         store.record(forKey: "b", fileIdentityKey: nil, page: 1, total: 10, finished: false)
         store.record(forKey: "b", fileIdentityKey: nil, page: 2, total: 10, finished: false)
         store.record(forKey: "b", fileIdentityKey: nil, page: 3, total: 10, finished: false)
+        #expect(ReadingProgressStore(defaults: defaults, storeKey: key).progress(forKey: "b", fileIdentityKey: nil) == nil)
 
-        try await Task.sleep(for: .milliseconds(450))
+        // Flushed rather than waited out; `DebouncerTests` covers the timing.
+        store.saveDebouncer.flush()
 
         // Rapid calls coalesce into a single write of the last value.
         let reloaded = ReadingProgressStore(defaults: defaults, storeKey: key)

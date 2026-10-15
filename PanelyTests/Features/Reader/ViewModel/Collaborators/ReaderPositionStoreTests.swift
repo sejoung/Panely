@@ -88,10 +88,10 @@ struct ReaderPositionStoreTests {
         #expect(reloaded.restoredIndex(forKey: "different-path", fileIdentityKey: fidKey) == 7)
     }
 
-    @Test func savePositionDebouncesAndEventuallyPersists() async throws {
+    @Test func savePositionDebouncesAndEventuallyPersists() {
         let fixture = makeIsolatedStore()
 
-        // The debounced path sleeps ~300 ms before writing. Multiple rapid
+        // The debounced path waits ~300 ms before writing. Multiple rapid
         // calls within that window must coalesce into a single write of
         // the last value — that's the whole reason this exists (60 Hz
         // vertical scroll was thrashing persistence).
@@ -100,8 +100,12 @@ struct ReaderPositionStoreTests {
         fixture.store.savePosition(forKey: key, fileIdentityKey: nil, pageIndex: 2)
         fixture.store.savePosition(forKey: key, fileIdentityKey: nil, pageIndex: 3)
 
-        // Wait past the debounce window with margin.
-        try await Task.sleep(for: .milliseconds(450))
+        // Nothing written yet…
+        #expect(fixture.reloadedStore().restoredIndex(forKey: key, fileIdentityKey: nil) == 0)
+
+        // …until the quiet period ends (flushed here; `DebouncerTests` covers
+        // the timing).
+        fixture.store.saveDebouncer.flush()
 
         let reloaded = fixture.reloadedStore()
         #expect(reloaded.restoredIndex(forKey: key, fileIdentityKey: nil) == 3)

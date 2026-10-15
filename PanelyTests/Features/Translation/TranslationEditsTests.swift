@@ -213,10 +213,7 @@ struct TranslationEditsModelTests {
         #expect(model.editedCount == 0)
         #expect(model.hiddenCount == 0)
         // The files go too, so reopening the book doesn't bring them back.
-        for _ in 0..<100 where model.store.pageCount() > 0 {
-            try await Task.sleep(for: .milliseconds(10))
-        }
-        #expect(model.store.pageCount() == 0)
+        try await waitUntil { model.store.pageCount() == 0 }
     }
 
     @Test func retranslationLandsOnlyForTheCorrectionItWasFor() async throws {
@@ -243,9 +240,7 @@ struct TranslationEditsModelTests {
 
         let reopened = TranslationEdits(store: model.store)
         // Saving runs in the background; wait for the file to land.
-        for _ in 0..<100 where model.store.pageCount() == 0 {
-            try await Task.sleep(for: .milliseconds(10))
-        }
+        try await waitUntil { model.store.pageCount() == 1 }
         await reopened.load(pageIDs: ["p1"], scope: .page)
 
         #expect(reopened.edits(forPage: "p1")?.edit(for: bubble)?.translations[TranslationLanguage.korean.rawValue] == "내 번역")
