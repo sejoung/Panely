@@ -45,6 +45,9 @@ actor RARArchiveReader: ArchiveReader {
     }
 
     func loadData(at path: String) throws -> Data {
+        // Checked before taking `unrarLock`: a superseded page read must not
+        // queue behind (and then hold up) the reads that replaced it.
+        try Task.checkCancellation()
         try requireEntry(path)
         if isSolid {
             return try Data(contentsOf: try extractedFileURL(for: path))
@@ -56,6 +59,7 @@ actor RARArchiveReader: ArchiveReader {
     /// `NSProgress` once enough bytes have arrived. Solid: reads the head of
     /// the already-extracted file.
     func loadDataPrefix(at path: String, maxBytes: Int) throws -> Data {
+        try Task.checkCancellation()
         try requireEntry(path)
         if isSolid {
             let handle = try FileHandle(forReadingFrom: try extractedFileURL(for: path))

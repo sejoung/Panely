@@ -88,6 +88,45 @@ nonisolated struct ReaderVerticalImageWindow {
         let upper = min(loadedImageCount, range.upperBound + ReaderImageLoadingPolicy.lazyKeepBuffer)
         return lower..<max(lower, upper)
     }
+
+    /// Loaded pages to drop back to placeholders for `range`: every page
+    /// outside `keepRange`, plus — when the pages left inside it still cost
+    /// more than `byteBudget` — the ones farthest from the viewport until the
+    /// rest fits. A count-only window held visible + 20 full-res bitmaps
+    /// whatever their size; on tall webtoon slices that is gigabytes.
+    ///
+    /// Pages within `visibleRangeBuffer` of `range` are never evicted, even
+    /// over budget: they're exactly what `loadIndices` re-requests, so
+    /// evicting them would decode them again on the next scroll tick.
+    func evictionIndices(
+        forVisibleRange range: Range<Int>,
+        loaded: Set<Int>,
+        loadedImageCount: Int,
+        byteBudget: Int,
+        cost: (Int) -> Int
+    ) -> [Int] {
+        guard !range.isEmpty else { return [] }
+        let keep = keepRange(forVisibleRange: range, loadedImageCount: loadedImageCount)
+        var evicted = loaded.filter { !keep.contains($0) }
+        let kept = loaded.subtracting(evicted)
+
+        var total = kept.reduce(0) { $0 + cost($1) }
+        if total > byteBudget {
+            let buffer = ReaderImageLoadingPolicy.visibleRangeBuffer
+            let protected = (range.lowerBound - buffer)..<(range.upperBound + buffer)
+            func distance(_ i: Int) -> Int {
+                i < range.lowerBound ? range.lowerBound - i : i - (range.upperBound - 1)
+            }
+            let candidates = kept
+                .filter { !protected.contains($0) }
+                .sorted { (distance($0), $0) > (distance($1), $1) }
+            for i in candidates where total > byteBudget {
+                evicted.insert(i)
+                total -= cost(i)
+            }
+        }
+        return evicted.sorted()
+    }
 }
 
 nonisolated enum ReaderImagePlaceholder {

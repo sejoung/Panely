@@ -12,7 +12,10 @@ extension Dictionary {
     mutating func capByRecency(to limit: Int, recency: (Value) -> Date) {
         guard count > limit else { return }
         let overflow = count - limit
-        let stale = sorted { recency($0.value) < recency($1.value) }
+        // Evaluate `recency` once per entry, not once per comparison: for
+        // `PageBookmarksStore` it scans a book's whole bookmark list.
+        let stale = map { (key: $0.key, recency: recency($0.value)) }
+            .sorted { $0.recency < $1.recency }
             .prefix(overflow)
             .map(\.key)
         for key in stale {

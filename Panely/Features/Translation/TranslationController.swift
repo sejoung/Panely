@@ -65,8 +65,18 @@ final class TranslationController {
     }
 
     /// Translations for the open book, keyed by `ComicPage.id`. Includes
-    /// pages still in progress.
+    /// pages still in progress. Written through `setPage`/`removeAllPages`,
+    /// which keep `hasPages` and `pageRevisions` in step.
     private(set) var pages: [String: TranslatedPage] = [:]
+    /// `!pages.isEmpty`, observed on its own: `pages` changes with every
+    /// balloon translated, and views that only ask whether there's anything
+    /// (toolbar, menus) shouldn't re-render each time.
+    private(set) var hasPages = false
+    /// A number that changes whenever a page's entry in `pages` does, unique
+    /// across controllers — lets the viewer keep what it built from a page
+    /// until the page changes (`ReaderViewModel.translationOverlayPages`).
+    @ObservationIgnored private(set) var pageRevisions: [String: Int] = [:]
+    private static var nextPageRevision = 0
     private(set) var phase: Phase = .idle
     /// Indices of pages whose translation is complete (cached or finished).
     private(set) var completedPageIndices: Set<Int> = []
@@ -154,6 +164,10 @@ final class TranslationController {
     /// Pages read ahead in fast mode. Three keep translation fed on an M1
     /// Pro without OCR running far ahead of a reader who jumps around.
     nonisolated static let fastLookahead = 3
+    /// Speech-level rewrites in flight at once during a job. The on-device
+    /// model takes two about 12% faster than one after the other; more
+    /// gain nothing (measured on an M1 Pro).
+    nonisolated static let concurrentSpeechLevelRewrites = 2
     nonisolated static let warmedUpBuildKey = "panely.translation.warmedUpBuild"
 
     init(
@@ -216,7 +230,7 @@ final class TranslationController {
         generation &+= 1
         bookPages = []
         pageSizes = []
-        pages = [:]
+        removeAllPages()
         completedPageIndices = []
         plan = nil
         finishedUnits = []
@@ -362,23 +376,30 @@ final class TranslationController {
         speechLevelProgress = nil
         notice = nil
 
-        var keys: [String] = []
+        var ids: [String] = []
         for index in indices {
             let id = bookPages[index].id
-            pages[id] = nil
+            setPage(nil, for: id)
             cacheKeys[id] = nil
             completedPageIndices.remove(index)
-            // Either mode's entry: a fast job reads accurate ones too.
-            keys += [TranslationMode.accurate, .fast].map {
-                TranslationStore.key(pageID: id, from: source, to: target, scope: scope, mode: $0)
-            }
+            ids.append(id)
         }
         plan = nil
         finishedUnits = []
         failedUnits = []
         focusPage = indices.min() ?? focusPage
         let store = store
-        await Task.detached(priority: .utility) { store.remove(keys: keys) }.value
+        let target = target
+        let scope = scope
+        await Task.detached(priority: .utility) {
+            // Either mode's entry: a fast job reads accurate ones too.
+            let keys = ids.flatMap { id in
+                [TranslationMode.accurate, .fast].map {
+                    TranslationStore.key(pageID: id, from: source, to: target, scope: scope, mode: $0)
+                }
+            }
+            store.remove(keys: keys)
+        }.value
         AppLog.info(.reader, "Translating pages again", metadata: ["pages": "\(indices.count)"])
         if let requestStart { requestStart() } else { start() }
     }
@@ -504,7 +525,8 @@ final class TranslationController {
             let lookaheadDepth = mode == .fast ? Self.fastLookahead : 1
             var lookahead: [(unit: TranslationUnit, analysis: Task<[PageAnalysis], any Error>)] = []
             func fillLookahead(excluding current: Int?) async {
-                while lookahead.count < lookaheadDepth {
+                // A paused job mustn't start more OCR on its way out.
+                while lookahead.count < lookaheadDepth, !Task.isCancelled {
                     let inFlight = Set(lookahead.map(\.unit.id) + [current].compactMap { $0 })
                     guard let unit = await self?.claimNextUnit(excluding: inFlight, generation: generation) else { return }
                     lookahead.append((unit, Task { try await analyzer.analyze(unit, plan: plan) }))
@@ -516,40 +538,92 @@ final class TranslationController {
 
             await fillLookahead(excluding: nil)
             while !lookahead.isEmpty {
+                guard !Task.isCancelled else {
+                    cancelLookahead()
+                    return
+                }
                 let (unit, analysisTask) = lookahead.removeFirst()
                 var unitFailed = false
                 do {
                     let waitStart = ContinuousClock.now
-                    let analyses = try await analysisTask.value
+                    // The analyses are tasks of their own, which cancelling
+                    // the job doesn't reach: pausing passes it on, so OCR
+                    // stops with the job instead of running to the end.
+                    let pending = lookahead.map(\.analysis)
+                    let analyses = try await withTaskCancellationHandler {
+                        try await analysisTask.value
+                    } onCancel: {
+                        analysisTask.cancel()
+                        for task in pending { task.cancel() }
+                    }
+                    // Finished regardless (or had nothing to cancel): the
+                    // unit is left for the resumed job, not marked done.
+                    try Task.checkCancellation()
                     stats.analysisWait += waitStart.duration(to: .now)
                     let queue = await self?.merge(analyses, generation: generation) ?? []
                     // Prefetch: the next units' OCR overlaps this unit's translation.
                     await fillLookahead(excluding: unit.id)
-                    for item in queue {
-                        try Task.checkCancellation()
-                        let translation: String
-                        if let known = translatedTexts[item.source] {
-                            translation = known
-                            stats.reused += 1
-                        } else {
+                    // Speech-level rewrites (the on-device model, ~0.45 s
+                    // each — most of a ja↔ko job) run beside the translator
+                    // instead of after it: the next balloons are translated
+                    // while the model works, two requests at a time (a third
+                    // is no faster — measured). Each rewrite still gets a
+                    // session of its own, so the text is the same as one at
+                    // a time; a balloon is shown once its rewrite is back.
+                    try await withThrowingTaskGroup(of: SpeechLevelRewrite.self) { rewrites in
+                        // Balloons waiting on a rewrite, by original text: a
+                        // line repeated meanwhile takes the same result.
+                        var rewriting: [String: [(pageIndex: Int, bubbleID: Int)]] = [:]
+                        func publish(_ translation: String, pageIndex: Int, bubbleID: Int) async {
                             let start = ContinuousClock.now
-                            var text = try await translator.translate(item.source)
+                            await self?.setTranslation(translation, pageIndex: pageIndex, bubbleID: bubbleID, generation: generation)
+                            stats.publishing += start.duration(to: .now)
+                        }
+                        func finish(_ rewrite: SpeechLevelRewrite) async throws {
+                            try Task.checkCancellation()
+                            stats.matchingSpeechLevel += rewrite.duration
+                            if rewrite.matched != nil { stats.speechLevelMatched += 1 }
+                            let translation = rewrite.matched ?? rewrite.translation
+                            translatedTexts[rewrite.source] = translation
+                            for balloon in rewriting.removeValue(forKey: rewrite.source) ?? [] {
+                                await publish(translation, pageIndex: balloon.pageIndex, bubbleID: balloon.bubbleID)
+                            }
+                        }
+                        for item in queue {
+                            try Task.checkCancellation()
+                            if let known = translatedTexts[item.source] {
+                                stats.reused += 1
+                                await publish(known, pageIndex: item.pageIndex, bubbleID: item.bubbleID)
+                                continue
+                            }
+                            if rewriting[item.source] != nil {
+                                stats.reused += 1
+                                rewriting[item.source]?.append((item.pageIndex, item.bubbleID))
+                                continue
+                            }
+                            let start = ContinuousClock.now
+                            let text = try await translator.translate(item.source)
                             stats.translating += start.duration(to: .now)
                             stats.translated += 1
-                            if let speechLevel {
-                                let start = ContinuousClock.now
-                                if let matched = await speechLevel.correct(text, source: item.source) {
-                                    text = matched
-                                    stats.speechLevelMatched += 1
-                                }
-                                stats.matchingSpeechLevel += start.duration(to: .now)
+                            guard let speechLevel else {
+                                translatedTexts[item.source] = text
+                                await publish(text, pageIndex: item.pageIndex, bubbleID: item.bubbleID)
+                                continue
                             }
-                            translation = text
-                            translatedTexts[item.source] = translation
+                            if rewriting.count >= Self.concurrentSpeechLevelRewrites, let done = try await rewrites.next() {
+                                try await finish(done)
+                            }
+                            let source = item.source
+                            rewriting[source] = [(item.pageIndex, item.bubbleID)]
+                            rewrites.addTask {
+                                let start = ContinuousClock.now
+                                let matched = await speechLevel.correct(text, source: source)
+                                return SpeechLevelRewrite(source: source, translation: text, matched: matched, duration: start.duration(to: .now))
+                            }
                         }
-                        let start = ContinuousClock.now
-                        await self?.setTranslation(translation, pageIndex: item.pageIndex, bubbleID: item.bubbleID, generation: generation)
-                        stats.publishing += start.duration(to: .now)
+                        while let done = try await rewrites.next() {
+                            try await finish(done)
+                        }
                     }
                 } catch {
                     if Task.isCancelled || error is CancellationError {
@@ -585,16 +659,17 @@ final class TranslationController {
         // A fast job takes accurate translations already made over its own;
         // an accurate job only reads its own.
         let modes: [TranslationMode] = mode == .fast ? [.accurate, .fast] : [.accurate]
-        let keyed = bookPages.enumerated().map { page in
-            (page.offset, page.element.id, modes.map {
-                TranslationStore.key(pageID: page.element.id, from: source, to: target, scope: scope, mode: $0)
-            })
-        }
+        let ids = bookPages.map(\.id)
+        // Hashing every page's keys is work too: all of it off the main actor.
         let cached = await Task.detached(priority: .utility) {
+            // One directory listing instead of a failed open per missing entry.
+            let existing = store.existingKeys()
             var found: [(Int, String, TranslatedPage, String)] = []
-            for (index, id, keys) in keyed {
-                for key in keys {
-                    if let page = store.load(key: key), page.isComplete {
+            guard !existing.isEmpty else { return found }
+            for (index, id) in ids.enumerated() {
+                for mode in modes {
+                    let key = TranslationStore.key(pageID: id, from: source, to: target, scope: scope, mode: mode)
+                    if existing.contains(key), let page = store.load(key: key), page.isComplete {
                         found.append((index, id, page, key))
                         break
                     }
@@ -603,11 +678,54 @@ final class TranslationController {
             return found
         }.value
         guard self.generation == generation else { return }
+        var loaded: [(String, TranslatedPage)] = []
+        var completed = completedPageIndices
         for (index, id, page, key) in cached where pages[id]?.isComplete != true {
-            pages[id] = page
+            loaded.append((id, page))
             cacheKeys[id] = key
-            completedPageIndices.insert(index)
+            completed.insert(index)
         }
+        guard !loaded.isEmpty else { return }
+        setPages(loaded)
+        completedPageIndices = completed
+    }
+
+    // MARK: - Pages
+
+    /// Every write to `pages` goes through here (and `setPages` /
+    /// `removeAllPages`), so `hasPages` and `pageRevisions` follow it.
+    private func setPage(_ page: TranslatedPage?, for id: String) {
+        pages[id] = page
+        pageRevisions[id] = page == nil ? nil : Self.makePageRevision()
+        updateHasPages()
+    }
+
+    /// Several pages in one write — one change for observers.
+    private func setPages(_ changes: [(String, TranslatedPage)]) {
+        guard !changes.isEmpty else { return }
+        var updated = pages
+        for (id, page) in changes {
+            updated[id] = page
+            pageRevisions[id] = Self.makePageRevision()
+        }
+        pages = updated
+        updateHasPages()
+    }
+
+    private func removeAllPages() {
+        if !pages.isEmpty { pages = [:] }
+        pageRevisions = [:]
+        updateHasPages()
+    }
+
+    private func updateHasPages() {
+        // Only on a flip: observers of `hasPages` don't care about the rest.
+        if hasPages == pages.isEmpty { hasPages = !pages.isEmpty }
+    }
+
+    private static func makePageRevision() -> Int {
+        nextPageRevision &+= 1
+        return nextPageRevision
     }
 
     // MARK: - Speech level
@@ -662,7 +780,7 @@ final class TranslationController {
         guard self.generation == generation else { return false }
         // Left alone if it changed meanwhile (cleared, or retranslated).
         if pages[id]?.isComplete == true, pages[id]?.speechLevelChecked != true {
-            pages[id] = page
+            setPage(page, for: id)
             if let source {
                 let key = cacheKeys[id] ?? TranslationStore.key(pageID: id, from: source, to: target, scope: scope, mode: mode)
                 let store = store
@@ -735,7 +853,7 @@ final class TranslationController {
             for bubble in page.bubbles where bubble.translation == nil {
                 queue.append((analysis.pageIndex, bubble.id, bubble.source))
             }
-            pages[id] = page
+            setPage(page, for: id)
         }
         return queue
     }
@@ -745,7 +863,7 @@ final class TranslationController {
         let id = bookPages[pageIndex].id
         guard var page = pages[id], let index = page.bubbles.firstIndex(where: { $0.id == bubbleID }) else { return }
         page.bubbles[index].translation = text
-        pages[id] = page
+        setPage(page, for: id)
     }
 
     private func finishUnit(_ unitID: Int, failed: Bool, generation: Int) {
@@ -761,7 +879,7 @@ final class TranslationController {
                 for bubbleIndex in page.bubbles.indices where page.bubbles[bubbleIndex].translation == nil {
                     page.bubbles[bubbleIndex].translation = ""
                 }
-                pages[id] = page
+                setPage(page, for: id)
             }
         }
         let failedPages = Set(plan.units.filter { failedUnits.contains($0.id) }.flatMap(\.pageIndices))
@@ -777,7 +895,7 @@ final class TranslationController {
             guard page.pendingCount == 0 else { continue }
             page.isComplete = true
             if jobMatchesSpeechLevel { page.speechLevelChecked = true }
-            pages[id] = page
+            setPage(page, for: id)
             completedPageIndices.insert(index)
             pagesCompletedThisJob += 1
             if !failedPages.contains(index), let source, page.imageWidth > 0 {
@@ -810,8 +928,19 @@ final class TranslationController {
     }
 }
 
+/// A balloon's translation back from the speech-level corrector: `matched`
+/// is the rewrite, `nil` to keep `translation`.
+private nonisolated struct SpeechLevelRewrite: Sendable {
+    let source: String
+    let translation: String
+    let matched: String?
+    let duration: Duration
+}
+
 /// Where a job's time went, logged when it ends — translating should be
 /// nearly all of it; the rest is waiting for OCR or for the main actor.
+/// `matchingSpeechLevel` adds up each rewrite's own time; rewrites overlap
+/// translation and each other, so it can exceed their share of the wall time.
 private nonisolated struct TranslationJobStats {
     let started = ContinuousClock.now
     var units = 0

@@ -7,6 +7,11 @@
 # their PNGs under the sandbox's own Caches dir; this script enables only the
 # snapshot suite and copies the results out into the repo after the run.
 #
+# The suite is enabled for this run's test process only: xcodebuild hands
+# TEST_RUNNER_-prefixed variables to the tests with the prefix dropped. (A
+# flag file in the shared sandbox would enable it for every test run on the
+# machine.)
+#
 # Usage:
 #   scripts/generate-snapshots.sh
 #
@@ -16,10 +21,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 BUNDLE_ID="io.github.sejoung.Panely.debug"
 SANDBOX_CACHE="$HOME/Library/Containers/$BUNDLE_ID/Data/Library/Caches/panely-snapshots"
-SNAPSHOT_FLAG="$HOME/Library/Containers/$BUNDLE_ID/Data/tmp/panely-generate-snapshots.flag"
 DEST="$PROJECT_ROOT/docs/screenshots"
 DERIVED_DATA_PATH="/private/tmp/PanelyDerivedData"
-export PANELY_GENERATE_SNAPSHOTS=1
+export TEST_RUNNER_PANELY_GENERATE_SNAPSHOTS=1
 
 EXPECTED_SNAPSHOTS=(
   "01-hero-single-page.png"
@@ -51,9 +55,7 @@ EXPECTED_SNAPSHOTS=(
 cd "$PROJECT_ROOT"
 
 RUN_STAMP="$(mktemp -t panely-snapshots.XXXXXX)"
-mkdir -p "$(dirname "$SNAPSHOT_FLAG")"
-: > "$SNAPSHOT_FLAG"
-trap 'rm -f "$RUN_STAMP" "$SNAPSHOT_FLAG"' EXIT
+trap 'rm -f "$RUN_STAMP"' EXIT
 
 echo "▶︎ Running snapshot test pass…"
 xcodebuild test \

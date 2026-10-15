@@ -9,16 +9,20 @@ nonisolated struct ComicPage: Identifiable, Sendable {
     let source: ComicPageSource
     let displayName: String
 
-    init(source: ComicPageSource, displayName: String) {
-        self.id = Self.makeID(for: source)
+    /// `contentSignature`, when given, must be `contentSignature(for:)` of the
+    /// source's file (the archive, for an entry). Every page of an archive
+    /// shares one, so `ArchiveLoader` stats the archive once instead of once
+    /// per page; `nil` computes it here.
+    init(source: ComicPageSource, displayName: String, contentSignature: String? = nil) {
+        self.id = Self.makeID(for: source, signature: contentSignature)
         self.source = source
         self.displayName = displayName
     }
 
-    private static func makeID(for source: ComicPageSource) -> String {
+    private static func makeID(for source: ComicPageSource, signature: String?) -> String {
         switch source {
         case .file(let url):
-            return "file:" + url.standardizedFileURL.path + "#" + contentSignature(for: url)
+            return "file:" + url.standardizedFileURL.path + "#" + (signature ?? contentSignature(for: url))
         case .archiveEntry(let reader, let path):
             // ArchiveReader is identified by its archive URL — different
             // readers for the same archive must produce the same id so
@@ -28,13 +32,14 @@ nonisolated struct ComicPage: Identifiable, Sendable {
             return "archive:"
                 + reader.archiveURL.standardizedFileURL.path
                 + "#"
-                + contentSignature(for: reader.archiveURL)
+                + (signature ?? contentSignature(for: reader.archiveURL))
                 + "#"
                 + path
         }
     }
 
-    private static func contentSignature(for url: URL) -> String {
+    /// Size + modification date of the file at `url`; part of every page id.
+    static func contentSignature(for url: URL) -> String {
         let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
         let modified = (attributes?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
         let size = (attributes?[.size] as? NSNumber)?.int64Value ?? -1

@@ -125,6 +125,41 @@ struct ReaderPositionStoreTests {
         #expect(fixture.store.restoredIndex(forKey: bookB, fileIdentityKey: nil) == 88)
     }
 
+    @Test func restoredIndexSeesTheStillDebouncedWrite() {
+        let fixture = makeIsolatedStore()
+        fixture.store.flushImmediately(forKey: "book", fileIdentityKey: "fid", pageIndex: 2)
+
+        // Reopening the same book inside the debounce window must restore the
+        // page just left, not the last landed one — under either key.
+        fixture.store.savePosition(forKey: "book", fileIdentityKey: "fid", pageIndex: 9)
+        #expect(fixture.store.restoredIndex(forKey: "book", fileIdentityKey: nil) == 9)
+        #expect(fixture.store.restoredIndex(forKey: "moved", fileIdentityKey: "fid") == 9)
+        // Nothing reached the defaults yet.
+        #expect(fixture.reloadedStore().restoredIndex(forKey: "book", fileIdentityKey: nil) == 2)
+
+        fixture.store.saveDebouncer.flush()
+        #expect(fixture.reloadedStore().restoredIndex(forKey: "book", fileIdentityKey: nil) == 9)
+    }
+
+    @Test func pagingThroughOneBookKeepsMRUOrderForEviction() {
+        let cap = 3
+        let fixture = makeIsolatedStore(maxEntries: cap)
+        fixture.store.flushImmediately(forKey: "a", fileIdentityKey: nil, pageIndex: 1)
+        fixture.store.flushImmediately(forKey: "b", fileIdentityKey: nil, pageIndex: 1)
+        // Repeated writes to the front key take the no-reshuffle path.
+        for page in 2...5 {
+            fixture.store.flushImmediately(forKey: "b", fileIdentityKey: nil, pageIndex: page)
+        }
+        fixture.store.flushImmediately(forKey: "a", fileIdentityKey: nil, pageIndex: 2)
+        fixture.store.flushImmediately(forKey: "c", fileIdentityKey: nil, pageIndex: 1)
+        fixture.store.flushImmediately(forKey: "d", fileIdentityKey: nil, pageIndex: 1)
+
+        let reloaded = fixture.reloadedStore(maxEntries: cap)
+        #expect(reloaded.restoredIndex(forKey: "b", fileIdentityKey: nil) == 0)  // least recent → evicted
+        #expect(reloaded.restoredIndex(forKey: "a", fileIdentityKey: nil) == 2)
+        #expect(reloaded.restoredIndex(forKey: "d", fileIdentityKey: nil) == 1)
+    }
+
     // MARK: - Entry cap / eviction
 
     @Test func evictsLeastRecentlyWrittenKeysBeyondCap() {

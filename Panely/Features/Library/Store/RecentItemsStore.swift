@@ -61,7 +61,8 @@ final class RecentItemsStore {
             var existing = items.remove(at: existingIndex)
             existing.openedAt = Date()
             existing.title = title
-            if bookmarks.resolve(existing.bookmarkData)?.isStale == true,
+            // Only a staleness probe — `url` is already open — so never mount.
+            if bookmarks.resolve(existing.bookmarkData, allowingMount: false)?.isStale == true,
                let refreshed = bookmarks.refreshedData(for: url) {
                 existing.bookmarkData = refreshed
             }
@@ -96,8 +97,13 @@ final class RecentItemsStore {
         }
     }
 
-    func resolve(_ item: RecentItem) -> URL? {
-        guard let result = bookmarks.resolveRefreshing(item.bookmarkData) else {
+    /// `allowingMount: false` for lookups the user didn't ask for (see
+    /// `SecurityScopedBookmarking.resolve(_:allowingMount:)`).
+    func resolve(_ item: RecentItem, allowingMount: Bool = true) -> URL? {
+        guard let result = bookmarks.resolveRefreshing(
+            item.bookmarkData,
+            allowingMount: allowingMount
+        ) else {
             availabilityByID[item.id] = .invalidBookmark
             return nil
         }
@@ -129,6 +135,8 @@ final class RecentItemsStore {
 
     /// Re-resolve every persisted bookmark away from SwiftUI's render path.
     /// Unreachable items stay stored but are omitted from Continue Reading.
+    /// A background sweep: it never mounts a volume, so a recent book on an
+    /// unmounted share reads as temporarily unavailable until it's opened.
     func refreshAvailability() async -> [RecentItemPathMigration] {
         let snapshot = items
         let checks = await withTaskGroup(
@@ -138,7 +146,7 @@ final class RecentItemsStore {
             for item in snapshot {
                 let bookmarks = self.bookmarks
                 group.addTask {
-                    (item.id, Self.checkAvailability(of: item, bookmarks: bookmarks))
+                    (item.id, Self.checkAvailability(of: item, bookmarks: bookmarks, allowingMount: false))
                 }
             }
             var results: [(UUID, BookmarkAvailabilityCheck)] = []
@@ -160,7 +168,8 @@ final class RecentItemsStore {
     func refreshAvailability(for item: RecentItem) async -> RecentItemRefreshResult {
         let bookmarks = self.bookmarks
         let check = await Task.detached(priority: .userInitiated) {
-            Self.checkAvailability(of: item, bookmarks: bookmarks)
+            // The user is opening it: mounting its volume is the point.
+            Self.checkAvailability(of: item, bookmarks: bookmarks, allowingMount: true)
         }.value
         guard let current = items.first(where: { $0.id == item.id }) else {
             return RecentItemRefreshResult(availability: .invalidBookmark, migration: nil)
@@ -197,9 +206,13 @@ final class RecentItemsStore {
 
     private nonisolated static func checkAvailability(
         of item: RecentItem,
-        bookmarks: any SecurityScopedBookmarking
+        bookmarks: any SecurityScopedBookmarking,
+        allowingMount: Bool
     ) -> BookmarkAvailabilityCheck {
-        guard let result = bookmarks.resolveRefreshing(item.bookmarkData) else {
+        guard let result = bookmarks.resolveRefreshing(
+            item.bookmarkData,
+            allowingMount: allowingMount
+        ) else {
             return .invalidBookmark
         }
         let url = result.url.standardizedFileURL

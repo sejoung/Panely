@@ -26,6 +26,52 @@ struct ZIPArchiveReaderTests {
         #expect(paths == ["001.jpg", "002.jpg"])
     }
 
+    /// The path index keeps the *first* entry for a duplicated path — the same
+    /// entry ZIPFoundation's first-match `archive[path]` resolved to — so the
+    /// deduped page reads the bytes it always did.
+    @Test func duplicatePathReadsFirstEntryBytes() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+
+        let first = workDir.appendingPathComponent("first.bin")
+        let second = workDir.appendingPathComponent("second.bin")
+        try Fixture.writeFile(first, bytes: Array(repeating: 0x1, count: 32))
+        try Fixture.writeFile(second, bytes: Array(repeating: 0x2, count: 48))
+
+        let zipURL = workDir.appendingPathComponent("dupes.cbz")
+        let archive = try Archive(url: zipURL, accessMode: .create)
+        try archive.addEntry(with: "001.jpg", fileURL: first)
+        try archive.addEntry(with: "001.jpg", fileURL: second) // duplicate path
+
+        let reader = try ZIPArchiveReader(url: zipURL)
+        let data = try await reader.loadData(at: "001.jpg")
+        let prefix = try await reader.loadDataPrefix(at: "001.jpg", maxBytes: 1_000)
+
+        #expect(Array(data) == Array(repeating: 0x1, count: 32))
+        #expect(Array(prefix) == Array(repeating: 0x1, count: 32))
+    }
+
+    /// Many entries resolve through the index the same as a scan would.
+    @Test func loadDataResolvesEveryEntryOfLargeArchive() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+
+        let zipURL = workDir.appendingPathComponent("book.cbz")
+        let archive = try Archive(url: zipURL, accessMode: .create)
+        for i in 0..<200 {
+            let payload = workDir.appendingPathComponent("\(i).bin")
+            try Fixture.writeFile(payload, bytes: [UInt8(i % 256), UInt8(i / 256)])
+            try archive.addEntry(with: "pages/\(i).jpg", fileURL: payload)
+        }
+
+        let reader = try ZIPArchiveReader(url: zipURL)
+        #expect(await reader.entryPaths().count == 200)
+        for i in [0, 1, 99, 199] {
+            let data = try await reader.loadData(at: "pages/\(i).jpg")
+            #expect(Array(data) == [UInt8(i % 256), UInt8(i / 256)])
+        }
+    }
+
     // MARK: - loadData
 
     /// `loadData(at:)` returns the entry's full uncompressed bytes, exactly.

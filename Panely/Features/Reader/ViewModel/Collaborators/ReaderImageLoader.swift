@@ -42,6 +42,14 @@ final class ReaderImageLoader {
     // MARK: - Cache + async state
 
     private let imageCache = ReaderImageMemoryCache()
+
+    /// Header-derived page dimensions keyed by `ComicPage.id`. Lets a
+    /// paged → vertical toggle (or any vertical rebuild of the same book)
+    /// lay out the strip without re-reading every page header. Holds a
+    /// single book: each vertical refresh keeps only its source's pages.
+    /// Failed header reads aren't stored, so they retry on the next rebuild.
+    private var dimensionCache: [String: CGSize] = [:]
+
     private var preloadTask: Task<Void, Never>?
     private var lazyLoadTask: Task<Void, Never>?
 
@@ -51,8 +59,9 @@ final class ReaderImageLoader {
     /// without this, a slow decode for a book the user just navigated away
     /// from would write stale pages into the now-current book or flash a
     /// "Failed to load" error onto it. (`Task.isCancelled` only covers the
-    /// `lazyLoadTask` path; the initial `ensureWindowLoaded` and the paged
-    /// spread are awaited directly and aren't cancellable.)
+    /// `lazyLoadTask` path and paged refreshes the view model schedules and
+    /// supersedes itself; the initial `ensureWindowLoaded` and the paged
+    /// spread a book load awaits directly aren't cancelled.)
     private var generation: Int = 0
 
     // Snapshot of the most recent refresh() inputs. Preload reads from these
@@ -76,6 +85,7 @@ final class ReaderImageLoader {
         currentImages = []
         currentPageIDs = []
         pageDimensions = []
+        dimensionCache.removeAll()
         loadedPageIndices.removeAll()
         failedPageIndices.removeAll()
     }
@@ -232,27 +242,47 @@ final class ReaderImageLoader {
         //    pool and held a buffer per task; chunking caps concurrency at
         //    ~core count without losing throughput. Falls back to a generic
         //    portrait aspect for any page whose header read fails so layout
-        //    still holds.
-        let fallbackSize = CGSize(width: 1000, height: 1500)
+        //    still holds. Pages already in `dimensionCache` (this book was
+        //    shown vertically before) skip the header read entirely.
+        //
+        //    Deliberately all-up-front rather than "initial window first, the
+        //    rest later": the strip has no scroll anchoring, so replacing
+        //    fallback-sized slots above the restored page with their real
+        //    heights afterwards would shove the page the user is reading
+        //    out of view (and shift fit-to-width, which keys off max width).
+        let fallbackSize = Self.fallbackPageSize
         let maxConcurrent = ReaderImageLoadingPolicy.lazyConcurrencyLimit
         var dims = Array(repeating: fallbackSize, count: pages.count)
-        for chunkStart in stride(from: 0, to: pages.count, by: maxConcurrent) {
-            let chunkEnd = min(chunkStart + maxConcurrent, pages.count)
-            await withTaskGroup(of: (Int, CGSize).self) { group in
-                for i in chunkStart..<chunkEnd {
+        var resolved: [String: CGSize] = [:]
+        var missing: [Int] = []
+        for (i, page) in pages.enumerated() {
+            if let size = dimensionCache[page.id] {
+                dims[i] = size
+                resolved[page.id] = size
+            } else {
+                missing.append(i)
+            }
+        }
+        for chunkStart in stride(from: 0, to: missing.count, by: maxConcurrent) {
+            let chunkEnd = min(chunkStart + maxConcurrent, missing.count)
+            await withTaskGroup(of: (Int, CGSize?).self) { group in
+                for i in missing[chunkStart..<chunkEnd] {
                     let page = pages[i]
                     group.addTask {
-                        let size = (try? await ImageLoader.dimensions(for: page)) ?? fallbackSize
+                        let size = try? await ImageLoader.dimensions(for: page)
                         return (i, size)
                     }
                 }
                 for await (i, size) in group {
+                    guard let size else { continue }
                     dims[i] = size
+                    resolved[pages[i].id] = size
                 }
             }
             if isCancelled() || generation != self.generation { return }
         }
         guard generation == self.generation else { return }
+        dimensionCache = resolved
         pageDimensions = dims
 
         // 2. Placeholders give ImageStackView the right frame for every slot.
@@ -302,6 +332,10 @@ final class ReaderImageLoader {
     /// NSImages so their decoded bitmaps can be released. NSCache still
     /// holds the recently-decoded images, so scrolling back within a few
     /// pages typically hits the cache and re-displays instantly.
+    ///
+    /// The window is also byte-budgeted (`keepWindowByteBudget`): past it the
+    /// pages farthest from the viewport go first, but the visible pages and
+    /// their `visibleRangeBuffer` neighbours always stay.
     private func evictPagesOutsideKeepWindow(
         visibleRange: Range<Int>,
         window: ReaderVerticalImageWindow
@@ -316,9 +350,18 @@ final class ReaderImageLoader {
         // the retry succeeds (no flash back to gray).
         failedPageIndices = failedPageIndices.filter { keepRange.contains($0) }
 
-        var newImages = currentImages
+        let images = currentImages
+        let candidates = window.evictionIndices(
+            forVisibleRange: visibleRange,
+            loaded: loadedPageIndices,
+            loadedImageCount: images.count,
+            byteBudget: Self.keepWindowByteBudget,
+            cost: { images.indices.contains($0) ? Self.estimatedBitmapCost(of: images[$0]) : 0 }
+        )
+
+        var newImages = images
         var evicted: [Int] = []
-        for i in loadedPageIndices where !keepRange.contains(i) {
+        for i in candidates {
             guard i < newImages.count, i < pageDimensions.count else { continue }
             newImages[i] = Self.makePlaceholder(size: pageDimensions[i])
             evicted.append(i)
@@ -425,6 +468,12 @@ final class ReaderImageLoader {
         ReaderImageMemoryCache.estimatedBitmapCost(of: image)
     }
 
+    /// Decoded-bitmap budget for the vertical keep window. Same RAM-scaled
+    /// sizing as the NSCache: the strip and the cache mostly hold the same
+    /// images, so this bounds what the strip pins beyond what the cache
+    /// would keep anyway.
+    static let keepWindowByteBudget = ReaderImageMemoryCache.costLimit()
+
     /// Outcome of a single page decode. Always carries an image to display
     /// (a failure produces a visible error placeholder) but distinguishes
     /// success from failure so the vertical lazy-load path can record them on
@@ -465,8 +514,11 @@ final class ReaderImageLoader {
             if generation == self.generation {
                 onError(String(localized: "Failed to load \(page.displayName)", bundle: .localized))
             }
-            let fallbackSize = (try? await ImageLoader.dimensions(for: page))
-                ?? CGSize(width: 1000, height: 1500)
+            let fallbackSize = if let cached = dimensionCache[page.id] {
+                cached
+            } else {
+                (try? await ImageLoader.dimensions(for: page)) ?? Self.fallbackPageSize
+            }
             return .failure(ReaderImagePlaceholder.makeError(size: fallbackSize, title: page.displayName))
         }
     }
@@ -531,6 +583,9 @@ final class ReaderImageLoader {
     static func makePlaceholder(size: CGSize) -> NSImage {
         ReaderImagePlaceholder.make(size: size)
     }
+
+    /// Generic portrait aspect for a page whose header can't be read.
+    static let fallbackPageSize = CGSize(width: 1000, height: 1500)
 
     /// Concurrency cap for header-fetch / decode TaskGroups. ~Core count
     /// keeps the pool busy without overcommitting; clamped to [2, 8] so

@@ -116,6 +116,7 @@ extension ReaderViewModel {
         let changes = AIChatExchange.changes(from: parsed, lines: lines)
         let target = translation.target
         var undo: [AIChatUndoEntry] = []
+        var updates: [TranslationEdits.BubbleUpdate] = []
         for (line, text) in changes.updates {
             undo.append(AIChatUndoEntry(
                 pageID: line.pageID,
@@ -123,10 +124,12 @@ extension ReaderViewModel {
                 target: target,
                 previous: line.bubble.edit?.translationIsReaders == true ? line.translation : nil
             ))
-            translationEdits.update(pageID: line.pageID, bubble: line.bubble) { edit in
+            updates.append(.init(pageID: line.pageID, bubble: line.bubble) { edit in
                 edit.translations[target.rawValue] = text
-            }
+            })
         }
+        // A reply can change hundreds of balloons: one write per page.
+        translationEdits.update(updates)
         aiChatUndo = undo.isEmpty ? nil : undo
         AppLog.info(.reader, "AI chat reply applied", metadata: [
             "updated": "\(changes.updates.count)", "unchanged": "\(changes.unchanged)",
@@ -138,11 +141,11 @@ extension ReaderViewModel {
     /// Put back the translations the last reply changed.
     func undoAIChatReply() {
         guard let undo = aiChatUndo else { return }
-        for entry in undo {
-            translationEdits.update(pageID: entry.pageID, bubble: entry.bubble) { edit in
+        translationEdits.update(undo.map { entry in
+            .init(pageID: entry.pageID, bubble: entry.bubble) { edit in
                 edit.translations[entry.target.rawValue] = entry.previous
             }
-        }
+        })
         aiChatUndo = nil
     }
 }

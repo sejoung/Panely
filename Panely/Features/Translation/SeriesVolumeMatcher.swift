@@ -29,17 +29,27 @@ nonisolated enum SeriesVolumeMatcher {
             title = (name as NSString).deletingPathExtension
         }
         title = title.lowercased()
-        // [Group] (Digital) {tag} 【…】 — release tags, not the title.
-        title = title.replacing(try! Regex(#"[\[\(\{【（][^\]\)\}】）]*[\]\)\}】）]"#), with: " ")
-        // Volume/chapter markers next to a number: v01, vol.2, ch 10, #3, 1권, 2화, 3巻, 4話…
-        title = title.replacing(try! Regex(#"(?:volume|vol|ch(?:apter)?|ep(?:isode)?|v|#)\s*\.?\s*[0-9０-９]+"#), with: " ")
-        title = title.replacing(try! Regex(#"[0-9０-９]+\s*(?:권|화|부|巻|話|卷|集)"#), with: " ")
-        title = title.replacing(try! Regex(#"(?:제|第)\s*[0-9０-９]+"#), with: " ")
-        // Remaining numbers (ranges like 1-294 included) and separators.
-        title = title.replacing(try! Regex(#"[0-9０-９]+"#), with: " ")
+        title = title.replacing(Patterns.releaseTags, with: " ")
+        title = title.replacing(Patterns.markedVolume, with: " ")
+        title = title.replacing(Patterns.countedVolume, with: " ")
+        title = title.replacing(Patterns.ordinalVolume, with: " ")
+        title = title.replacing(Patterns.numbers, with: " ")
         return title.unicodeScalars
             .filter { CharacterSet.alphanumerics.contains($0) }
             .map(String.init)
             .joined()
+    }
+
+    /// Compiled once — the toolbar asks for the series' volumes as it
+    /// renders. `Regex` isn't `Sendable`; these are only ever read.
+    private enum Patterns {
+        /// [Group] (Digital) {tag} 【…】 — release tags, not the title.
+        nonisolated(unsafe) static let releaseTags = try! Regex(#"[\[\(\{【（][^\]\)\}】）]*[\]\)\}】）]"#)
+        /// Volume/chapter markers next to a number: v01, vol.2, ch 10, #3, 1권, 2화, 3巻, 4話…
+        nonisolated(unsafe) static let markedVolume = try! Regex(#"(?:volume|vol|ch(?:apter)?|ep(?:isode)?|v|#)\s*\.?\s*[0-9０-９]+"#)
+        nonisolated(unsafe) static let countedVolume = try! Regex(#"[0-9０-９]+\s*(?:권|화|부|巻|話|卷|集)"#)
+        nonisolated(unsafe) static let ordinalVolume = try! Regex(#"(?:제|第)\s*[0-9０-９]+"#)
+        /// Remaining numbers (ranges like 1-294 included) and separators.
+        nonisolated(unsafe) static let numbers = try! Regex(#"[0-9０-９]+"#)
     }
 }

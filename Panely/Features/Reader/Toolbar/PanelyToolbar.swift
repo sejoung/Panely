@@ -154,12 +154,13 @@ private struct ToolbarLanguageLabel: View {
 /// pinned), and an overflowing `HStack` clips both ends — which would cut
 /// off exactly the page/volume buttons. So when it doesn't fit, the widest
 /// groups fold into menus instead: fit/zoom first, then layout.
-struct PanelyToolbar: View {
+struct PanelyToolbar<TranslationPanelContent: View>: View {
     let state: PanelyToolbarState
     let actions: PanelyToolbarActions
     /// Content of the translation popover (the toolbar stays presentation-only;
-    /// the panel brings its own state).
-    let translationPanel: AnyView?
+    /// the panel brings its own state). Generic rather than `AnyView`, so
+    /// SwiftUI keeps the panel's identity across the toolbar's re-renders.
+    let translationPanel: TranslationPanelContent?
 
     @State private var hoveredHint: ToolbarHint?
     @State private var showsTranslationPanel = false
@@ -169,7 +170,7 @@ struct PanelyToolbar: View {
     init(
         state: PanelyToolbarState,
         actions: PanelyToolbarActions,
-        translationPanel: AnyView? = nil,
+        translationPanel: TranslationPanelContent?,
         previewHint: ToolbarHint? = nil
     ) {
         self.state = state
@@ -734,6 +735,13 @@ struct PanelyToolbar: View {
 
     private var nextKeyHint: String {
         state.direction.isRTL ? "←" : "→"
+    }
+}
+
+extension PanelyToolbar where TranslationPanelContent == EmptyView {
+    /// Without a translation popover (previews).
+    init(state: PanelyToolbarState, actions: PanelyToolbarActions, previewHint: ToolbarHint? = nil) {
+        self.init(state: state, actions: actions, translationPanel: nil, previewHint: previewHint)
     }
 }
 

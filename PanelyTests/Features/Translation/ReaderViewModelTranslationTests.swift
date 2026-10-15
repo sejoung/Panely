@@ -42,6 +42,33 @@ struct TranslationControllerTests {
         #expect(startRequested)
     }
 
+    /// `hasPages` flips with `pages`; a page's revision is new whenever its
+    /// entry is.
+    @Test func hasPagesAndRevisionsFollowThePages() async throws {
+        let store = try makeTemporaryTranslationStore()
+        let pages = Fixture.makeImagePages(count: 2)
+        try store.save(makeTranslatedPage(), key: TranslationStore.key(pageID: pages[1].id, from: .japanese, to: .korean))
+        let controller = TranslationController(store: store, defaults: InMemoryKeyValueStore())
+        controller.requestStart = {}
+        #expect(!controller.hasPages)
+
+        reload(controller, pages: pages)
+        await controller.cacheTask?.value
+        #expect(controller.hasPages)
+        let first = try #require(controller.pageRevisions[pages[1].id])
+        #expect(controller.pageRevisions[pages[0].id] == nil)
+
+        await controller.translateAgain(pageIndices: [1])
+        #expect(!controller.hasPages)
+        #expect(controller.pageRevisions.isEmpty)
+
+        try store.save(makeTranslatedPage(), key: TranslationStore.key(pageID: pages[1].id, from: .japanese, to: .korean))
+        reload(controller, pages: pages)
+        await controller.cacheTask?.value
+        #expect(controller.hasPages)
+        #expect(controller.pageRevisions[pages[1].id].map { $0 != first } == true)
+    }
+
     @Test func translationOrderStartsAtTheCurrentPageAndWraps() {
         #expect(TranslationController.translationOrder(count: 5, startingAt: 2) == [2, 3, 4, 0, 1])
         #expect(TranslationController.translationOrder(count: 3, startingAt: 9) == [2, 0, 1])
@@ -413,5 +440,38 @@ struct ReaderViewModelTranslationLanguageTests {
 
         vm.showTranslation(in: .english)
         #expect(vm.translationOverlayPages.first??.bubbles.first?.translation == "One")
+    }
+
+    /// The overlay pages are kept between renders, but never past a change
+    /// to what they're made of: the reader's edits, edit mode, the language.
+    @Test(.enabled(if: TranslationController.isSupportedOnThisMac))
+    func overlayPagesFollowEditsAndEditMode() async throws {
+        let vm = makeTestViewModel()
+        vm.translationEnabled = true
+        vm.translationTargetLanguage = .korean
+        vm.layout = .single
+        let pages = Fixture.makeImagePages(count: 1)
+        let source = TranslationLanguage.japanese
+        try vm.translation.store.save(makeTranslatedPage("하나"), key: TranslationStore.key(pageID: pages[0].id, from: source, to: .korean))
+        vm.currentSourceURL = URL(fileURLWithPath: "/series/b/vol1.cbz")
+        vm.translationSourceLanguage = source
+        vm.source = ComicSource(title: "Vol 1", pages: pages)
+        try await waitUntil { vm.translation.hasPages }
+        vm.currentPageIndex = 0
+        await vm.refreshImages()
+
+        let shown = try #require(vm.translationOverlayPages.first ?? nil)
+        #expect(shown.bubbles.first?.translation == "하나")
+        #expect((vm.translationOverlayPages.first ?? nil) == shown)
+
+        vm.translationEdits.update(pageID: pages[0].id, bubble: shown.bubbles[0]) {
+            $0.translations[TranslationLanguage.korean.rawValue] = "내 번역"
+        }
+        #expect(vm.translationOverlayPages.first??.bubbles.first?.translation == "내 번역")
+
+        vm.translationEdits.hide(pageID: pages[0].id, bubble: shown.bubbles[0])
+        #expect(vm.translationOverlayPages.first??.bubbles.isEmpty == true)
+        vm.setEditingTranslations(true)
+        #expect(vm.translationOverlayPages.first??.bubbles.first?.edit?.isHidden == true)
     }
 }

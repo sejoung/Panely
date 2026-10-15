@@ -115,6 +115,24 @@ struct ReadingProgressStoreTests {
         #expect(store.progress(forKey: "d", fileIdentityKey: nil) != nil)     // newest survives
     }
 
+    @Test func keysRevisionMovesOnlyWhenTheKeySetChanges() {
+        let store = ReadingProgressStore(defaults: InMemoryKeyValueStore(), storeKey: "rp-\(UUID())")
+        store.flushImmediately(forKey: "book", fileIdentityKey: "fid", page: 1, total: 10, finished: false)
+        let afterFirst = store.keysRevision
+        let revision = store.revision
+
+        // A page turn rewrites existing records: content changes, keys don't.
+        store.flushImmediately(forKey: "book", fileIdentityKey: "fid", page: 2, total: 10, finished: false)
+        #expect(store.keysRevision == afterFirst)
+        #expect(store.revision == revision + 1)  // one in-place mutation
+
+        store.flushImmediately(forKey: "other", fileIdentityKey: nil, page: 1, total: 10, finished: false)
+        #expect(store.keysRevision != afterFirst)
+        let afterOther = store.keysRevision
+        store.remove(forKey: "other", fileIdentityKey: nil)
+        #expect(store.keysRevision != afterOther)
+    }
+
     @Test func completionStaysFinishedWhenReaderMovesBackward() {
         let store = ReadingProgressStore(
             defaults: InMemoryKeyValueStore(),

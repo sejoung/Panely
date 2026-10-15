@@ -198,6 +198,23 @@ struct PageBookmarksStoreTests {
         #expect(store.bookmarkedBooks().count == 3)
     }
 
+    @Test func memoizedBookmarkedBooksFollowEveryChange() {
+        let store = freshStore()
+        _ = store.togglePageBookmark(key: "/lib/A.cbz", pageIndex: 1)
+        #expect(store.bookmarkedBooks().map(\.key) == ["/lib/A.cbz"])
+        // Served from the memo while nothing changed.
+        #expect(store.bookmarkedBooks(excluding: "/lib/A.cbz").isEmpty)
+
+        _ = store.togglePageBookmark(key: "/lib/B.cbz", pageIndex: 2)
+        #expect(store.bookmarkedBooks().map(\.key) == ["/lib/B.cbz", "/lib/A.cbz"])
+
+        store.setBookRef(makeRef(title: "Renamed", path: "/lib/B.cbz"), forKey: "/lib/B.cbz")
+        #expect(store.bookmarkedBooks().first?.title == "Renamed")
+
+        store.pageBookmarksByBook = [:]
+        #expect(store.bookmarkedBooks().isEmpty)
+    }
+
     @Test func moveBookmarksMergesIntoTheNewKey() {
         let store = freshStore()
         _ = store.togglePageBookmark(key: "/old/A.cbz", pageIndex: 3)

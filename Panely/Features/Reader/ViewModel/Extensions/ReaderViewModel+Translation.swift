@@ -148,19 +148,19 @@ extension ReaderViewModel {
     /// language as selected only then — the series remembers its language,
     /// so a new volume would otherwise show one ticked with nothing of it.
     var translationIsShowing: Bool {
-        translationOverlayVisible && (!translation.pages.isEmpty || translation.hasActiveJob)
+        translationOverlayVisible && (translation.hasPages || translation.hasActiveJob)
     }
 
     /// The open book's languages with something to show — what can be
     /// switched to. The rest can only be started.
     var translationLanguagesWithResults: [TranslationController] {
-        translationLanguagesForBook.filter { !$0.pages.isEmpty || $0.hasActiveJob }
+        translationLanguagesForBook.filter { $0.hasPages || $0.hasActiveJob }
     }
 
     /// A language with nothing of it to show in this book — never
     /// translated, or its cache cleared. Picking it has to translate first.
     func translationNeedsStarting(_ controller: TranslationController) -> Bool {
-        controller.pages.isEmpty && !controller.hasActiveJob
+        !controller.hasPages && !controller.hasActiveJob
     }
 
     /// Pick a language in the panel's View list: show it, translating the
@@ -190,7 +190,7 @@ extension ReaderViewModel {
 
     /// Edit mode needs a translation on screen to edit.
     var canEditTranslations: Bool {
-        translationFeatureAvailable && hasSource && !translation.pages.isEmpty
+        translationFeatureAvailable && hasSource && translation.hasPages
     }
 
     /// Enter or leave balloon edit mode. Entering shows the translation.
@@ -230,26 +230,57 @@ extension ReaderViewModel {
     /// Translations for the images on screen, aligned with `currentImages`
     /// (empty when the feature is off), with the reader's edits applied. Each
     /// balloon also carries the book's other languages for the popover.
+    ///
+    /// Read on every render, and in the vertical layout `currentImages` is
+    /// the whole book while a job changes one page at a time — so each page
+    /// is built once and kept (`TranslationMemo`) until something it's made
+    /// of changes.
     var translationOverlayPages: [TranslatedPage?] {
         guard translationFeatureAvailable else { return [] }
         let shown = translation
-        let others = translationManager.openBook.filter { $0 !== shown && !$0.pages.isEmpty }
+        let target = shown.target
+        let includeHidden = isEditingTranslations
+        // Read once each, for the observation as much as for the lookups.
+        let machinePages = shown.pages
+        let revisions = shown.pageRevisions
+        let editedPages = translationEdits.pages
+        let retranslating = translationEdits.retranslating
+        let others = translationManager.openBook
+            .filter { $0 !== shown && $0.hasPages }
+            .map { (target: $0.target, pages: $0.pages, revisions: $0.pageRevisions) }
         return imageLoader.currentPageIDs.map { id in
-            guard let machine = shown.pages[id] else { return nil }
-            var page = translationEdits.apply(to: machine, pageID: id, target: shown.target, includeHidden: isEditingTranslations)
+            guard let machine = machinePages[id], let revision = revisions[id] else { return nil }
+            let edits = editedPages[id]
+            let key = TranslationMemo.OverlayKey(
+                revision: revision,
+                target: target,
+                edits: edits,
+                retranslating: edits == nil || retranslating.isEmpty ? [] : retranslating.filter { $0.pageID == id },
+                includeHidden: includeHidden,
+                alternates: others.compactMap { other in other.revisions[id].map { .init(target: other.target, revision: $0) } }
+            )
+            if let memo = translationMemo.overlayPages[id], memo.key == key { return memo.page }
+            var page = translationEdits.apply(to: machine, pageID: id, target: target, includeHidden: includeHidden)
             page.pageID = id
-            guard !others.isEmpty else { return page }
-            let edits = translationEdits.edits(forPage: id)
-            for index in page.bubbles.indices {
-                var alternates: [TranslationLanguage: String] = [:]
-                for other in others {
-                    guard let bubble = other.pages[id]?.bubbles.first(where: { $0.source == page.bubbles[index].source }) else { continue }
-                    if let text = edits?.translation(of: bubble, in: other.target) ?? bubble.translation, !text.isEmpty {
-                        alternates[other.target] = text
-                    }
+            if !key.alternates.isEmpty {
+                // Each other language's balloons by their text, looked up
+                // once per page rather than searched for per balloon.
+                let otherBubbles = others.compactMap { other -> (TranslationLanguage, [String: TranslatedBubble])? in
+                    guard let bubbles = other.pages[id]?.bubbles else { return nil }
+                    return (other.target, Dictionary(bubbles.map { ($0.source, $0) }, uniquingKeysWith: { first, _ in first }))
                 }
-                page.bubbles[index].alternates = alternates.isEmpty ? nil : alternates
+                for index in page.bubbles.indices {
+                    var alternates: [TranslationLanguage: String] = [:]
+                    for (otherTarget, bySource) in otherBubbles {
+                        guard let bubble = bySource[page.bubbles[index].source] else { continue }
+                        if let text = edits?.translation(of: bubble, in: otherTarget) ?? bubble.translation, !text.isEmpty {
+                            alternates[otherTarget] = text
+                        }
+                    }
+                    page.bubbles[index].alternates = alternates.isEmpty ? nil : alternates
+                }
             }
+            translationMemo.overlayPages[id] = .init(key: key, page: page)
             return page
         }
     }
@@ -292,7 +323,7 @@ extension ReaderViewModel {
     /// There's a translation to redo: the shown language has results and
     /// the book's language is known.
     var canTranslateAgain: Bool {
-        translationFeatureAvailable && hasSource && translation.source != nil && !translation.pages.isEmpty
+        translationFeatureAvailable && hasSource && translation.source != nil && translation.hasPages
     }
 
     /// Analyze and translate the pages on screen again, the current way.
@@ -437,12 +468,23 @@ extension ReaderViewModel {
 
     /// The open book's hidden balloons in reading order, for the panel's list.
     var translationHiddenBalloons: [HiddenBalloon] {
-        let pageIndices = Dictionary(source.pages.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { first, _ in first })
-        return translationEdits.hiddenBalloons
+        let hidden = translationEdits.hiddenBalloons
+        guard !hidden.isEmpty else { return [] }
+        let pageIndices = translationPageIndicesByID
+        return hidden
             .compactMap { item in
                 pageIndices[item.pageID].map { HiddenBalloon(pageIndex: $0, pageID: item.pageID, edit: item.edit) }
             }
             .sorted { ($0.pageIndex, $0.edit.rect.minY) < ($1.pageIndex, $1.edit.rect.minY) }
+    }
+
+    /// The open book's page indices by page id, kept until the book changes
+    /// (`translationSourceDidChange`) — the edit bar asks on every render.
+    private var translationPageIndicesByID: [String: Int] {
+        if let memo = translationMemo.pageIndices { return memo }
+        let indices = Dictionary(source.pages.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { first, _ in first })
+        translationMemo.pageIndices = indices
+        return indices
     }
 
     /// Translate a corrected original on its own, outside the book's job.
@@ -484,7 +526,14 @@ extension ReaderViewModel {
     /// the folder, which may be unrelated works.
     var translatableSeriesVolumes: [URL] {
         guard let current = currentSourceURL else { return [] }
-        return SeriesVolumeMatcher.volumes(matching: current, among: siblings)
+        // The toolbar asks on every render, and titles are matched by regex.
+        let siblings = siblings
+        if let memo = translationMemo.seriesVolumes, memo.book == current, memo.siblings == siblings {
+            return memo.volumes
+        }
+        let volumes = SeriesVolumeMatcher.volumes(matching: current, among: siblings)
+        translationMemo.seriesVolumes = .init(book: current, siblings: siblings, volumes: volumes)
+        return volumes
     }
 
     /// Translate the open book, then every other volume of the series in the
@@ -552,6 +601,7 @@ extension ReaderViewModel {
     /// the new book is set up once the load has also restored the series'
     /// layout — which decides page vs strip — later in the same main-actor turn.
     func translationSourceDidChange() {
+        translationMemo = TranslationMemo()
         seriesTranslationSkipped = []
         isEditingTranslations = false
         translationManager.detachOpenBook()
@@ -645,5 +695,41 @@ extension ReaderViewModel {
         controller.sourceResolver = { [weak self] in
             self?.seriesPreferences.translationSource(forSeries: seriesID)
         }
+    }
+
+    /// What the translation getters read on every render keep between
+    /// renders (`ReaderViewModel.translationMemo`). Each entry carries what
+    /// it was made from and is only used while that's unchanged; the whole
+    /// memo goes when the book changes.
+    struct TranslationMemo {
+        struct OverlayKey: Equatable {
+            struct Alternate: Equatable {
+                let target: TranslationLanguage
+                let revision: Int
+            }
+            /// `TranslationController.pageRevisions` of the shown language's page.
+            let revision: Int
+            let target: TranslationLanguage
+            let edits: PageEdits?
+            let retranslating: Set<TranslationEdits.Retranslation>
+            let includeHidden: Bool
+            /// The other languages with this page, and their pages' revisions.
+            let alternates: [Alternate]
+        }
+
+        struct OverlayPage {
+            let key: OverlayKey
+            let page: TranslatedPage
+        }
+
+        struct SeriesVolumes {
+            let book: URL
+            let siblings: [URL]
+            let volumes: [URL]
+        }
+
+        var overlayPages: [String: OverlayPage] = [:]
+        var seriesVolumes: SeriesVolumes?
+        var pageIndices: [String: Int]?
     }
 }

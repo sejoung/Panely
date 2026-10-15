@@ -77,6 +77,9 @@ final class ReaderViewModel {
     @ObservationIgnored var aiChatLines: [AIChatExchange.Line] = []
     /// What the last reply changed, to undo it.
     var aiChatUndo: [AIChatUndoEntry]?
+    /// What translation getters read on every render keep between renders
+    /// (`ReaderViewModel+Translation`).
+    @ObservationIgnored var translationMemo = TranslationMemo()
     /// Balloon edit mode: edited balloons are marked, hidden ones show as
     /// outlines, and a balloon's popover offers its edits. Off = reading,
     /// with nothing on the page but the translation.
@@ -117,6 +120,12 @@ final class ReaderViewModel {
     /// file-identity stats and full progress-key scans on the main thread.
     @ObservationIgnored var continueReadingMemo: ContinueReadingMemo?
     @ObservationIgnored var readingBadgeKeyMemo = ReadingBadgeKeyMemo()
+    /// Which progress keys belong to which recent source — the part of the
+    /// Continue Reading scan that a page turn can't change.
+    @ObservationIgnored var continueReadingIndexMemo: ContinueReadingIndexMemo?
+    /// The open book's position keys, derived once per load instead of per
+    /// page change (see `ReaderViewModel+Source.persistPosition`).
+    @ObservationIgnored var currentPositionKeysMemo: CurrentPositionKeysMemo?
     var isLoading: Bool = false
     var loadingMessage: String = ""
 
@@ -132,6 +141,9 @@ final class ReaderViewModel {
     /// banner; cleared on a timer, by the next load, or on dismissal.
     var volumeNotice: VolumeNavigationNotice?
     @ObservationIgnored var volumeNoticeDismissTask: Task<Void, Never>?
+    /// The in-flight paged-mode spread refresh. Each page change cancels the
+    /// previous one so a slider scrub decodes only the spread it lands on.
+    @ObservationIgnored var pagedRefreshTask: Task<Void, Never>?
     var sourceRenderRevision: Int = 0
     var sourceChangedOnDisk: Bool = false
     var sourceChangeMessage: String?
@@ -384,6 +396,10 @@ final class ReaderViewModel {
     /// a page turn inside the debounce window before ⌘Q would be lost. With a
     /// nil queue the block runs inline on the posting (main) thread. The weak
     /// capture makes it a no-op once the VM is gone.
+    ///
+    /// Resigning active lands any still-debounced write too, so the stores'
+    /// multi-second persistence debounce never outlives the user's session
+    /// with the app in front.
     private func observeAppTermination() {
         _ = NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification,
@@ -391,7 +407,20 @@ final class ReaderViewModel {
             queue: nil
         ) { [weak self] _ in
             MainActor.assumeIsolated {
+                // The pending write may belong to a book that is no longer
+                // open (its load failed, or an empty folder was picked), which
+                // `flushPositionImmediately` — current book only — can't reach.
+                self?.flushPendingPositionWrites()
                 self?.flushPositionImmediately()
+            }
+        }
+        _ = NotificationCenter.default.addObserver(
+            forName: NSApplication.willResignActiveNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.flushPendingPositionWrites()
             }
         }
     }

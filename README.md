@@ -470,18 +470,55 @@ Terminal) and move the result straight to `/Applications`.
 ## Testing
 
 ```bash
-xcodebuild test \
-  -project Panely.xcodeproj \
-  -scheme Panely \
-  -destination 'platform=macOS' \
-  CODE_SIGN_IDENTITY="-"
+scripts/test.sh          # fast tier (= plain `xcodebuild test`, what CI runs)
+scripts/test-slow.sh     # + slow tier: real FSEvents, real Vision OCR, every random seed
+scripts/test-visual.sh   # screenshot comparisons against PanelyTests/Snapshots/Reference/
+scripts/benchmark-translation.sh [--book PATH]   # time each translation stage and whole jobs
 ```
 
-**705 tests across 93 suites** cover:
+The tiers are set in `PanelyTests/TestTiers.swift`; the slow and visual tiers
+are opt-in through `PANELY_SLOW_TESTS=1` / `PANELY_VISUAL_TESTS=1`, which the
+scripts pass as `TEST_RUNNER_…` so xcodebuild hands them to the test process.
+The fast tier takes about 6–8 s of test time; the visual tier about 10 s; the
+slow tier adds about 3 s on top of the fast one (its FSEvents tests mostly wait).
+
+Every test's temp files live under one `tmp/paneltest-run-*` directory per run
+(`Fixture.runDirectory`), each in its own parent so a folder a test opens has
+no siblings to list as volumes; a run deletes what runs over an hour old left
+behind. (Leftovers used to accumulate straight in `tmp` — 55k entries — and
+made every folder-opening test slower than the last.)
+
+The suites cover:
 
 `SnapshotGalleryTests` is discovered in normal runs but gated off unless
 `scripts/generate-snapshots.sh` enables snapshot generation, so the default
 `xcodebuild test` path does not render or copy manual PNGs.
+
+Several suites guard what actually reaches the screen, not just the models:
+
+- **`LibrarySidebarRenderingTests`** renders the real sidebar off-screen over
+  a fixture library and checks the `NSOutlineView` AppKit built — rows,
+  levels, which folders expand. A tree that scans fine but draws flat fails.
+- **Update rendering tests** (`LibrarySidebarUpdateRenderingTests`,
+  `ReaderToolbarRenderingTests`, `TranslationEditBarRenderingTests`,
+  `ThumbnailSidebarRenderingTests`, `GoMenuRenderingTests`) host real views,
+  change the view model (turn pages, open another book, record progress, a
+  translation arriving) and check the hosted views follow. Helpers in
+  `PanelyTests/Snapshots/HostedViewInspection.swift`.
+- **`ReaderViewerRenderingTests`** checks where the real viewer places each
+  page (single, double, right-to-left, cover alone, vertical strip), and
+  **`TranslationOverlayDrawingTests`** reads back what the translation overlay
+  draws, including that partial hover redraws match a full redraw.
+- **`VisualRegressionTests`** (opt-in: `scripts/test-visual.sh`) renders a set of screens and compares each with
+  a reference PNG in `PanelyTests/Snapshots/Reference/` (`SnapshotComparator`:
+  more than 0.1% of pixels off by over 6 levels fails — the dark chrome needs
+  that sensitivity; font-smoothing noise is ~0.01%). On a
+  failure the rendered image and a red-on-gray diff land in the Debug
+  sandbox's `Caches/panely-visual-diffs/`. References are tied to the macOS
+  major version they were recorded on and the suite skips on any other.
+  After an intended UI change, re-record with
+  `scripts/update-reference-snapshots.sh` and review the PNGs before
+  committing.
 
 - Pure data types (`ComicPage`, `ComicSource`, `RecentItem`, enum raw values)
 - Natural-sort contract (Foundation behaviour Panely relies on)
@@ -794,10 +831,13 @@ PanelyTests/                            # mirrors the source tree
 ├── FileAssociationTests.swift
 ├── EntitlementsTests.swift
 ├── TestKeyValueStore.swift             # in-memory KeyValueStoring for persistence tests
-├── Snapshots/                          # docs/screenshots/ generator (skipped in CI)
+├── Snapshots/                          # docs/screenshots/ generator (skipped in CI) + visual regression
 │   ├── SnapshotRenderer.swift          # NSHostingView + offscreen window → PNG
 │   ├── SnapshotSampleContent.swift     # placeholder pages + LibraryFixture
-│   └── SnapshotGalleryTests.swift      # 15 manual scenarios
+│   ├── SnapshotGalleryTests.swift      # manual scenarios
+│   ├── SnapshotComparator.swift        # tolerant pixel diff + diff image
+│   ├── VisualRegressionTests.swift     # screens vs Reference/*.png
+│   └── Reference/                      # reference PNGs + recording macOS version
 ├── Core/Comic/                         # ArchiveLoader, ZIP/RAR readers, FolderLoader, ImageLoader{Load,Dimensions},
 │                                       # ComicModel, LoaderExtension, NaturalSort
 ├── Core/Diagnostics/                   # AppLog, DiagnosticLogStore
@@ -838,7 +878,12 @@ docs/
 
 scripts/
 ├── generate-app-icon.sh                # SVG → .icns pipeline
+├── test.sh                            # fast test tier (what CI runs)
+├── test-slow.sh                       # fast + slow tiers (real FSEvents / OCR, all seeds)
+├── test-visual.sh                     # screenshot comparisons only
+├── benchmark-translation.sh           # translation timings per stage / per job (opt-in benchmark)
 ├── generate-snapshots.sh               # rebuild docs/screenshots/*.png from SnapshotGalleryTests
+├── update-reference-snapshots.sh       # re-record PanelyTests/Snapshots/Reference/*.png
 ├── convert-text-detector.py            # rebuild Resources/ComicTextDetector.mlpackage (Core ML)
 ├── install-local.sh                    # build + install locally for hands-on testing (--debug, --test…)
 └── release.sh                          # bump + tag + push automation
@@ -942,7 +987,9 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   every page's pixel dimensions concurrently (header-only `CGImageSource`
   read; for archive entries `ArchiveReader.loadDataPrefix(maxBytes: 64 KB)`
   bails out of the ZIP/RAR extract early so we don't decompress the
-  whole entry just to read width/height). Dimension fetches and decodes
+  whole entry just to read width/height; `ZIPArchiveReader` resolves
+  entries through a path index built once, not ZIPFoundation's linear
+  `archive[path]` scan). Dimension fetches and decodes
   both run through chunked `withTaskGroup` capped at `min(8, cores)` to
   avoid blowing through the cooperative pool on big folders.
   `currentImages` is filled with same-sized gray placeholder `NSImage`s
@@ -955,8 +1002,21 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   abandoned work stops promptly.
 - **Window eviction** — when the visible range moves, pages outside
   `[range ± 10]` are swapped back to placeholders so a 1000-page strip
-  doesn't pin every decoded image in memory. Recently-evicted pages
-  typically restore from `NSCache` instantly when scrolled back.
+  doesn't pin every decoded image in memory. The window is also
+  byte-budgeted (same RAM-scaled limit as the `NSCache`): past it the
+  pages farthest from the viewport go first, but visible pages and their
+  `± 2` load buffer always stay. Recently-evicted pages typically restore
+  from `NSCache` instantly when scrolled back.
+- **Dimension cache** — header-read dimensions are kept per book by page
+  id, so toggling paged ↔ vertical rebuilds the strip without re-reading
+  every header. They're still fetched all up front on first entry: the
+  strip has no scroll anchoring, so filling real heights in after the
+  restored page is shown would shift it out of view.
+- **Paged cancellation** — page changes run through one tracked refresh
+  task; each new page change cancels the previous one, and
+  `ImageLoader.load` forwards that cancellation into its detached decode
+  task (and the archive read), so scrubbing the page slider decodes only
+  the spread it lands on.
 - **`ImageStackView` view recycling** — the stack stores `pageFrames` for
   every page (drives all geometry queries) but only materializes
   `NSImageView` instances for pages whose frames intersect the visible
@@ -1162,7 +1222,8 @@ git push origin v1.0.0
   no artifacts — storage footprint is essentially zero.
   `SnapshotGalleryTests` is gated off by default because it is a PNG
   generator; regenerate the manual's PNGs with `scripts/generate-snapshots.sh`
-  when needed.
+  when needed. CI runs the fast tier only: `VisualRegressionTests` and the
+  slow tier are opt-in (`scripts/test-visual.sh`, `scripts/test-slow.sh`).
 - **Releases** attach a single zip (~5–10 MB) to GitHub Releases using
   `ditto` so resource forks are preserved.
 - **SPM cache** speeds up subsequent runs; invalidates on `Package.resolved`

@@ -1,4 +1,5 @@
 import Foundation
+import os
 import ZIPFoundation
 
 nonisolated enum ArchiveLoader {
@@ -26,10 +27,10 @@ nonisolated enum ArchiveLoader {
 
     static func load(from url: URL) async throws -> ComicSource {
         try await Task.detached(priority: .userInitiated) {
-            let reader = try ArchiveFormat.openReader(for: url)
-            let paths = try await reader.entryPaths()
+            let listing = try await listing(for: url)
+            let reader = listing.reader
 
-            let imagePaths = paths.filter { path in
+            let imagePaths = listing.paths.filter { path in
                 guard !isMetadataEntry(path) else { return false }
                 let ext = (path as NSString).pathExtension.lowercased()
                 return FolderLoader.supportedExtensions.contains(ext)
@@ -40,7 +41,8 @@ nonisolated enum ArchiveLoader {
             let pages = sorted.map { path in
                 ComicPage(
                     source: .archiveEntry(reader: reader, path: path),
-                    displayName: (path as NSString).lastPathComponent
+                    displayName: (path as NSString).lastPathComponent,
+                    contentSignature: listing.signature
                 )
             }
 
@@ -51,14 +53,49 @@ nonisolated enum ArchiveLoader {
 
     static func hasNestedArchives(at url: URL) async throws -> Bool {
         try await Task.detached(priority: .userInitiated) {
-            let reader = try ArchiveFormat.openReader(for: url)
-            let paths = try await reader.entryPaths()
-            return paths.contains { path in
+            let listing = try await listing(for: url)
+            let hasNested = listing.paths.contains { path in
                 guard !isMetadataEntry(path) else { return false }
                 let ext = (path as NSString).pathExtension.lowercased()
                 return supportedExtensions.contains(ext)
             }
+            // A flat archive is loaded directly next — hand the open reader
+            // and its listing over instead of opening the file a second time.
+            if !hasNested {
+                pendingListing.withLock { $0 = listing }
+            }
+            return hasNested
         }.value
+    }
+
+    /// An opened archive plus its entry listing and content signature.
+    private struct Listing: Sendable {
+        let url: URL
+        let signature: String
+        let reader: any ArchiveReader
+        let paths: [String]
+    }
+
+    /// One-slot handoff from `hasNestedArchives` to the `load(from:)` that
+    /// follows it for the same archive. Opening a ZIP reads its whole
+    /// central directory (a RAR, every header), and a book open used to do
+    /// that twice back to back. Taken (emptied) by the next lookup, and only
+    /// reused while the file's size + mtime signature is unchanged.
+    private static let pendingListing = OSAllocatedUnfairLock<Listing?>(initialState: nil)
+
+    private static func listing(for url: URL) async throws -> Listing {
+        let key = url.standardizedFileURL
+        let signature = ComicPage.contentSignature(for: url)
+        let handedOver = pendingListing.withLock { slot -> Listing? in
+            guard let listing = slot else { return nil }
+            slot = nil
+            return listing.url == key && listing.signature == signature ? listing : nil
+        }
+        if let handedOver { return handedOver }
+
+        let reader = try ArchiveFormat.openReader(for: url)
+        let paths = try await reader.entryPaths()
+        return Listing(url: key, signature: signature, reader: reader, paths: paths)
     }
 
     /// Entries that carry no content of their own: Finder's "Compress" stores

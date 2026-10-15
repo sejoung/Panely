@@ -31,6 +31,25 @@ struct LibrarySidebarModelTests {
         #expect(model.nodes.contains { $0.name == "Nested" })
     }
 
+    @Test func reloadListsSubfolderContents() async throws {
+        let root = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let series = root.appendingPathComponent("Series", isDirectory: true)
+        let arc = series.appendingPathComponent("Arc", isDirectory: true)
+        try FileManager.default.createDirectory(at: arc, withIntermediateDirectories: true)
+        _ = try Fixture.writeFile(series.appendingPathComponent("Vol01.cbz"))
+        _ = try Fixture.writeFile(arc.appendingPathComponent("Vol02.cbz"))
+
+        let model = LibrarySidebarModel()
+        await model.reload(rootURL: root, loader: LiveLibraryTreeLoader())
+
+        let seriesNode = try #require(model.nodes.first { $0.name == "Series" })
+        let children = try #require(seriesNode.children)
+        #expect(children.map(\.name).sorted() == ["Arc", "Vol01"])
+        let arcNode = try #require(children.first { $0.name == "Arc" })
+        #expect(arcNode.children?.map(\.name) == ["Vol02"])
+    }
+
     @Test func reloadUsesInjectedTreeLoader() async {
         let model = LibrarySidebarModel()
 

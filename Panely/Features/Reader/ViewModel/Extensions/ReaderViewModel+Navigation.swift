@@ -156,9 +156,19 @@ extension ReaderViewModel {
     /// In continuous (vertical) layouts the entire strip is already loaded,
     /// so paging just means scrolling — no need to re-iterate every page
     /// through ImageLoader on every keystroke.
+    ///
+    /// Paged refreshes are tracked so each one cancels the last: dragging the
+    /// page slider calls `jump(to:)` for every value it passes, and without
+    /// this every intermediate spread was read and decoded to completion. A
+    /// cancelled refresh leaves `currentImages` alone (no error, no stale
+    /// spread) — the newer refresh owns the screen.
     func scheduleRefreshIfPaged() {
         guard !layout.isContinuous else { return }
-        Task { await refreshImages() }
+        pagedRefreshTask?.cancel()
+        pagedRefreshTask = Task { [weak self] in
+            guard !Task.isCancelled else { return }
+            await self?.refreshImages()
+        }
     }
 
     // MARK: - Chrome toggles

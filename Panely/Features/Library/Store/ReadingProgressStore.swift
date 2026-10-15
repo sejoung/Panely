@@ -5,15 +5,21 @@ import Foundation
 /// Powers the sidebar's progress badges and the "Continue reading" row.
 ///
 /// Writes are debounced and coalesced (vertical scroll fires on every page
-/// change at ~60 Hz); a sync flush is provided for app termination. Capped on
-/// entry count — the least-recently-updated books drop out first — so a long
-/// reading history can't grow `UserDefaults` without bound (mirrors the caps
-/// on `ReaderPositionStore` / `PageBookmarksStore`).
+/// change at ~60 Hz); a sync flush is provided for app termination, and the
+/// pending write is also settled when the app resigns active or another
+/// book's write arrives. Capped on entry count — the least-recently-updated
+/// books drop out first — so a long reading history can't grow
+/// `UserDefaults` without bound (mirrors the caps on `ReaderPositionStore` /
+/// `PageBookmarksStore`).
 @Observable
 @MainActor
 final class ReadingProgressStore {
     nonisolated static let storeKey = "panely.readingProgress"
     nonisolated static let maxEntries = 4000
+    /// Quiet period before a debounced write lands. Every write re-encodes
+    /// the whole dictionary (up to `maxEntries`) into `UserDefaults` on the
+    /// main thread, so this is deliberately longer than a page-turn cadence.
+    nonisolated static let saveDelay: Duration = .seconds(2)
 
     /// Keyed by `PositionKey`. Observed, so the sidebar re-renders its badges
     /// as soon as progress changes.
@@ -24,10 +30,15 @@ final class ReadingProgressStore {
     /// from the whole dictionary and revalidate in O(1) — and still register
     /// an observation dependency — instead of re-scanning thousands of keys.
     private(set) var revision = 0
+    /// Bumped only when the *set of keys* changes (a book's first record, a
+    /// removal, a migration, an eviction) — not when an existing record's
+    /// page moves. Lets readers cache structure derived from the keys (e.g.
+    /// which records belong to which recent source) across page turns.
+    @ObservationIgnored private(set) var keysRevision = 0
 
     /// Module-internal so tests can flush the pending write instead of
     /// waiting out the delay.
-    let saveDebouncer = Debouncer()
+    let saveDebouncer = Debouncer(delay: ReadingProgressStore.saveDelay)
     /// Key of the write waiting in `saveDebouncer`. One debouncer serves every
     /// book, so a write for a different key must flush this one first instead
     /// of replacing it — otherwise finishing Vol 1 and immediately opening
@@ -80,12 +91,13 @@ final class ReadingProgressStore {
         // Settle the pending write first so it can't be lost (another book's)
         // or resurrect what is being changed below (this book's).
         saveDebouncer.flush()
-        var dict = entries
-        dict.removeValue(forKey: key)
-        if let fileIdentityKey { dict.removeValue(forKey: fileIdentityKey) }
-        guard dict != entries else { return }
-        entries = dict
-        defaults.saveCodable(dict, forKey: storeKey)
+        guard entries[key] != nil || fileIdentityKey.map({ entries[$0] != nil }) == true else { return }
+        mutateEntries { dict in
+            dict.removeValue(forKey: key)
+            if let fileIdentityKey { dict.removeValue(forKey: fileIdentityKey) }
+        }
+        keysRevision &+= 1
+        persist()
     }
 
     /// Explicitly forget every progress record addressable through a recent
@@ -101,7 +113,8 @@ final class ReadingProgressStore {
         }
         guard filtered.count != entries.count else { return }
         entries = filtered
-        defaults.saveCodable(filtered, forKey: storeKey)
+        keysRevision &+= 1
+        persist()
     }
 
     func migrateSourcePath(from oldPath: String, to newPath: String) {
@@ -127,7 +140,8 @@ final class ReadingProgressStore {
         }
         guard changed else { return }
         entries = migrated
-        defaults.saveCodable(migrated, forKey: storeKey)
+        keysRevision &+= 1
+        persist()
     }
 
     /// Completion is sticky so moving back from the final page does not make a
@@ -140,24 +154,19 @@ final class ReadingProgressStore {
         total: Int
     ) {
         saveDebouncer.flush()
-        var dict = entries
         let progress = ReadingProgress(
             page: page,
             total: total,
             finished: false,
             updatedAt: clock()
         )
-        dict[key] = progress
-        if let fileIdentityKey { dict[fileIdentityKey] = progress }
-        evictIfNeeded(&dict)
-        entries = dict
-        defaults.saveCodable(dict, forKey: storeKey)
+        store(progress, forKey: key, fileIdentityKey: fileIdentityKey)
     }
 
     // MARK: - Recording
 
     /// Debounced write. Rapid repeat calls coalesce into one round-trip after
-    /// ~300 ms of quiet (matches `ReaderPositionStore`).
+    /// `saveDelay` of quiet (matches `ReaderPositionStore`).
     func record(forKey key: String, fileIdentityKey: String?, page: Int, total: Int, finished: Bool) {
         settlePendingWrite(unlessFor: key)
         pendingKey = key
@@ -191,8 +200,7 @@ final class ReadingProgressStore {
     }
 
     private func writeNow(key: String, fileIdentityKey: String?, page: Int, total: Int, finished: Bool) {
-        var dict = entries
-        let existing = dict[key] ?? fileIdentityKey.flatMap { dict[$0] }
+        let existing = entries[key] ?? fileIdentityKey.flatMap { entries[$0] }
         // Preserve completion while the underlying page count is unchanged.
         // If the book is replaced with a different-length edition, recompute
         // from its new end rather than carrying a stale completion forever.
@@ -205,17 +213,37 @@ final class ReadingProgressStore {
             finished: effectiveFinished,
             updatedAt: clock()
         )
-        dict[key] = progress
-        if let fid = fileIdentityKey {
-            dict[fid] = progress
-        }
-        evictIfNeeded(&dict)
-        entries = dict
-        defaults.saveCodable(dict, forKey: storeKey)
+        store(progress, forKey: key, fileIdentityKey: fileIdentityKey)
     }
 
-    /// Drop the least-recently-updated entries until back under the cap.
-    private func evictIfNeeded(_ dict: inout [String: ReadingProgress]) {
-        dict.capByRecency(to: maxEntries) { $0.updatedAt }
+    /// Write `progress` under both keys in place — one `entries` mutation
+    /// (one revision bump) and no copy of the whole dictionary — then evict
+    /// and persist.
+    private func store(_ progress: ReadingProgress, forKey key: String, fileIdentityKey: String?) {
+        // Only a new key can change the key set (eviction runs only once a
+        // new key pushes the count over the cap).
+        let addsKey = entries[key] == nil
+            || fileIdentityKey.map { entries[$0] == nil } == true
+        let maxEntries = maxEntries
+        mutateEntries { dict in
+            dict[key] = progress
+            if let fid = fileIdentityKey {
+                dict[fid] = progress
+            }
+            // Drop the least-recently-updated entries until back under the cap.
+            dict.capByRecency(to: maxEntries) { $0.updatedAt }
+        }
+        if addsKey { keysRevision &+= 1 }
+        persist()
+    }
+
+    /// Mutates `entries` through its `_modify` accessor, so the dictionary
+    /// is changed in place rather than copied, and observers see one change.
+    private func mutateEntries(_ body: (inout [String: ReadingProgress]) -> Void) {
+        body(&entries)
+    }
+
+    private func persist() {
+        defaults.saveCodable(entries, forKey: storeKey)
     }
 }

@@ -16,26 +16,51 @@ nonisolated enum ImageLoader {
     /// File URLs go straight through `CGImageSourceCreateWithURL` (zero-copy
     /// mmap by ImageIO). Archive entries still need to materialize bytes via
     /// the `ArchiveReader` actor before they can be decoded.
+    ///
+    /// Cancellation-aware: a cancelled caller skips the archive read and the
+    /// decode (see `detached(_:)`). A decode already inside ImageIO can't be
+    /// interrupted, so it finishes and its image is still returned — the
+    /// caller may as well cache it.
     static func load(_ page: ComicPage) async throws -> NSImage {
         switch page.source {
         case .file(let url):
-            return try await Task.detached(priority: .userInitiated) {
-                try Task.checkCancellation()
+            return try await detached {
                 guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else {
                     throw ImageLoaderError.decodingFailed
                 }
                 return try Self.decodeEagerly(from: src)
-            }.value
+            }
 
         case .archiveEntry(let reader, let path):
+            try Task.checkCancellation()
             let data = try await reader.loadData(at: path)
             try Task.checkCancellation()
-            return try await Task.detached(priority: .userInitiated) {
+            return try await detached {
                 guard let src = CGImageSourceCreateWithData(data as CFData, nil) else {
                     throw ImageLoaderError.decodingFailed
                 }
                 return try Self.decodeEagerly(from: src)
-            }.value
+            }
+        }
+    }
+
+    /// Runs `work` off the caller's actor at user-initiated priority.
+    /// `Task.detached` doesn't inherit cancellation, so it's forwarded
+    /// explicitly — otherwise a superseded page (slider scrub, fast paging)
+    /// would still pay for a full decode. `work` starts with a cancellation
+    /// check, so a task cancelled before it got a thread does no work.
+    private static func detached<T: Sendable>(
+        _ work: @escaping @Sendable () throws -> T
+    ) async throws -> T {
+        try Task.checkCancellation()
+        let task = Task.detached(priority: .userInitiated) {
+            try Task.checkCancellation()
+            return try work()
+        }
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
         }
     }
 
@@ -63,22 +88,23 @@ nonisolated enum ImageLoader {
     static func dimensions(for page: ComicPage) async throws -> CGSize {
         switch page.source {
         case .file(let url):
-            return try await Task.detached(priority: .userInitiated) {
+            return try await detached {
                 try Self.readDimensionsFromURL(url)
-            }.value
+            }
 
         case .archiveEntry(let reader, let path):
             let prefix = try await reader.loadDataPrefix(at: path, maxBytes: 64 * 1024)
-            if let size = try? await Task.detached(priority: .userInitiated, operation: {
+            if let size = try? await detached({
                 try Self.readDimensionsFromData(prefix)
-            }).value {
+            }) {
                 return size
             }
             // Fallback: prefix wasn't enough. Read the entire entry.
+            try Task.checkCancellation()
             let full = try await reader.loadData(at: path)
-            return try await Task.detached(priority: .userInitiated) {
+            return try await detached {
                 try Self.readDimensionsFromData(full)
-            }.value
+            }
         }
     }
 

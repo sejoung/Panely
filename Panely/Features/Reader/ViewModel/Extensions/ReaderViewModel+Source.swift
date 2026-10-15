@@ -252,7 +252,9 @@ extension ReaderViewModel {
             }
             .sorted { $0.path.count > $1.path.count }
         for item in candidates {
-            guard let folder = recentItems.resolve(item),
+            // Probing grants, not opening them: the book's own volume is
+            // already reachable, so never mount (or prompt) for a folder.
+            guard let folder = recentItems.resolve(item, allowingMount: false),
                   folder.path != target.path,
                   folder.isAncestor(of: target) else { continue }
             return folder
@@ -277,9 +279,13 @@ extension ReaderViewModel {
     /// the sidebar's `.task(id:)` key, which re-runs `LibrarySidebarModel.reload`
     /// and picks up files added/removed on disk since the last scan. Driven
     /// both by the sidebar's manual refresh button and by `syncLibraryWatcher`'s
-    /// on-disk change callback.
-    func refreshLibraryTree() {
+    /// on-disk change callback. Only the manual refresh also re-checks
+    /// Continue Reading availability (a bookmark resolve + reachability stat
+    /// per recent item); for watcher events, app activation and source
+    /// changes already cover that.
+    func refreshLibraryTree(checkingAvailability: Bool = true) {
         libraryRefreshToken = UUID()
+        guard checkingAvailability else { return }
         Task { await refreshContinueReadingAvailability() }
     }
 
@@ -324,7 +330,7 @@ extension ReaderViewModel {
             // Debounce: only refresh once the folder goes quiet, so a busy /
             // cloud-synced root can't storm full tree re-scans.
             self?.libraryRefreshDebouncer.schedule {
-                self?.refreshLibraryTree()
+                self?.refreshLibraryTree(checkingAvailability: false)
             }
         }
     }
@@ -447,20 +453,59 @@ extension ReaderViewModel {
         persistPosition(immediate: true)
     }
 
+    /// Land whatever page/progress write is still waiting out its debounce
+    /// (no-op when nothing is pending). Used when the app resigns active, so
+    /// the longer persistence debounce never leaves a write hanging while the
+    /// app sits in the background.
+    func flushPendingPositionWrites() {
+        positions.saveDebouncer.flush()
+        readingProgress.saveDebouncer.flush()
+    }
+
+    /// Context the current book's `PositionKey.Keys` were derived from.
+    /// `loadEpoch` is included so a reload (the file may have been replaced
+    /// on disk) re-derives the file identity.
+    struct CurrentPositionKeysMemo {
+        struct Context: Equatable {
+            let source: URL
+            let opened: URL?
+            let tempRoot: URL?
+            let loadEpoch: Int
+        }
+        let context: Context
+        let keys: PositionKey.Keys
+    }
+
+    /// `PositionKey.keys` stats the file for its identity; every page change
+    /// persists under these keys, so derive them once per opened book.
+    private func currentPositionKeys(for url: URL) -> PositionKey.Keys {
+        let context = CurrentPositionKeysMemo.Context(
+            source: url,
+            opened: openedSourceURL,
+            tempRoot: tempDir.url,
+            loadEpoch: loadEpoch
+        )
+        if let memo = currentPositionKeysMemo, memo.context == context {
+            return memo.keys
+        }
+        let keys = PositionKey.keys(for: url, opened: context.opened, tempRoot: context.tempRoot)
+        currentPositionKeysMemo = CurrentPositionKeysMemo(context: context, keys: keys)
+        return keys
+    }
+
     /// Writes the current page to both the position store (exact restore) and
     /// the reading-progress store (badges / Continue Reading). `immediate`
     /// picks the synchronous flush over the debounced save — the only thing
     /// that differs between the two entry points above.
     private func persistPosition(immediate: Bool) {
         guard let url = currentSourceURL else { return }
-        let opened = openedSourceURL
-        let tempRoot = tempDir.url
+        let keys = currentPositionKeys(for: url)
         let page = currentPageIndex
 
         if immediate {
-            positions.flushImmediately(for: url, opened: opened, tempRoot: tempRoot, pageIndex: page)
+            positions.flushImmediately(forKey: keys.primary, fileIdentityKey: keys.fileIdentity, pageIndex: page)
         } else {
-            positions.savePosition(for: url, opened: opened, tempRoot: tempRoot, pageIndex: page)
+            positions.savePosition(forKey: keys.primary, fileIdentityKey: keys.fileIdentity, pageIndex: page)
         }
 
         guard totalPages > 0 else { return }
@@ -471,9 +516,9 @@ extension ReaderViewModel {
             coverAlone: spreadCoverAlone
         ) == nil
         if immediate {
-            readingProgress.flushImmediately(for: url, opened: opened, tempRoot: tempRoot, page: page, total: totalPages, finished: finished)
+            readingProgress.flushImmediately(forKey: keys.primary, fileIdentityKey: keys.fileIdentity, page: page, total: totalPages, finished: finished)
         } else {
-            readingProgress.record(for: url, opened: opened, tempRoot: tempRoot, page: page, total: totalPages, finished: finished)
+            readingProgress.record(forKey: keys.primary, fileIdentityKey: keys.fileIdentity, page: page, total: totalPages, finished: finished)
         }
     }
 

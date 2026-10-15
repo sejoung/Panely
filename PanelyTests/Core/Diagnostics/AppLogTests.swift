@@ -3,6 +3,7 @@ import Logging
 import Testing
 @testable import Panely
 
+@Suite(.serialized)
 struct AppLogTests {
     @Test func metadataIsWrittenToDiagnosticLogStore() async throws {
         let token = "app-log-test-\(UUID().uuidString)"

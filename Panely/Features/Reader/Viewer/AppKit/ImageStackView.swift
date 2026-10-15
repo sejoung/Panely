@@ -184,21 +184,23 @@ final class ImageStackView: NSView {
         }
         let pageFrame = pageFrames[index]
         let scale = pageFrame.width / page.imageWidth
-        let content = TranslationOverlayLayout.contentRect(for: page)
+        let overlay = overlayViews[index] ?? {
+            let overlay = TranslationOverlayView(frame: .zero)
+            overlay.onEdit = onTranslationEdit
+            addSubview(overlay) // last → above every image view
+            overlayViews[index] = overlay
+            return overlay
+        }()
+        // Laid out once per page: the overlay keeps the layout it's sized by
+        // here and draws with it.
+        let content = overlay.preparedLayout(for: page).contentRect(imageSize: page.imageSize)
         let frame = CGRect(
             x: pageFrame.minX + content.minX * scale,
             y: pageFrame.minY + content.minY * scale,
             width: content.width * scale,
             height: content.height * scale
         )
-        let overlay = overlayViews[index] ?? {
-            let overlay = TranslationOverlayView(frame: frame)
-            overlay.onEdit = onTranslationEdit
-            addSubview(overlay) // last → above every image view
-            overlayViews[index] = overlay
-            return overlay
-        }()
-        overlay.frame = frame
+        if overlay.frame != frame { overlay.frame = frame }
         overlay.update(
             page: page,
             showsTranslation: showsTranslation,

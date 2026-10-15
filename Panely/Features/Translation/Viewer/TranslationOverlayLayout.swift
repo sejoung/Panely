@@ -58,6 +58,12 @@ nonisolated enum TranslationOverlayLayout {
         /// What to paint: each balloon with a translation, or one stand-in per
         /// group carrying its balloons' translations a line each.
         var drawn: [(bubble: TranslatedBubble, patch: CGRect)] = []
+
+        /// Everything drawn, in page pixels: the page itself plus any patch
+        /// reaching past it (see `contentRect(for:)`).
+        func contentRect(imageSize: CGSize) -> CGRect {
+            patches.values.reduce(CGRect(origin: .zero, size: imageSize)) { $0.union($1) }
+        }
     }
 
     /// Lay out a page's translations so none covers another.
@@ -186,7 +192,7 @@ nonisolated enum TranslationOverlayLayout {
     /// Everything a page's overlay draws, in page pixels: the page itself plus
     /// any balloon reaching past it.
     static func contentRect(for page: TranslatedPage) -> CGRect {
-        patches(for: page).values.reduce(CGRect(origin: .zero, size: page.imageSize)) { $0.union($1) }
+        layout(for: page).contentRect(imageSize: page.imageSize)
     }
 
     /// The translation at the largest font size that fits `size`, capped at
@@ -208,13 +214,13 @@ nonisolated enum TranslationOverlayLayout {
         color: NSColor,
         outline: NSColor?
     ) -> (string: NSAttributedString, outline: NSAttributedString?, size: CGSize) {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        paragraph.lineBreakMode = .byWordWrapping
+        // Korean breaks between words (eojeol), not mid-word syllables.
+        paragraph.lineBreakStrategy = .hangulWordPriority
         func make(_ fontSize: CGFloat) -> NSAttributedString {
-            let paragraph = NSMutableParagraphStyle()
-            paragraph.alignment = .center
-            paragraph.lineBreakMode = .byWordWrapping
-            // Korean breaks between words (eojeol), not mid-word syllables.
-            paragraph.lineBreakStrategy = .hangulWordPriority
-            return NSAttributedString(string: text, attributes: [
+            NSAttributedString(string: text, attributes: [
                 .font: NSFont.systemFont(ofSize: fontSize, weight: .semibold),
                 .foregroundColor: color,
                 .paragraphStyle: paragraph,
@@ -244,9 +250,15 @@ nonisolated enum TranslationOverlayLayout {
         var bestSize = measure(best)
         while high - low > 0.5 {
             let mid = (low + high) / 2
+            // The word check first: it's the cheap one, and a size it rules
+            // out needn't be laid out at all.
+            guard wordsFit(mid) else {
+                high = mid
+                continue
+            }
             let candidate = make(mid)
             let candidateSize = measure(candidate)
-            if candidateSize.height <= size.height && candidateSize.width <= size.width + 0.5 && wordsFit(mid) {
+            if candidateSize.height <= size.height && candidateSize.width <= size.width + 0.5 {
                 best = candidate
                 bestSize = candidateSize
                 low = mid

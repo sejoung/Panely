@@ -29,10 +29,40 @@ extension ReaderViewModel {
         struct Inputs: Equatable {
             let progressRevision: Int
             let recentsRevision: Int
+            let refreshToken: UUID
             let unavailableKeys: Set<String>
         }
         let inputs: Inputs
         let suggestion: ContinueReadingSuggestion?
+    }
+
+    /// The structural half of the Continue Reading scan: which progress keys
+    /// belong to which available recent source (prefix matches over every
+    /// key), and the file-identity alias of each (a stat per key). None of
+    /// that moves when a page turn rewrites an existing record, so it's kept
+    /// until recents, the progress *key set*, or the library tree change —
+    /// a page turn then only re-reads the records these slots point at.
+    struct ContinueReadingIndexMemo {
+        struct Inputs: Equatable {
+            let recentsRevision: Int
+            let progressKeysRevision: Int
+            let refreshToken: UUID
+        }
+        let inputs: Inputs
+        /// In scan order (recents order; per source: the source itself,
+        /// then archive-inner volumes, then folder children), which is also
+        /// the tie-break order between equally fresh candidates.
+        let slots: [ContinueReadingSlot]
+    }
+
+    struct ContinueReadingSlot {
+        let key: String
+        let item: RecentItem
+        let relativePath: String?
+        let fileIdentityKey: String?
+        /// A book below a remembered container folder: hidden while
+        /// `unavailableContinueReadingKeys` lists it.
+        let isFolderChild: Bool
     }
 
     /// `PositionKey.keys` stats the file for its identity; the sidebar asks
@@ -73,16 +103,6 @@ extension ReaderViewModel {
         let fileIdentityKey: String?
     }
 
-    private struct ContinueReadingCandidate {
-        let key: String
-        let title: String
-        let fraction: Double
-        let updatedAt: Date
-        let item: RecentItem
-        let relativePath: String?
-        let fileIdentityKey: String?
-    }
-
     /// The most-recently-read book that isn't finished, drawn from recents so
     /// it stays openable via its security-scoped bookmark. `nil` when nothing
     /// qualifies.
@@ -93,39 +113,55 @@ extension ReaderViewModel {
     /// open) it resolves to whatever you read last — the primary use case.
     var continueReadingSuggestion: ContinueReadingSuggestion? {
         // Reading the revisions (not just the memo) keeps the observation
-        // dependency on both stores alive when the memo hits.
+        // dependency on both stores alive when the memo hits. The refresh
+        // token re-derives the cached file identities after a tree rescan.
         let inputs = ContinueReadingMemo.Inputs(
             progressRevision: readingProgress.revision,
             recentsRevision: recentItems.revision,
+            refreshToken: libraryRefreshToken,
             unavailableKeys: unavailableContinueReadingKeys
         )
         if let memo = continueReadingMemo, memo.inputs == inputs {
             return memo.suggestion
         }
-        let suggestion = computeContinueReadingSuggestion()
+        let suggestion = computeContinueReadingSuggestion(
+            slots: continueReadingSlots(),
+            unavailableKeys: inputs.unavailableKeys
+        )
         continueReadingMemo = ContinueReadingMemo(inputs: inputs, suggestion: suggestion)
         return suggestion
     }
 
-    private func computeContinueReadingSuggestion() -> ContinueReadingSuggestion? {
-        var best: ContinueReadingCandidate?
+    /// The freshest unfinished record among `slots`; the first slot wins a
+    /// tie. Two dictionary lookups per slot — no scanning, no stats.
+    private func computeContinueReadingSuggestion(
+        slots: [ContinueReadingSlot],
+        unavailableKeys: Set<String>
+    ) -> ContinueReadingSuggestion? {
+        var best: (slot: ContinueReadingSlot, progress: ReadingProgress)?
         var bestUpdatedAt = Date.distantPast
 
-        for item in recentItems.items {
-            for candidate in continueReadingCandidates(for: item) {
-                guard candidate.updatedAt > bestUpdatedAt else { continue }
-                bestUpdatedAt = candidate.updatedAt
-                best = candidate
-            }
+        for slot in slots {
+            if slot.isFolderChild, unavailableKeys.contains(slot.key) { continue }
+            guard let progress = readingProgress.mostRecentProgress(
+                forKey: slot.key,
+                fileIdentityKey: slot.fileIdentityKey
+            ),
+                  !progress.finished,
+                  progress.total > 0,
+                  progress.updatedAt > bestUpdatedAt
+            else { continue }
+            bestUpdatedAt = progress.updatedAt
+            best = (slot, progress)
         }
         return best.map {
             ContinueReadingSuggestion(
-                id: $0.key,
-                title: $0.title,
-                fraction: $0.fraction,
-                item: $0.item,
-                relativePath: $0.relativePath,
-                fileIdentityKey: $0.fileIdentityKey
+                id: $0.slot.key,
+                title: continueReadingTitle(for: $0.slot.item, relativePath: $0.slot.relativePath),
+                fraction: $0.progress.fraction,
+                item: $0.slot.item,
+                relativePath: $0.slot.relativePath,
+                fileIdentityKey: $0.slot.fileIdentityKey
             )
         }
     }
@@ -191,47 +227,45 @@ extension ReaderViewModel {
         errorMessage = nil
     }
 
-    private func continueReadingCandidates(for item: RecentItem) -> [ContinueReadingCandidate] {
+    private func continueReadingSlots() -> [ContinueReadingSlot] {
+        let inputs = ContinueReadingIndexMemo.Inputs(
+            recentsRevision: recentItems.revision,
+            progressKeysRevision: readingProgress.keysRevision,
+            refreshToken: libraryRefreshToken
+        )
+        if let memo = continueReadingIndexMemo, memo.inputs == inputs {
+            return memo.slots
+        }
+        let slots = recentItems.items.flatMap { continueReadingSlots(for: $0) }
+        continueReadingIndexMemo = ContinueReadingIndexMemo(inputs: inputs, slots: slots)
+        return slots
+    }
+
+    private func continueReadingSlots(for item: RecentItem) -> [ContinueReadingSlot] {
         guard let url = recentItems.availableURL(for: item) else { return [] }
         let keys = PositionKey.keys(for: url, opened: nil, tempRoot: nil)
-        var candidates: [ContinueReadingCandidate] = []
-        var includedKeys: Set<String> = []
-
-        if let progress = readingProgress.mostRecentProgress(
-            forKey: keys.primary,
-            fileIdentityKey: keys.fileIdentity
-        ),
-           let candidate = continueReadingCandidate(
-            key: keys.primary,
-            item: item,
-            relativePath: nil,
-            fileIdentityKey: keys.fileIdentity,
-            progress: progress
-           ) {
-            candidates.append(candidate)
-            includedKeys.insert(keys.primary)
-        }
+        // The source's own record, or its file-identity alias.
+        var slots = [
+            ContinueReadingSlot(
+                key: keys.primary,
+                item: item,
+                relativePath: nil,
+                fileIdentityKey: keys.fileIdentity,
+                isFolderChild: false
+            ),
+        ]
 
         let nestedPrefix = keys.primary + "#"
-        for (key, progress) in readingProgress.entries where key.hasPrefix(nestedPrefix) {
+        for key in readingProgress.entries.keys where key.hasPrefix(nestedPrefix) {
             let relativePath = String(key.dropFirst(nestedPrefix.count))
-            let fileIdentityKey = PositionKey.fileIdentity(for: url)
-                .map { $0 + "#" + relativePath }
-            let freshest = readingProgress.mostRecentProgress(
-                forKey: key,
-                fileIdentityKey: fileIdentityKey
-            ) ?? progress
-            guard includedKeys.insert(key).inserted,
-                  !relativePath.isEmpty,
-                  let candidate = continueReadingCandidate(
-                    key: key,
-                    item: item,
-                    relativePath: relativePath,
-                    fileIdentityKey: fileIdentityKey,
-                    progress: freshest
-                  )
-            else { continue }
-            candidates.append(candidate)
+            guard !relativePath.isEmpty else { continue }
+            slots.append(ContinueReadingSlot(
+                key: key,
+                item: item,
+                relativePath: relativePath,
+                fileIdentityKey: keys.fileIdentity.map { $0 + "#" + relativePath },
+                isFolderChild: false
+            ))
         }
 
         // A remembered container directory may resolve to a child volume.
@@ -239,52 +273,23 @@ extension ReaderViewModel {
         // rather than zip-in-zip's `root#inner` convention.
         if item.isDirectory {
             let childPrefix = keys.primary + "/"
-            for (key, progress) in readingProgress.entries
+            for key in readingProgress.entries.keys
             where key.hasPrefix(childPrefix) && !key.contains("#") {
                 let relativePath = String(key.dropFirst(childPrefix.count))
                 let childURL = url
                     .appendingPathComponent(relativePath)
                     .standardizedFileURL
-                let fileIdentityKey = PositionKey.fileIdentity(for: childURL)
-                let freshest = readingProgress.mostRecentProgress(
-                    forKey: key,
-                    fileIdentityKey: fileIdentityKey
-                ) ?? progress
-                guard includedKeys.insert(key).inserted,
-                      !relativePath.isEmpty,
-                      url.isAncestor(of: childURL),
-                      !unavailableContinueReadingKeys.contains(key),
-                      let candidate = continueReadingCandidate(
-                        key: key,
-                        item: item,
-                        relativePath: relativePath,
-                        fileIdentityKey: fileIdentityKey,
-                        progress: freshest
-                      )
-                else { continue }
-                candidates.append(candidate)
+                guard !relativePath.isEmpty, url.isAncestor(of: childURL) else { continue }
+                slots.append(ContinueReadingSlot(
+                    key: key,
+                    item: item,
+                    relativePath: relativePath,
+                    fileIdentityKey: PositionKey.fileIdentity(for: childURL),
+                    isFolderChild: true
+                ))
             }
         }
-        return candidates
-    }
-
-    private func continueReadingCandidate(
-        key: String,
-        item: RecentItem,
-        relativePath: String?,
-        fileIdentityKey: String?,
-        progress: ReadingProgress
-    ) -> ContinueReadingCandidate? {
-        guard !progress.finished, progress.total > 0 else { return nil }
-        return ContinueReadingCandidate(
-            key: key,
-            title: continueReadingTitle(for: item, relativePath: relativePath),
-            fraction: progress.fraction,
-            updatedAt: progress.updatedAt,
-            item: item,
-            relativePath: relativePath,
-            fileIdentityKey: fileIdentityKey
-        )
+        return slots
     }
 
     private func continueReadingTitle(for item: RecentItem, relativePath: String?) -> String {

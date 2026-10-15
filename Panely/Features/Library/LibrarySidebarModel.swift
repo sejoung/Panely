@@ -3,6 +3,10 @@ import Foundation
 @Observable
 @MainActor
 final class LibrarySidebarModel {
+    /// How deep the full (second-pass) scan lists the library. The directory
+    /// watcher ignores changes below this depth, which the tree never shows.
+    nonisolated static let deepScanDepth = 3
+
     private(set) var nodes: [FileNode] = []
     private(set) var scanCompleted = false
     var expandedNodeIDs: Set<URL> = []
@@ -44,9 +48,13 @@ final class LibrarySidebarModel {
         // deep scan and replace only when it actually differs — a no-change
         // refresh then touches nothing (no flicker, no relayout).
 
-        let deep = await loader.loadTree(from: rootURL, maxDepth: 3)
+        let deep = await loader.loadTree(from: rootURL, maxDepth: Self.deepScanDepth)
         if Task.isCancelled { return }
-        if deep != nodes {
+        // Deep-compare off the main actor; a same-root refresh of a big
+        // library otherwise walks two full trees on the main thread.
+        let changed = await FileNode.treesDiffer(deep, nodes)
+        if Task.isCancelled { return }
+        if changed {
             nodes = deep
             expandAncestors(of: activeURL)
         }
@@ -62,7 +70,7 @@ final class LibrarySidebarModel {
 
     private static func ancestorURLs(of activeURL: URL, in nodes: [FileNode]) -> [URL] {
         for node in nodes {
-            if node.url.standardizedFileURL == activeURL {
+            if node.standardizedURL == activeURL {
                 return []
             }
             if let children = node.children,
@@ -79,7 +87,7 @@ final class LibrarySidebarModel {
         children: [FileNode]
     ) -> [URL]? {
         for child in children {
-            if child.url.standardizedFileURL == activeURL {
+            if child.standardizedURL == activeURL {
                 return [node.id]
             }
             if let grandchildren = child.children,

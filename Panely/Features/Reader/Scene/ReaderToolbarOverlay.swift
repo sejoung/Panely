@@ -15,11 +15,9 @@ struct ReaderToolbarOverlay: View {
             // A popover doesn't inherit the window's `\.locale` — it gets the
             // system one, so its text would stay in the launch language until
             // a restart. Hand it the app's locale explicitly.
-            translationPanel: AnyView(
-                TranslationPanel()
-                    .environment(viewModel)
-                    .environment(\.locale, viewModel.localization.locale)
-            )
+            translationPanel: TranslationPanel()
+                .environment(viewModel)
+                .environment(\.locale, viewModel.localization.locale)
         )
         .padding(PanelySpacing.md)
         .opacity(shown ? 1 : 0)

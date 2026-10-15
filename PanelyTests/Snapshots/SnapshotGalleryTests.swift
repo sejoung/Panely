@@ -439,22 +439,11 @@ struct SnapshotGalleryTests {
     }
 }
 
+/// Set by `scripts/generate-snapshots.sh` for its run only (as
+/// `TEST_RUNNER_PANELY_GENERATE_SNAPSHOTS`; xcodebuild drops the prefix).
 private enum SnapshotGenerationGate {
     static var isEnabled: Bool {
-        if ProcessInfo.processInfo.environment["PANELY_GENERATE_SNAPSHOTS"] == "1" {
-            return true
-        }
-
-        guard let attributes = try? FileManager.default.attributesOfItem(atPath: flagURL.path),
-              let modified = attributes[.modificationDate] as? Date
-        else { return false }
-
-        return Date().timeIntervalSince(modified) < 30 * 60
-    }
-
-    private static var flagURL: URL {
-        FileManager.default.temporaryDirectory
-            .appendingPathComponent("panely-generate-snapshots.flag")
+        ProcessInfo.processInfo.environment["PANELY_GENERATE_SNAPSHOTS"] == "1"
     }
 }
 
@@ -466,7 +455,7 @@ private enum SnapshotGenerationGate {
 /// produce a clean offscreen capture. Visually faithful enough for the
 /// user manual; never shipped in the app binary.
 @MainActor
-private struct MockReaderScene: View {
+struct MockReaderScene: View {
     @Environment(ReaderViewModel.self) private var viewModel
 
     var body: some View {

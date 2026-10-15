@@ -26,10 +26,24 @@ actor DiagnosticLogStore {
         let message: String
     }
 
-    private let logFileName = "recent-log.txt"
-    private let directoryNameOverride: String?
+    private nonisolated static let logFileName = "recent-log.txt"
     private nonisolated static let productionDirectoryName = "panely-diagnostics"
     private nonisolated static let testDirectoryName = "panely-diagnostics-tests"
+    /// Resolved once: every appended line used to look up the caches
+    /// directory and re-check the test environment.
+    private nonisolated let directoryURL: URL
+    private nonisolated let fileURL: URL
+
+    /// Kept open between appends (one `open`/`close` per line was most of a
+    /// log call's cost) and reopened after rotation, `clear()`, or the file
+    /// vanishing underneath it. `fileSize` mirrors the file's length so
+    /// rotation needs no `stat` per line.
+    private var handle: FileHandle?
+    private var fileSize: UInt64 = 0
+    /// Appends since the open file was last confirmed to still exist (the
+    /// caches directory can be emptied from outside the app).
+    private var appendsSinceExistenceCheck = 0
+    private nonisolated static let existenceCheckInterval = 64
 
     // FIFO pipeline for the fire-and-forget static `record` path. Previously
     // each call spawned its own `Task.detached`, and detached tasks have no
@@ -42,7 +56,14 @@ actor DiagnosticLogStore {
     private let stream: AsyncStream<Entry>
 
     init(directoryName: String? = nil) {
-        self.directoryNameOverride = directoryName
+        let caches = FileManager.default
+            .urls(for: .cachesDirectory, in: .userDomainMask)
+            .first ?? FileManager.default.temporaryDirectory
+        self.directoryURL = caches.appendingPathComponent(
+            directoryName ?? Self.directoryName,
+            isDirectory: true
+        )
+        self.fileURL = directoryURL.appendingPathComponent(Self.logFileName)
         let (stream, continuation) = AsyncStream.makeStream(of: Entry.self)
         self.stream = stream
         self.continuation = continuation
@@ -50,6 +71,7 @@ actor DiagnosticLogStore {
 
     deinit {
         continuation.finish()
+        try? handle?.close()
     }
 
     /// Drains the FIFO stream. Started only for `shared` (which lives for the
@@ -80,17 +102,16 @@ actor DiagnosticLogStore {
     }
 
     func logFileURL() -> URL {
-        diagnosticsDirectory().appendingPathComponent(logFileName)
+        fileURL
     }
 
     func diagnosticsDirectoryURL() -> URL {
-        diagnosticsDirectory()
+        directoryURL
     }
 
     func ensureDiagnosticsDirectory() -> URL {
-        let url = diagnosticsDirectory()
-        try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        return url
+        try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        return directoryURL
     }
 
     func logSizeBytes() -> UInt64 {
@@ -140,6 +161,7 @@ actor DiagnosticLogStore {
     /// assuming success.
     @discardableResult
     func clear() -> Bool {
+        closeHandle()
         let url = logFileURL()
         guard FileManager.default.fileExists(atPath: url.path) else { return true }
         do {
@@ -151,45 +173,56 @@ actor DiagnosticLogStore {
     }
 
     private func append(_ entry: Entry) {
-        let line = "\(entry.timestamp) [\(entry.level.wireName)] [\(entry.category.rawValue)] \(entry.message)\n"
-        let url = logFileURL()
+        let line = Data("\(entry.timestamp) [\(entry.level.wireName)] [\(entry.category.rawValue)] \(entry.message)\n".utf8)
         do {
-            try FileManager.default.createDirectory(
-                at: diagnosticsDirectory(),
-                withIntermediateDirectories: true
-            )
-            rotateIfNeeded(at: url, incomingBytes: line.utf8.count)
-
-            if FileManager.default.fileExists(atPath: url.path),
-               let handle = try? FileHandle(forWritingTo: url) {
-                defer { try? handle.close() }
-                try handle.seekToEnd()
-                try handle.write(contentsOf: Data(line.utf8))
-            } else {
-                try Data(line.utf8).write(to: url, options: .atomic)
+            if handle != nil {
+                appendsSinceExistenceCheck += 1
+                if appendsSinceExistenceCheck >= Self.existenceCheckInterval {
+                    appendsSinceExistenceCheck = 0
+                    if !FileManager.default.fileExists(atPath: fileURL.path) { closeHandle() }
+                }
             }
+            var handle = try openHandle()
+            if fileSize + UInt64(line.count) > DiagnosticLogPolicy.maxLogBytes {
+                rotate()
+                handle = try openHandle()
+            }
+            try handle.write(contentsOf: line)
+            fileSize += UInt64(line.count)
         } catch {
-            // Logging must never affect app behavior.
+            // Logging must never affect app behavior. Reopen next time.
+            closeHandle()
         }
     }
 
-    private func diagnosticsDirectory() -> URL {
-        let caches = FileManager.default
-            .urls(for: .cachesDirectory, in: .userDomainMask)
-            .first ?? FileManager.default.temporaryDirectory
-        return caches.appendingPathComponent(directoryNameOverride ?? Self.directoryName, isDirectory: true)
+    /// The open append handle, opening (and creating) the file on first use.
+    private func openHandle() throws -> FileHandle {
+        if let handle { return handle }
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        if !FileManager.default.fileExists(atPath: fileURL.path) {
+            try Data().write(to: fileURL, options: .atomic)
+        }
+        let opened = try FileHandle(forWritingTo: fileURL)
+        fileSize = try opened.seekToEnd()
+        handle = opened
+        appendsSinceExistenceCheck = 0
+        return opened
     }
 
-    private func rotateIfNeeded(at url: URL, incomingBytes: Int) {
-        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
-              let currentSize = attrs[.size] as? UInt64,
-              currentSize + UInt64(incomingBytes) > DiagnosticLogPolicy.maxLogBytes,
-              let data = try? Data(contentsOf: url)
-        else { return }
-
+    /// Keep the newest `trimToBytes` of the log. The trimmed copy replaces
+    /// the file atomically, so the old handle is closed and the next append
+    /// opens the new file.
+    private func rotate() {
+        closeHandle()
+        guard let data = try? Data(contentsOf: fileURL) else { return }
         let keepBytes = Int(DiagnosticLogPolicy.trimToBytes)
-        let trimmed = data.suffix(keepBytes)
-        try? trimmed.write(to: url, options: .atomic)
+        try? data.suffix(keepBytes).write(to: fileURL, options: .atomic)
+    }
+
+    private func closeHandle() {
+        try? handle?.close()
+        handle = nil
+        fileSize = 0
     }
 
     // ISO8601DateFormatter is comparatively expensive to allocate; reuse one.
@@ -207,10 +240,11 @@ actor DiagnosticLogStore {
         isRunningTests ? testDirectoryName : productionDirectoryName
     }
 
-    private nonisolated static var isRunningTests: Bool {
+    /// Fixed for the life of the process, so evaluated once.
+    private nonisolated static let isRunningTests: Bool = {
         let environment = ProcessInfo.processInfo.environment
         return environment["XCTestConfigurationFilePath"] != nil
             || environment["XCTestSessionIdentifier"] != nil
             || NSClassFromString("XCTestCase") != nil
-    }
+    }()
 }

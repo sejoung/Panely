@@ -22,29 +22,9 @@ extension PanelyApp {
 
             Divider()
 
-            Button(
-                viewModel.isCurrentPageBookmarked
-                    ? String(localized: "Remove Page Bookmark", bundle: .localized)
-                    : String(localized: "Add Page Bookmark", bundle: .localized)
-            ) {
-                viewModel.toggleCurrentPageBookmark()
-            }
-            .keyboardShortcut("d", modifiers: .command)
-            .disabled(!viewModel.hasSource)
+            GoPageBookmarkItems(viewModel: viewModel)
 
-            Button(String(localized: "Previous Bookmark", bundle: .localized)) {
-                viewModel.jumpToPreviousBookmark()
-            }
-            .keyboardShortcut("[", modifiers: [.command, .shift])
-            .disabled(!viewModel.canGoPreviousBookmark)
-
-            Button(String(localized: "Next Bookmark", bundle: .localized)) {
-                viewModel.jumpToNextBookmark()
-            }
-            .keyboardShortcut("]", modifiers: [.command, .shift])
-            .disabled(!viewModel.canGoNextBookmark)
-
-            bookmarksMenu
+            GoBookmarksMenu(viewModel: viewModel)
 
             Button(String(localized: "Remove All Bookmarks in This Book…", bundle: .localized)) {
                 BookmarkAlerts.removeAllInCurrentBook(viewModel)
@@ -83,11 +63,46 @@ extension PanelyApp {
             .disabled(!viewModel.canStepToNextVolume)
         }
     }
+}
 
-    /// Every bookmark as a menu: the open book's pages first, then one
-    /// submenu per other bookmarked book.
-    @ViewBuilder
-    private var bookmarksMenu: some View {
+/// The Go menu's page-dependent bookmark items (toggle, previous/next). A
+/// view of their own so a page turn re-renders just these rows, not the whole
+/// menu with its every-book bookmarks submenu.
+private struct GoPageBookmarkItems: View {
+    let viewModel: ReaderViewModel
+
+    var body: some View {
+        Button(
+            viewModel.isCurrentPageBookmarked
+                ? String(localized: "Remove Page Bookmark", bundle: .localized)
+                : String(localized: "Add Page Bookmark", bundle: .localized)
+        ) {
+            viewModel.toggleCurrentPageBookmark()
+        }
+        .keyboardShortcut("d", modifiers: .command)
+        .disabled(!viewModel.hasSource)
+
+        Button(String(localized: "Previous Bookmark", bundle: .localized)) {
+            viewModel.jumpToPreviousBookmark()
+        }
+        .keyboardShortcut("[", modifiers: [.command, .shift])
+        .disabled(!viewModel.canGoPreviousBookmark)
+
+        Button(String(localized: "Next Bookmark", bundle: .localized)) {
+            viewModel.jumpToNextBookmark()
+        }
+        .keyboardShortcut("]", modifiers: [.command, .shift])
+        .disabled(!viewModel.canGoNextBookmark)
+    }
+}
+
+/// Every bookmark as a menu: the open book's pages first, then one submenu
+/// per other bookmarked book. A view of its own so it depends only on the
+/// bookmark store and the open book, never on the current page.
+private struct GoBookmarksMenu: View {
+    let viewModel: ReaderViewModel
+
+    var body: some View {
         let current = viewModel.currentBookPageBookmarks
         let others = viewModel.otherBookmarkedBooks
         Menu(String(localized: "Bookmarks", bundle: .localized)) {

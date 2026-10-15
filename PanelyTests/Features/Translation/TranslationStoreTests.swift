@@ -1,4 +1,5 @@
 import CoreGraphics
+import CryptoKit
 import Foundation
 import Testing
 @testable import Panely
@@ -45,6 +46,22 @@ struct TranslationStoreTests {
         // Accurate keeps the key from before modes existed; fast has its own.
         #expect(base == TranslationStore.key(pageID: "p1", from: .japanese, to: .korean, mode: .accurate))
         #expect(base != TranslationStore.key(pageID: "p1", from: .japanese, to: .korean, mode: .fast))
+    }
+
+    @Test func keysAreTheHashsFirstHalfInHex() {
+        let key = TranslationStore.key(pageID: "p1", from: .japanese, to: .korean)
+        let composite = "p1|\(TranslationLanguage.japanese.rawValue)>\(TranslationLanguage.korean.rawValue)|\(TranslationScope.page.rawValue)|v\(TranslatedPage.formatVersion)"
+        let expected = SHA256.hash(data: Data(composite.utf8)).prefix(16).map { String(format: "%02x", $0) }.joined()
+        // Cached entries are found by these names: they mustn't change.
+        #expect(key == expected)
+    }
+
+    @Test func existingKeysListsWhatsOnDisk() throws {
+        let store = try makeTemporaryTranslationStore()
+        #expect(store.existingKeys().isEmpty)
+        try store.save(makeTranslatedPage(), key: "a")
+        try store.save(makeTranslatedPage(), key: "b")
+        #expect(store.existingKeys() == ["a", "b"])
     }
 
     @Test func missingOrCorruptEntriesLoadAsNil() throws {

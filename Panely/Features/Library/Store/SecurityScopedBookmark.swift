@@ -3,6 +3,12 @@ import Foundation
 nonisolated protocol SecurityScopedBookmarking: Sendable {
     func data(for url: URL) throws -> Data
     func resolve(_ bookmarkData: Data) -> SecurityScopedBookmark.Resolution?
+    /// `allowingMount: false` resolves without mounting the volume the
+    /// bookmark lives on or showing any UI for it — for background sweeps
+    /// and launch-time restores, where silently mounting a network share (or
+    /// stalling the main thread on it) isn't what the user asked for. An
+    /// unmounted target then simply fails to resolve.
+    func resolve(_ bookmarkData: Data, allowingMount: Bool) -> SecurityScopedBookmark.Resolution?
     func refreshedData(for url: URL) -> Data?
     func isDirectory(_ url: URL) -> Bool
 }
@@ -11,6 +17,12 @@ nonisolated protocol SecurityScopedBookmarking: Sendable {
 // otherwise pin these helpers to the main actor even though the protocol
 // itself is nonisolated and they are called from background work.
 nonisolated extension SecurityScopedBookmarking {
+    /// Resolvers that never mount anything (test doubles) needn't tell the
+    /// two resolutions apart.
+    func resolve(_ bookmarkData: Data, allowingMount: Bool) -> SecurityScopedBookmark.Resolution? {
+        resolve(bookmarkData)
+    }
+
     /// Resolve `data` and, when the OS reports the bookmark stale, mint a fresh
     /// one in place. Returns the resolved `url` plus, when a refresh happened,
     /// the new bookmark data and standardized path for the caller to persist.
@@ -18,8 +30,11 @@ nonisolated extension SecurityScopedBookmarking {
     ///
     /// Shared by `FavoritesStore` and `RecentItemsStore`, whose `resolve`
     /// methods were otherwise byte-for-byte identical.
-    func resolveRefreshing(_ data: Data) -> (url: URL, refreshed: (data: Data, path: String)?)? {
-        guard let resolution = resolve(data) else { return nil }
+    func resolveRefreshing(
+        _ data: Data,
+        allowingMount: Bool = true
+    ) -> (url: URL, refreshed: (data: Data, path: String)?)? {
+        guard let resolution = resolve(data, allowingMount: allowingMount) else { return nil }
         let url = resolution.url
         guard resolution.isStale, let newData = refreshedData(for: url) else {
             return (url, nil)
@@ -35,6 +50,10 @@ nonisolated struct LiveSecurityScopedBookmarkResolver: SecurityScopedBookmarking
 
     func resolve(_ bookmarkData: Data) -> SecurityScopedBookmark.Resolution? {
         SecurityScopedBookmark.resolve(bookmarkData)
+    }
+
+    func resolve(_ bookmarkData: Data, allowingMount: Bool) -> SecurityScopedBookmark.Resolution? {
+        SecurityScopedBookmark.resolve(bookmarkData, allowingMount: allowingMount)
     }
 
     func refreshedData(for url: URL) -> Data? {
@@ -60,11 +79,14 @@ nonisolated enum SecurityScopedBookmark {
         )
     }
 
-    static func resolve(_ bookmarkData: Data) -> Resolution? {
+    static func resolve(_ bookmarkData: Data, allowingMount: Bool = true) -> Resolution? {
         var isStale = false
+        let options: URL.BookmarkResolutionOptions = allowingMount
+            ? .withSecurityScope
+            : [.withSecurityScope, .withoutUI, .withoutMounting]
         guard let url = try? URL(
             resolvingBookmarkData: bookmarkData,
-            options: .withSecurityScope,
+            options: options,
             relativeTo: nil,
             bookmarkDataIsStale: &isStale
         ) else {

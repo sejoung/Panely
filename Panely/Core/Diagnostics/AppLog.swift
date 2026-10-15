@@ -93,7 +93,7 @@ nonisolated enum AppLog {
     static func trace(
         _ category: DiagnosticCategory,
         _ message: @autoclosure () -> String,
-        metadata: Metadata? = nil,
+        metadata: @autoclosure () -> Metadata? = nil,
         source: String? = nil,
         file: String = #fileID,
         function: String = #function,
@@ -102,7 +102,7 @@ nonisolated enum AppLog {
         log(
             level: .trace,
             category,
-            message(),
+            message,
             metadata: metadata,
             source: source,
             file: file,
@@ -114,7 +114,7 @@ nonisolated enum AppLog {
     static func debug(
         _ category: DiagnosticCategory,
         _ message: @autoclosure () -> String,
-        metadata: Metadata? = nil,
+        metadata: @autoclosure () -> Metadata? = nil,
         source: String? = nil,
         file: String = #fileID,
         function: String = #function,
@@ -123,7 +123,7 @@ nonisolated enum AppLog {
         log(
             level: .debug,
             category,
-            message(),
+            message,
             metadata: metadata,
             source: source,
             file: file,
@@ -135,7 +135,7 @@ nonisolated enum AppLog {
     static func info(
         _ category: DiagnosticCategory,
         _ message: @autoclosure () -> String,
-        metadata: Metadata? = nil,
+        metadata: @autoclosure () -> Metadata? = nil,
         source: String? = nil,
         file: String = #fileID,
         function: String = #function,
@@ -144,7 +144,7 @@ nonisolated enum AppLog {
         log(
             level: .info,
             category,
-            message(),
+            message,
             metadata: metadata,
             source: source,
             file: file,
@@ -156,7 +156,7 @@ nonisolated enum AppLog {
     static func warning(
         _ category: DiagnosticCategory,
         _ message: @autoclosure () -> String,
-        metadata: Metadata? = nil,
+        metadata: @autoclosure () -> Metadata? = nil,
         source: String? = nil,
         file: String = #fileID,
         function: String = #function,
@@ -165,7 +165,7 @@ nonisolated enum AppLog {
         log(
             level: .warning,
             category,
-            message(),
+            message,
             metadata: metadata,
             source: source,
             file: file,
@@ -177,7 +177,7 @@ nonisolated enum AppLog {
     static func notice(
         _ category: DiagnosticCategory,
         _ message: @autoclosure () -> String,
-        metadata: Metadata? = nil,
+        metadata: @autoclosure () -> Metadata? = nil,
         source: String? = nil,
         file: String = #fileID,
         function: String = #function,
@@ -186,7 +186,7 @@ nonisolated enum AppLog {
         log(
             level: .notice,
             category,
-            message(),
+            message,
             metadata: metadata,
             source: source,
             file: file,
@@ -198,7 +198,7 @@ nonisolated enum AppLog {
     static func error(
         _ category: DiagnosticCategory,
         _ message: @autoclosure () -> String,
-        metadata: Metadata? = nil,
+        metadata: @autoclosure () -> Metadata? = nil,
         source: String? = nil,
         file: String = #fileID,
         function: String = #function,
@@ -207,7 +207,7 @@ nonisolated enum AppLog {
         log(
             level: .error,
             category,
-            message(),
+            message,
             metadata: metadata,
             source: source,
             file: file,
@@ -219,7 +219,7 @@ nonisolated enum AppLog {
     static func critical(
         _ category: DiagnosticCategory,
         _ message: @autoclosure () -> String,
-        metadata: Metadata? = nil,
+        metadata: @autoclosure () -> Metadata? = nil,
         source: String? = nil,
         file: String = #fileID,
         function: String = #function,
@@ -228,7 +228,7 @@ nonisolated enum AppLog {
         log(
             level: .critical,
             category,
-            message(),
+            message,
             metadata: metadata,
             source: source,
             file: file,
@@ -237,20 +237,25 @@ nonisolated enum AppLog {
         )
     }
 
+    /// Checks the level *before* building anything: callers' messages and
+    /// metadata (often a `DiagnosticRedactor.describe` that stats a file)
+    /// are autoclosures, evaluated only for an event that will be written.
+    /// The configured level is read once here; the handler trusts it.
     private static func log(
         level: Logging.Logger.Level,
         _ category: DiagnosticCategory,
-        _ message: String,
-        metadata: Metadata?,
+        _ message: () -> String,
+        metadata: () -> Metadata?,
         source: String?,
         file: String,
         function: String,
         line: UInt
     ) {
+        guard level >= DiagnosticLogConfiguration.currentLogLevel.loggerLevel else { return }
         logger(for: category).log(
             level: level,
-            "\(message)",
-            metadata: metadata,
+            "\(message())",
+            metadata: metadata(),
             source: source ?? category.rawValue,
             file: file,
             function: function,
@@ -335,13 +340,13 @@ private nonisolated struct PanelyLogHandler: LogHandler {
     var metadata: Logging.Logger.Metadata = [:]
     var metadataProvider: Logging.Logger.MetadataProvider?
 
-    /// Read live from configuration rather than cached at init. The handler is
-    /// now long-lived (one per category, see `AppLog.loggers`), so a cached
-    /// level would make the Diagnostics settings' level picker a no-op. The
-    /// setter is ignored — the level is centrally owned by
-    /// `DiagnosticLogConfiguration`.
+    /// Lets every event through: `AppLog.log` — the only way events reach
+    /// this handler — has already checked the live configured level, so
+    /// reading `UserDefaults` again here (once in swift-log's `Logger.log`,
+    /// once in `log(event:)`) would just repeat it. The setter is ignored —
+    /// the level is centrally owned by `DiagnosticLogConfiguration`.
     var logLevel: Logging.Logger.Level {
-        get { DiagnosticLogConfiguration.currentLogLevel.loggerLevel }
+        get { .trace }
         set { _ = newValue }
     }
 
@@ -364,8 +369,6 @@ private nonisolated struct PanelyLogHandler: LogHandler {
     }
 
     func log(event: Logging.LogEvent) {
-        guard event.level >= logLevel else { return }
-
         var mergedMetadata = metadata
         let providedMetadata = metadataProvider?.get() ?? [:]
         if providedMetadata.isEmpty == false {

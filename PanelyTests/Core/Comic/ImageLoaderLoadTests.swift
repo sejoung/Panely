@@ -1,6 +1,7 @@
 import Testing
 import AppKit
 import Foundation
+import ZIPFoundation
 @testable import Panely
 
 /// Covers `ImageLoader.load` — the eager-decode path that replaced the
@@ -64,5 +65,53 @@ struct ImageLoaderLoadTests {
         var rect = NSRect(origin: .zero, size: image.size)
         let cg = image.cgImage(forProposedRect: &rect, context: nil, hints: nil)
         #expect(cg != nil)
+    }
+
+    // MARK: - Cancellation
+
+    /// A superseded page (slider scrub, fast paging) must not pay for a full
+    /// decode: the decode runs on a detached task, which doesn't inherit
+    /// cancellation by itself, so `load` has to forward it.
+    @Test func cancelledCallerSkipsFileDecode() async throws {
+        let dir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let url = dir.appendingPathComponent("img.png")
+        try Fixture.makePNG(width: 64, height: 64).write(to: url)
+        let page = ComicPage(source: .file(url), displayName: "img.png")
+
+        await #expect(throws: CancellationError.self) {
+            try await Self.loadCancelled(page)
+        }
+    }
+
+    @Test func cancelledCallerSkipsArchiveRead() async throws {
+        let dir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let png = dir.appendingPathComponent("img.png")
+        try Fixture.makePNG(width: 64, height: 64).write(to: png)
+        let zipURL = dir.appendingPathComponent("book.cbz")
+        let archive = try Archive(url: zipURL, accessMode: .create)
+        try archive.addEntry(with: "img.png", fileURL: png)
+
+        let reader = try ZIPArchiveReader(url: zipURL)
+        let page = ComicPage(source: .archiveEntry(reader: reader, path: "img.png"), displayName: "img.png")
+
+        await #expect(throws: CancellationError.self) {
+            try await Self.loadCancelled(page)
+        }
+        // The reader itself is still fine for callers that aren't cancelled.
+        let image = try await ImageLoader.load(page)
+        #expect(image.size == CGSize(width: 64, height: 64))
+    }
+
+    /// Runs `ImageLoader.load` inside a task that is already cancelled.
+    private static func loadCancelled(_ page: ComicPage) async throws {
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            _ = try await ImageLoader.load(page)
+        }
+        try await task.value
     }
 }

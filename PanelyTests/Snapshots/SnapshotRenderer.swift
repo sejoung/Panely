@@ -49,6 +49,31 @@ enum SnapshotRenderer {
         size: CGSize,
         named relativePath: String
     ) async throws -> URL {
+        let pngData = try await renderPNG(view, size: size)
+        let destination = try outputDirectory().appendingPathComponent(relativePath)
+        try FileManager.default.createDirectory(
+            at: destination.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try pngData.write(to: destination)
+        print("📸 \(destination.path)")
+        return destination
+    }
+
+    /// Render `view` at `size` and return the PNG bytes, for callers that
+    /// compare instead of writing (`VisualRegressionTests`).
+    static func renderPNG<V: View>(_ view: V, size: CGSize) async throws -> Data {
+        let hosted = await host(view, size: size)
+        defer { hosted.close() }
+        try? await Task.sleep(for: .seconds(settleSeconds))
+        return try hosted.pngData()
+    }
+
+    /// Host `view` in an off-screen window and give SwiftUI its first layout
+    /// pass. Callers wait for whatever async state they need (a fixed settle
+    /// for captures, a polled condition for `LibrarySidebarRenderingTests`)
+    /// and must `close()` the result.
+    static func host<V: View>(_ view: V, size: CGSize) async -> HostedView {
         // The hosting view forces the SwiftUI tree into the AppKit world.
         // Inject color scheme + frame at this layer so subviews that read
         // them via `@Environment` see the right values.
@@ -74,60 +99,82 @@ enum SnapshotRenderer {
         window.colorSpace = NSColorSpace.sRGB
         window.contentView = hostingView
         window.makeKeyAndOrderFront(nil)
-        defer { window.close() }
 
-        // Yield the main actor in two phases. Phase 1 lets SwiftUI complete
-        // its initial layout pass and fire `.task` modifiers. Phase 2 gives
-        // those tasks (e.g., LibrarySidebar's two-stage FileNode scan)
-        // enough wall time to finish. `Task.sleep` properly cooperates with
+        // Yield the main actor so SwiftUI completes its initial layout pass
+        // and fires `.task` modifiers. `Task.sleep` properly cooperates with
         // the actor scheduler — unlike `RunLoop.run(until:)`, which blocked
         // the loop and starved the SwiftUI render task.
         try? await Task.sleep(for: .milliseconds(100))
-        await MainActor.run { hostingView.layoutSubtreeIfNeeded() }
-        try? await Task.sleep(for: .seconds(settleSeconds))
-
         hostingView.layoutSubtreeIfNeeded()
-        hostingView.displayIfNeeded()
+        return HostedView(window: window, hostingView: hostingView, size: size)
+    }
 
-        // Manual high-DPI bitmap — `bitmapImageRepForCachingDisplay(in:)`
-        // would honor the screen scale, but off-screen windows often don't
-        // pick one up. Constructing a bitmap at `size × scale` pixels and
-        // labelling it as `size` points gives us deterministic Retina
-        // output regardless of which display the test machine has.
-        let pixelWidth = Int(size.width * renderScale)
-        let pixelHeight = Int(size.height * renderScale)
-        guard let bitmap = NSBitmapImageRep(
-            bitmapDataPlanes: nil,
-            pixelsWide: pixelWidth,
-            pixelsHigh: pixelHeight,
-            bitsPerSample: 8,
-            samplesPerPixel: 4,
-            hasAlpha: true,
-            isPlanar: false,
-            colorSpaceName: .deviceRGB,
-            bytesPerRow: 0,
-            bitsPerPixel: 0
-        ) else {
-            throw RenderError.encodingFailed
-        }
-        bitmap.size = size
-        hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+    /// A view on screen (off-screen, really) in its own window.
+    @MainActor
+    final class HostedView {
+        let window: NSWindow
+        let hostingView: NSView
+        let size: CGSize
 
-        guard let pngData = bitmap.representation(
-            using: NSBitmapImageRep.FileType.png,
-            properties: [:]
-        ) else {
-            throw RenderError.encodingFailed
+        init(window: NSWindow, hostingView: NSView, size: CGSize) {
+            self.window = window
+            self.hostingView = hostingView
+            self.size = size
         }
 
-        let destination = try outputDirectory().appendingPathComponent(relativePath)
-        try FileManager.default.createDirectory(
-            at: destination.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try pngData.write(to: destination)
-        print("📸 \(destination.path)")
-        return destination
+        func close() {
+            window.close()
+        }
+
+        /// First view of type `T` in the hosted hierarchy, depth-first —
+        /// e.g. the `NSOutlineView` that backs a SwiftUI `List`.
+        func firstSubview<T: NSView>(of type: T.Type) -> T? {
+            func find(_ view: NSView) -> T? {
+                if let match = view as? T { return match }
+                for subview in view.subviews {
+                    if let match = find(subview) { return match }
+                }
+                return nil
+            }
+            return find(hostingView)
+        }
+
+        func pngData() throws -> Data {
+            hostingView.layoutSubtreeIfNeeded()
+            hostingView.displayIfNeeded()
+
+            // Manual high-DPI bitmap — `bitmapImageRepForCachingDisplay(in:)`
+            // would honor the screen scale, but off-screen windows often don't
+            // pick one up. Constructing a bitmap at `size × scale` pixels and
+            // labelling it as `size` points gives us deterministic Retina
+            // output regardless of which display the test machine has.
+            let pixelWidth = Int(size.width * renderScale)
+            let pixelHeight = Int(size.height * renderScale)
+            guard let bitmap = NSBitmapImageRep(
+                bitmapDataPlanes: nil,
+                pixelsWide: pixelWidth,
+                pixelsHigh: pixelHeight,
+                bitsPerSample: 8,
+                samplesPerPixel: 4,
+                hasAlpha: true,
+                isPlanar: false,
+                colorSpaceName: .deviceRGB,
+                bytesPerRow: 0,
+                bitsPerPixel: 0
+            ) else {
+                throw RenderError.encodingFailed
+            }
+            bitmap.size = size
+            hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+
+            guard let pngData = bitmap.representation(
+                using: NSBitmapImageRep.FileType.png,
+                properties: [:]
+            ) else {
+                throw RenderError.encodingFailed
+            }
+            return pngData
+        }
     }
 
     /// Output dir for the generated PNGs. The test bundle inherits the

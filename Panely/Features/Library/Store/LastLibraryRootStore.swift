@@ -45,17 +45,20 @@ final class LastLibraryRootStore {
     /// Resolve the persisted root for display only: no stale-bookmark refresh
     /// write, no security scope started. `nil` when nothing is stored or it no
     /// longer resolves. Use `restore()` (not this) for the actual launch reopen.
+    /// Never mounts a volume or shows UI (it backs a Settings label).
     func peek() -> URL? {
         guard let data = defaults.data(forKey: key) else { return nil }
-        return bookmarks.resolve(data)?.url
+        return bookmarks.resolve(data, allowingMount: false)?.url
     }
 
     /// Resolve the persisted root, refreshing a stale bookmark in place. Returns
     /// the URL — the caller starts its security scope — or `nil` when nothing is
     /// stored / it can no longer be resolved (folder deleted, drive ejected).
+    /// Runs on the main thread at launch, unasked, so it never mounts the
+    /// root's volume: an unmounted network share is skipped, not mounted.
     func restore() -> URL? {
         guard let data = defaults.data(forKey: key),
-              let result = bookmarks.resolveRefreshing(data) else { return nil }
+              let result = bookmarks.resolveRefreshing(data, allowingMount: false) else { return nil }
         if let refreshed = result.refreshed {
             defaults.set(refreshed.data, forKey: key)
         }

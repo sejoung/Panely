@@ -21,7 +21,9 @@ struct SidebarHost: View {
             otherBookmarkedBooks: viewModel.otherBookmarkedBooks,
             volumes: viewModel.sidebarVolumes,
             libraryTreeLoader: viewModel.dependencies.libraryTreeLoader,
-            currentPageIndex: viewModel.currentPageIndex,
+            // A closure, read only by the bookmark rows: reading the page
+            // here would re-render the whole sidebar on every page turn.
+            currentPageIndex: { viewModel.currentPageIndex },
             readingBadge: { viewModel.readingBadge(for: $0) },
             continueReadingTitle: suggestion?.title,
             continueReadingFraction: suggestion?.fraction ?? 0,

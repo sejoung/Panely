@@ -40,7 +40,11 @@ struct LibrarySidebar: View {
     var otherBookmarkedBooks: [BookmarkedBook] = []
     let volumes: [URL]
     let libraryTreeLoader: any LibraryTreeLoading
-    let currentPageIndex: Int
+    /// Read only by the open book's bookmarks section (to mark the current
+    /// page), so a page turn re-renders that section and not the whole
+    /// sidebar with its file tree. A closure for that reason: a plain value
+    /// would make every page turn a new `LibrarySidebar`.
+    let currentPageIndex: () -> Int
     var readingBadge: (URL) -> ReadingBadge? = { _ in nil }
     var continueReadingTitle: String? = nil
     var continueReadingFraction: Double = 0
@@ -244,10 +248,10 @@ struct LibrarySidebar: View {
         if !pageBookmarks.isEmpty {
             Section(header: bookmarksHeader) {
                 ForEach(pageBookmarks) { bm in
-                    PageBookmarkRow(
+                    CurrentBookBookmarkRow(
                         bookmark: bm,
                         page: bookmarkPages.indices.contains(bm.pageIndex) ? bookmarkPages[bm.pageIndex] : nil,
-                        isCurrent: bm.pageIndex == currentPageIndex,
+                        currentPageIndex: currentPageIndex,
                         onTap: { actions.onJumpToBookmark(bm) },
                         onRemove: { actions.onRemovePageBookmark(bm) }
                     )
@@ -351,6 +355,8 @@ struct LibrarySidebar: View {
                 ForEach(model.nodes) { node in
                     FileTreeNodeRow(
                         node: node,
+                        isActive: activeStdURL == node.standardizedURL,
+                        badge: readingBadge(node.url),
                         activeStdURL: activeStdURL,
                         expandedNodeIDs: $model.expandedNodeIDs,
                         readingBadge: readingBadge,
@@ -433,13 +439,40 @@ struct LibrarySidebar: View {
     }
 }
 
+/// A bookmark row in the open book's section. Reads the current page itself
+/// (through `currentPageIndex`), so its body — not the sidebar's — is what a
+/// page turn invalidates.
+private struct CurrentBookBookmarkRow: View {
+    let bookmark: PageBookmark
+    let page: ComicPage?
+    let currentPageIndex: () -> Int
+    let onTap: () -> Void
+    let onRemove: () -> Void
+
+    var body: some View {
+        PageBookmarkRow(
+            bookmark: bookmark,
+            page: page,
+            isCurrent: bookmark.pageIndex == currentPageIndex(),
+            onTap: onTap,
+            onRemove: onRemove
+        )
+    }
+}
+
+/// One file-tree row and, for a folder, its children. Not wrapped in
+/// `.equatable()`: inside a `List`, an `EquatableView` around the
+/// `DisclosureGroup` hides it from the outline, so folders lose their
+/// disclosure and their children never show.
 private struct FileTreeNodeRow: View {
     let node: FileNode
+    let isActive: Bool
+    let badge: ReadingBadge?
     let activeStdURL: URL?
     @Binding var expandedNodeIDs: Set<URL>
     let readingBadge: (URL) -> ReadingBadge?
     let onSelect: (URL) -> Void
-    var onExport: ((_ books: [URL], _ title: String, _ isSeries: Bool) -> Void)?
+    let onExport: ((_ books: [URL], _ title: String, _ isSeries: Bool) -> Void)?
 
     var body: some View {
         if let children = node.children, !children.isEmpty {
@@ -447,6 +480,8 @@ private struct FileTreeNodeRow: View {
                 ForEach(children) { child in
                     FileTreeNodeRow(
                         node: child,
+                        isActive: activeStdURL == child.standardizedURL,
+                        badge: readingBadge(child.url),
                         activeStdURL: activeStdURL,
                         expandedNodeIDs: $expandedNodeIDs,
                         readingBadge: readingBadge,
@@ -465,8 +500,8 @@ private struct FileTreeNodeRow: View {
     private var row: some View {
         FileNodeRow(
             node: node,
-            isActive: activeStdURL == node.url.standardizedFileURL,
-            badge: readingBadge(node.url),
+            isActive: isActive,
+            badge: badge,
             onTap: { onSelect(node.url) }
         )
         .contextMenu {
@@ -518,7 +553,7 @@ private struct FileTreeNodeRow: View {
         pageBookmarks: [],
         volumes: [],
         libraryTreeLoader: LiveLibraryTreeLoader(),
-        currentPageIndex: 0,
+        currentPageIndex: { 0 },
         actions: LibrarySidebarActions()
     )
     .frame(height: 480)

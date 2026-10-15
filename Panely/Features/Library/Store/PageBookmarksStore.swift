@@ -26,12 +26,22 @@ final class PageBookmarksStore {
     /// can stage bookmark sets without driving the toggle path; production
     /// code should go through `togglePageBookmark` / `removePageBookmark`
     /// so persistence + caps stay in sync.
-    var pageBookmarksByBook: [String: [PageBookmark]] = [:]
+    var pageBookmarksByBook: [String: [PageBookmark]] = [:] {
+        didSet { revision &+= 1 }
+    }
 
     /// How to reopen each bookmarked book, keyed like `pageBookmarksByBook`.
     /// Optional per book: bookmarks saved before the cross-book list existed
     /// have no entry and fall back to their key (a path) for title and lookup.
-    private(set) var bookRefs: [String: PageBookmarkBookRef] = [:]
+    private(set) var bookRefs: [String: PageBookmarkBookRef] = [:] {
+        didSet { revision &+= 1 }
+    }
+
+    /// Bumped on every change to either dictionary, so the sorted cross-book
+    /// list is rebuilt only when bookmarks change, not on every read (the
+    /// sidebar and the Go menu read it on every page turn).
+    private(set) var revision = 0
+    @ObservationIgnored private var bookmarkedBooksMemo: (revision: Int, books: [BookmarkedBook])?
 
     init(defaults: any KeyValueStoring = LiveKeyValueStore()) {
         self.defaults = defaults
@@ -134,8 +144,22 @@ final class PageBookmarksStore {
     /// Every bookmarked book except `excludedKey`, most recently bookmarked
     /// first — the order someone looking for "that page I marked" expects.
     func bookmarkedBooks(excluding excludedKey: String? = nil) -> [BookmarkedBook] {
+        // Reading `revision` keeps the observation dependency when memoized.
+        let revision = revision
+        let books: [BookmarkedBook]
+        if let memo = bookmarkedBooksMemo, memo.revision == revision {
+            books = memo.books
+        } else {
+            books = sortedBookmarkedBooks()
+            bookmarkedBooksMemo = (revision, books)
+        }
+        guard let excludedKey else { return books }
+        return books.filter { $0.key != excludedKey }
+    }
+
+    private func sortedBookmarkedBooks() -> [BookmarkedBook] {
         var dated: [(book: BookmarkedBook, latest: Date)] = []
-        for (key, bookmarks) in pageBookmarksByBook where key != excludedKey && !bookmarks.isEmpty {
+        for (key, bookmarks) in pageBookmarksByBook where !bookmarks.isEmpty {
             let book = BookmarkedBook(
                 key: key,
                 title: title(forKey: key),

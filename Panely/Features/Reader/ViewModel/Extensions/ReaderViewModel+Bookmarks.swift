@@ -17,8 +17,10 @@ extension ReaderViewModel {
     // MARK: - Favorite book toggle
 
     var isCurrentBookFavorite: Bool {
-        guard let target = currentFavoriteTarget else { return false }
-        return favorites.isFavorite(url: target.url, innerPath: target.innerPath)
+        // Identity only: the full target also stats the book for
+        // `isDirectory`, and the toolbar and Go menu read this every render.
+        guard let identity = currentFavoriteIdentity else { return false }
+        return favorites.isFavorite(url: identity.url, innerPath: identity.innerPath)
     }
 
     func toggleFavoriteForCurrentBook() {
@@ -237,24 +239,25 @@ extension ReaderViewModel {
     /// inner relative path instead, so favorites survive cleanup and cache
     /// eviction.
     private var currentFavoriteTarget: FavoriteTarget? {
-        guard let current = currentSourceURL else { return nil }
-
-        if let innerPath = currentInnerArchiveRelativePath,
-           let opened = openedSourceURL {
-            return FavoriteTarget(
-                url: opened,
-                title: displayTitle(for: current),
-                innerPath: innerPath,
-                isDirectory: isDirectory(current)
-            )
-        }
-
+        guard let current = currentSourceURL,
+              let identity = currentFavoriteIdentity else { return nil }
         return FavoriteTarget(
-            url: current,
+            url: identity.url,
             title: displayTitle(for: current),
-            innerPath: nil,
+            innerPath: identity.innerPath,
             isDirectory: isDirectory(current)
         )
+    }
+
+    /// The URL + inner path a favorite of the current book is filed under
+    /// (see `currentFavoriteTarget`), without touching the file system.
+    private var currentFavoriteIdentity: (url: URL, innerPath: String?)? {
+        guard let current = currentSourceURL else { return nil }
+        if let innerPath = currentInnerArchiveRelativePath,
+           let opened = openedSourceURL {
+            return (opened, innerPath)
+        }
+        return (current, nil)
     }
 
     private var currentInnerArchiveRelativePath: String? {

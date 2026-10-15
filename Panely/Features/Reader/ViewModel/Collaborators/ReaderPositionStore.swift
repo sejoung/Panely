@@ -17,6 +17,10 @@ final class ReaderPositionStore {
     /// order list so a book the user still reads keeps its position even
     /// across launches. ~4000 entries ≈ a couple hundred KB.
     nonisolated static let maxEntries = 4000
+    /// Quiet period before a debounced write lands (see
+    /// `ReadingProgressStore.saveDelay`). Every write bridges the whole
+    /// dictionary and order list into `UserDefaults` on the main thread.
+    nonisolated static let saveDelay: Duration = .seconds(2)
 
     /// In-memory mirror of the positions dict. Module-internal (not private)
     /// so tests can assert the lazy-hydration invariant — production code
@@ -24,15 +28,18 @@ final class ReaderPositionStore {
     /// the UserDefaults write paired.
     var cache: [String: Int]?
     /// MRU order mirror (most-recently-written key first). Persisted under
-    /// `orderKey` so eviction survives relaunch.
+    /// `orderKey` so eviction survives relaunch. Reconciled against `cache`
+    /// once on hydration, then kept in step by every write.
     private var orderCache: [String]?
     /// Module-internal so tests can flush the pending write instead of
     /// waiting out the delay.
-    let saveDebouncer = Debouncer()
-    /// Key of the write waiting in `saveDebouncer`. The debouncer is shared by
-    /// every book, so a write for a different key flushes this one first
-    /// rather than replacing it (see `ReadingProgressStore.pendingKey`).
-    private var pendingKey: String?
+    let saveDebouncer = Debouncer(delay: ReaderPositionStore.saveDelay)
+    /// The write waiting in `saveDebouncer`. The debouncer is shared by every
+    /// book, so a write for a different key flushes this one first rather
+    /// than replacing it (see `ReadingProgressStore.pendingKey`). Also
+    /// consulted by `restoredIndex`, so reopening the same book inside the
+    /// debounce window restores the page just left, not the one before it.
+    private var pending: (key: String, fileIdentityKey: String?, pageIndex: Int)?
     private let defaults: any KeyValueStoring
     private let positionsKey: String
     private let orderKey: String
@@ -50,12 +57,12 @@ final class ReaderPositionStore {
     }
 
     /// Schedule a debounced write. Rapid repeat calls coalesce into a single
-    /// `UserDefaults` round-trip after ~300 ms of quiet. `fileIdentityKey`
+    /// `UserDefaults` round-trip after `saveDelay` of quiet. `fileIdentityKey`
     /// (when available) is mirrored alongside the primary key so external-
     /// drive mount-path drifts ("/Volumes/X" → "/Volumes/X 1") still recover.
     func savePosition(forKey key: String, fileIdentityKey: String?, pageIndex: Int) {
-        if pendingKey != key { saveDebouncer.flush() }
-        pendingKey = key
+        if pending?.key != key { saveDebouncer.flush() }
+        pending = (key, fileIdentityKey, pageIndex)
         saveDebouncer.schedule { [weak self] in
             self?.writeNow(key: key, fileIdentityKey: fileIdentityKey, pageIndex: pageIndex)
         }
@@ -64,18 +71,17 @@ final class ReaderPositionStore {
     /// Synchronous flush. Used by the app-terminate observer and by the
     /// debounced path after its sleep expires.
     func flushImmediately(forKey key: String, fileIdentityKey: String?, pageIndex: Int) {
-        if pendingKey != key { saveDebouncer.flush() }
+        if pending?.key != key { saveDebouncer.flush() }
         saveDebouncer.cancel()
         writeNow(key: key, fileIdentityKey: fileIdentityKey, pageIndex: pageIndex)
     }
 
     /// Restored page index for `key`, falling back to `fileIdentityKey` so a
     /// renamed/remounted file recovers its position. Returns 0 when nothing
-    /// matches.
+    /// matches. A still-debounced write reads as if it had already landed.
     func restoredIndex(forKey key: String, fileIdentityKey: String?) -> Int {
-        let dict = loaded()
-        if let primary = dict[key] { return primary }
-        if let fid = fileIdentityKey, let secondary = dict[fid] { return secondary }
+        if let primary = storedIndex(forKey: key) { return primary }
+        if let fid = fileIdentityKey, let secondary = storedIndex(forKey: fid) { return secondary }
         return 0
     }
 
@@ -83,8 +89,10 @@ final class ReaderPositionStore {
 
     /// Stable primary key for `sourceURL`. Centralises `PositionKey` derivation
     /// here so callers (viewmodel, bookmark facade) don't each build their own.
+    /// Path-only (`PositionKey.make`): unlike `PositionKey.keys` it never stats
+    /// the file for its identity, so it's cheap enough for render paths.
     func primaryKey(for sourceURL: URL, opened openedURL: URL?, tempRoot: URL?) -> String {
-        PositionKey.keys(for: sourceURL, opened: openedURL, tempRoot: tempRoot).primary
+        PositionKey.make(for: sourceURL, opened: openedURL, tempRoot: tempRoot)
     }
 
     func savePosition(
@@ -120,8 +128,9 @@ final class ReaderPositionStore {
         guard oldPath != newPath else { return }
         // Land the pending write under its old key so the migration carries it.
         saveDebouncer.flush()
-        var dict = loaded()
-        var order = loadedOrder(dict: dict)
+        hydrate()
+        var dict = cache ?? [:]
+        var order = orderCache ?? []
         var replacements: [String: String] = [:]
 
         for key in dict.keys {
@@ -149,18 +158,28 @@ final class ReaderPositionStore {
     }
 
     private func writeNow(key: String, fileIdentityKey: String?, pageIndex: Int) {
-        var dict = loaded()
-        var order = loadedOrder(dict: dict)
+        pending = nil
+        hydrate()
+        guard var dict = cache, var order = orderCache else { return }
+        // Release the mirrors while editing so the local copies are uniquely
+        // referenced and mutate in place — no per-write copy of up to
+        // `maxEntries` keys.
+        cache = nil
+        orderCache = nil
 
         dict[key] = pageIndex
         if let fid = fileIdentityKey {
             dict[fid] = pageIndex
         }
 
-        // Promote the touched keys to the front (most-recently-used).
+        // Promote the touched keys to the front (most-recently-used). Paging
+        // through one book re-touches the keys already there, so skip the
+        // O(n) reshuffle in that common case.
         let touched = [key, fileIdentityKey].compactMap { $0 }
-        order.removeAll { touched.contains($0) }
-        order.insert(contentsOf: touched, at: 0)
+        if !order.starts(with: touched) {
+            order.removeAll { touched.contains($0) }
+            order.insert(contentsOf: touched, at: 0)
+        }
 
         evictIfNeeded(dict: &dict, order: &order)
 
@@ -178,13 +197,22 @@ final class ReaderPositionStore {
             dict.removeValue(forKey: stale)
         }
         // Defensive: if the order list somehow under-counts the dict (it
-        // shouldn't — `loadedOrder` seeds every dict key), drop arbitrary
+        // shouldn't — `hydrate` seeds every dict key), drop arbitrary
         // extras so the cap is always honored.
         if dict.count > maxEntries {
             for extra in dict.keys.shuffled().prefix(dict.count - maxEntries) {
                 dict.removeValue(forKey: extra)
             }
         }
+    }
+
+    /// The persisted value for `key`, with the pending debounced write
+    /// applied on top.
+    private func storedIndex(forKey key: String) -> Int? {
+        if let pending, pending.key == key || pending.fileIdentityKey == key {
+            return pending.pageIndex
+        }
+        return loaded()[key]
     }
 
     /// Lazy hydration. First call pays one UserDefaults syscall; subsequent
@@ -197,20 +225,19 @@ final class ReaderPositionStore {
         return loaded
     }
 
-    /// MRU order, reconciled against `dict`: any dict key without a recorded
-    /// position in the order list (entries that predate order tracking, or a
-    /// direct defaults write) is appended so it's still an eviction candidate
-    /// but ranks below anything explicitly touched; stale order entries no
-    /// longer in the dict are dropped.
-    private func loadedOrder(dict: [String: Int]) -> [String] {
-        var order = orderCache ?? (defaults.array(forKey: orderKey) as? [String] ?? [])
-        let known = Set(order)
-        let missing = dict.keys.filter { !known.contains($0) }
-        if !missing.isEmpty {
-            order.append(contentsOf: missing)
-        }
-        order.removeAll { dict[$0] == nil }
+    /// Hydrate both mirrors. The MRU order is reconciled against the dict
+    /// once, here: any dict key without a recorded position in the order list
+    /// (entries that predate order tracking, or a direct defaults write) is
+    /// appended so it's still an eviction candidate but ranks below anything
+    /// explicitly touched; stale order entries no longer in the dict are
+    /// dropped. Every later write keeps the two in step itself.
+    private func hydrate() {
+        let dict = loaded()
+        guard orderCache == nil else { return }
+        var order = defaults.array(forKey: orderKey) as? [String] ?? []
+        var known: Set<String> = []
+        order.removeAll { dict[$0] == nil || !known.insert($0).inserted }
+        order.append(contentsOf: dict.keys.filter { !known.contains($0) })
         orderCache = order
-        return order
     }
 }

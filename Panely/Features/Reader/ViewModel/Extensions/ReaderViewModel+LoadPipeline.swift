@@ -222,6 +222,7 @@ extension ReaderViewModel {
     private func startLoad() -> Int {
         unavailableRecentItem = nil
         imageLoader.cancelBackgroundWork()
+        pagedRefreshTask?.cancel()
         ThumbnailLoader.shared.removeAll()
         sourceRenderRevision &+= 1
         clearSourceChangeNotice()

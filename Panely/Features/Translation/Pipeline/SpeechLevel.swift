@@ -302,6 +302,10 @@ nonisolated enum SpeechLevelAvailability: Equatable, Sendable {
 nonisolated struct OnDeviceSpeechLevelCorrector: SpeechLevelCorrecting {
     let source: TranslationLanguage
     let target: TranslationLanguage
+    /// One for the job; each balloon still gets a session of its own.
+    /// The transformation guardrails: the text is the book's, and comics
+    /// are often violent or crude — the default ones refuse those.
+    private let model = SystemLanguageModel(useCase: .general, guardrails: .permissiveContentTransformations)
 
     /// `nil` when the pair has no speech levels to match or the model isn't
     /// there.
@@ -315,9 +319,6 @@ nonisolated struct OnDeviceSpeechLevelCorrector: SpeechLevelCorrecting {
               let have = SpeechLevelRules.level(ofTranslation: translation, language: target),
               SpeechLevelRules.needsRewrite(translation: have, original: wanted)
         else { return nil }
-        // The transformation guardrails: the text is the book's, and comics
-        // are often violent or crude — the default ones refuse those.
-        let model = SystemLanguageModel(useCase: .general, guardrails: .permissiveContentTransformations)
         let session = LanguageModelSession(model: model, instructions: SpeechLevelRules.instructions(for: target, level: wanted))
         do {
             let response = try await session.respond(to: translation, options: GenerationOptions(temperature: 0))

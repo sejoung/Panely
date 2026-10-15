@@ -1,6 +1,7 @@
 import AppKit
 import CoreGraphics
 import Foundation
+import ImageIO
 import Vision
 
 /// Balloons found on one page by one unit of work, still untranslated.
@@ -18,13 +19,21 @@ nonisolated struct PageAnalysis: Sendable {
 /// pages it keeps between strip bands are touched by one task at a time.
 ///
 /// Strip bands overlap and a tall page spans several bands, so the last few
-/// decoded pages are kept rather than decoding a 20,000 px page once per band.
+/// decoded pages are kept rather than decoding a 20,000 px page once per band
+/// — and bands read side by side (fast mode) share a page being decoded.
+/// Page scope reads each page once, so it keeps none.
 @available(macOS 26.0, *)
 actor PageAnalyzer {
     private let pages: [ComicPage]
     private let language: TranslationLanguage
     private var decoded: [(index: Int, image: CGImage)] = []
+    private var decoding: [Int: Task<CGImage, any Error>] = [:]
     private static let decodedCacheSize = 4
+    /// Also bounded by size: four 20,000 px slices are ~1 GB decoded.
+    private static let decodedCachePixels = 48_000_000
+    /// Second looks read side by side, a few at a time — enough to keep up
+    /// with fast translation without crowding out the pages' own OCR.
+    private static let concurrentRereads = 2
 
     init(pages: [ComicPage], language: TranslationLanguage) {
         self.pages = pages
@@ -42,7 +51,7 @@ actor PageAnalyzer {
     // MARK: - Page scope
 
     private func analyzePage(_ index: Int) async throws -> PageAnalysis {
-        let image = try await decodedImage(index)
+        let image = try await Self.decode(pages[index])
         let (regions, detections) = try await recognize(image)
         let drafts = BubbleGrouper.group(regions, language: language, detections: detections)
         let bubbles = makeBubbles(from: drafts, sampling: image) { $0 }
@@ -90,7 +99,7 @@ actor PageAnalyzer {
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
         for index in layout.pages(intersecting: band.top..<(band.top + band.height)) {
             try Task.checkCancellation()
-            let image = try await decodedImage(index)
+            let image = try await stripPage(index)
             let rect = layout.pageRect(index)
             // CG's origin is bottom-left; band rows run top-down.
             let y = band.height - (rect.minY - band.top) - rect.height
@@ -114,24 +123,37 @@ actor PageAnalyzer {
         return (regions + (try await reread(MissedText.boxesToReread(found, regions: regions), in: image)), found)
     }
 
-    /// Each box cut out, enlarged and read on its own.
+    /// Each box cut out, enlarged and read on its own — a few at once, the
+    /// results kept in the boxes' order.
     private func reread(_ boxes: [DetectedRegion], in image: CGImage) async throws -> [TextRegion] {
-        let imageSize = CGSize(width: image.width, height: image.height)
-        var found: [TextRegion] = []
-        for box in boxes {
-            try Task.checkCancellation()
-            let crop = MissedText.cropRect(for: box.rect, in: imageSize)
-            let scale = MissedText.scale(for: crop)
-            guard crop.width >= 4, crop.height >= 4, let enlarged = Self.enlarge(image, crop: crop, scale: scale) else { continue }
-            let regions = try await PageTextRecognizer(language: language).recognize(enlarged)
-            found += regions
-                .filter { !MissedText.isNoise($0.text) }
-                .map { MissedText.mapBack($0, crop: crop, scale: scale) }
+        let language = language
+        var results = [[TextRegion]](repeating: [], count: boxes.count)
+        try await withThrowingTaskGroup(of: (Int, [TextRegion]).self) { group in
+            for (index, box) in boxes.enumerated() {
+                if index >= Self.concurrentRereads, let (done, regions) = try await group.next() {
+                    results[done] = regions
+                }
+                group.addTask { (index, try await Self.reread(box, in: image, language: language)) }
+            }
+            for try await (done, regions) in group {
+                results[done] = regions
+            }
         }
+        let found = results.flatMap { $0 }
         if !found.isEmpty {
             AppLog.debug(.reader, "Second look read missed text", metadata: ["boxes": "\(boxes.count)", "regions": "\(found.count)"])
         }
         return found
+    }
+
+    private static func reread(_ box: DetectedRegion, in image: CGImage, language: TranslationLanguage) async throws -> [TextRegion] {
+        try Task.checkCancellation()
+        let crop = MissedText.cropRect(for: box.rect, in: CGSize(width: image.width, height: image.height))
+        let scale = MissedText.scale(for: crop)
+        guard crop.width >= 4, crop.height >= 4, let enlarged = enlarge(image, crop: crop, scale: scale) else { return [] }
+        return try await PageTextRecognizer(language: language).recognize(enlarged)
+            .filter { !MissedText.isNoise($0.text) }
+            .map { MissedText.mapBack($0, crop: crop, scale: scale) }
     }
 
     private static func enlarge(_ image: CGImage, crop: CGRect, scale: CGFloat) -> CGImage? {
@@ -187,15 +209,49 @@ actor PageAnalyzer {
         return BubbleBackgroundSampler.inkShare(image, in: room, excluding: textArea, background: background) < Self.maxInkInBalloonRoom
     }
 
-    private func decodedImage(_ index: Int) async throws -> CGImage {
+    /// A page under a strip band: kept for the bands after it, and decoded
+    /// once when bands read side by side both need it.
+    private func stripPage(_ index: Int) async throws -> CGImage {
         if let hit = decoded.first(where: { $0.index == index }) { return hit.image }
-        let image = try await ImageLoader.load(pages[index])
-        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            throw ImageLoaderError.decodingFailed
+        if let inFlight = decoding[index] { return try await inFlight.value }
+        let page = pages[index]
+        let task = Task { try await Self.decode(page) }
+        decoding[index] = task
+        defer { decoding[index] = nil }
+        let image = try await task.value
+        decoded.append((index, image))
+        var pixels = decoded.reduce(0) { $0 + $1.image.width * $1.image.height }
+        while decoded.count > Self.decodedCacheSize || (decoded.count > 1 && pixels > Self.decodedCachePixels) {
+            let dropped = decoded.removeFirst()
+            pixels -= dropped.image.width * dropped.image.height
         }
-        decoded.append((index, cgImage))
-        if decoded.count > Self.decodedCacheSize { decoded.removeFirst() }
-        return cgImage
+        return image
+    }
+
+    /// A page decoded for analysis. Like `ImageLoader.load`, but at utility
+    /// priority: that decodes the pages on screen at user-initiated, and a
+    /// job's OCR running in the background shouldn't compete with them.
+    nonisolated static func decode(_ page: ComicPage) async throws -> CGImage {
+        let data: Data?
+        switch page.source {
+        case .file:
+            data = nil
+        case let .archiveEntry(reader, path):
+            data = try await reader.loadData(at: path)
+        }
+        return try await Task.detached(priority: .utility) {
+            try Task.checkCancellation()
+            let source: CGImageSource? = switch page.source {
+            case let .file(url): CGImageSourceCreateWithURL(url as CFURL, nil)
+            case .archiveEntry: data.flatMap { CGImageSourceCreateWithData($0 as CFData, nil) }
+            }
+            // Decoded here, not on first use (see `ImageLoader`).
+            let options = [kCGImageSourceShouldCacheImmediately: true] as CFDictionary
+            guard let source, let image = CGImageSourceCreateImageAtIndex(source, 0, options) else {
+                throw ImageLoaderError.decodingFailed
+            }
+            return image
+        }.value
     }
 }
 
@@ -213,8 +269,7 @@ nonisolated enum TranslationLanguageDetector {
         var text = ""
         for index in TranslationController.translationOrder(count: pages.count, startingAt: start).prefix(maxPages) {
             if Task.isCancelled { return nil }
-            guard let image = try? await ImageLoader.load(pages[index]),
-                  let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { continue }
+            guard let cgImage = try? await PageAnalyzer.decode(pages[index]) else { continue }
             var request = RecognizeDocumentsRequest()
             request.textRecognitionOptions.recognitionLanguages = TranslationLanguage.allCases.map(\.localeLanguage)
             request.textRecognitionOptions.automaticallyDetectLanguage = true

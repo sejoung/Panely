@@ -46,7 +46,7 @@ extension ReaderViewModel {
         return ToolbarTranslationState(
             showsTranslation: translationIsShowing,
             isWorking: translationManager.openBook.contains(where: \.isWorking),
-            hasTranslations: !translation.pages.isEmpty,
+            hasTranslations: translation.hasPages,
             shownLanguage: translationDisplayLanguage,
             shownLanguageName: translationDisplayLanguage.displayName(in: locale),
             languages: listed.map {

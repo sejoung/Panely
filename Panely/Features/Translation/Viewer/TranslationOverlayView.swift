@@ -47,12 +47,22 @@ final class TranslationOverlayView: NSView {
     private var pendingPopover: Task<Void, Never>?
     private var trackingArea: NSTrackingArea?
     private let pendingView = PendingBubblesView()
-    /// Fitted text per balloon, valid for `fittedForScale`. Fitting is a small
-    /// binary search per balloon; redraws (hover, scroll) reuse it.
-    private var fittedText: [Int: TranslationPatchPainter.Fitted] = [:]
-    private var fittedForScale: CGFloat = 0
-    /// The page's translations laid out together (page pixels).
+    /// Fitted text per balloon, with what it was fitted to. Fitting is a
+    /// small binary search per balloon; redraws (hover, scroll) reuse it, and
+    /// so does a page update that leaves the balloon's patch as it was — a
+    /// job fills a page in one balloon at a time.
+    private var fittedText: [Int: (fit: FitKey, fitted: TranslationPatchPainter.Fitted)] = [:]
+    /// The page's translations laid out together (page pixels), and the
+    /// page they were laid out for.
     private var layout = TranslationOverlayLayout.PageLayout()
+    private var layoutPage: TranslatedPage?
+
+    /// What a fit depends on besides the text (which `Fitted` checks itself).
+    private struct FitKey: Equatable {
+        let size: CGSize
+        let glyph: CGFloat
+        let background: BubbleBackground
+    }
 
     override var isFlipped: Bool { true }
 
@@ -83,9 +93,17 @@ final class TranslationOverlayView: NSView {
         // The open popover belongs to the other mode.
         if page == nil || modeChanged { closePopover() }
         if page != self.page {
-            layout = page.map(TranslationOverlayLayout.layout) ?? TranslationOverlayLayout.PageLayout()
-            // Patches can change size with a neighbour; refit.
-            fittedText = [:]
+            if let page {
+                _ = preparedLayout(for: page)
+                // Fits of balloons that left the page go; the rest are checked
+                // against their patch when drawn.
+                let ids = Set(page.bubbles.map(\.id) + layout.drawn.map(\.bubble.id))
+                fittedText = fittedText.filter { ids.contains($0.key) }
+            } else {
+                layout = TranslationOverlayLayout.PageLayout()
+                layoutPage = nil
+                fittedText = [:]
+            }
         }
         self.page = page
         self.showsTranslation = showsTranslation
@@ -97,6 +115,16 @@ final class TranslationOverlayView: NSView {
     }
 
     // MARK: - Geometry
+
+    /// `page` laid out, reused while the page is the same — `ImageStackView`
+    /// sizes the overlay from it and `update` draws with it.
+    func preparedLayout(for page: TranslatedPage) -> TranslationOverlayLayout.PageLayout {
+        if page != layoutPage {
+            layout = TranslationOverlayLayout.layout(for: page)
+            layoutPage = page
+        }
+        return layout
+    }
 
     private func patchInView(_ bubble: TranslatedBubble) -> CGRect {
         guard let page else { return .zero }
@@ -220,16 +248,24 @@ final class TranslationOverlayView: NSView {
             x: min(markStart.x, point.x), y: min(markStart.y, point.y),
             width: abs(point.x - markStart.x), height: abs(point.y - markStart.y)
         ).intersection(pageInView)
+        let previous = markedArea
         markedArea = area.isNull ? nil : area
-        needsDisplay = true
+        invalidateMark(previous)
+        invalidateMark(markedArea)
+    }
+
+    /// Redraw only where the marked area was or is.
+    private func invalidateMark(_ area: CGRect?) {
+        guard let area else { return }
+        setNeedsDisplay(area.insetBy(dx: -2, dy: -2))
     }
 
     override func mouseUp(with event: NSEvent) {
         defer {
             markStart = nil
-            if markedArea != nil {
+            if let area = markedArea {
                 markedArea = nil
-                needsDisplay = true
+                invalidateMark(area)
             }
         }
         guard markStart != nil else {
@@ -258,9 +294,18 @@ final class TranslationOverlayView: NSView {
 
     private func setHovered(_ id: Int?) {
         guard id != hoveredBubbleID else { return }
+        let previous = hoveredBubbleID
         hoveredBubbleID = id
         (id == nil ? NSCursor.arrow : NSCursor.pointingHand).set()
-        needsDisplay = true
+        // Only the two highlights change; `draw` repaints what's under them.
+        invalidateHighlight(of: previous)
+        invalidateHighlight(of: id)
+    }
+
+    private func invalidateHighlight(of id: Int?) {
+        guard let id, let bubble = page?.bubbles.first(where: { $0.id == id }) else { return }
+        // The highlight's stroke sits just outside the hit area.
+        setNeedsDisplay(hitAreaInView(bubble).insetBy(dx: -4, dy: -4))
     }
 
     // MARK: - Popover
@@ -371,15 +416,15 @@ final class TranslationOverlayView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         guard let page else { return }
-        if fittedForScale != scale {
-            fittedText = [:]
-            fittedForScale = scale
-        }
         if showsTranslation {
             // Balloons drawn together come as one, their translations a line each.
             for (bubble, rect) in layout.drawn {
                 let patch = inView(rect)
-                guard patch.intersects(dirtyRect), let translation = bubble.translation else { continue }
+                // Over artwork a patch is feathered past its edge
+                // (`TranslationPatchPainter`): a redraw next to it repaints it.
+                let bleed = max(6, CGFloat(bubble.glyphSize) * scale * 0.8)
+                guard patch.insetBy(dx: -bleed, dy: -bleed).intersects(dirtyRect),
+                      let translation = bubble.translation else { continue }
                 drawTranslation(translation, of: bubble, in: patch)
             }
         }
@@ -412,13 +457,17 @@ final class TranslationOverlayView: NSView {
     }
 
     private func drawTranslation(_ translation: String, of bubble: TranslatedBubble, in patch: CGRect) {
-        fittedText[bubble.id] = TranslationPatchPainter.draw(
+        let glyph = CGFloat(bubble.glyphSize) * scale
+        let fit = FitKey(size: patch.size, glyph: glyph, background: bubble.background)
+        let cached = fittedText[bubble.id]
+        let fitted = TranslationPatchPainter.draw(
             translation,
             background: bubble.background,
-            glyph: CGFloat(bubble.glyphSize) * scale,
+            glyph: glyph,
             in: patch,
-            fitted: fittedText[bubble.id]
+            fitted: cached?.fit == fit ? cached?.fitted : nil
         )
+        fittedText[bubble.id] = fitted.map { (fit, $0) }
     }
 
     /// Edit mode: where a hidden balloon is — the original shows through,
@@ -432,10 +481,7 @@ final class TranslationOverlayView: NSView {
         path.stroke()
         let size = min(max(12, patch.height * 0.16), 18)
         guard patch.width > size * 2, patch.height > size * 1.5 else { return }
-        let configuration = NSImage.SymbolConfiguration(pointSize: size * 0.7, weight: .semibold)
-            .applying(NSImage.SymbolConfiguration(paletteColors: [.systemGray]))
-        guard let eye = NSImage(systemSymbolName: "eye.slash", accessibilityDescription: nil)?
-            .withSymbolConfiguration(configuration) else { return }
+        guard let eye = Self.symbol("eye.slash", pointSize: size * 0.7, weight: .semibold, color: .systemGray) else { return }
         let rect = CGRect(x: patch.maxX - eye.size.width - 4, y: patch.minY + 4, width: eye.size.width, height: eye.size.height)
         eye.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
     }
@@ -449,10 +495,7 @@ final class TranslationOverlayView: NSView {
         let badge = CGRect(x: patch.maxX - size - 3, y: patch.minY + 3, width: size, height: size)
         NSColor.controlAccentColor.withAlphaComponent(0.9).setFill()
         NSBezierPath(ovalIn: badge).fill()
-        let configuration = NSImage.SymbolConfiguration(pointSize: size * 0.5, weight: .bold)
-            .applying(NSImage.SymbolConfiguration(paletteColors: [.white]))
-        guard let pencil = NSImage(systemSymbolName: "pencil", accessibilityDescription: nil)?
-            .withSymbolConfiguration(configuration) else { return }
+        guard let pencil = Self.symbol("pencil", pointSize: size * 0.5, weight: .bold, color: .white) else { return }
         let glyph = CGRect(
             x: badge.midX - pencil.size.width / 2,
             y: badge.midY - pencil.size.height / 2,
@@ -460,6 +503,31 @@ final class TranslationOverlayView: NSView {
             height: pencil.size.height
         )
         pencil.draw(in: glyph, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+    }
+
+    private struct SymbolKey: Hashable {
+        let name: String
+        let pointSize: CGFloat
+        let weight: NSFont.Weight
+        let color: NSColor
+        let appearance: NSAppearance.Name
+    }
+
+    /// The badges' symbols, made once per size rather than on every draw.
+    private static var symbols: [SymbolKey: NSImage] = [:]
+
+    private static func symbol(_ name: String, pointSize: CGFloat, weight: NSFont.Weight, color: NSColor) -> NSImage? {
+        let key = SymbolKey(name: name, pointSize: pointSize, weight: weight, color: color, appearance: NSAppearance.currentDrawing().name)
+        if let cached = symbols[key] { return cached }
+        let configuration = NSImage.SymbolConfiguration(pointSize: pointSize, weight: weight)
+            .applying(NSImage.SymbolConfiguration(paletteColors: [color]))
+        guard let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
+            .withSymbolConfiguration(configuration) else { return nil }
+        // Sizes come from patch heights within a few points' range; still,
+        // don't let an odd page grow this without bound.
+        if symbols.count > 256 { symbols.removeAll() }
+        symbols[key] = image
+        return image
     }
 
     private func drawHoverHighlight(around patch: CGRect, glyph: CGFloat) {

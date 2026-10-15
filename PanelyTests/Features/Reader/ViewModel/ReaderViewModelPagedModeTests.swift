@@ -180,6 +180,40 @@ struct ReaderViewModelPagedModeTests {
         #expect(vm.spreadCoverAlone)
     }
 
+    // MARK: paged refresh cancellation
+
+    /// A slider scrub calls `jump(to:)` for every value it passes. Each jump
+    /// supersedes the previous refresh; the strip must end on the spread the
+    /// scrub landed on, and the cancelled decodes must not surface as errors.
+    @Test func rapidJumpsCancelSupersededRefreshesAndShowFinalSpread() async throws {
+        let root = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let png = try Fixture.makePNG(width: 400, height: 600)
+        let pages: [ComicPage] = try (0..<30).map { i in
+            let url = root.appendingPathComponent("\(i).png")
+            try png.write(to: url)
+            return ComicPage(source: .file(url), displayName: "\(i).png")
+        }
+        let vm = makeTestViewModel()
+        vm.source = ComicSource(title: "Scrub", pages: pages)
+        vm.layout = .single
+
+        var superseded: [Task<Void, Never>] = []
+        for index in 1..<30 {
+            vm.jump(to: index)
+            if let task = vm.pagedRefreshTask { superseded.append(task) }
+        }
+        try #require(!superseded.isEmpty)
+        let latest = superseded.removeLast()
+        await latest.value
+
+        let allCancelled = superseded.allSatisfy { $0.isCancelled }
+        #expect(allCancelled)
+        #expect(vm.imageLoader.currentPageIDs == [pages[29].id])
+        #expect(vm.errorMessage == nil)
+    }
+
     // MARK: helpers
 
     private func makeViewModel(pageCount: Int) -> ReaderViewModel {

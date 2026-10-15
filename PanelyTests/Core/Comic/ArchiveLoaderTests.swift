@@ -109,6 +109,54 @@ struct ArchiveLoaderIntegrationTests {
         #expect(comic.pages.map(\.displayName) == ["01.jpg", "02.jpg"])
     }
 
+    /// `hasNestedArchives` hands its open reader to the `load` that follows;
+    /// the handed-over listing must produce exactly the pages (ids included)
+    /// a fresh open would.
+    @Test func loadAfterNestedCheckMatchesFreshLoad() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+
+        let src = try Fixture.makeTempDir()
+        try Fixture.writeFile(src.appendingPathComponent("01.jpg"))
+        try Fixture.writeFile(src.appendingPathComponent("02.jpg"))
+        let zipURL = workDir.appendingPathComponent("book.cbz")
+        try Fixture.zipDirectory(src, to: zipURL)
+        try? FileManager.default.removeItem(at: src)
+
+        #expect(try await ArchiveLoader.hasNestedArchives(at: zipURL) == false)
+        let handedOver = try await ArchiveLoader.load(from: zipURL)
+        let fresh = try await ArchiveLoader.load(from: zipURL)
+
+        #expect(handedOver.pages.map(\.id) == fresh.pages.map(\.id))
+        #expect(handedOver.pages.map(\.displayName) == ["01.jpg", "02.jpg"])
+    }
+
+    /// An archive replaced between the nested check and the load must not be
+    /// served from the stale handed-over listing.
+    @Test func loadAfterNestedCheckSeesReplacedArchive() async throws {
+        let workDir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: workDir) }
+
+        let zipURL = workDir.appendingPathComponent("book.cbz")
+        let first = try Fixture.makeTempDir()
+        try Fixture.writeFile(first.appendingPathComponent("01.jpg"))
+        try Fixture.zipDirectory(first, to: zipURL)
+        try? FileManager.default.removeItem(at: first)
+
+        #expect(try await ArchiveLoader.hasNestedArchives(at: zipURL) == false)
+
+        let second = try Fixture.makeTempDir()
+        try Fixture.writeFile(second.appendingPathComponent("01.jpg"))
+        try Fixture.writeFile(second.appendingPathComponent("02.jpg"))
+        try Fixture.writeFile(second.appendingPathComponent("03.jpg"))
+        try FileManager.default.removeItem(at: zipURL)
+        try Fixture.zipDirectory(second, to: zipURL)
+        try? FileManager.default.removeItem(at: second)
+
+        let comic = try await ArchiveLoader.load(from: zipURL)
+        #expect(comic.pages.map(\.displayName) == ["01.jpg", "02.jpg", "03.jpg"])
+    }
+
     @Test func hasNestedArchivesIgnoresMacOSXResourceForks() async throws {
         let workDir = try Fixture.makeTempDir()
         defer { try? FileManager.default.removeItem(at: workDir) }

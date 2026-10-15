@@ -6,10 +6,22 @@ nonisolated struct FileNode: Identifiable, Hashable, Sendable {
     let name: String
     let kind: Kind
     var children: [FileNode]?
+    /// `url.standardizedFileURL`, computed once when the tree is built (off
+    /// the main actor) instead of by every sidebar row on every render.
+    let standardizedURL: URL
 
     nonisolated enum Kind: Hashable, Sendable {
         case folder
         case archive
+    }
+
+    init(id: URL, url: URL, name: String, kind: Kind, children: [FileNode]?) {
+        self.id = id
+        self.url = url
+        self.name = name
+        self.kind = kind
+        self.children = children
+        self.standardizedURL = url.standardizedFileURL
     }
 
     var iconName: String {
@@ -25,6 +37,12 @@ nonisolated struct FileNode: Identifiable, Hashable, Sendable {
         return ext.isEmpty ? nil : ext.lowercased()
     }
 
+    /// `@concurrent`: a plain nonisolated async func would run on the
+    /// caller's actor — the sidebar model is main-actor, so the top-level
+    /// listing and the final sort would land on the main thread. Stops early
+    /// (returning a partial tree the caller discards) once the calling task
+    /// is cancelled, e.g. by a newer refresh.
+    @concurrent
     static func loadTree(from url: URL, maxDepth: Int = 3) async -> [FileNode] {
         // Top-level scan parallelizes per-entry subtree builds. Each
         // subtree's recursion stays serial — that gives ~chunk-wide speedup
@@ -34,6 +52,7 @@ nonisolated struct FileNode: Identifiable, Hashable, Sendable {
         var nodes: [FileNode] = []
 
         for chunkStart in stride(from: 0, to: contents.count, by: chunkSize) {
+            if Task.isCancelled { break }
             let chunkEnd = min(chunkStart + chunkSize, contents.count)
             let chunk = Array(contents[chunkStart..<chunkEnd])
             let chunkNodes = await withTaskGroup(of: FileNode?.self, returning: [FileNode].self) { group in
@@ -108,9 +127,19 @@ nonisolated struct FileNode: Identifiable, Hashable, Sendable {
     /// Serial subtree build used inside parallel top-level chunks.
     /// Avoids nested TaskGroup explosion (would be N^depth tasks).
     private static func buildTreeSerial(at url: URL, depth: Int, maxDepth: Int) -> [FileNode] {
+        // Child tasks inherit the scan's cancellation; skip listing further
+        // directories once it's set.
+        guard !Task.isCancelled else { return [] }
         let nodes = directoryEntries(at: url).compactMap {
             processEntry($0, depth: depth, maxDepth: maxDepth)
         }
         return sortedByName(nodes)
+    }
+
+    /// Whether two scans differ. `@concurrent` so the deep compare of a
+    /// large tree runs off the main actor.
+    @concurrent
+    static func treesDiffer(_ lhs: [FileNode], _ rhs: [FileNode]) async -> Bool {
+        lhs != rhs
     }
 }

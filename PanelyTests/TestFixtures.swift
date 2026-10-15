@@ -7,13 +7,52 @@ import ZIPFoundation
 @testable import Panely
 
 enum Fixture {
+    /// This test run's scratch area: every temp dir and test cache root lives
+    /// under it rather than straight in the sandbox's `tmp`.
+    ///
+    /// Two reasons. Anything a test leaves behind (a view model that's never
+    /// freed never runs its cache's `deinit`) used to pile up in `tmp` — 55k
+    /// entries after a few weeks — and both opening a folder (which lists the
+    /// folder's siblings as volumes) and `ReaderTempDirectory`'s startup sweep
+    /// walk that directory, so every run got slower than the last. Now a run
+    /// starts by deleting what earlier runs left (anything `paneltest`-
+    /// prefixed, or one of the test translation stores, over an hour old, so
+    /// a concurrent run's files survive).
+    ///
+    /// Must not start with `panely-` — `ReaderTempDirectory.cleanupStaleEntries()`
+    /// sweeps that prefix at startup and can race with in-flight tests.
+    static let runDirectory: URL = {
+        let tmp = FileManager.default.temporaryDirectory
+        // In the background: after a long gap there can be tens of thousands
+        // of entries, and deleting them inline stalled the first tests.
+        Task.detached(priority: .background) { sweepEarlierRuns(in: tmp) }
+        let dir = tmp.appendingPathComponent("paneltest-run-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }()
+
     static func makeTempDir() throws -> URL {
-        // Must not start with `panely-` — `ReaderTempDirectory.cleanupStaleEntries()`
-        // sweeps that prefix at startup and can race with in-flight tests.
-        let url = FileManager.default.temporaryDirectory
+        // Its own parent, so a folder a test opens has no sibling folders
+        // for the load to list as volumes (the run's other temp dirs).
+        let url = runDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
             .appendingPathComponent("paneltest-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
+    }
+
+    private static func sweepEarlierRuns(in tmp: URL) {
+        let cutoff = Date().addingTimeInterval(-60 * 60)
+        let entries = (try? FileManager.default.contentsOfDirectory(
+            at: tmp,
+            includingPropertiesForKeys: [.contentModificationDateKey]
+        )) ?? []
+        let prefixes = ["paneltest", "panely-translation-tests-", "panely-translation-edit-tests-"]
+        for entry in entries where prefixes.contains(where: entry.lastPathComponent.hasPrefix) {
+            let modified = (try? entry.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            guard let modified, modified < cutoff else { continue }
+            try? FileManager.default.removeItem(at: entry)
+        }
     }
 
     @discardableResult

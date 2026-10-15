@@ -245,6 +245,36 @@ struct TranslationEditsModelTests {
 
         #expect(reopened.edits(forPage: "p1")?.edit(for: bubble)?.translations[TranslationLanguage.korean.rawValue] == "내 번역")
     }
+
+    /// An AI chat reply's changes land together: the same edits as one at a
+    /// time, one file per page.
+    @Test func aBatchOfChangesMatchesThemOneByOne() async throws {
+        let first = makeTranslatedPage().bubbles[0]
+        var second = first
+        second.id = 1
+        second.source = "別の原文"
+        second.rect = CGRect(x: 20, y: 30, width: 5, height: 5)
+        let changes: [(String, TranslatedBubble, String?)] = [
+            ("p1", first, "하나"), ("p1", second, "둘"), ("p2", first, "셋"), ("p1", first, nil),
+        ]
+        let korean = TranslationLanguage.korean.rawValue
+
+        let oneByOne = try makeModel()
+        await oneByOne.load(pageIDs: ["p1", "p2"], scope: .page)
+        for (pageID, bubble, text) in changes {
+            oneByOne.update(pageID: pageID, bubble: bubble) { $0.translations[korean] = text }
+        }
+        let batched = try makeModel()
+        await batched.load(pageIDs: ["p1", "p2"], scope: .page)
+        batched.update(changes.map { pageID, bubble, text in
+            .init(pageID: pageID, bubble: bubble) { $0.translations[korean] = text }
+        })
+
+        #expect(batched.pages == oneByOne.pages)
+        #expect(batched.edits(forPage: "p1")?.edit(for: first) == nil)
+        #expect(batched.edits(forPage: "p1")?.edit(for: second)?.translations[korean] == "둘")
+        try await waitUntil { batched.store.pageCount() == 2 }
+    }
 }
 
 /// Balloons the reader adds over text the analysis missed.

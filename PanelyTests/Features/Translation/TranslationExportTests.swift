@@ -121,6 +121,11 @@ struct TranslationExportWriterTests {
 /// written out in the background, then listed as exported.
 @MainActor
 struct ReaderViewModelTranslationExportTests {
+    /// Exports render at utility priority, so a full test run's CPU-heavy
+    /// suites (real Vision OCR) can hold one back well past the default
+    /// 10 s. A passing export still returns as soon as it lands.
+    static let exportTimeout: Duration = .seconds(60)
+
     private struct Setup {
         let vm: ReaderViewModel
         let book: URL
@@ -167,7 +172,7 @@ struct ReaderViewModelTranslationExportTests {
         let setup = try await makeSetup()
 
         export(setup)
-        try await waitUntil { !setup.vm.translationExports.history.isEmpty || !setup.vm.translationExports.stoppedJobs.isEmpty }
+        try await waitUntil(timeout: Self.exportTimeout) { !setup.vm.translationExports.history.isEmpty || !setup.vm.translationExports.stoppedJobs.isEmpty }
 
         let record = try #require(setup.vm.translationExports.history.first)
         #expect(record.title == "Vol01")
@@ -194,7 +199,7 @@ struct ReaderViewModelTranslationExportTests {
         try setup.vm.dependencies.translationEditStore.save(edits, key: TranslationEditStore.key(pageID: setup.pages[0].id, scope: .page))
 
         export(setup)
-        try await waitUntil { !setup.vm.translationExports.history.isEmpty || !setup.vm.translationExports.stoppedJobs.isEmpty }
+        try await waitUntil(timeout: Self.exportTimeout) { !setup.vm.translationExports.history.isEmpty || !setup.vm.translationExports.stoppedJobs.isEmpty }
 
         // Its only balloon hidden, the page has nothing left to show.
         #expect(setup.vm.translationExports.history.isEmpty)
@@ -207,7 +212,7 @@ struct ReaderViewModelTranslationExportTests {
         let setup = try await makeSetup(cacheFirstPage: false)
 
         export(setup)
-        try await waitUntil { !setup.vm.translationExports.stoppedJobs.isEmpty }
+        try await waitUntil(timeout: Self.exportTimeout) { !setup.vm.translationExports.stoppedJobs.isEmpty }
 
         let job = try #require(setup.vm.translationExports.stoppedJobs.first)
         #expect(job.stage == .failed(TranslationExportError.nothingTranslated.errorDescription ?? ""))
@@ -218,7 +223,7 @@ struct ReaderViewModelTranslationExportTests {
             key: TranslationStore.key(pageID: setup.pages[0].id, from: .japanese, to: .korean)
         )
         setup.vm.retryTranslationExport(job)
-        try await waitUntil { !setup.vm.translationExports.history.isEmpty }
+        try await waitUntil(timeout: Self.exportTimeout) { !setup.vm.translationExports.history.isEmpty }
         #expect(setup.vm.translationExports.stoppedJobs.isEmpty)
     }
 
@@ -230,7 +235,7 @@ struct ReaderViewModelTranslationExportTests {
         vm.requestTranslationExport(books: [book], title: "Book", isSeries: false)
         let request = try #require(vm.translationExportRequest)
         vm.startTranslationExport(request, options: TranslationExportOptions(target: .korean))
-        try await waitUntil { !vm.translationExports.stoppedJobs.isEmpty }
+        try await waitUntil(timeout: Self.exportTimeout) { !vm.translationExports.stoppedJobs.isEmpty }
 
         #expect(vm.translationExports.stoppedJobs.first?.stage == .failed(TranslationExportError.noDestination.errorDescription ?? ""))
     }

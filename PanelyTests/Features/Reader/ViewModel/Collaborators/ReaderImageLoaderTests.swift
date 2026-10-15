@@ -159,6 +159,46 @@ struct ReaderImageLoaderTests {
         }
     }
 
+    /// Toggling paged ↔ vertical must not re-read every page header: the
+    /// second vertical build of the same book reuses the cached dimensions.
+    /// Proven by deleting the files in between — a fresh header read would
+    /// fail and fall back to the generic 1000×1500 aspect.
+    @Test func verticalRebuildReusesCachedDimensions() async throws {
+        let root = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let sizes = [CGSize(width: 40, height: 90), CGSize(width: 70, height: 20)]
+        let pages: [ComicPage] = try sizes.enumerated().map { i, size in
+            let url = root.appendingPathComponent("\(i).png")
+            try Fixture.makePNG(width: Int(size.width), height: Int(size.height)).write(to: url)
+            return ComicPage(source: .file(url), displayName: "\(i).png")
+        }
+        let source = ComicSource(title: "Strip", pages: pages)
+        let loader = ReaderImageLoader()
+
+        func refresh(_ layout: PageLayout) async {
+            await loader.refresh(
+                source: source,
+                layout: layout,
+                currentPageIndex: 0,
+                navigationStep: 1,
+                isCancelled: { false },
+                onError: { _ in }
+            )
+        }
+
+        await refresh(.vertical)
+        #expect(loader.pageDimensions == sizes)
+
+        await refresh(.single)
+        for page in pages {
+            if case .file(let url) = page.source { try FileManager.default.removeItem(at: url) }
+        }
+        await refresh(.vertical)
+
+        #expect(loader.pageDimensions == sizes)
+    }
+
     // MARK: - estimatedBitmapCost
 
     @Test func bitmapCostUsesPixelDimensionsForBitmapReps() throws {

@@ -34,12 +34,36 @@ nonisolated struct TranslationStore: Sendable {
     ) -> String {
         let modeTag = mode == .accurate ? "" : "|\(mode.rawValue)"
         let composite = "\(pageID)|\(source.rawValue)>\(target.rawValue)|\(scope.rawValue)\(modeTag)|v\(TranslatedPage.formatVersion)"
-        return SHA256.hash(data: Data(composite.utf8)).prefix(16).map { String(format: "%02x", $0) }.joined()
+        return hex(SHA256.hash(data: Data(composite.utf8)).prefix(16))
+    }
+
+    /// Lowercase hex, without a `String(format:)` per byte — a book's keys
+    /// are made for every page and language each time it opens.
+    private static func hex(_ bytes: some Sequence<UInt8>) -> String {
+        let digits = Array("0123456789abcdef".utf8)
+        var out: [UInt8] = []
+        out.reserveCapacity(32)
+        for byte in bytes {
+            out.append(digits[Int(byte >> 4)])
+            out.append(digits[Int(byte & 0x0f)])
+        }
+        return String(decoding: out, as: UTF8.self)
     }
 
     func load(key: String) -> TranslatedPage? {
         guard let data = try? Data(contentsOf: fileURL(forKey: key)) else { return nil }
         return try? JSONDecoder().decode(TranslatedPage.self, from: data)
+    }
+
+    /// The keys with an entry on disk — one directory listing, so a book's
+    /// pages that were never translated don't each cost a failed open.
+    func existingKeys() -> Set<String> {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? []
+        var keys = Set<String>(minimumCapacity: names.count)
+        for name in names where name.hasSuffix(".json") {
+            keys.insert(String(name.dropLast(5)))
+        }
+        return keys
     }
 
     func save(_ page: TranslatedPage, key: String) throws {

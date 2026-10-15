@@ -38,7 +38,7 @@ final class TestExtractionCacheManager: ExtractionCacheManaging, @unchecked Send
     private let root: URL
 
     init(
-        root: URL = FileManager.default.temporaryDirectory
+        root: URL = Fixture.runDirectory
             .appendingPathComponent("paneltest-cache-root-\(UUID().uuidString)", isDirectory: true),
         cacheBudgetBytes: UInt64 = 10 * 1024 * 1024 * 1024
     ) {
@@ -251,11 +251,11 @@ func makeTestDependencies(
     filePicker: any FilePicking = TestFilePicker(),
     localization: AppLocalization = AppLocalization(language: "en"),
     translationStore: TranslationStore = TranslationStore(
-        root: FileManager.default.temporaryDirectory
+        root: Fixture.runDirectory
             .appendingPathComponent("panely-translation-tests-\(UUID().uuidString)", isDirectory: true)
     ),
     translationEditStore: TranslationEditStore = TranslationEditStore(
-        root: FileManager.default.temporaryDirectory
+        root: Fixture.runDirectory
             .appendingPathComponent("panely-translation-edit-tests-\(UUID().uuidString)", isDirectory: true)
     ),
     makeSpeechLevelCorrector: @escaping @Sendable (TranslationLanguage, TranslationLanguage) -> (any SpeechLevelCorrecting)? = { _, _ in nil },

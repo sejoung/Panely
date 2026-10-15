@@ -170,6 +170,36 @@ final class TranslationEdits {
         save(edits, pageID: pageID)
     }
 
+    /// One balloon's change in a batch (`update(_:)`).
+    struct BubbleUpdate {
+        let pageID: String
+        let bubble: TranslatedBubble
+        let change: (inout BubbleEdit) -> Void
+    }
+
+    /// Many balloons at once (an AI chat's reply): the same as updating each
+    /// in turn, but each page is written and saved once.
+    func update(_ updates: [BubbleUpdate]) {
+        var changed: [String: PageEdits] = [:]
+        var order: [String] = []
+        for update in updates {
+            var edits = changed[update.pageID] ?? pages[update.pageID] ?? PageEdits()
+            edits.update(update.bubble, update.change)
+            if changed[update.pageID] == nil { order.append(update.pageID) }
+            changed[update.pageID] = edits
+        }
+        guard !order.isEmpty else { return }
+        var updated = pages
+        for pageID in order {
+            let edits = changed[pageID] ?? PageEdits()
+            updated[pageID] = edits.isEmpty ? nil : edits
+        }
+        pages = updated
+        for pageID in order {
+            save(changed[pageID] ?? PageEdits(), pageID: pageID)
+        }
+    }
+
     /// Add a balloon the reader marked out.
     func add(pageID: String, edit: BubbleEdit) {
         var edits = pages[pageID] ?? PageEdits()

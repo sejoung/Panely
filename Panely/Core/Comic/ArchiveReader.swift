@@ -34,6 +34,8 @@ protocol ArchiveReader: Actor {
     /// Unique paths of every file entry (directories excluded), in archive order.
     func entryPaths() throws -> [String]
 
+    /// Throws `CancellationError` when the calling task is already cancelled,
+    /// so superseded page reads don't occupy the actor.
     func loadData(at path: String) throws -> Data
 
     /// Reads at least the first `maxBytes` of an entry (or the whole entry if

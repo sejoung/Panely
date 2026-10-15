@@ -183,8 +183,13 @@ nonisolated enum TranslationTextNormalizer {
         var result = text.replacingOccurrences(of: "\n", with: language.lineJoiner)
         // OCR renders one ellipsis many ways (・・, ••, ⋯, ..., …。); the
         // translator handles a single "…" far better than any of those.
-        result = result.replacing(try! Regex("[・•⋯…‥.。]{2,}"), with: "…")
-        result = result.replacing(try! Regex(" {2,}"), with: " ")
+        result = result.replacing(ellipsis, with: "…")
+        result = result.replacing(spaces, with: " ")
         return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
+
+    // Compiled once, not per balloon. `Regex` isn't `Sendable`; these are
+    // only ever read.
+    nonisolated(unsafe) private static let ellipsis = try! Regex("[・•⋯…‥.。]{2,}")
+    nonisolated(unsafe) private static let spaces = try! Regex(" {2,}")
 }
