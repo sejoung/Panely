@@ -29,6 +29,7 @@ struct AppKitImageScroller: NSViewRepresentable {
     /// Translation assist results aligned with `images` (empty when off).
     var translationPages: [TranslatedPage?] = []
     var showsTranslation: Bool = false
+    var onTranslationEdit: (TranslationEditRequest) -> Void = { _ in }
 
     /// Looser than `ViewerController.fitTolerance` (10×) on purpose: a tiny
     /// stray manual zoom should still count as "at base" so the first
@@ -147,6 +148,7 @@ struct AppKitImageScroller: NSViewRepresentable {
     /// Same ordering rule as `updateContentImages`, so each overlay lands on
     /// its own page. A count mismatch (images mid-swap) shows none.
     private func updateTranslationOverlay(_ content: ImageStackView) {
+        content.onTranslationEdit = onTranslationEdit
         guard translationPages.count == images.count else {
             content.setTranslationOverlay([], showsTranslation: false)
             return

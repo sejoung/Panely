@@ -64,6 +64,8 @@ final class ReaderViewModel {
     /// Experimental translation assist: one job per book, kept running in the
     /// background when another book is opened (see `ReaderViewModel+Translation`).
     let translationManager: TranslationManager
+    /// The reader's balloon edits for the open book, laid over every language.
+    let translationEdits: TranslationEdits
 
     // MARK: - Source state
 
@@ -334,6 +336,7 @@ final class ReaderViewModel {
         self.filePicker = dependencies.filePickerFactory()
         self.localization = dependencies.localization
         self.translationManager = TranslationManager(store: dependencies.translationStore, defaults: dependencies.keyValueStore)
+        self.translationEdits = TranslationEdits(store: dependencies.translationEditStore)
         localization.apply(preferences.appLanguage)
         preferences.refreshAppleLanguagesOverride()
 

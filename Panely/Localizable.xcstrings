@@ -24,6 +24,22 @@
         }
       }
     },
+    "%lld Hidden Balloons" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld Hidden Balloons"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "숨긴 말풍선 %lld개"
+          }
+        }
+      }
+    },
     "%lld of %lld pages translated" : {
       "localizations" : {
         "en" : {
@@ -354,6 +370,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "불러오기가 끝나면 사용할 수 있습니다."
+          }
+        }
+      }
+    },
+    "Balloon hidden. Hidden balloons come back from the translation panel or View › Show Hidden Balloons." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Balloon hidden. Hidden balloons come back from the translation panel or View › Show Hidden Balloons."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "말풍선을 숨겼습니다. 숨긴 말풍선은 번역 패널이나 보기 › 숨긴 말풍선 보기에서 다시 보이게 할 수 있습니다."
+          }
+        }
+      }
+    },
+    "Balloons you hid in this book appear again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Balloons you hid in this book appear again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 책에서 숨긴 말풍선이 다시 나타납니다."
           }
         }
       }
@@ -865,18 +913,18 @@
         }
       }
     },
-    "Click a balloon to see the original next to its translations." : {
+    "Click a balloon to see the original next to its translations, and to correct or hide it." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Click a balloon to see the original next to its translations."
+            "value" : "Click a balloon to see the original next to its translations, and to correct or hide it."
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "말풍선을 클릭하면 원문과 번역을 함께 볼 수 있습니다."
+            "value" : "말풍선을 클릭하면 원문과 번역을 함께 보고, 고치거나 숨길 수 있습니다."
           }
         }
       }
@@ -977,6 +1025,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "맞춤법 자동 수정"
+          }
+        }
+      }
+    },
+    "Correct the recognized text and translate it again" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Correct the recognized text and translate it again"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "인식된 원문을 고친 뒤 다시 번역합니다"
           }
         }
       }
@@ -1141,6 +1205,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "삭제"
+          }
+        }
+      }
+    },
+    "Delete All Edits" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete All Edits"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "고친 내용 모두 삭제"
+          }
+        }
+      }
+    },
+    "Delete All Edits…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete All Edits…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "고친 내용 모두 삭제…"
+          }
+        }
+      }
+    },
+    "Delete all your translation edits?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete all your translation edits?"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "직접 고친 번역을 모두 삭제할까요?"
           }
         }
       }
@@ -1446,6 +1558,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "편집"
+          }
+        }
+      }
+    },
+    "Edited pages" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edited pages"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "고친 페이지"
           }
         }
       }
@@ -1937,6 +2065,22 @@
         }
       }
     },
+    "Fix Original" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fix Original"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "원문 고치기"
+          }
+        }
+      }
+    },
     "Folder is empty or has no supported content" : {
       "localizations" : {
         "en" : {
@@ -2035,6 +2179,22 @@
         }
       }
     },
+    "Go back to the machine translation, the recognized original, or both" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go back to the machine translation, the recognized original, or both"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기계 번역이나 인식된 원문, 또는 둘 다로 되돌립니다"
+          }
+        }
+      }
+    },
     "Go to Page" : {
       "localizations" : {
         "en" : {
@@ -2063,6 +2223,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "페이지로 이동…"
+          }
+        }
+      }
+    },
+    "Go to this page" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go to this page"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 페이지로 이동"
           }
         }
       }
@@ -2097,6 +2273,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "도움말"
+          }
+        }
+      }
+    },
+    "Hide" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "숨기기"
           }
         }
       }
@@ -2165,6 +2357,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "대체 가리기"
+          }
+        }
+      }
+    },
+    "Hide this balloon — for text that isn't really there. Show it again from the translation panel." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide this balloon — for text that isn't really there. Show it again from the translation panel."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 말풍선을 숨깁니다. 글자가 아닌 것을 잘못 인식했을 때 쓰세요. 번역 패널에서 다시 보이게 할 수 있습니다."
           }
         }
       }
@@ -2538,6 +2746,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "기계 번역"
+          }
+        }
+      }
+    },
+    "Machine translation of your corrected original" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Machine translation of your corrected original"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "고친 원문의 기계 번역"
           }
         }
       }
@@ -3145,6 +3369,22 @@
         }
       }
     },
+    "Original corrected — not translated again yet" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Original corrected — not translated again yet"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "원문을 고쳤지만 아직 다시 번역하지 않음"
+          }
+        }
+      }
+    },
     "Other Books" : {
       "localizations" : {
         "en" : {
@@ -3157,6 +3397,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "다른 책"
+          }
+        }
+      }
+    },
+    "p. %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "p. %lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld쪽"
           }
         }
       }
@@ -3730,6 +3986,22 @@
         }
       }
     },
+    "Recognized as: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recognized as: %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "인식된 원문: %@"
+          }
+        }
+      }
+    },
     "Redo" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4099,6 +4371,38 @@
         }
       }
     },
+    "Restore Original" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore Original"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "원문 되돌리기"
+          }
+        }
+      }
+    },
+    "Restore the recognized original and its machine translation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore the recognized original and its machine translation"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "인식된 원문과 그 기계 번역으로 되돌립니다"
+          }
+        }
+      }
+    },
     "Resume" : {
       "localizations" : {
         "en" : {
@@ -4196,6 +4500,118 @@
         }
       }
     },
+    "Revert" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revert"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "원래대로"
+          }
+        }
+      }
+    },
+    "Revert All" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revert All"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모두 되돌리기"
+          }
+        }
+      }
+    },
+    "Revert all %lld edited balloons in this book to the machine translation? Hidden balloons appear again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revert all %lld edited balloons in this book to the machine translation? Hidden balloons appear again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 책에서 고친 말풍선 %lld개를 모두 기계 번역으로 되돌릴까요? 숨긴 말풍선도 다시 나타납니다."
+          }
+        }
+      }
+    },
+    "Revert All Edits in This Book…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revert All Edits in This Book…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 책의 수정 모두 되돌리기…"
+          }
+        }
+      }
+    },
+    "Revert Both" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revert Both"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "둘 다 되돌리기"
+          }
+        }
+      }
+    },
+    "Rewrite this translation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rewrite this translation"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 번역을 직접 고칩니다"
+          }
+        }
+      }
+    },
+    "Rewritten translations, corrected originals and hidden balloons go back to the machine translation in every book. This can't be undone." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rewritten translations, corrected originals and hidden balloons go back to the machine translation in every book. This can't be undone."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모든 책에서 직접 고친 번역, 고친 원문, 숨긴 말풍선이 기계 번역으로 돌아갑니다. 되돌릴 수 없습니다."
+          }
+        }
+      }
+    },
     "Right" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4260,6 +4676,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "화면 오른쪽"
+          }
+        }
+      }
+    },
+    "Save" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장"
           }
         }
       }
@@ -4379,6 +4811,22 @@
         }
       }
     },
+    "Show" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "보이기"
+          }
+        }
+      }
+    },
     "Show All" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4392,6 +4840,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "모두 보기"
+          }
+        }
+      }
+    },
+    "Show Hidden Balloons" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show Hidden Balloons"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "숨긴 말풍선 보기"
           }
         }
       }
@@ -5170,6 +5634,22 @@
         }
       }
     },
+    "Translate Again" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Translate Again"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다시 번역"
+          }
+        }
+      }
+    },
     "Translate Entire Series (%lld Volumes)" : {
       "localizations" : {
         "en" : {
@@ -5506,6 +5986,22 @@
         }
       }
     },
+    "Translations you rewrote, originals you corrected and balloons you hid. They're kept apart from the cache, so clearing it or translating again keeps them." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Translations you rewrote, originals you corrected and balloons you hid. They're kept apart from the cache, so clearing it or translating again keeps them."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "직접 고친 번역, 고친 원문, 숨긴 말풍선입니다. 캐시와 따로 저장되므로 캐시를 지우거나 다시 번역해도 유지됩니다."
+          }
+        }
+      }
+    },
     "Undo" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5635,6 +6131,38 @@
         }
       }
     },
+    "Use Machine Translation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use Machine Translation"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기계 번역 사용"
+          }
+        }
+      }
+    },
+    "Use the machine translation again" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use the machine translation again"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기계 번역으로 되돌립니다"
+          }
+        }
+      }
+    },
     "Vertical Scroll" : {
       "localizations" : {
         "en" : {
@@ -5749,6 +6277,38 @@
         }
       }
     },
+    "Your Edits" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your Edits"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "직접 고친 내용"
+          }
+        }
+      }
+    },
+    "Your translation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your translation"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "직접 고친 번역"
+          }
+        }
+      }
+    },
     "Zoom" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5843,6 +6403,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "축소 (⌘−)"
+          }
+        }
+      }
+    },
+    "⇧↩ for a new line" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⇧↩ for a new line"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⇧↩ 줄바꿈"
           }
         }
       }

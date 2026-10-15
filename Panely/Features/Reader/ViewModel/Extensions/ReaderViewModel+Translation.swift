@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 /// Experimental translation assist. The heavy lifting lives on
@@ -20,6 +21,11 @@ import Foundation
 /// its own progress and cache, and the balloon popover shows them side by side.
 /// Jobs outlive the open book: opening another book leaves them running in the
 /// background, and reopening the book reattaches to them.
+///
+/// Balloons can be corrected from their popover — a translation rewritten, the
+/// recognised original fixed and translated again, a misread balloon hidden.
+/// Those edits (`TranslationEdits`) are kept apart from the machine
+/// translations and laid over them for display.
 ///
 /// It's a comprehension aid: originals stay one click (or ⇧⌘T) away, and
 /// nothing is written back into the user's files.
@@ -157,20 +163,23 @@ extension ReaderViewModel {
     }
 
     /// Translations for the images on screen, aligned with `currentImages`
-    /// (empty when the feature is off). Each balloon also carries the book's
-    /// other languages for the popover.
+    /// (empty when the feature is off), with the reader's edits applied. Each
+    /// balloon also carries the book's other languages for the popover.
     var translationOverlayPages: [TranslatedPage?] {
         guard translationFeatureAvailable else { return [] }
         let shown = translation
         let others = translationManager.openBook.filter { $0 !== shown && !$0.pages.isEmpty }
         return imageLoader.currentPageIDs.map { id in
-            guard var page = shown.pages[id] else { return nil }
+            guard let machine = shown.pages[id] else { return nil }
+            var page = translationEdits.apply(to: machine, pageID: id, target: shown.target)
+            page.pageID = id
             guard !others.isEmpty else { return page }
+            let edits = translationEdits.edits(forPage: id)
             for index in page.bubbles.indices {
                 var alternates: [TranslationLanguage: String] = [:]
                 for other in others {
-                    if let text = other.pages[id]?.bubbles.first(where: { $0.source == page.bubbles[index].source })?.translation,
-                       !text.isEmpty {
+                    guard let bubble = other.pages[id]?.bubbles.first(where: { $0.source == page.bubbles[index].source }) else { continue }
+                    if let text = edits?.translation(of: bubble, in: other.target) ?? bubble.translation, !text.isEmpty {
                         alternates[other.target] = text
                     }
                 }
@@ -225,6 +234,100 @@ extension ReaderViewModel {
 
     func dismissTranslationNotice() {
         translation.notice = nil
+    }
+
+    // MARK: - Edits
+
+    /// A change the reader made in a balloon's popover. Translations written
+    /// by the reader belong to the shown language; hiding and corrected
+    /// originals hold for every language.
+    func applyTranslationEdit(_ request: TranslationEditRequest) {
+        let target = translation.target
+        let bubble = request.bubble
+        switch request.change {
+        case let .setTranslation(text):
+            let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            translationEdits.update(pageID: request.pageID, bubble: bubble) { edit in
+                edit.translations[target.rawValue] = text.isEmpty ? nil : text
+            }
+        case .revertTranslation:
+            translationEdits.update(pageID: request.pageID, bubble: bubble) { edit in
+                edit.translations[target.rawValue] = nil
+            }
+        case .hide:
+            translationEdits.hide(pageID: request.pageID, bubble: bubble)
+        case let .correctSource(text):
+            let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let corrected = text.isEmpty || text == bubble.source ? nil : text
+            translationEdits.update(pageID: request.pageID, bubble: bubble) { edit in
+                edit.correctedSource = corrected
+                edit.retranslations = [:]
+            }
+            guard let corrected else { return }
+            // Every language the balloon is translated into gets the
+            // correction, the shown one first.
+            let targets = [target] + translationManager.openBook
+                .filter { $0.target != target && $0.pages[request.pageID]?.bubbles.contains { $0.source == bubble.source } == true }
+                .map(\.target)
+            for language in targets {
+                retranslate(bubble, correctedSource: corrected, pageID: request.pageID, into: language)
+            }
+        case .revertSource:
+            translationEdits.update(pageID: request.pageID, bubble: bubble) { edit in
+                edit.correctedSource = nil
+                edit.retranslations = [:]
+            }
+        case .revertAll:
+            translationEdits.update(pageID: request.pageID, bubble: bubble) { edit in
+                edit.translations[target.rawValue] = nil
+                edit.correctedSource = nil
+                edit.retranslations = [:]
+            }
+        case .retranslate:
+            guard let corrected = bubble.edit?.correctedSource else { return }
+            retranslate(bubble, correctedSource: corrected, pageID: request.pageID, into: target)
+        }
+    }
+
+    /// The open book's hidden balloons in reading order, for the panel's list.
+    var translationHiddenBalloons: [HiddenBalloon] {
+        let pageIndices = Dictionary(source.pages.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return translationEdits.hiddenBalloons
+            .compactMap { item in
+                pageIndices[item.pageID].map { HiddenBalloon(pageIndex: $0, pageID: item.pageID, edit: item.edit) }
+            }
+            .sorted { ($0.pageIndex, $0.edit.rect.minY) < ($1.pageIndex, $1.edit.rect.minY) }
+    }
+
+    /// Translate a corrected original on its own, outside the book's job.
+    /// Needs the language pack like the job does; without it the balloon
+    /// keeps offering to try again and the banner offers the download.
+    private func retranslate(_ bubble: TranslatedBubble, correctedSource: String, pageID: String, into target: TranslationLanguage) {
+        guard #available(macOS 26.0, *), let source = translationSourceLanguage, source != target else { return }
+        let retranslation = TranslationEdits.Retranslation(
+            pageID: pageID,
+            recognizedSource: bubble.source,
+            correctedSource: correctedSource,
+            target: target
+        )
+        translationEdits.beginRetranslation(retranslation)
+        let mode = translationMode
+        Task { [weak self] in
+            let text: String? = await Task.detached(priority: .userInitiated) {
+                do {
+                    return try await PageTranslator(from: source, to: target, mode: mode).translate(correctedSource)
+                } catch {
+                    AppLog.error(.reader, "Translating a corrected balloon failed", metadata: ["error": "\(error)"])
+                    return nil
+                }
+            }.value
+            guard let self else { return }
+            self.translationEdits.finishRetranslation(retranslation, bubble: bubble, text: text)
+            if text == nil, target == self.translation.target,
+               await TranslationAvailability.status(from: source, to: target, mode: mode) == .needsDownload {
+                self.translation.notice = .needsLanguageDownload(source, target)
+            }
+        }
     }
 
     // MARK: - Series
@@ -316,6 +419,9 @@ extension ReaderViewModel {
     /// are reattached as they are; on a settings change running jobs restart
     /// with the new settings. `autoStart` honours the series' auto-translate.
     func reloadTranslations(autoStart: Bool = false, bookChanged: Bool = false) {
+        let editedPageIDs = translationFeatureAvailable && hasSource ? source.pages.map(\.id) : []
+        let editScope = translationScope
+        Task { await translationEdits.load(pageIDs: editedPageIDs, scope: editScope) }
         if bookChanged {
             guard let url = currentSourceURL, hasSource else { return }
             translationManager.beginBook(

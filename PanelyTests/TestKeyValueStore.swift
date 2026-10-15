@@ -254,6 +254,10 @@ func makeTestDependencies(
         root: FileManager.default.temporaryDirectory
             .appendingPathComponent("panely-translation-tests-\(UUID().uuidString)", isDirectory: true)
     ),
+    translationEditStore: TranslationEditStore = TranslationEditStore(
+        root: FileManager.default.temporaryDirectory
+            .appendingPathComponent("panely-translation-edit-tests-\(UUID().uuidString)", isDirectory: true)
+    ),
     readerLibraryScopeFactory: @MainActor @escaping () -> ReaderLibraryScope = { ReaderLibraryScope() }
 ) -> AppDependencies {
     AppDependencies(
@@ -268,6 +272,7 @@ func makeTestDependencies(
         filePickerFactory: { filePicker },
         localization: localization,
         translationStore: translationStore,
+        translationEditStore: translationEditStore,
         makeReaderPreferences: { ReaderPreferences(defaults: keyValueStore) },
         makeReaderPositions: { ReaderPositionStore(defaults: keyValueStore) },
         makeReadingProgress: { ReadingProgressStore(defaults: keyValueStore) },

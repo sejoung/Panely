@@ -227,6 +227,14 @@ written into your files.
 - **Several languages per book** — each language is a separate job and cache;
   clicking a balloon shows its translation, the other languages and the
   original side by side (selectable, so Look Up works)
+- **Correct balloons** — from the same popover: rewrite a translation, fix
+  the recognised original and translate it again, or hide a balloon OCR made
+  up out of artwork (undo from the banner, or bring hidden ones back from the
+  panel or View › Show Hidden Balloons). Edited balloons carry a pencil
+  badge; **Revert** undoes one balloon, and the panel lists hidden balloons
+  and reverts a whole book. Edits are kept
+  apart from the cache under Application Support, so clearing the cache or
+  translating again keeps them; **Settings → Experimental** deletes them
 - **Background jobs** — translating continues when you open another book; a
   pill over the page shows other books' progress and opens the job list
   (pause / resume / stop / open the book). One job runs at a time, the one on
@@ -392,7 +400,7 @@ Terminal) and move the result straight to `/Applications`.
 | `⌃⌘P` | Show / hide thumbnail sidebar |
 | `⇧⌘T` | Translation assist: switch between the original and the translation |
 | `⌥⌘T` | Translation assist: translate this book / pause |
-| Click a speech balloon | Translation assist: the translation, other languages and the original |
+| Click a speech balloon | Translation assist: the translation, other languages and the original; edit, fix the original, hide |
 | Hover left edge | Reveal sidebar as overlay (auto-hide mode) |
 | `ESC` | Dismiss sidebar overlay (when unpinned) |
 | Double-click on image | Toggle 1× ↔ 2× zoom |
@@ -659,8 +667,10 @@ Panely/
 │   │   ├── TranslationManager.swift    # app-wide jobs: one per book × language, background + queue
 │   │   ├── TranslationController.swift # one book into one language: plan, OCR → translate, progress
 │   │   ├── TranslationStore.swift      # per-page JSON cache (page id + languages + scope)
+│   │   ├── TranslationEdits.swift      # the reader's balloon edits for the open book (+ TranslationEditStore)
+│   │   ├── LanguagePackDownloads.swift # app-wide language pack status and downloads
 │   │   ├── SeriesVolumeMatcher.swift   # which neighbours are volumes of the same series
-│   │   ├── Model/                      # TranslationLanguage, TranslatedPage / TranslatedBubble
+│   │   ├── Model/                      # TranslationLanguage, TranslatedPage / TranslatedBubble, PageEdits
 │   │   ├── Pipeline/                   # OCRTiling, TranslationPlan (page / strip), PageAnalyzer,
 │   │   │                               # PageTextRecognizer (Vision), PageTranslator (Translation),
 │   │   │                               # BubbleGrouper, BubbleBackgroundSampler, TextClassifiers

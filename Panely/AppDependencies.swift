@@ -19,6 +19,8 @@ nonisolated struct AppDependencies {
     let localization: AppLocalization
     /// On-disk cache for the translation assist. Tests point it at a temp dir.
     let translationStore: TranslationStore
+    /// The reader's balloon edits. Tests point it at a temp dir.
+    let translationEditStore: TranslationEditStore
 
     // Reader collaborators are surfaced as factories so tests can swap in
     // doubles without subclassing `ReaderViewModel`. The live implementations
@@ -46,6 +48,7 @@ nonisolated struct AppDependencies {
             filePickerFactory: { LiveFilePicker() },
             localization: .shared,
             translationStore: TranslationStore(),
+            translationEditStore: TranslationEditStore(),
             makeReaderPreferences: { ReaderPreferences(defaults: keyValueStore) },
             makeReaderPositions: { ReaderPositionStore(defaults: keyValueStore) },
             makeReadingProgress: { ReadingProgressStore(defaults: keyValueStore) },

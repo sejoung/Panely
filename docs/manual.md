@@ -383,6 +383,8 @@ Assist**. The same tab sets:
   Default** follows Panely's interface language.
 - **Translate Sound Effects** — off by default; onomatopoeia like スッ or
   パチパチ is left as drawn.
+- **Your Edits** — how many pages you've corrected, and a button to delete
+  the edits. They're stored apart from the cache.
 - **Translation Cache** — how much space finished translations take, and a
   button to clear them.
 
@@ -421,6 +423,30 @@ while an English translation runs.
 
 Click any balloon to see its translation, the book's other languages and the
 original together. The text is selectable, so you can copy it or look a word up.
+
+### Correcting balloons
+
+The same popover lets you correct a balloon:
+
+- **Edit** — rewrite the translation. Your translation applies to that
+  language only; **Use Machine Translation** goes back.
+- **Fix Original** — when OCR misread the text, correct it and it's
+  translated again, into every language the book is translated into.
+  **Restore Original** goes back.
+- **Hide** — for a "balloon" OCR made up out of artwork or background. The
+  banner that follows offers **Undo**; later, bring hidden balloons back with
+  **Show N Hidden Balloons** in the translation panel or **View › Show Hidden
+  Balloons**.
+
+Edited balloons carry a small pencil in their corner. **Revert** in the popover
+undoes that balloon alone — when both its translation and its original were
+changed, pick either or both. In the translation panel, expand the hidden
+balloons to jump to their pages or bring them back one by one with **Show**,
+and **Revert All Edits in This Book** undoes everything changed in this book
+only.
+
+`↩` saves, `⇧↩` starts a new line (`⌥↩` and `⌃↩` work too), `esc` cancels. Edits are stored apart from
+the translation cache, so clearing the cache or switching modes keeps them.
 
 ### Other books and whole series
 

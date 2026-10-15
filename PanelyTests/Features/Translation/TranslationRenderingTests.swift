@@ -111,5 +111,27 @@ struct TranslationOverlayLayoutTests {
         let font = fitted.string.attribute(.font, at: 0, effectiveRange: nil) as? NSFont
         #expect((font?.pointSize ?? 0) <= 40)
         #expect((font?.pointSize ?? 0) > 10)
+        #expect(fitted.outline == nil)
+    }
+
+    /// Stroking the filled text traces the system font's overlapping inner
+    /// contours as stray lines; the outline is its own stroke-only pass,
+    /// drawn under a plain fill.
+    @MainActor
+    @Test func outlineIsASeparateStrokeOnlyPass() throws {
+        let fitted = TranslationOverlayLayout.fittedText(
+            "After the emperor's death",
+            in: CGSize(width: 200, height: 120),
+            maxFontSize: 40,
+            color: .black,
+            outline: .white
+        )
+        #expect(fitted.string.attribute(.strokeWidth, at: 0, effectiveRange: nil) == nil)
+        let outline = try #require(fitted.outline)
+        #expect(outline.string == fitted.string.string)
+        let width = try #require(outline.attribute(.strokeWidth, at: 0, effectiveRange: nil) as? Double)
+        #expect(width > 0) // positive = stroke only, no fill
+        #expect(outline.attribute(.font, at: 0, effectiveRange: nil) as? NSFont
+            == fitted.string.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
     }
 }

@@ -58,6 +58,8 @@ struct TranslationPanel: View {
                 TranslationPrimaryAction()
             }
 
+            TranslationEditsSection()
+
             if viewModel.currentBookLivesInTemporaryFolder {
                 TranslationCaveat(
                     systemImage: "exclamationmark.triangle",
@@ -106,7 +108,7 @@ struct TranslationPanel: View {
             Divider()
 
             Toggle("Translate This Series Automatically", isOn: autoBinding)
-            Text("Click a balloon to see the original next to its translations.")
+            Text("Click a balloon to see the original next to its translations, and to correct or hide it.")
                 .font(.caption)
                 .foregroundStyle(PanelyColor.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -187,6 +189,100 @@ struct TranslationPanel: View {
         let names = volumes.map { $0.deletingPathExtension().lastPathComponent }
         let shown = names.prefix(4).joined(separator: ", ")
         return names.count > 4 ? shown + " …" : shown
+    }
+}
+
+/// The open book's balloon edits: hidden balloons listed to bring back one at
+/// a time (or all at once), and a way to revert everything changed in this
+/// book. Edits in other books stay as they are; Settings deletes them all.
+struct TranslationEditsSection: View {
+    @Environment(ReaderViewModel.self) private var viewModel
+    @State private var showsHidden = false
+    @State private var confirmsRevert = false
+
+    var body: some View {
+        let edits = viewModel.translationEdits
+        let edited = edits.editedCount
+        if edited > 0 {
+            VStack(alignment: .leading, spacing: PanelySpacing.xs) {
+                let hidden = viewModel.translationHiddenBalloons
+                if !hidden.isEmpty {
+                    DisclosureGroup(isExpanded: $showsHidden) {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: PanelySpacing.xs) {
+                                ForEach(hidden) { balloon in
+                                    hiddenRow(balloon)
+                                }
+                            }
+                            .padding(.vertical, 2)
+                        }
+                        .frame(maxHeight: 150)
+                    } label: {
+                        HStack(spacing: PanelySpacing.xs) {
+                            Label("\(hidden.count) Hidden Balloons", systemImage: "eye.slash")
+                            Spacer(minLength: 0)
+                            Button("Show All") {
+                                edits.showAllHidden()
+                            }
+                            .controlSize(.small)
+                            .help("Balloons you hid in this book appear again.")
+                        }
+                    }
+                }
+
+                if confirmsRevert {
+                    VStack(alignment: .leading, spacing: PanelySpacing.xs) {
+                        Text("Revert all \(edited) edited balloons in this book to the machine translation? Hidden balloons appear again.")
+                            .font(.caption)
+                            .foregroundStyle(PanelyColor.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        HStack(spacing: PanelySpacing.xs) {
+                            Spacer(minLength: 0)
+                            Button("Cancel") {
+                                confirmsRevert = false
+                            }
+                            Button("Revert All", role: .destructive) {
+                                edits.revertAllInBook()
+                                confirmsRevert = false
+                            }
+                        }
+                        .controlSize(.small)
+                    }
+                } else {
+                    Button {
+                        confirmsRevert = true
+                    } label: {
+                        Label("Revert All Edits in This Book…", systemImage: "arrow.uturn.backward")
+                    }
+                    .buttonStyle(.link)
+                    .font(.caption)
+                }
+            }
+        }
+    }
+
+    /// Page (click to go there), the balloon's text, and "Show".
+    private func hiddenRow(_ balloon: HiddenBalloon) -> some View {
+        HStack(spacing: PanelySpacing.xs) {
+            Button {
+                viewModel.jump(to: balloon.pageIndex)
+            } label: {
+                Text("p. \(balloon.pageIndex + 1)")
+                    .monospacedDigit()
+            }
+            .buttonStyle(.link)
+            .help("Go to this page")
+            Text(verbatim: balloon.edit.correctedSource ?? balloon.edit.recognizedSource)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .foregroundStyle(PanelyColor.textSecondary)
+            Spacer(minLength: 0)
+            Button("Show") {
+                viewModel.translationEdits.showHidden(pageID: balloon.pageID, edit: balloon.edit)
+            }
+            .controlSize(.small)
+        }
+        .font(.caption)
     }
 }
 

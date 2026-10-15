@@ -139,6 +139,11 @@ extension PanelyApp {
                 .keyboardShortcut("t", modifiers: [.command, .option])
                 .disabled(!viewModel.hasSource)
 
+                Button(String(localized: "Show Hidden Balloons", bundle: .localized)) {
+                    viewModel.translationEdits.showAllHidden()
+                }
+                .disabled(viewModel.translationEdits.hiddenCount == 0)
+
                 Divider()
             }
         }

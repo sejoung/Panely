@@ -23,6 +23,7 @@ struct ViewerContainer: View {
     var viewerController: ViewerController? = nil
     var translationPages: [TranslatedPage?] = []
     var showsTranslation: Bool = false
+    var onTranslationEdit: (TranslationEditRequest) -> Void = { _ in }
 
     var body: some View {
         ZStack {
@@ -47,7 +48,8 @@ struct ViewerContainer: View {
                     onWheelPageTurn: onWheelPageTurn,
                     viewerController: viewerController,
                     translationPages: translationPages,
-                    showsTranslation: showsTranslation
+                    showsTranslation: showsTranslation,
+                    onTranslationEdit: onTranslationEdit
                 )
             }
         }

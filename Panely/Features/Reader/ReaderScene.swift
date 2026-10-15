@@ -168,6 +168,18 @@ private struct ReaderStatusBanner: View {
                     viewModel.dismissTranslationNotice()
                 }
             }
+        } else if viewModel.translationEdits.recentlyHidden != nil {
+            banner(
+                systemImage: "eye.slash",
+                message: String(localized: "Balloon hidden. Hidden balloons come back from the translation panel or View › Show Hidden Balloons.", bundle: .localized)
+            ) {
+                Button("Undo") {
+                    viewModel.translationEdits.undoHide()
+                }
+                Button("Dismiss") {
+                    viewModel.translationEdits.dismissRecentlyHidden()
+                }
+            }
         }
     }
 

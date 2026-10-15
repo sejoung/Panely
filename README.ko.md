@@ -201,6 +201,12 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   기억
 - **책 하나에 여러 언어** — 언어마다 작업과 캐시가 따로이며, 말풍선을 클릭하면
   번역·다른 언어 번역·원문을 함께 보여줌(텍스트 선택 가능, 사전 찾기 지원)
+- **말풍선 고치기** — 같은 팝오버에서 번역을 직접 고치거나, 잘못 인식된 원문을
+  고쳐 다시 번역하거나, 그림을 글자로 잘못 읽은 말풍선을 숨김(숨긴 직후 안내에서
+  실행 취소, 나중에는 패널이나 보기 › 숨긴 말풍선 보기로 다시 보이게 함). 고친
+  말풍선에는 연필 표시가 붙고, **원래대로**로 말풍선 하나만 되돌리며, 패널에서
+  숨긴 말풍선 목록과 책 단위 되돌리기를 제공. 고친 내용은 캐시와 따로 Application Support에
+  저장되어 캐시를 지우거나 다시 번역해도 유지되며, **설정 → 실험적 기능**에서 삭제
 - **백그라운드 작업** — 다른 책을 열어도 번역이 계속됨. 페이지 위 표시로 다른
   책의 진행률을 보여주고, 누르면 작업 목록(일시정지 / 재개 / 중지 / 책 열기)이
   열림. 작업은 한 번에 하나씩, 지금 보는 것부터 실행
@@ -353,7 +359,7 @@ LaunchServices 캐시에 남을 수 있으니, 우클릭 → "다음으로 압�
 | `⌃⌘P` | 썸네일 사이드바 표시 / 숨김 |
 | `⇧⌘T` | 번역 보조: 원문 ↔ 번역 전환 |
 | `⌥⌘T` | 번역 보조: 이 책 번역하기 / 일시정지 |
-| 말풍선 클릭 | 번역 보조: 번역·다른 언어 번역·원문 보기 |
+| 말풍선 클릭 | 번역 보조: 번역·다른 언어 번역·원문 보기, 번역 고치기·원문 고치기·숨기기 |
 | 왼쪽 가장자리 호버 | 사이드바 오버레이로 나타냄 (자동 숨김 모드에서) |
 | `ESC` | 사이드바 오버레이 해제 (고정 안 된 상태) |
 | 이미지 위 더블클릭 | 1× ↔ 2× 줌 토글 |
@@ -604,8 +610,10 @@ Panely/
 │   │   ├── TranslationManager.swift    # 앱 전체 작업: 책 × 언어당 하나, 백그라운드 + 대기열
 │   │   ├── TranslationController.swift # 책 하나를 한 언어로: 작업 계획, OCR → 번역, 진행 상황
 │   │   ├── TranslationStore.swift      # 페이지별 JSON 캐시 (페이지 id + 언어 + 범위)
+│   │   ├── TranslationEdits.swift      # 열린 책의 말풍선 수정 내용 (+ TranslationEditStore)
+│   │   ├── LanguagePackDownloads.swift # 앱 전체 언어팩 상태와 다운로드
 │   │   ├── SeriesVolumeMatcher.swift   # 같은 시리즈의 다른 권 판별
-│   │   ├── Model/                      # TranslationLanguage, TranslatedPage / TranslatedBubble
+│   │   ├── Model/                      # TranslationLanguage, TranslatedPage / TranslatedBubble, PageEdits
 │   │   ├── Pipeline/                   # OCRTiling, TranslationPlan (page / strip), PageAnalyzer,
 │   │   │                               # PageTextRecognizer (Vision), PageTranslator (Translation),
 │   │   │                               # BubbleGrouper, BubbleBackgroundSampler, TextClassifiers

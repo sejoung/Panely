@@ -3,7 +3,8 @@ import QuartzCore
 import SwiftUI
 
 /// Draws one page's translations over the original and makes each balloon
-/// clickable: a click opens the original next to its translation.
+/// clickable: a click opens the original next to its translation, where the
+/// balloon can also be corrected (`onEdit`).
 ///
 /// Hosted by `ImageStackView` above all page images (not inside the page's
 /// image view), positioned over the page and extended past it when a balloon
@@ -20,6 +21,8 @@ import SwiftUI
 final class TranslationOverlayView: NSView {
     private(set) var page: TranslatedPage?
     private(set) var showsTranslation = false
+    /// A correction made in a balloon's popover.
+    var onEdit: ((TranslationEditRequest) -> Void)?
     private var pageOrigin: CGPoint = .zero
     private var scale: CGFloat = 1
 
@@ -30,7 +33,7 @@ final class TranslationOverlayView: NSView {
     private let pendingView = PendingBubblesView()
     /// Fitted text per balloon, valid for `fittedForScale`. Fitting is a small
     /// binary search per balloon; redraws (hover, scroll) reuse it.
-    private var fittedText: [Int: (text: String, string: NSAttributedString, size: CGSize)] = [:]
+    private var fittedText: [Int: (text: String, string: NSAttributedString, outline: NSAttributedString?, size: CGSize)] = [:]
     private var fittedForScale: CGFloat = 0
 
     override var isFlipped: Bool { true }
@@ -157,11 +160,24 @@ final class TranslationOverlayView: NSView {
         // Look the balloon up again: its translation may have arrived meanwhile.
         guard let bubble = page?.bubbles.first(where: { $0.id == id }) else { return }
         closePopover()
+        let pageID = page?.pageID
         let host = NSHostingController(
             rootView: TranslationBubblePopover(
                 source: bubble.source,
                 translation: bubble.translation,
-                alternates: bubble.alternates ?? [:]
+                alternates: bubble.alternates ?? [:],
+                edit: bubble.edit,
+                onEdit: pageID == nil ? nil : { [weak self] change in
+                    // Return can reach both the field and the default button;
+                    // the first one closes the popover and wins.
+                    guard let self, let pageID, self.popover != nil else { return }
+                    self.closePopover()
+                    self.onEdit?(TranslationEditRequest(pageID: pageID, bubble: bubble, change: change))
+                },
+                onEditingChanged: { [weak self] isEditing in
+                    // A stray click outside mustn't throw away what's typed.
+                    self?.popover?.behavior = isEditing ? .applicationDefined : .transient
+                }
             )
         )
         host.sizingOptions = [.preferredContentSize]
@@ -201,6 +217,9 @@ final class TranslationOverlayView: NSView {
             if showsTranslation, let translation = bubble.translation, !translation.isEmpty {
                 drawTranslation(translation, of: bubble, in: patch)
             }
+            if showsTranslation, bubble.edit != nil {
+                drawEditBadge(in: patch)
+            }
             if bubble.id == hoveredBubbleID {
                 drawHoverHighlight(around: patch, glyph: CGFloat(bubble.glyphSize) * scale)
             }
@@ -233,9 +252,9 @@ final class TranslationOverlayView: NSView {
 
         let inner = patch.insetBy(dx: glyph * 0.3, dy: glyph * 0.3)
         guard inner.width > 4, inner.height > 4 else { return }
-        let text: (string: NSAttributedString, size: CGSize)
+        let text: (string: NSAttributedString, outline: NSAttributedString?, size: CGSize)
         if let cached = fittedText[bubble.id], cached.text == translation {
-            text = (cached.string, cached.size)
+            text = (cached.string, cached.outline, cached.size)
         } else {
             let fitted = TranslationOverlayLayout.fittedText(
                 translation,
@@ -244,7 +263,7 @@ final class TranslationOverlayView: NSView {
                 color: background.isDark ? .white : .black,
                 outline: background.isUniform ? nil : (background.isDark ? .black : .white)
             )
-            fittedText[bubble.id] = (translation, fitted.string, fitted.size)
+            fittedText[bubble.id] = (translation, fitted.string, fitted.outline, fitted.size)
             text = fitted
         }
         let textRect = CGRect(
@@ -253,7 +272,36 @@ final class TranslationOverlayView: NSView {
             width: inner.width,
             height: text.size.height + 1
         )
+        if let outline = text.outline {
+            // Round joins: mitred corners spike out of "A", "M", "V".
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current?.cgContext.setLineJoin(.round)
+            outline.draw(with: textRect, options: [.usesLineFragmentOrigin, .usesFontLeading])
+            NSGraphicsContext.restoreGraphicsState()
+        }
         text.string.draw(with: textRect, options: [.usesLineFragmentOrigin, .usesFontLeading])
+    }
+
+    /// A small pencil in the corner of a balloon the reader changed, so
+    /// edits can be told apart (and found again to revert) without opening
+    /// every balloon.
+    private func drawEditBadge(in patch: CGRect) {
+        let size = min(max(12, patch.height * 0.16), 18)
+        guard patch.width > size * 2, patch.height > size * 1.5 else { return }
+        let badge = CGRect(x: patch.maxX - size - 3, y: patch.minY + 3, width: size, height: size)
+        NSColor.controlAccentColor.withAlphaComponent(0.9).setFill()
+        NSBezierPath(ovalIn: badge).fill()
+        let configuration = NSImage.SymbolConfiguration(pointSize: size * 0.5, weight: .bold)
+            .applying(NSImage.SymbolConfiguration(paletteColors: [.white]))
+        guard let pencil = NSImage(systemSymbolName: "pencil", accessibilityDescription: nil)?
+            .withSymbolConfiguration(configuration) else { return }
+        let glyph = CGRect(
+            x: badge.midX - pencil.size.width / 2,
+            y: badge.midY - pencil.size.height / 2,
+            width: pencil.size.width,
+            height: pencil.size.height
+        )
+        pencil.draw(in: glyph, from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
     }
 
     private func drawHoverHighlight(around patch: CGRect, glyph: CGFloat) {

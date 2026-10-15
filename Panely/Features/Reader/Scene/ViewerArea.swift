@@ -40,7 +40,8 @@ struct ViewerArea: View {
                 },
                 viewerController: viewerController,
                 translationPages: viewModel.translationOverlayPages,
-                showsTranslation: viewModel.translationOverlayVisible
+                showsTranslation: viewModel.translationOverlayVisible,
+                onTranslationEdit: { viewModel.applyTranslationEdit($0) }
             )
             .overlay(alignment: .top) {
                 TitleBarPassthrough(systemSettings: viewModel.dependencies.systemSettings)

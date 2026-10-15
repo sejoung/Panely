@@ -19,6 +19,9 @@ nonisolated struct TranslatedPage: Codable, Sendable, Equatable {
     var imageHeight: Double
     var bubbles: [TranslatedBubble]
     var isComplete: Bool = true
+    /// The `ComicPage.id` this page belongs to, filled in for display so a
+    /// balloon edit can name its page — never cached.
+    var pageID: String? = nil
 
     var pendingCount: Int { bubbles.filter { $0.translation == nil }.count }
 }
@@ -40,6 +43,9 @@ nonisolated struct TranslatedBubble: Codable, Sendable, Equatable, Identifiable 
     /// The same balloon in the book's other translated languages, filled in
     /// for display (balloon popover) — never cached.
     var alternates: [TranslationLanguage: String]? = nil
+    /// How the reader changed this balloon, filled in for display
+    /// (`PageEdits.apply`) — never cached.
+    var edit: BubbleEditState? = nil
 }
 
 /// Tone behind a balloon's text, sampled from the page so the translation

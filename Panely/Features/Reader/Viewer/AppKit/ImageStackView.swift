@@ -37,6 +37,12 @@ final class ImageStackView: NSView {
     private var overlayPages: [TranslatedPage?] = []
     private var showsTranslation = false
     private var overlayViews: [Int: TranslationOverlayView] = [:]
+    /// A balloon corrected in one of the overlays' popovers.
+    var onTranslationEdit: ((TranslationEditRequest) -> Void)? {
+        didSet {
+            for overlay in overlayViews.values { overlay.onEdit = onTranslationEdit }
+        }
+    }
 
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { false }
@@ -173,6 +179,7 @@ final class ImageStackView: NSView {
         )
         let overlay = overlayViews[index] ?? {
             let overlay = TranslationOverlayView(frame: frame)
+            overlay.onEdit = onTranslationEdit
             addSubview(overlay) // last → above every image view
             overlayViews[index] = overlay
             return overlay

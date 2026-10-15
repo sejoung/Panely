@@ -9,6 +9,9 @@ struct ExperimentalSettingsView: View {
 
     @State private var cacheBytes: UInt64?
     @State private var isClearing = false
+    @State private var editedPageCount: Int?
+    @State private var isDeletingEdits = false
+    @State private var confirmsDeletingEdits = false
 
     private var locale: Locale { viewModel.localization.locale }
 
@@ -86,6 +89,32 @@ struct ExperimentalSettingsView: View {
                     }
                 }
 
+                Section("Your Edits") {
+                    LabeledContent("Edited pages") {
+                        if let editedPageCount, !isDeletingEdits {
+                            Text(verbatim: "\(editedPageCount)")
+                                .monospacedDigit()
+                        } else {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                    }
+                    Text("Translations you rewrote, originals you corrected and balloons you hid. They're kept apart from the cache, so clearing it or translating again keeps them.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button("Delete All Edits…", role: .destructive) {
+                        confirmsDeletingEdits = true
+                    }
+                    .disabled(isDeletingEdits || (editedPageCount ?? 0) == 0)
+                    .confirmationDialog("Delete all your translation edits?", isPresented: $confirmsDeletingEdits) {
+                        Button("Delete All Edits", role: .destructive) {
+                            deleteEdits()
+                        }
+                    } message: {
+                        Text("Rewritten translations, corrected originals and hidden balloons go back to the machine translation in every book. This can't be undone.")
+                    }
+                }
+
                 Section("Translation Cache") {
                     LabeledContent("Cached translations") {
                         if let cacheBytes, !isClearing {
@@ -108,6 +137,21 @@ struct ExperimentalSettingsView: View {
         .padding(.vertical, 12)
         .task(id: viewModel.translationFeatureAvailable) {
             await refreshCacheSize()
+            await refreshEditedPageCount()
+        }
+    }
+
+    private func refreshEditedPageCount() async {
+        let store = viewModel.translationEdits.store
+        editedPageCount = await Task.detached(priority: .utility) { store.pageCount() }.value
+    }
+
+    private func deleteEdits() {
+        isDeletingEdits = true
+        Task {
+            await viewModel.translationEdits.removeAll()
+            await refreshEditedPageCount()
+            isDeletingEdits = false
         }
     }
 

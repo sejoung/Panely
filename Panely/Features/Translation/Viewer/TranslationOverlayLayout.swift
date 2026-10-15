@@ -38,7 +38,15 @@ nonisolated enum TranslationOverlayLayout {
 
     /// The translation at the largest font size that fits `size`, capped at
     /// `maxFontSize` (the source glyph size — a translation shouldn't shout
-    /// louder than the original). Returns the string and its laid-out size.
+    /// louder than the original). Returns the string, its laid-out size and,
+    /// when `outline` is given, the same text as an outline to draw *under*
+    /// it.
+    ///
+    /// The outline is a separate pass on purpose: the system font's glyphs are
+    /// built from overlapping contours, and stroking the filled text (a
+    /// negative stroke width) traces those inner overlaps too — stray light
+    /// lines through "e", "A", "t". Filled on top, the inner strokes vanish
+    /// and only the halo around each letter shows.
     @MainActor
     static func fittedText(
         _ text: String,
@@ -47,25 +55,18 @@ nonisolated enum TranslationOverlayLayout {
         minFontSize: CGFloat = 6,
         color: NSColor,
         outline: NSColor?
-    ) -> (string: NSAttributedString, size: CGSize) {
+    ) -> (string: NSAttributedString, outline: NSAttributedString?, size: CGSize) {
         func make(_ fontSize: CGFloat) -> NSAttributedString {
             let paragraph = NSMutableParagraphStyle()
             paragraph.alignment = .center
             paragraph.lineBreakMode = .byWordWrapping
             // Korean breaks between words (eojeol), not mid-word syllables.
             paragraph.lineBreakStrategy = .hangulWordPriority
-            var attributes: [NSAttributedString.Key: Any] = [
+            return NSAttributedString(string: text, attributes: [
                 .font: NSFont.systemFont(ofSize: fontSize, weight: .semibold),
                 .foregroundColor: color,
                 .paragraphStyle: paragraph,
-            ]
-            if let outline {
-                // Over artwork the patch is feathered, so a thin outline keeps
-                // the letters legible against whatever shows through.
-                attributes[.strokeColor] = outline
-                attributes[.strokeWidth] = -3.0
-            }
-            return NSAttributedString(string: text, attributes: attributes)
+            ])
         }
         func measure(_ string: NSAttributedString) -> CGSize {
             string.boundingRect(
@@ -90,7 +91,21 @@ nonisolated enum TranslationOverlayLayout {
                 high = mid
             }
         }
-        return (best, bestSize)
+        // Over artwork the patch is feathered, so an outline keeps the
+        // letters legible against whatever shows through. Stroke only (a
+        // positive width, centred on the contour): half of it shows outside
+        // the letters once the fill is drawn over it.
+        let outlined = outline.map { outline in
+            let string = NSMutableAttributedString(attributedString: best)
+            let range = NSRange(location: 0, length: string.length)
+            string.addAttributes([
+                .foregroundColor: NSColor.clear,
+                .strokeColor: outline,
+                .strokeWidth: 4.0,
+            ], range: range)
+            return NSAttributedString(attributedString: string)
+        }
+        return (best, outlined, bestSize)
     }
 }
 
