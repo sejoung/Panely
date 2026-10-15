@@ -71,6 +71,12 @@ final class ReaderViewModel {
     let translationExports: TranslationExportManager
     /// The export sheet's subject while it's up.
     var translationExportRequest: TranslationExportRequest?
+    /// The AI chat sheet's subject while it's up (`ReaderViewModel+AIChat`).
+    var aiChatRequest: AIChatRequest?
+    /// The balloons last copied for the AI chat, to map its reply back.
+    @ObservationIgnored var aiChatLines: [AIChatExchange.Line] = []
+    /// What the last reply changed, to undo it.
+    var aiChatUndo: [AIChatUndoEntry]?
     /// Balloon edit mode: edited balloons are marked, hidden ones show as
     /// outlines, and a balloon's popover offers its edits. Off = reading,
     /// with nothing on the page but the translation.

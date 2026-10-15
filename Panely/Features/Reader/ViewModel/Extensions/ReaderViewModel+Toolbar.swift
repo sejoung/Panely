@@ -61,6 +61,7 @@ extension ReaderViewModel {
             isEditing: isEditingTranslations,
             canEdit: canEditTranslations,
             canTranslateAgain: canTranslateAgain && !translation.isWorking,
+            canImproveWithAIChat: canImproveWithAIChat,
             canExport: canExportCurrentBook,
             canExportSeries: canExportCurrentBook && !translatableSeriesVolumes.isEmpty
         )
@@ -114,6 +115,7 @@ extension ReaderViewModel {
                 startTranslating(into: language)
             },
             onTranslatePageAgain: { [self] in translateCurrentPagesAgain() },
+            onImproveWithAIChat: { [self] in requestAIChat() },
             onExportBook: { [self] in requestExportOfCurrentBook() },
             onExportSeries: { [self] in requestExportOfCurrentSeries() }
         )

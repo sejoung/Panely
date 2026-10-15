@@ -343,6 +343,7 @@ final class TranslationOverlayView: NSView {
             menu.addItem(.separator())
         }
         menu.addItem(ClosureMenuItem(L("Translate This Page Again")) { request(pageStandIn, .translatePageAgain) })
+        menu.addItem(ClosureMenuItem(L("Improve with an AI Chat…")) { request(pageStandIn, .improveWithAIChat) })
         menu.addItem(ClosureMenuItem(L("Add a Balloon Here…")) { request(pageStandIn, .startAddingBalloon) })
         menu.addItem(.separator())
         let mode = ClosureMenuItem(isEditing ? L("Done Editing Balloons") : L("Edit Balloons")) {

@@ -233,6 +233,12 @@ written into your files.
 - **Several languages per book** — each language is a separate job and cache;
   clicking a balloon shows its translation, the other languages and the
   original side by side (selectable, so Look Up works)
+- **Improve with an AI chat** — save the book (or chosen pages) as a text file
+  (each balloon's id, original and translation), attach it in ChatGPT, Claude
+  or any chat with the prompt shown to copy, and open the reply file: changed
+  translations become your edits, undoable in one go, and balloons the chat
+  left out are named. No API key, and nothing leaves the Mac unless you give
+  it to a chat
 - **Translate again** — a page (edit bar) or the whole book (panel) is read
   and translated again the current way, so pages done before an improvement
   get it without clearing the cache

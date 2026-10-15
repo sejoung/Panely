@@ -176,11 +176,11 @@ struct TranslationOverlayMenuTests {
         overlay.onEdit = { changes.append($0.change) }
 
         let menu = try #require(overlay.contextMenu(at: NSPoint(x: balloon.midX, y: balloon.midY)))
-        // Edit…, Fix Original…, Hide | Translate again, Add here | Edit mode
-        #expect(menu.items.count == 8)
-        for index in [2, 4, 5, 7] { menu.performActionForItem(at: index) }
+        // Edit…, Fix Original…, Hide | Translate again, AI chat, Add here | Edit mode
+        #expect(menu.items.count == 9)
+        for index in [2, 4, 5, 6, 8] { menu.performActionForItem(at: index) }
 
-        #expect(changes == [.hide, .translatePageAgain, .startAddingBalloon, .enterEditMode])
+        #expect(changes == [.hide, .translatePageAgain, .improveWithAIChat, .startAddingBalloon, .enterEditMode])
     }
 
     @Test func elsewhereOnThePageOnlyThePageActions() throws {
@@ -189,8 +189,8 @@ struct TranslationOverlayMenuTests {
         overlay.onEdit = { changes.append($0.change) }
 
         let menu = try #require(overlay.contextMenu(at: NSPoint(x: 100, y: 100)))
-        #expect(menu.items.count == 4)
-        menu.performActionForItem(at: 3)
+        #expect(menu.items.count == 5)
+        menu.performActionForItem(at: 4)
 
         #expect(changes == [.leaveEditMode])
         #expect(overlay.contextMenu(at: NSPoint(x: 100, y: 2500)) == nil)
@@ -215,7 +215,7 @@ struct TranslationOverlayMenuTests {
             windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 1
         ))
 
-        #expect(stack.menu(for: event)?.items.count == 4)
+        #expect(stack.menu(for: event)?.items.count == 5)
     }
 }
 

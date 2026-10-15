@@ -23,6 +23,8 @@ enum TranslationEditChange: Equatable {
     case translatePageAgain
     /// Edit mode, ready to drag out a balloon over missed text.
     case startAddingBalloon
+    /// Improve this balloon's page through the reader's AI chat.
+    case improveWithAIChat
     /// Add a balloon over this area of the page (in page pixels), dragged
     /// out in edit mode where the analysis found no text.
     case addBalloon(CGRect)

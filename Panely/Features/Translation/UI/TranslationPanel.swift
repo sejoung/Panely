@@ -175,6 +175,14 @@ struct TranslationPanel: View {
                 }
             }
 
+            if viewModel.canImproveWithAIChat {
+                Button("Improve with an AI Chat…") {
+                    dismiss()
+                    viewModel.requestAIChat()
+                }
+                .help("Save the book's balloons as a text file for ChatGPT, Claude or another chat to improve in context, then open its reply.")
+            }
+
             if viewModel.canTranslateAgain {
                 Button("Translate This Book Again…") {
                     confirmsTranslatingAgain = true

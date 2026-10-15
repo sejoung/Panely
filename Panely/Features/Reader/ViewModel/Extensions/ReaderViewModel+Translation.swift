@@ -388,6 +388,8 @@ extension ReaderViewModel {
         case .startAddingBalloon:
             setEditingTranslations(true)
             isAddingTranslationBalloon = isEditingTranslations
+        case .improveWithAIChat:
+            requestAIChat()
         case .translatePageAgain:
             guard canTranslateAgain, let index = source.pages.firstIndex(where: { $0.id == request.pageID }) else { return }
             let controller = translation

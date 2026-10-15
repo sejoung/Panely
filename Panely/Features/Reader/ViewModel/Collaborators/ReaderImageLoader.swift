@@ -463,7 +463,7 @@ final class ReaderImageLoader {
             // current book — otherwise a failure from a book the user just
             // left would flash onto the now-current one.
             if generation == self.generation {
-                onError("Failed to load \(page.displayName)")
+                onError(String(localized: "Failed to load \(page.displayName)", bundle: .localized))
             }
             let fallbackSize = (try? await ImageLoader.dimensions(for: page))
                 ?? CGSize(width: 1000, height: 1500)

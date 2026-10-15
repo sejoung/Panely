@@ -400,6 +400,19 @@ struct SnapshotGalleryTests {
         )
     }
 
+    @Test func aiChatSheet() async throws {
+        let vm = try await TranslationSnapshotContent.translatedViewModel()
+        try await render(
+            AIChatSheet(request: AIChatRequest(scope: .book))
+                .environment(vm)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(PanelyColor.bgSecondary)
+                .environment(\.locale, Locale(identifier: "en")),
+            size: CGSize(width: 520, height: 760),
+            named: "24-ai-chat-sheet.png"
+        )
+    }
+
     private func labelled(_ title: LocalizedStringKey, _ image: NSImage) -> some View {
         VStack(spacing: 12) {
             Image(nsImage: image)

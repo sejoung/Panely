@@ -531,6 +531,39 @@ longer apply.
 Edits are stored apart from the translation cache, so clearing the cache or
 switching modes keeps them.
 
+### Improving with an AI chat
+
+A chat model that reads a whole page — or book — at once fixes what
+translating balloon by balloon can't: who's speaking, how they speak, names
+kept the same. Panely doesn't call one itself; use the one you already have
+(ChatGPT, Claude, Gemini…) by passing it a text file:
+
+![Improve with an AI Chat](screenshots/24-ai-chat-sheet.png)
+
+1. Open **Improve with an AI Chat…** — from the language menu, by
+   right-clicking a page, or from **This Book & Series** in the panel. It
+   starts with the whole book: a chat reading the whole story keeps
+   speakers and names straight. **Choose Pages** narrows it for a chat that
+   can't take a whole book.
+2. **Save as Text File…** saves the balloons, one per line: an id like
+   `[p12-3]` (page 12, third balloon), the original and the current
+   translation. Attach the file to a new chat.
+3. The sheet shows a prompt to go with it — select it or press **Copy
+   Prompt**, paste it into the chat and change it if you like. It asks the
+   chat to send every balloon back as `[id] translation`, as a text file
+   (or one code block).
+4. Save the chat's reply as a `.txt` file and press **Open the Reply…** —
+   or, if it answered in the conversation, copy the reply and press
+   **Paste the Reply**.
+   Each balloon whose translation it changed takes the new one, as your own
+   edit (a pencil in edit mode, **Use Machine Translation** to go back one
+   by one); **Undo** puts the whole reply back. Balloons the reply left out
+   are named — ask the chat for those, or choose fewer pages.
+
+A file carries a whole book where pasted text can be cut short. Your text
+leaves your Mac only when you give it to a chat; some chats refuse mature
+content.
+
 ### Other books and whole series
 
 Translating continues when you open another book. While it runs, a small pill

@@ -45,6 +45,7 @@ EXPECTED_SNAPSHOTS=(
   "21-translation-export-sheet.png"
   "22-jobs-window.png"
   "23-experimental-settings.png"
+  "24-ai-chat-sheet.png"
 )
 
 cd "$PROJECT_ROOT"

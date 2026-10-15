@@ -62,6 +62,7 @@ struct ToolbarTranslationState: Equatable {
     var canEdit = false
     /// The pages on screen have a translation to redo.
     var canTranslateAgain = false
+    var canImproveWithAIChat = false
     /// The book can be exported; `canExportSeries` when it has other volumes.
     var canExport = false
     var canExportSeries = false
@@ -99,6 +100,7 @@ struct PanelyToolbarActions {
     var onToggleTranslationEditing: () -> Void = {}
     var onTranslateInto: (TranslationLanguage) -> Void = { _ in }
     var onTranslatePageAgain: () -> Void = {}
+    var onImproveWithAIChat: () -> Void = {}
     var onExportBook: () -> Void = {}
     var onExportSeries: () -> Void = {}
 }
@@ -518,6 +520,11 @@ struct PanelyToolbar: View {
             if translation.canTranslateAgain {
                 Button("Translate This Page Again") {
                     actions.onTranslatePageAgain()
+                }
+            }
+            if translation.canImproveWithAIChat {
+                Button("Improve with an AI Chat…") {
+                    actions.onImproveWithAIChat()
                 }
             }
             Button("Translation Panel…") {

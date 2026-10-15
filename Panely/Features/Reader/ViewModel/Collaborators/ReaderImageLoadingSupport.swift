@@ -117,7 +117,7 @@ nonisolated enum ReaderImagePlaceholder {
                 .foregroundColor: NSColor.white.withAlphaComponent(0.92),
                 .paragraphStyle: paragraph,
             ]
-            let text = "Failed to load\n\(title)"
+            let text = String(localized: "Failed to load\n\(title)", bundle: .localized)
             let textRect = rect.insetBy(dx: 32, dy: max(32, rect.height * 0.35))
             text.draw(in: textRect, withAttributes: attributes)
             return true
