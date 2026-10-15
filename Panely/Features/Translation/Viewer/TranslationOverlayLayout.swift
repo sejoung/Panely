@@ -11,13 +11,21 @@ nonisolated enum TranslationOverlayLayout {
     /// narrow, which would leave a horizontal translation one or two
     /// characters per line, so its patch is widened about its centre.
     ///
+    /// In a detected balloon (`TranslatedBubble.balloonRect`) of one flat
+    /// tone, the patch also takes the room inside the balloon — the part of
+    /// its box an ellipse is sure to contain — so a translation isn't
+    /// squeezed into the original's narrow column when the balloon has space
+    /// around it. It never reaches the balloon's outline.
+    ///
     /// Kept within the page's width, and within its height unless the balloon
     /// itself runs past the page — a strip balloon crossing into the next
     /// slice keeps its full extent.
     static func patchRect(for bubble: TranslatedBubble, imageSize: CGSize) -> CGRect {
         let glyph = CGFloat(bubble.glyphSize)
         var rect = bubble.rect.insetBy(dx: -glyph * 0.3, dy: -glyph * 0.3)
-        if bubble.isVertical {
+        if let balloon = bubble.balloonRect, bubble.background.isUniform {
+            rect = rect.union(roomInside(balloon))
+        } else if bubble.isVertical {
             let minWidth = min(rect.height * 0.9, glyph * 9)
             if rect.width < minWidth {
                 rect = rect.insetBy(dx: -(minWidth - rect.width) / 2, dy: 0)
@@ -26,6 +34,15 @@ nonisolated enum TranslationOverlayLayout {
         let bounds = CGRect(origin: .zero, size: imageSize).union(bubble.rect)
         let clipped = rect.intersection(CGRect(x: 0, y: bounds.minY, width: imageSize.width, height: bounds.height))
         return clipped.isNull ? .zero : clipped
+    }
+
+    /// The rectangle inside a balloon's box that its outline can't cross:
+    /// the largest one an ellipse holds is 71% of its box each way; a little
+    /// less leaves the outline's stroke alone. Rectangular boxes and clouds
+    /// have at least that much room.
+    static func roomInside(_ balloon: CGRect) -> CGRect {
+        let share: CGFloat = 0.66
+        return balloon.insetBy(dx: balloon.width * (1 - share) / 2, dy: balloon.height * (1 - share) / 2)
     }
 
     /// Everything a page's overlay draws, in page pixels: the page itself plus

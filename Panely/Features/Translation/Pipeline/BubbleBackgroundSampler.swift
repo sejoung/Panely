@@ -62,4 +62,53 @@ nonisolated enum BubbleBackgroundSampler {
             isUniform: count / Double(samples.count) >= uniformShare
         )
     }
+
+    /// How much of `rect`, outside `excluded`, is ink rather than the
+    /// balloon's own `background` — 0 for an empty balloon interior. A line
+    /// OCR didn't read, or a drawing reaching into the balloon, shows up here.
+    static func inkShare(_ image: CGImage, in rect: CGRect, excluding excluded: CGRect, background: BubbleBackground) -> Double {
+        let bounds = CGRect(x: 0, y: 0, width: image.width, height: image.height)
+        let clipped = rect.integral.intersection(bounds)
+        guard !clipped.isNull, clipped.width >= 1, clipped.height >= 1,
+              let crop = image.cropping(to: clipped) else { return 1 }
+
+        let scale = min(1, Double(sampleSide) / Double(max(crop.width, crop.height)))
+        let width = max(1, Int(Double(crop.width) * scale))
+        let height = max(1, Int(Double(crop.height) * scale))
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        let drawn: Bool = pixels.withUnsafeMutableBytes { buffer in
+            guard let context = CGContext(
+                data: buffer.baseAddress,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: width * 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+            ) else { return false }
+            context.interpolationQuality = .medium
+            context.draw(crop, in: CGRect(x: 0, y: 0, width: width, height: height))
+            return true
+        }
+        guard drawn else { return 1 }
+
+        let tone = background.luminance
+        var counted = 0
+        var ink = 0
+        for row in 0..<height {
+            for column in 0..<width {
+                // Back to image pixels (the bitmap's rows run top-down).
+                let point = CGPoint(
+                    x: clipped.minX + (Double(column) + 0.5) / scale,
+                    y: clipped.minY + (Double(row) + 0.5) / scale
+                )
+                guard !excluded.contains(point) else { continue }
+                let i = (row * width + column) * 4
+                let luminance = (0.299 * Double(pixels[i]) + 0.587 * Double(pixels[i + 1]) + 0.114 * Double(pixels[i + 2])) / 255
+                counted += 1
+                if abs(luminance - tone) > 0.3 { ink += 1 }
+            }
+        }
+        return counted == 0 ? 0 : Double(ink) / Double(counted)
+    }
 }

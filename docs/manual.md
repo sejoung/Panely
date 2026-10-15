@@ -434,7 +434,9 @@ Translation starts at the page you're on and keeps ahead of you as you read:
 
 - A detector trained on comics finds the balloons, so all the lines of one
   balloon are translated together, and artwork that looks like text to OCR (a
-  drawn sound effect, a pattern) is left alone. **Hide** is for whatever still
+  drawn sound effect, a pattern) is left alone. A translation can use the
+  room inside its balloon — when nothing else is drawn there — so a long one
+  isn't squeezed into the original's narrow lines. **Hide** is for whatever still
   slips through (see below).
 - Balloons appear with a pulsing outline and "…" as soon as they're found, and
   fill in one by one.

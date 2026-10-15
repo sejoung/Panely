@@ -7,6 +7,9 @@ nonisolated struct BubbleDraft: Equatable, Sendable {
     var glyphSize: CGFloat
     var isVertical: Bool
     var source: String
+    /// The detected balloon around the text, when there is one — room the
+    /// translation can use beyond the original's own lines.
+    var balloonRect: CGRect? = nil
 }
 
 /// Turns Vision's paragraphs into balloons.
@@ -51,7 +54,13 @@ nonisolated enum BubbleGrouper {
                 outside.append(region)
             }
         }
-        let detected = byContainer.values.map { makeDraft(from: $0, language: language) }
+        let detected = byContainer.map { container, parts in
+            var draft = makeDraft(from: parts, language: language)
+            if detections[container].kind == .balloon {
+                draft.balloonRect = detections[container].rect
+            }
+            return draft
+        }
         return sortedInReadingOrder(detected + groupByLayout(outside, language: language))
     }
 

@@ -44,6 +44,10 @@ nonisolated struct TranslatedBubble: Codable, Sendable, Equatable, Identifiable 
     /// `nil` while the translation is still on its way.
     var translation: String?
     var background: BubbleBackground
+    /// The balloon's outline as detected (`BalloonDetector`), in page pixels;
+    /// the translation is laid out in the room inside it. `nil` for text
+    /// outside balloons, and for pages translated before detection.
+    var balloonRect: CGRect? = nil
     /// The same balloon in the book's other translated languages, filled in
     /// for display (balloon popover) — never cached.
     var alternates: [TranslationLanguage: String]? = nil

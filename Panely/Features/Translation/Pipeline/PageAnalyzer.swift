@@ -121,6 +121,8 @@ actor PageAnalyzer {
             .filter { !SoundEffectClassifier.isSoundEffect($0.source, language: language) }
             .map { draft in
                 let padding = draft.glyphSize * 0.3
+                let textArea = draft.rect.insetBy(dx: -padding, dy: -padding)
+                let background = BubbleBackgroundSampler.sample(image, in: textArea)
                 return TranslatedBubble(
                     id: 0,
                     rect: toPageCoordinates(draft.rect),
@@ -128,9 +130,26 @@ actor PageAnalyzer {
                     isVertical: draft.isVertical,
                     source: draft.source,
                     translation: nil,
-                    background: BubbleBackgroundSampler.sample(image, in: draft.rect.insetBy(dx: -padding, dy: -padding))
+                    background: background,
+                    balloonRect: draft.balloonRect.flatMap { balloon in
+                        roomIsEmpty(in: balloon, around: textArea, background: background, image: image) ? toPageCoordinates(balloon) : nil
+                    }
                 )
             }
+    }
+
+    /// Share of ink above which the room inside a balloon (beyond its text)
+    /// isn't empty. Measured: an empty balloon interior 0–1.3%, a balloon
+    /// with a line OCR didn't read 9%.
+    static let maxInkInBalloonRoom = 0.03
+
+    /// Whether the translation may spread into the balloon's room: only a
+    /// flat-toned balloon with nothing else in it. A line OCR missed would
+    /// otherwise be painted over, untranslated.
+    private func roomIsEmpty(in balloon: CGRect, around textArea: CGRect, background: BubbleBackground, image: CGImage) -> Bool {
+        guard background.isUniform else { return false }
+        let room = TranslationOverlayLayout.roomInside(balloon)
+        return BubbleBackgroundSampler.inkShare(image, in: room, excluding: textArea, background: background) < Self.maxInkInBalloonRoom
     }
 
     private func decodedImage(_ index: Int) async throws -> CGImage {

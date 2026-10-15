@@ -269,8 +269,11 @@ written into your files.
   run on the GPU, ~0.1 s a page alongside OCR) tells which OCR lines share a
   balloon and which "text" is really artwork: columns of one balloon are
   joined in reading order, neighbouring balloons stay apart, and drawn sound
-  effects or patterns OCR misread are dropped. Without it (or where it finds
-  nothing) the layout rules group the text as before
+  effects or patterns OCR misread are dropped. A translation also gets the
+  room inside its balloon instead of only the original's lines — when that
+  room is empty, so a line OCR missed is never painted over. Without the
+  detector (or where it finds nothing) the layout rules group the text as
+  before
 - **Speech level matched** (Japanese ↔ Korean, Apple Intelligence) — Apple
   Translation leans polite whatever the original says; Panely reads the
   original's level from its endings and has the on-device model rewrite only

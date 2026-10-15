@@ -22,6 +22,32 @@ struct BubbleBackgroundSamplerTests {
         return context.makeImage()!
     }
 
+    /// The room inside a balloon is empty unless something's drawn there
+    /// beyond the text — a line OCR didn't read.
+    @Test func inkInTheRoomBesideTheTextIsMeasured() {
+        let size = 80
+        func balloon(withMissedLine: Bool) -> CGImage {
+            let context = CGContext(
+                data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )!
+            context.setFillColor(CGColor(gray: 1, alpha: 1))
+            context.fill(CGRect(x: 0, y: 0, width: size, height: size))
+            context.setFillColor(CGColor(gray: 0, alpha: 1))
+            // The read text: top-left area (CG's origin is bottom-left).
+            context.fill(CGRect(x: 10, y: 50, width: 30, height: 20))
+            if withMissedLine {
+                context.fill(CGRect(x: 10, y: 15, width: 50, height: 8))
+            }
+            return context.makeImage()!
+        }
+        let text = CGRect(x: 8, y: 8, width: 34, height: 24) // top-left origin
+        let room = CGRect(x: 0, y: 0, width: 80, height: 80)
+
+        #expect(BubbleBackgroundSampler.inkShare(balloon(withMissedLine: false), in: room, excluding: text, background: .white) < 0.01)
+        #expect(BubbleBackgroundSampler.inkShare(balloon(withMissedLine: true), in: room, excluding: text, background: .white) > 0.03)
+    }
+
     @Test func whiteBalloonWithBlackTextSamplesWhiteAndUniform() {
         let image = makeImage(background: CGColor(red: 1, green: 1, blue: 1, alpha: 1), ink: CGColor(red: 0, green: 0, blue: 0, alpha: 1), textShare: 0.25)
 
@@ -68,6 +94,30 @@ struct BubbleBackgroundSamplerTests {
 struct TranslationOverlayLayoutTests {
     private func bubble(rect: CGRect, glyph: Double, vertical: Bool) -> TranslatedBubble {
         TranslatedBubble(id: 0, rect: rect, glyphSize: glyph, isVertical: vertical, source: "", translation: "", background: .white)
+    }
+
+    /// In a detected balloon the translation gets the room inside it, but
+    /// still covers the original and stays off the outline.
+    @Test func aBalloonsRoomWidensThePatchWithinItsOutline() {
+        var narrow = bubble(rect: CGRect(x: 190, y: 100, width: 20, height: 160), glyph: 20, vertical: true)
+        let balloon = CGRect(x: 100, y: 60, width: 200, height: 240)
+        narrow.balloonRect = balloon
+        let image = CGSize(width: 1000, height: 1000)
+
+        let patch = TranslationOverlayLayout.patchRect(for: narrow, imageSize: image)
+
+        #expect(patch.contains(narrow.rect))
+        #expect(patch.contains(TranslationOverlayLayout.roomInside(balloon)))
+        #expect(balloon.insetBy(dx: 10, dy: 10).contains(patch))
+        #expect(patch.width > 100)
+
+        // Over artwork there's no flat balloon to spread into: laid out as
+        // without one.
+        narrow.background = BubbleBackground(red: 0.5, green: 0.4, blue: 0.3, isUniform: false)
+        var withoutBalloon = narrow
+        withoutBalloon.balloonRect = nil
+        #expect(TranslationOverlayLayout.patchRect(for: narrow, imageSize: image)
+            == TranslationOverlayLayout.patchRect(for: withoutBalloon, imageSize: image))
     }
 
     @Test func horizontalPatchIsTheTextPlusPadding() {
