@@ -533,7 +533,7 @@ switching modes keeps them.
 
 ### Improving with an AI chat
 
-A chat model that reads a whole page — or book — at once fixes what
+A chat model that reads a whole book at once fixes what
 translating balloon by balloon can't: who's speaking, how they speak, names
 kept the same. Panely doesn't call one itself; use the one you already have
 (ChatGPT, Claude, Gemini…) by passing it a text file:
@@ -554,11 +554,11 @@ kept the same. Panely doesn't call one itself; use the one you already have
    (or one code block).
 4. Save the chat's reply as a `.txt` file and press **Open the Reply…** —
    or, if it answered in the conversation, copy the reply and press
-   **Paste the Reply**.
-   Each balloon whose translation it changed takes the new one, as your own
-   edit (a pencil in edit mode, **Use Machine Translation** to go back one
-   by one); **Undo** puts the whole reply back. Balloons the reply left out
-   are named — ask the chat for those, or choose fewer pages.
+   **Paste the Reply**. Each balloon whose translation it changed takes the
+   new one, as your own edit (a pencil in edit mode, **Use Machine
+   Translation** to go back one by one); **Undo** puts the whole reply back.
+   Balloons the reply left out are named — ask the chat for those, or choose
+   fewer pages.
 
 A file carries a whole book where pasted text can be cut short. Your text
 leaves your Mac only when you give it to a chat; some chats refuse mature
