@@ -233,7 +233,8 @@
 
   function currentLang() {
     var p = new URLSearchParams(location.search).get("lang");
-    return p === "ko" ? "ko" : "en";
+    if (p === "ko" || p === "en") return p;
+    return /^ko\b/i.test(navigator.language || "") ? "ko" : "en";
   }
 
   function rewrite(container, lang) {
@@ -261,6 +262,7 @@
     });
     document.documentElement.lang = lang;
     document.title = lang === "ko" ? "Panely — 사용 설명서" : "Panely — User Manual";
+    document.querySelector(".topbar-brand").setAttribute("href", "index.html?lang=" + lang);
   }
 
   function setActive(lang) {

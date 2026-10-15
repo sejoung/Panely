@@ -375,42 +375,75 @@
     section { padding: 48px 0; }
     .section-head h2 { font-size: 26px; }
   }
+  /* Language toggle */
+  .hero { position: relative; }
+  .lang-toggle {
+    position: absolute;
+    top: 20px;
+    right: 24px;
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .lang-toggle button {
+    background: transparent;
+    color: var(--text-secondary);
+    border: none;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .lang-toggle button.active {
+    background: var(--accent);
+    color: white;
+  }
+  .lang-toggle button:not(.active):hover { color: var(--text-primary); }
+  @media (max-width: 640px) {
+    .lang-toggle { top: 14px; right: 16px; }
+  }
 </style>
 </head>
 <body>
 
 <header class="hero">
   <div class="container">
+    <div class="lang-toggle" role="group" aria-label="Language">
+      <button type="button" data-lang="en">EN</button>
+      <button type="button" data-lang="ko">한국어</button>
+    </div>
     <img class="hero-icon" src="icon/panely-icon-stacked.svg" alt="Panely icon">
     <h1>Panely</h1>
-    <p class="tagline">A minimal, fast comic &amp; image viewer for macOS.</p>
-    <p class="tagline-sub">macOS를 위한 미니멀하고 빠른 만화 / 이미지 뷰어</p>
+    <p class="tagline" data-i18n="hero.tagline">A minimal, fast comic &amp; image viewer for macOS.</p>
+    <p class="tagline-sub" data-i18n="hero.taglineSub">macOS를 위한 미니멀하고 빠른 만화 / 이미지 뷰어</p>
 
     <div class="cta-row">
-      <a class="btn btn-primary" href="https://github.com/sejoung/Panely/releases/latest">
+      <a class="btn btn-primary" href="https://github.com/sejoung/Panely/releases/latest" data-i18n="hero.download">
         Download for macOS
       </a>
-      <a class="btn btn-secondary" href="manual.html">
+      <a class="btn btn-secondary" href="manual.html" data-i18n="hero.manual" data-href-ko="manual.html?lang=ko">
         Read the Manual
       </a>
-      <a class="btn btn-secondary" href="https://github.com/sejoung/Panely">
+      <a class="btn btn-secondary" href="https://github.com/sejoung/Panely" data-i18n="hero.github">
         View on GitHub
       </a>
     </div>
     <p class="hero-version" id="latest-release" hidden>
       <span class="version-pill" id="latest-version"></span>
       <span class="version-date" id="latest-date"></span>
-      <a id="latest-notes" href="https://github.com/sejoung/Panely/releases/latest">Release notes →</a>
+      <a id="latest-notes" href="https://github.com/sejoung/Panely/releases/latest" data-i18n="hero.notes">Release notes →</a>
     </p>
-    <p class="hero-meta">Requires macOS 14 (Sonoma) or later · Apache 2.0</p>
+    <p class="hero-meta" data-i18n="hero.meta">Requires macOS 14 (Sonoma) or later · Apache 2.0</p>
   </div>
 </header>
 
 <section>
   <div class="container">
     <div class="section-head">
-      <h2>Built to get out of your way</h2>
-      <p>Chrome hides when you're reading. The viewer always takes the max space.</p>
+      <h2 data-i18n="features.title">Built to get out of your way</h2>
+      <p data-i18n="features.lead">Chrome hides when you're reading. The viewer always takes the max space.</p>
     </div>
 
     <div class="features">
@@ -419,8 +452,8 @@
           <rect x="4" y="3" width="7" height="18" rx="1"/>
           <rect x="13" y="3" width="7" height="18" rx="1"/>
         </svg>
-        <h3>Three reading modes</h3>
-        <p>Single page, double-page spread, or vertical scroll for webtoons. Cycle with the toolbar or fit-mode shortcuts.</p>
+        <h3 data-i18n="f1.title">Three reading modes</h3>
+        <p data-i18n="f1.body">Single page, double-page spread, or vertical scroll for webtoons. Cycle with the toolbar or fit-mode shortcuts.</p>
       </div>
 
       <div class="feature">
@@ -428,8 +461,8 @@
           <path d="M3 7l2-3h5l2 3h9v12H3z"/>
           <path d="M10 12h4"/>
         </svg>
-        <h3>Folders, CBZ/ZIP, CBR/RAR</h3>
-        <p>Open a single file, a volume folder, or a series root. Nested archives extract automatically, up to three levels deep.</p>
+        <h3 data-i18n="f2.title">Folders, CBZ/ZIP, CBR/RAR</h3>
+        <p data-i18n="f2.body">Open a single file, a volume folder, or a series root. Nested archives extract automatically, up to three levels deep.</p>
       </div>
 
       <div class="feature">
@@ -437,8 +470,8 @@
           <rect x="3" y="6" width="18" height="12" rx="2"/>
           <path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"/>
         </svg>
-        <h3>Keyboard-first</h3>
-        <p>Every core action has a shortcut. Arrow keys for pages, <kbd>⌘G</kbd> to jump, <kbd>⌘D</kbd> to bookmark, <kbd>⌃⌘P</kbd> for thumbnails.</p>
+        <h3 data-i18n="f3.title">Keyboard-first</h3>
+        <p data-i18n="f3.body">Every core action has a shortcut. Arrow keys for pages, <kbd>⌘G</kbd> to jump, <kbd>⌘D</kbd> to bookmark, <kbd>⌃⌘P</kbd> for thumbnails.</p>
       </div>
 
       <div class="feature">
@@ -446,16 +479,16 @@
           <circle cx="12" cy="12" r="9"/>
           <path d="M12 7v5l3 3"/>
         </svg>
-        <h3>Fast on big books</h3>
-        <p>Lazy windowing in vertical mode loads header-only dimensions up front, then streams pages only where you're looking.</p>
+        <h3 data-i18n="f4.title">Fast on big books</h3>
+        <p data-i18n="f4.body">Lazy windowing in vertical mode loads header-only dimensions up front, then streams pages only where you're looking.</p>
       </div>
 
       <div class="feature">
         <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/>
         </svg>
-        <h3>Bookmarks &amp; favorites</h3>
-        <p>Star books for quick access in the sidebar. Pin individual pages and jump between them with <kbd>⌘⇧[</kbd> / <kbd>⌘⇧]</kbd>.</p>
+        <h3 data-i18n="f5.title">Bookmarks &amp; favorites</h3>
+        <p data-i18n="f5.body">Star books for quick access in the sidebar. Pin individual pages and jump between them with <kbd>⌘⇧[</kbd> / <kbd>⌘⇧]</kbd>.</p>
       </div>
 
       <div class="feature">
@@ -464,8 +497,8 @@
           <path d="M3 9h18"/>
           <path d="M9 4v5"/>
         </svg>
-        <h3>Resume where you left off</h3>
-        <p>Per-book page memory survives archive re-extraction. Layout, direction, fit mode, and sidebar state are all persisted.</p>
+        <h3 data-i18n="f6.title">Resume where you left off</h3>
+        <p data-i18n="f6.body">Per-book page memory survives archive re-extraction. Layout, direction, fit mode, and sidebar state are all persisted.</p>
       </div>
 
       <div class="feature">
@@ -473,8 +506,8 @@
           <path d="M3 7l2-3h5l2 3h9v12H3z"/>
           <path d="M9 13l2 2 4-4"/>
         </svg>
-        <h3>Open straight from Finder</h3>
-        <p>Right-click any <code>.cbz</code> or <code>.zip</code> &rarr; <strong>Open With &rarr; Panely</strong>. Drop a folder onto the app icon to open it directly.</p>
+        <h3 data-i18n="f7.title">Open straight from Finder</h3>
+        <p data-i18n="f7.body">Right-click any <code>.cbz</code> or <code>.zip</code> &rarr; <strong>Open With &rarr; Panely</strong>. Drop a folder onto the app icon to open it directly.</p>
       </div>
     </div>
   </div>
@@ -483,18 +516,18 @@
 <section class="showcase">
   <div class="container">
     <div class="section-head">
-      <h2>Read comics in a language you don&rsquo;t know</h2>
-      <p>Experimental, macOS 26 or later. Panely reads the speech balloons on your Mac and lays a machine translation over the page &mdash; nothing leaves your Mac unless you choose to, and the original is one click away.</p>
+      <h2 data-i18n="tr.title">Read comics in a language you don&rsquo;t know</h2>
+      <p data-i18n="tr.lead">Experimental, macOS 26 or later. Panely reads the speech balloons on your Mac and lays a machine translation over the page &mdash; nothing leaves your Mac unless you choose to, and the original is one click away.</p>
     </div>
-    <img class="showcase-shot" src="screenshots/18-translation-before-after.png" alt="A comic page before and after translation" loading="lazy">
+    <img class="showcase-shot" src="screenshots/18-translation-before-after.png" alt="A comic page before and after translation" data-alt-ko="번역 전과 후의 만화 페이지" loading="lazy">
     <div class="showcase-points">
-      <span><strong>Correct it</strong> &mdash; fix a translation or a misread balloon, right on the page</span>
-      <span><strong>Polish it</strong> &mdash; hand the whole book to ChatGPT, Claude or any AI chat as a text file, open its reply</span>
-      <span><strong>Keep it</strong> &mdash; export a translated copy as CBZ, ZIP or images</span>
-      <span><strong>Keep reading</strong> &mdash; whole series translate and export in the background</span>
+      <span data-i18n="tr.correct"><strong>Correct it</strong> &mdash; fix a translation or a misread balloon, right on the page</span>
+      <span data-i18n="tr.polish"><strong>Polish it</strong> &mdash; hand the whole book to ChatGPT, Claude or any AI chat as a text file, open its reply</span>
+      <span data-i18n="tr.keep"><strong>Keep it</strong> &mdash; export a translated copy as CBZ, ZIP or images</span>
+      <span data-i18n="tr.reading"><strong>Keep reading</strong> &mdash; whole series translate and export in the background</span>
     </div>
     <div class="cta-row" style="margin-top: 22px;">
-      <a class="btn btn-secondary" href="manual.html#translation-assist-experimental">How it works</a>
+      <a class="btn btn-secondary" href="manual.html#translation-assist-experimental" data-i18n="tr.how" data-href-ko="manual.html?lang=ko#번역-보조-실험적-기능">How it works</a>
     </div>
   </div>
 </section>
@@ -502,23 +535,23 @@
 <section class="guide">
   <div class="container">
     <div class="section-head">
-      <h2>&ldquo;Panely can&rsquo;t be opened&rdquo;?</h2>
-      <p>Panely is open source but not notarized by Apple, so Gatekeeper warns on first launch. It&rsquo;s safe to open — here&rsquo;s how.</p>
+      <h2 data-i18n="gk.title">&ldquo;Panely can&rsquo;t be opened&rdquo;?</h2>
+      <p data-i18n="gk.lead">Panely is open source but not notarized by Apple, so Gatekeeper warns on first launch. It&rsquo;s safe to open — here&rsquo;s how.</p>
     </div>
     <div class="guide-card">
       <ol class="guide-steps">
         <li>
-          <span class="step-label">Drag <strong>Panely.app</strong> into your <strong>/Applications</strong> folder.</span>
+          <span class="step-label" data-i18n="gk.step1">Drag <strong>Panely.app</strong> into your <strong>/Applications</strong> folder.</span>
         </li>
         <li>
-          <span class="step-label">Right-click (or Control-click) <strong>Panely.app</strong> and choose <strong>Open</strong>. Unlike a double-click, this gives you an <strong>Open</strong> button that launches it.</span>
+          <span class="step-label" data-i18n="gk.step2">Right-click (or Control-click) <strong>Panely.app</strong> and choose <strong>Open</strong>. Unlike a double-click, this gives you an <strong>Open</strong> button that launches it.</span>
         </li>
         <li>
-          <span class="step-label">If macOS still blocks it, open <strong>System Settings → Privacy &amp; Security</strong>, scroll to the Security section, and click <strong>Open Anyway</strong> next to the Panely notice.</span>
+          <span class="step-label" data-i18n="gk.step3">If macOS still blocks it, open <strong>System Settings → Privacy &amp; Security</strong>, scroll to the Security section, and click <strong>Open Anyway</strong> next to the Panely notice.</span>
         </li>
       </ol>
       <div class="guide-note">
-        <p>Prefer the terminal? Remove the quarantine flag after moving Panely to <code>/Applications</code>:</p>
+        <p data-i18n="gk.terminal">Prefer the terminal? Remove the quarantine flag after moving Panely to <code>/Applications</code>:</p>
         <pre><code>xattr -dr com.apple.quarantine /Applications/Panely.app</code></pre>
       </div>
     </div>
@@ -528,14 +561,14 @@
 <section class="feedback">
   <div class="container">
     <div class="section-head">
-      <h2>Feedback is welcome</h2>
-      <p>If you find any issues or have feature requests, please open an issue on GitHub.</p>
+      <h2 data-i18n="fb.title">Feedback is welcome</h2>
+      <p data-i18n="fb.lead">If you find any issues or have feature requests, please open an issue on GitHub.</p>
     </div>
     <div class="cta-row">
-      <a class="btn btn-primary" href="https://github.com/sejoung/Panely/issues/new">
+      <a class="btn btn-primary" href="https://github.com/sejoung/Panely/issues/new" data-i18n="fb.open">
         Open an issue
       </a>
-      <a class="btn btn-secondary" href="https://github.com/sejoung/Panely/issues">
+      <a class="btn btn-secondary" href="https://github.com/sejoung/Panely/issues" data-i18n="fb.browse">
         Browse issues
       </a>
     </div>
@@ -545,48 +578,48 @@
 <section class="shortcuts">
   <div class="container">
     <div class="section-head">
-      <h2>A few shortcuts</h2>
-      <p>The rest live in the menu bar.</p>
+      <h2 data-i18n="sc.title">A few shortcuts</h2>
+      <p data-i18n="sc.lead">The rest live in the menu bar.</p>
     </div>
     <div class="shortcut-grid">
       <div class="shortcut">
-        <span class="label">Open folder / CBZ / ZIP / CBR / RAR</span>
+        <span class="label" data-i18n="sc.open">Open folder / CBZ / ZIP / CBR / RAR</span>
         <span class="keys"><kbd>⌘</kbd><kbd>O</kbd></span>
       </div>
       <div class="shortcut">
-        <span class="label">Previous / next page</span>
+        <span class="label" data-i18n="sc.page">Previous / next page</span>
         <span class="keys"><kbd>←</kbd><kbd>→</kbd></span>
       </div>
       <div class="shortcut">
-        <span class="label">Go to page…</span>
+        <span class="label" data-i18n="sc.goto">Go to page…</span>
         <span class="keys"><kbd>⌘</kbd><kbd>G</kbd></span>
       </div>
       <div class="shortcut">
-        <span class="label">Toggle page bookmark</span>
+        <span class="label" data-i18n="sc.bookmark">Toggle page bookmark</span>
         <span class="keys"><kbd>⌘</kbd><kbd>D</kbd></span>
       </div>
       <div class="shortcut">
-        <span class="label">Fit to screen / width / height</span>
+        <span class="label" data-i18n="sc.fit">Fit to screen / width / height</span>
         <span class="keys"><kbd>⌘1</kbd><kbd>⌘2</kbd><kbd>⌘3</kbd></span>
       </div>
       <div class="shortcut">
-        <span class="label">Zoom in / out / reset</span>
+        <span class="label" data-i18n="sc.zoom">Zoom in / out / reset</span>
         <span class="keys"><kbd>⌘+</kbd><kbd>⌘−</kbd><kbd>⌘0</kbd></span>
       </div>
       <div class="shortcut">
-        <span class="label">Pin library sidebar</span>
+        <span class="label" data-i18n="sc.sidebar">Pin library sidebar</span>
         <span class="keys"><kbd>⌃</kbd><kbd>⌘</kbd><kbd>S</kbd></span>
       </div>
       <div class="shortcut">
-        <span class="label">Show thumbnails</span>
+        <span class="label" data-i18n="sc.thumbs">Show thumbnails</span>
         <span class="keys"><kbd>⌃</kbd><kbd>⌘</kbd><kbd>P</kbd></span>
       </div>
       <div class="shortcut">
-        <span class="label">Original &harr; translation</span>
+        <span class="label" data-i18n="sc.translation">Original &harr; translation</span>
         <span class="keys"><kbd>⇧</kbd><kbd>⌘</kbd><kbd>T</kbd></span>
       </div>
       <div class="shortcut">
-        <span class="label">Jobs window</span>
+        <span class="label" data-i18n="sc.jobs">Jobs window</span>
         <span class="keys"><kbd>⌥</kbd><kbd>⌘</kbd><kbd>J</kbd></span>
       </div>
     </div>
@@ -596,7 +629,7 @@
 <section class="requirements">
   <div class="container">
     <div class="requirements-card">
-      <p><strong>Requirements</strong> · macOS 14 (Sonoma) or later · Apple silicon &amp; Intel · Sandbox-compliant</p>
+      <p data-i18n="req"><strong>Requirements</strong> · macOS 14 (Sonoma) or later · Apple silicon &amp; Intel · Sandbox-compliant</p>
     </div>
   </div>
 </section>
@@ -604,40 +637,162 @@
 <footer>
   <div class="container">
     <div class="links">
-      <a href="manual.html">Manual</a>
+      <a href="manual.html" data-i18n="ft.manual" data-href-ko="manual.html?lang=ko">Manual</a>
       <a href="https://github.com/sejoung/Panely">GitHub</a>
-      <a href="https://github.com/sejoung/Panely/releases">Releases</a>
-      <a href="https://github.com/sejoung/Panely/blob/main/README.ko.md">한국어 README</a>
-      <a href="https://github.com/sejoung/Panely/blob/main/LICENSE">License</a>
+      <a href="https://github.com/sejoung/Panely/releases" data-i18n="ft.releases">Releases</a>
+      <a href="https://github.com/sejoung/Panely/blob/main/README.ko.md" data-i18n="ft.readme" data-href-ko="https://github.com/sejoung/Panely/blob/main/README.md">한국어 README</a>
+      <a href="https://github.com/sejoung/Panely/blob/main/LICENSE" data-i18n="ft.license">License</a>
     </div>
-    <p>Apache License 2.0 · Built with Swift &amp; AppKit</p>
+    <p data-i18n="ft.built">Apache License 2.0 · Built with Swift &amp; AppKit</p>
   </div>
 </footer>
+
+<script>
+  // English is the page as written; Korean comes from this table. The
+  // language is ?lang=ko|en, else the browser's.
+  var KO = {
+      "hero.tagline": "macOS를 위한 미니멀하고 빠른 만화 / 이미지 뷰어",
+      "hero.taglineSub": "A minimal, fast comic &amp; image viewer for macOS.",
+      "hero.download": "\n        macOS용 다운로드\n      ",
+      "hero.manual": "\n        사용 설명서 보기\n      ",
+      "hero.github": "\n        GitHub에서 보기\n      ",
+      "hero.notes": "릴리스 노트 →",
+      "hero.meta": "macOS 14 (Sonoma) 이상 · Apache 2.0",
+      "features.title": "읽는 데만 집중하도록",
+      "features.lead": "읽는 동안에는 도구 막대가 숨고, 뷰어가 언제나 화면을 가장 넓게 씁니다.",
+      "f1.title": "세 가지 보기 방식",
+      "f1.body": "한 쪽 보기, 두 쪽 펼침, 웹툰을 위한 세로 스크롤. 도구 막대나 맞춤 단축키로 바꿉니다.",
+      "f2.title": "폴더, CBZ/ZIP, CBR/RAR",
+      "f2.body": "파일 하나, 권 폴더, 시리즈 최상위 폴더 무엇이든 엽니다. 압축 안의 압축도 세 단계까지 자동으로 풉니다.",
+      "f3.title": "키보드 중심",
+      "f3.body": "주요 동작마다 단축키가 있습니다. 화살표 키로 페이지 이동, <kbd>⌘G</kbd>로 페이지 이동, <kbd>⌘D</kbd>로 북마크, <kbd>⌃⌘P</kbd>로 썸네일.",
+      "f4.title": "두꺼운 책도 빠르게",
+      "f4.body": "세로 모드에서는 이미지 크기만 먼저 읽어 두고, 보고 있는 곳의 페이지만 불러옵니다.",
+      "f5.title": "북마크와 즐겨찾기",
+      "f5.body": "책에 별표를 달아 사이드바에서 바로 열고, 페이지를 북마크해 <kbd>⌘⇧[</kbd> / <kbd>⌘⇧]</kbd>로 오갑니다.",
+      "f6.title": "읽던 곳에서 이어 읽기",
+      "f6.body": "책마다 읽던 페이지를 기억하고, 압축을 다시 풀어도 유지됩니다. 보기 방식, 넘김 방향, 맞춤, 사이드바 상태도 모두 저장됩니다.",
+      "f7.title": "Finder에서 바로 열기",
+      "f7.body": "<code>.cbz</code>나 <code>.zip</code>을 우클릭 &rarr; <strong>다음으로 열기 &rarr; Panely</strong>. 폴더를 앱 아이콘에 끌어다 놓아도 바로 열립니다.",
+      "tr.title": "모르는 언어로 된 만화 읽기",
+      "tr.lead": "실험적 기능, macOS 26 이상. Panely가 Mac 안에서 말풍선을 읽고 페이지 위에 기계 번역을 겹쳐 보여줍니다 &mdash; 직접 보내지 않는 한 아무것도 Mac 밖으로 나가지 않고, 원문은 클릭 한 번이면 다시 볼 수 있습니다.",
+      "tr.correct": "<strong>고치기</strong> &mdash; 잘못된 번역이나 잘못 읽은 말풍선을 페이지에서 바로 수정",
+      "tr.polish": "<strong>다듬기</strong> &mdash; 책 전체를 텍스트 파일로 ChatGPT, Claude 등 AI 채팅에 맡기고 답 파일을 열기",
+      "tr.keep": "<strong>간직하기</strong> &mdash; 번역본을 CBZ, ZIP 또는 이미지로 내보내기",
+      "tr.reading": "<strong>계속 읽기</strong> &mdash; 시리즈 전체 번역과 내보내기는 백그라운드에서",
+      "tr.how": "작동 방식 보기",
+      "gk.title": "Panely가 열리지 않나요?",
+      "gk.lead": "Panely는 오픈 소스지만 Apple 공증을 받지 않아 처음 실행할 때 Gatekeeper가 경고합니다. 안심하고 열어도 됩니다 — 방법은 다음과 같습니다.",
+      "gk.step1": "<strong>Panely.app</strong>을 <strong>/응용 프로그램</strong>(Applications) 폴더로 끌어다 놓습니다.",
+      "gk.step2": "<strong>Panely.app</strong>을 우클릭(또는 Control-클릭)하고 <strong>열기</strong>를 선택합니다. 더블클릭과 달리 실행할 수 있는 <strong>열기</strong> 버튼이 나옵니다.",
+      "gk.step3": "그래도 막히면 <strong>시스템 설정 → 개인정보 보호 및 보안</strong>을 열고 보안 항목까지 내려가, Panely 안내 옆의 <strong>그래도 열기</strong>를 누릅니다.",
+      "gk.terminal": "터미널이 편하다면 Panely를 <code>/Applications</code>로 옮긴 뒤 격리 속성을 지우세요:",
+      "fb.title": "피드백을 환영합니다",
+      "fb.lead": "문제를 발견했거나 원하는 기능이 있다면 GitHub에 이슈를 남겨 주세요.",
+      "fb.open": "\n        이슈 남기기\n      ",
+      "fb.browse": "\n        이슈 둘러보기\n      ",
+      "sc.title": "주요 단축키",
+      "sc.lead": "나머지는 메뉴 막대에 있습니다.",
+      "sc.open": "폴더 / CBZ / ZIP / CBR / RAR 열기",
+      "sc.page": "이전 / 다음 페이지",
+      "sc.goto": "페이지로 이동…",
+      "sc.bookmark": "페이지 북마크 켜기/끄기",
+      "sc.fit": "화면 / 너비 / 높이에 맞춤",
+      "sc.zoom": "확대 / 축소 / 원래 크기",
+      "sc.sidebar": "라이브러리 사이드바 고정",
+      "sc.thumbs": "썸네일 보기",
+      "sc.translation": "원문 &harr; 번역",
+      "sc.jobs": "작업 윈도우",
+      "req": "<strong>요구 사항</strong> · macOS 14 (Sonoma) 이상 · Apple silicon 및 Intel · 샌드박스 준수",
+      "ft.manual": "사용 설명서",
+      "ft.releases": "릴리스",
+      "ft.readme": "English README",
+      "ft.license": "라이선스",
+      "ft.built": "Apache License 2.0 · Swift와 AppKit으로 제작"
+  };
+  var META = {
+    en: {
+      title: document.title,
+      description: document.querySelector('meta[name="description"]').content
+    },
+    ko: {
+      title: "Panely — macOS를 위한 미니멀하고 빠른 만화 / 이미지 뷰어",
+      description: "macOS를 위한 미니멀하고 빠른 만화·이미지 뷰어. 폴더, CBZ/ZIP, CBR/RAR을 열고 한 쪽, 두 쪽, 세로(웹툰) 보기를 지원합니다. 키보드 중심, 샌드박스 지원, 오픈 소스."
+    }
+  };
+  var ENGLISH = {};
+  var currentLang = "en";
+
+  function pickLang() {
+    var p = new URLSearchParams(location.search).get("lang");
+    if (p === "ko" || p === "en") return p;
+    return /^ko\b/i.test(navigator.language || "") ? "ko" : "en";
+  }
+
+  function applyLang(lang) {
+    currentLang = lang;
+    document.querySelectorAll("[data-i18n]").forEach(function (el) {
+      var key = el.dataset.i18n;
+      if (!(key in ENGLISH)) ENGLISH[key] = { html: el.innerHTML, href: el.getAttribute("href") };
+      el.innerHTML = lang === "ko" ? KO[key] : ENGLISH[key].html;
+      if (el.dataset.hrefKo) el.setAttribute("href", lang === "ko" ? el.dataset.hrefKo : ENGLISH[key].href);
+    });
+    document.querySelectorAll("[data-alt-ko]").forEach(function (el) {
+      if (!el.dataset.altEn) el.dataset.altEn = el.alt;
+      el.alt = lang === "ko" ? el.dataset.altKo : el.dataset.altEn;
+    });
+    document.documentElement.lang = lang;
+    document.title = META[lang].title;
+    document.querySelector('meta[name="description"]').content = META[lang].description;
+    document.querySelectorAll(".lang-toggle button").forEach(function (b) {
+      b.classList.toggle("active", b.dataset.lang === lang);
+    });
+    renderRelease();
+  }
+
+  document.querySelectorAll(".lang-toggle button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var url = new URL(location.href);
+      url.searchParams.set("lang", b.dataset.lang);
+      history.replaceState(null, "", url);
+      applyLang(b.dataset.lang);
+    });
+  });
+</script>
 
 <script>
   // Show the latest published release so visitors can tell at a glance whether
   // they're on the current build. Fetched live from the GitHub API so the page
   // never goes stale; on any failure the block just stays hidden and the
   // Download button (which always points at /releases/latest) still works.
+  var release = null;
+
+  function renderRelease() {
+    if (!release) return;
+    var ko = currentLang === "ko";
+    document.getElementById("latest-version").textContent = (ko ? "최신: " : "Latest: ") + release.tag_name;
+    if (release.published_at) {
+      var date = new Date(release.published_at).toLocaleDateString(ko ? "ko-KR" : "en-US", {
+        year: "numeric", month: "short", day: "numeric"
+      });
+      document.getElementById("latest-date").textContent = ko ? date + " 출시" : "released " + date;
+    }
+  }
+
+  applyLang(pickLang());
+
   (function () {
     fetch("https://api.github.com/repos/sejoung/Panely/releases/latest", {
       headers: { Accept: "application/vnd.github+json" }
     })
       .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
       .then(function (rel) {
-        var tag = rel.tag_name;
-        if (!tag) return;
-        document.getElementById("latest-version").textContent = "Latest: " + tag;
-        if (rel.published_at) {
-          var d = new Date(rel.published_at);
-          document.getElementById("latest-date").textContent =
-            "released " + d.toLocaleDateString(undefined, {
-              year: "numeric", month: "short", day: "numeric"
-            });
-        }
+        if (!rel.tag_name) return;
+        release = rel;
         if (rel.html_url) {
           document.getElementById("latest-notes").href = rel.html_url;
         }
+        renderRelease();
         document.getElementById("latest-release").hidden = false;
       })
       .catch(function () { /* keep the block hidden on rate-limit / offline */ });
