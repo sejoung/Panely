@@ -721,6 +721,22 @@
         }
       }
     },
+    "Checked once the book's language is known" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checked once the book's language is known"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "책의 언어를 알게 되면 확인합니다"
+          }
+        }
+      }
+    },
     "Clear Cache" : {
       "localizations" : {
         "en" : {
@@ -1337,6 +1353,22 @@
         }
       }
     },
+    "Download Language Pack…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download Language Pack…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "언어팩 다운로드…"
+          }
+        }
+      }
+    },
     "Download the %@ → %@ language pack to translate." : {
       "localizations" : {
         "en" : {
@@ -1349,6 +1381,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "번역하려면 %1$@ → %2$@ 언어팩을 다운로드하세요."
+          }
+        }
+      }
+    },
+    "Downloading Language Pack…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloading Language Pack…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "언어팩 다운로드 중…"
+          }
+        }
+      }
+    },
+    "Downloading…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloading…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다운로드 중…"
           }
         }
       }
@@ -2234,6 +2298,54 @@
         }
       }
     },
+    "Language Packs" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Language Packs"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "언어팩"
+          }
+        }
+      }
+    },
+    "Language packs are downloaded from the translation panel the first time a book is translated. Manage downloaded packs in System Settings › General › Language & Region › Translation Languages." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Language packs are downloaded from the translation panel the first time a book is translated. Manage downloaded packs in System Settings › General › Language & Region › Translation Languages."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "언어팩은 책을 처음 번역할 때 번역 패널에서 받습니다. 받은 언어팩은 시스템 설정 › 일반 › 언어 및 지역 › 번역 언어에서 관리할 수 있습니다."
+          }
+        }
+      }
+    },
+    "Language packs are large, so this can take several minutes. The progress bar in the system window may not move for a while." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Language packs are large, so this can take several minutes. The progress bar in the system window may not move for a while."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "언어팩은 용량이 커서 몇 분 걸릴 수 있습니다. 시스템 창의 진행 막대가 한동안 움직이지 않을 수 있습니다."
+          }
+        }
+      }
+    },
     "Last opened" : {
       "localizations" : {
         "en" : {
@@ -2789,6 +2901,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "최근 항목 없음"
+          }
+        }
+      }
+    },
+    "Not Installed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not Installed"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "설치 안 됨"
           }
         }
       }
@@ -3983,6 +4111,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "계속"
+          }
+        }
+      }
+    },
+    "Resume Translation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Resume Translation"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이어서 번역"
           }
         }
       }

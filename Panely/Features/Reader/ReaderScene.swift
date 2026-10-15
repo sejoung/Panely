@@ -162,10 +162,7 @@ private struct ReaderStatusBanner: View {
                 message: notice.message(locale: viewModel.localization.locale)
             ) {
                 if #available(macOS 26.0, *), case let .needsLanguageDownload(source, target) = notice {
-                    LanguagePackDownloadButton(source: source, target: target, mode: viewModel.translation.mode) {
-                        viewModel.dismissTranslationNotice()
-                        viewModel.startTranslatingCurrentBook()
-                    }
+                    LanguagePackDownloadButton(source: source, target: target, mode: viewModel.translation.mode)
                 }
                 Button("Dismiss") {
                     viewModel.dismissTranslationNotice()

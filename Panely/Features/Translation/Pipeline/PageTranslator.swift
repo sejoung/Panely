@@ -32,6 +32,27 @@ nonisolated enum TranslationAvailability {
         }
     }
 
+    /// The pair's status once a download the user agreed to has finished.
+    /// Apple Translation reports no download progress and may still be
+    /// installing when `prepareTranslation()` returns, so this polls until the
+    /// pack is in — or gives up after half an hour, or when cancelled.
+    static func statusAfterDownload(
+        from source: TranslationLanguage,
+        to target: TranslationLanguage,
+        mode: TranslationMode
+    ) async -> TranslationLanguageStatus {
+        let deadline = ContinuousClock.now + .seconds(30 * 60)
+        while true {
+            let current = await status(from: source, to: target, mode: mode)
+            guard current == .needsDownload, ContinuousClock.now < deadline else { return current }
+            do {
+                try await Task.sleep(for: .seconds(2))
+            } catch {
+                return current
+            }
+        }
+    }
+
     /// For SwiftUI's `translationTask`, the one API that may download a
     /// language pack — the pack for `mode`'s model.
     static func configuration(
@@ -54,8 +75,8 @@ nonisolated enum TranslationAvailability {
 ///
 /// Uses `TranslationSession(installedSource:target:)` (macOS 26), which works
 /// outside SwiftUI but can't prompt for a language download — callers check
-/// `TranslationAvailability` first and send the user to Settings, where the
-/// download runs through SwiftUI's `translationTask`.
+/// `TranslationAvailability` first and send the user to the translation
+/// panel, where the download runs through SwiftUI's `translationTask`.
 ///
 /// Not `Sendable`: one translation job owns one translator.
 @available(macOS 26.0, *)

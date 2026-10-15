@@ -27,6 +27,7 @@ final class TranslationManager {
     private(set) var openBookKey = ""
 
     let store: TranslationStore
+    let languagePacks = LanguagePackDownloads()
     @ObservationIgnored private let defaults: any KeyValueStoring
     @ObservationIgnored private var openBookTitle = ""
     @ObservationIgnored private var openBookURL: URL?
@@ -40,6 +41,9 @@ final class TranslationManager {
         self.store = store
         self.defaults = defaults
         placeholder = TranslationController(store: store, defaults: defaults)
+        languagePacks.onInstalled = { [weak self] pack in
+            self?.languagePackInstalled(pack)
+        }
     }
 
     /// The controller for the open book in the language it's shown in.
@@ -176,6 +180,15 @@ final class TranslationManager {
             self.start(controller)
         }
         return controller
+    }
+
+    /// Jobs that stopped for want of `pack` — in any book — start again.
+    private func languagePackInstalled(_ pack: LanguagePackDownloads.Pack) {
+        for controller in openBook + background
+        where controller.notice == .needsLanguageDownload(pack.source, pack.target) && controller.mode.effective == pack.mode {
+            controller.notice = nil
+            start(controller)
+        }
     }
 
     private func jobEnded() {

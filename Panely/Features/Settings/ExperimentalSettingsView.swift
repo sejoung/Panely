@@ -10,6 +10,8 @@ struct ExperimentalSettingsView: View {
     @State private var cacheBytes: UInt64?
     @State private var isClearing = false
 
+    private var locale: Locale { viewModel.localization.locale }
+
     private var enabled: Binding<Bool> {
         Binding(
             get: { viewModel.translationEnabled },
@@ -59,10 +61,29 @@ struct ExperimentalSettingsView: View {
                         : "Fast translation requires macOS 26.4 or later.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    Text("Language packs are downloaded from the translation panel the first time a book is translated. Manage downloaded packs in System Settings › General › Language & Region › Translation Languages.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     Toggle("Translate Sound Effects", isOn: includeSoundEffects)
                     Text("The default language is what new series are shown in. Each series can be shown in another language, and each book's own language is detected the first time it's translated — both from the translation button in the toolbar, remembered per series.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+
+                let downloading = viewModel.translationManager.languagePacks.downloading
+                if !downloading.isEmpty {
+                    Section("Language Packs") {
+                        ForEach(downloading, id: \.self) { pack in
+                            LabeledContent {
+                                LanguagePackDownloadingLabel()
+                            } label: {
+                                Text(verbatim: "\(pack.source.displayName(in: locale)) → \(pack.target.displayName(in: locale))")
+                            }
+                        }
+                        Text(LanguagePackDownloadingLabel.note)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 Section("Translation Cache") {
