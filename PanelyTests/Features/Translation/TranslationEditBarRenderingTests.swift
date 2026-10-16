@@ -8,8 +8,8 @@ import Testing
 /// only while editing, and offers the hidden-balloon menu and "Revert This
 /// Book…" only once something was changed.
 ///
-/// Checked by the controls AppKit has on screen (one per button or menu,
-/// see `HostedView.controlFrames`) and whether the bar's capsule is drawn.
+/// Checked by the controls on screen (one per button or menu, see
+/// `controlCount`) and whether the bar's capsule is drawn.
 @MainActor
 struct TranslationEditBarRenderingTests {
 
@@ -84,19 +84,50 @@ struct TranslationEditBarRenderingTests {
         }
     }
 
-    /// Every focus-ring view (hidden ones too) and the model state behind the
-    /// bar, so a CI failure says which control is missing — the count can
-    /// differ between macOS versions.
-    private func controlsReport(of hosted: SnapshotRenderer.HostedView, _ vm: ReaderViewModel) -> String {
-        let rings = hosted.allSubviews()
-            .filter { String(describing: type(of: $0)) == "_FocusRingView" }
-            .map { ring in
-                let frame = hosted.frameInHost(of: ring, rect: ring.bounds).integral
-                return "  \(frame)\(ring.isHiddenOrHasHiddenAncestor ? " hidden" : "")"
-            }
+    /// The model state behind the bar and what was found on screen, so a
+    /// failure says which control is missing.
+    private func controlsReport(of hosted: SnapshotRenderer.HostedView, _ vm: ReaderViewModel) throws -> String {
+        let rings = hosted.controlFrames()
+        let bezels = try rings.first.map { bezelSpans(in: try hosted.capture(), atY: $0.minY + 2) } ?? []
         let model = "model:    edited=\(vm.translationEdits.editedCount) hidden=\(vm.translationEdits.hiddenCount)"
             + " hiddenListed=\(vm.translationHiddenBalloons.count) translating=\(vm.translation.isWorking)"
-        return model + "\nfocus rings (\(rings.count)):\n" + rings.joined(separator: "\n")
+        return model
+            + "\nfocus rings: \(rings.map { "\($0.minX)–\($0.maxX)" })"
+            + "\nbezels:      \(bezels.map { "\($0.lowerBound)–\($0.upperBound)" })"
+    }
+
+    /// Controls on screen: AppKit's focus-ring views (`controlFrames`), plus
+    /// any bordered bezel on the controls' row that has none. macOS 26 gives
+    /// the hidden-balloon `Menu` no `_FocusRingView` (27 does), so there its
+    /// bezel stands in; a bezel never counts twice for a control with a ring.
+    private func controlCount(in hosted: SnapshotRenderer.HostedView, _ pixels: RenderedPixels) -> Int {
+        let rings = hosted.controlFrames()
+        // All controls share a row; 2 pt down is inside every bezel, above
+        // the labels.
+        guard let row = rings.first?.minY else { return 0 }
+        let ringless = bezelSpans(in: pixels, atY: row + 2).filter { bezel in
+            !rings.contains { $0.minX < bezel.upperBound && bezel.lowerBound < $0.maxX }
+        }
+        return rings.count + ringless.count
+    }
+
+    /// Horizontal spans at `y` drawn over the bar's black, at least a small
+    /// button wide — bordered bezels; the capsule's outline crosses the row
+    /// only a few points wide.
+    private func bezelSpans(in pixels: RenderedPixels, atY y: CGFloat) -> [Range<CGFloat>] {
+        let black = RenderedPixels.RGB(r: 0, g: 0, b: 0)
+        let step = 1 / pixels.scale
+        var spans: [Range<CGFloat>] = []
+        var start: CGFloat?
+        for x in stride(from: 0, through: Self.size.width, by: step) {
+            let drawn = x < Self.size.width && pixels.color(at: CGPoint(x: x, y: y)).differs(from: black, by: 15)
+            if drawn, start == nil { start = x }
+            if !drawn, let begin = start {
+                if x - begin >= 20 { spans.append(begin..<x) }
+                start = nil
+            }
+        }
+        return spans
     }
 
     /// The bar draws a capsule outlined in the accent color over the black
@@ -105,6 +136,6 @@ struct TranslationEditBarRenderingTests {
         let pixels = try hosted.capture()
         let everything = CGRect(origin: .zero, size: Self.size)
         guard pixels.accentPixels(in: everything) > 100 else { return .hidden }
-        return .shown(controls: hosted.controlFrames().count)
+        return .shown(controls: controlCount(in: hosted, pixels))
     }
 }
