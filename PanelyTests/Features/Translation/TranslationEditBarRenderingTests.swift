@@ -17,14 +17,14 @@ struct TranslationEditBarRenderingTests {
         let vm = try await TranslationSnapshotContent.translatedViewModel()
         let hosted = await host(vm)
         defer { hosted.close() }
-        try await expect(in: hosted, .hidden, "reading: no edit bar")
+        try await expect(in: hosted, of: vm, .hidden, "reading: no edit bar")
 
         vm.setEditingTranslations(true)
         // "Translate Page Again" and "Done".
-        try await expect(in: hosted, .shown(controls: 2), "editing: the bar, nothing changed yet")
+        try await expect(in: hosted, of: vm, .shown(controls: 2), "editing: the bar, nothing changed yet")
 
         vm.setEditingTranslations(false)
-        try await expect(in: hosted, .hidden, "back to reading: the bar gone")
+        try await expect(in: hosted, of: vm, .hidden, "back to reading: the bar gone")
     }
 
     @Test func hidingABalloonOffersItsMenuAndRevert() async throws {
@@ -32,16 +32,16 @@ struct TranslationEditBarRenderingTests {
         vm.setEditingTranslations(true)
         let hosted = await host(vm)
         defer { hosted.close() }
-        try await expect(in: hosted, .shown(controls: 2), "editing, nothing changed")
+        try await expect(in: hosted, of: vm, .shown(controls: 2), "editing, nothing changed")
 
         let page = vm.source.pages[0]
         let bubble = try #require(vm.translation.pages[page.id]?.bubbles.first)
         vm.translationEdits.hide(pageID: page.id, bubble: bubble)
         // "1 Hidden" menu, "Translate Page Again", "Revert This Book…", "Done".
-        try await expect(in: hosted, .shown(controls: 4), "a balloon hidden: its menu and Revert appear")
+        try await expect(in: hosted, of: vm, .shown(controls: 4), "a balloon hidden: its menu and Revert appear")
 
         vm.translationEdits.showAllHidden()
-        try await expect(in: hosted, .shown(controls: 2), "shown again: back to two controls")
+        try await expect(in: hosted, of: vm, .shown(controls: 2), "shown again: back to two controls")
     }
 
     // MARK: - Helpers
@@ -75,12 +75,28 @@ struct TranslationEditBarRenderingTests {
 
     private func expect(
         in hosted: SnapshotRenderer.HostedView,
+        of vm: ReaderViewModel,
         _ expected: BarState,
         _ what: String
     ) async throws {
-        try await hosted.settle(what, describe: { try "expected: \(expected)\ngot:      \(state(of: hosted))" }) {
+        try await hosted.settle(what, describe: { try "expected: \(expected)\ngot:      \(state(of: hosted))\n\(controlsReport(of: hosted, vm))" }) {
             try state(of: hosted) == expected
         }
+    }
+
+    /// Every focus-ring view (hidden ones too) and the model state behind the
+    /// bar, so a CI failure says which control is missing — the count can
+    /// differ between macOS versions.
+    private func controlsReport(of hosted: SnapshotRenderer.HostedView, _ vm: ReaderViewModel) -> String {
+        let rings = hosted.allSubviews()
+            .filter { String(describing: type(of: $0)) == "_FocusRingView" }
+            .map { ring in
+                let frame = hosted.frameInHost(of: ring, rect: ring.bounds).integral
+                return "  \(frame)\(ring.isHiddenOrHasHiddenAncestor ? " hidden" : "")"
+            }
+        let model = "model:    edited=\(vm.translationEdits.editedCount) hidden=\(vm.translationEdits.hiddenCount)"
+            + " hiddenListed=\(vm.translationHiddenBalloons.count) translating=\(vm.translation.isWorking)"
+        return model + "\nfocus rings (\(rings.count)):\n" + rings.joined(separator: "\n")
     }
 
     /// The bar draws a capsule outlined in the accent color over the black
