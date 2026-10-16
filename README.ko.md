@@ -77,7 +77,8 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   시리즈의 줌을 세션 동안 기억(종료 시 초기화). 다른 시리즈로 점프하면 새 책의
   맞춤으로 스냅되고, 나중에 돌아오면 그 시리즈의 줌이 복원됨
 - **자동 센터링** — 뷰포트가 더 클 때 이미지를 중앙에 유지
-- **±2페이지 프리로드**(페이지 모드) — 다음 페이지 전환이 즉시 체감
+- **±2페이지 프리로드**(페이지 모드, 두 페이지 모드에서는 ±2펼침) — 다음
+  페이지 전환이 즉시 체감
 - **시리즈 연속 읽기** — 한 권의 마지막 페이지에 닿고 다음 시블링이 있으면
   뷰어 하단에 다음 권 파일명 + "Next volume" 버튼이 뜬 카드(Up next)가
   표시됨. 대칭으로 페이지 0에서 backward를 명시적으로 누르면 상단에
@@ -142,10 +143,11 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   `.cbz` / `.zip` / `.cbr` / `.rar` 접미사
 - **트리에서 현재 책 표시** — 책을 열면 상위 폴더들이 자동으로 펼쳐져
   현재 권이 항상 사이드바에 보이고, 권 사이를 이동하면 펼침 상태도 따라감
-- **파일 트리 새로고침** — 사이드바 헤더의 **새로고침 버튼**으로 라이브러리를
-  즉시 재스캔. 갱신은 제자리 diff라 트리가 비거나 접히지 않고 펼쳐둔 폴더도
-  유지됨. (FSEvents 기반 *자동* 갱신은 플래그 뒤에 있으나 현재 비활성 —
-  대용량/클라우드 동기화 루트에서 재스캔 폭주 위험 — 그래서 지금은 수동 갱신)
+- **파일 트리 새로고침** — 라이브러리 폴더 아래에서 파일이 추가·삭제·이름
+  변경되면 사이드바가 자동으로 재스캔(FSEvents, 1.5초 디바운스 — 계속 쓰기가
+  일어나는 루트나 클라우드 동기화 루트는 잠잠해진 뒤 한 번만 재스캔)하고,
+  사이드바 헤더의 **새로고침 버튼**으로 즉시 재스캔도 가능. 어느 쪽이든 갱신은
+  제자리 diff라 트리가 비거나 접히지 않고 펼쳐둔 폴더도 유지됨
 - **읽기 진행도** — 추적된 책마다 사이드바에 배지 표시: 읽는 중엔 진행 링,
   완독하면 체크. 영속 `{page, total, finished}` 기록(정확 복원용 위치 저장소와
   별개)에서 계산. 최상단의 **이어보기** 한 줄로 가장 최근에 읽던 미완독 책으로
@@ -155,7 +157,8 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   이미지로 스크롤(키보드로 마지막 이동한 위치가 아니라 현재 뷰포트 중앙에
   있는 페이지 기준)
 - 같은 폴더의 형제 책 간 **볼륨 네비게이션**
-- **최근 항목** — security-scoped bookmark로 실행 간 유지, 동일한
+- **최근 항목** — **파일 → 최근 항목 열기**에 최근 연 항목 10개 표시(**메뉴
+  지우기**로 비우기). security-scoped bookmark로 실행 간 유지, 동일한
   아이콘 스킴으로 표시
 - **실행 시 마지막 라이브러리 자동 복원** — 마지막에 보던 폴더를
   자동으로 다시 열어(security-scoped bookmark) 콜드 스타트가 빈 사이드바가
@@ -173,6 +176,14 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   행마다 삭제 버튼, 전체삭제)와 다른 책에 남겨 둔 북마크가 함께 표시됨. 다른
   책의 북마크를 고르면 그 책이 해당 페이지로 열림. 같은 목록을 툴바의 북마크
   메뉴와 **이동 → 북마크**에서도 바로 볼 수 있음
+- **즐겨찾기** — `⌘⇧D`(또는 툴바 별 버튼, **이동 → 즐겨찾기에 추가**)로 책에
+  별표를 하면 사이드바 **즐겨찾기** 섹션에 표시되어 한 번 클릭으로 다시 열 수
+  있음. 행의 컨텍스트 메뉴에서 제거
+- **썸네일 사이드바** — `⌃⌘P`(또는 툴바 버튼)로 오른쪽에 페이지 썸네일 목록을
+  열고(지연 로드), 썸네일을 클릭하면 해당 페이지로 이동. 기본은 숨김, 표시
+  상태는 영구 저장
+- **페이지로 이동** — `⌘G`로 페이지 번호 입력 창을 열거나, 하단 슬라이더 위
+  페이지 카운터를 클릭해 번호를 입력(Enter로 이동, Esc로 취소)
 - **즉시 뜨는 툴바 설명** — 툴바 아이콘에 마우스를 올리면 시스템 툴팁 지연
   없이 이름과 단축키가 바로 표시됨
 - **창 크기에 맞는 툴바** — 창이 좁거나 라이브러리를 고정해 툴바가 다 들어가지
@@ -195,6 +206,9 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
 - **기기 내 처리** — Vision 문서 인식(OCR, 세로쓰기 일본어 포함) + Apple
   Translation. 언어팩이 없으면 번역 패널이나 상태 배너에서 시스템 안내로 한 번
   다운로드
+- **빠르게 / 정확하게**(설정 → 실험적 기능 → **번역 방식**) — 기본인 빠르게는 한 권을
+  1분 정도에, 정확하게는 관용 표현을 더 잘 옮기지만 20배 정도 걸림. 방식마다 언어팩이
+  따로이며, 빠르게는 macOS 26.4 이상 필요(그 전에는 모두 정확하게)
 - **할 일마다 한 곳** — 툴바 번역 버튼은 원문 ↔ 번역 전환(`⇧⌘T`), 옆의 언어 이름
   ("한국어 ▾")은 언어 전환·추가와 패널·편집 모드를 여는 메뉴. **번역 패널**은 이 책 번역에만 집중: 큰 버튼 하나
   (번역 / 언어팩 다운로드 / 일시정지 / 이어서)와 상태 한 줄, **보기** 목록(원문
@@ -208,7 +222,7 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   화면의 안내문(프롬프트)과 함께 ChatGPT, Claude 등 아무 채팅에 첨부하고, 답 파일을 열면 바뀐 번역이
   직접 고친 내용으로 반영됨(한 번에 실행 취소, 빠진 말풍선은 번호로 알려줌). API 키가 필요
   없고, 채팅에 줄 때만 Mac 밖으로 나감
-- **다시 번역** — 페이지(편집 막대) 또는 책 전체(패널)를 지금 방식으로 다시 읽고 번역해,
+- **다시 번역** — 페이지(우클릭, 언어 메뉴, 편집 막대) 또는 책 전체(패널)를 지금 방식으로 다시 읽고 번역해,
   개선 전에 번역된 페이지도 캐시를 지우지 않고 적용
 - **놓친 글자** — 감지 모델이 찾았는데 OCR이 비워 둔 글자 상자는 자동으로 확대해서 다시
   읽음. 그래도 남은 글자는 편집 모드에서 드래그로 상자를 그려 추가(확대해서 읽고 번역,
@@ -274,7 +288,7 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
 
 - **macOS 14** (Sonoma) 이상
 - 실험적 기능인 번역 보조는 **macOS 26** 이상
-- **Xcode 16** 이상 (소스 빌드 시)
+- **Xcode 26.4** 이상 (소스 빌드 시 — 번역 코드가 macOS 26.4 SDK의 API를 사용)
 
 ## 릴리스 설치
 
@@ -401,7 +415,7 @@ LaunchServices 캐시에 남을 수 있으니, 우클릭 → "다음으로 압�
 | `⌥⌘J` | 작업 창: 백그라운드 번역·내보내기, 내보낸 책 |
 | 말풍선 클릭 | 번역 보조: 번역·다른 언어 번역·원문 보기 (편집 모드에서는 고치기·숨기기·원래대로) |
 | 왼쪽 가장자리 호버 | 사이드바 오버레이로 나타냄 (자동 숨김 모드에서) |
-| `ESC` | 사이드바 오버레이 해제 (고정 안 된 상태) |
+| `ESC` | 사이드바 오버레이 해제 (고정 안 된 상태). 말풍선 편집 모드가 켜져 있으면 먼저 편집 모드 종료 |
 | 이미지 위 더블클릭 | 1× ↔ 2× 줌 토글 |
 | 스크롤 휠 / 트랙패드 스크롤 | 페이지 레이아웃: 더 이상 스크롤할 여백이 없으면 페이지 넘김 (아래 = 다음, 위 = 이전. 트랙패드는 스와이프당 1페이지). View → Disable Scroll Page Turning으로 끄기 |
 | 트랙패드 핀치 | 줌 인 / 아웃 |
@@ -411,18 +425,56 @@ LaunchServices 캐시에 남을 수 있으니, 우클릭 → "다음으로 압�
 ## 테스트
 
 ```bash
-xcodebuild test \
-  -project Panely.xcodeproj \
-  -scheme Panely \
-  -destination 'platform=macOS' \
-  CODE_SIGN_IDENTITY="-"
+scripts/test.sh          # fast 티어 (= 일반 `xcodebuild test`, CI가 실행하는 것)
+scripts/test-slow.sh     # + slow 티어: 실제 FSEvents, 실제 Vision OCR, 모든 랜덤 시드
+scripts/test-visual.sh   # PanelyTests/Snapshots/Reference/ 기준 스크린샷 비교
+scripts/benchmark-translation.sh [--book PATH]   # 번역 단계별·작업 전체 소요 시간 측정
 ```
 
-**93 스위트에 걸친 705개 테스트**가 다음을 커버:
+티어는 `PanelyTests/TestTiers.swift`에서 정합니다. slow와 visual 티어는
+`PANELY_SLOW_TESTS=1` / `PANELY_VISUAL_TESTS=1`로 켜는 opt-in이며(벤치마크
+`PanelyTests/Benchmarks/TranslationBenchmarkTests.swift`는 자체
+`PANELY_BENCHMARK=1`), 스크립트가 이를 `TEST_RUNNER_…`로 넘겨 xcodebuild가
+테스트 프로세스에 전달합니다. fast 티어는 테스트 시간 약 6–8초, visual
+티어는 약 10초, slow 티어는 fast 위에 약 3초를 더합니다(FSEvents 테스트는
+대부분 기다리는 시간).
+
+모든 테스트의 임시 파일은 실행마다 하나인 `tmp/paneltest-run-*` 디렉터리
+아래에 있고(`Fixture.runDirectory`), 테스트가 여는 폴더에 볼륨으로 나열될
+형제가 없도록 각자 별도 부모 폴더를 씁니다. 각 실행은 이전 실행이 남긴
+1시간 이상 지난 항목을 지웁니다. (예전에는 잔여물이 `tmp`에 그대로 쌓여 —
+55k개 — 폴더를 여는 테스트가 갈수록 느려졌습니다.)
 
 `SnapshotGalleryTests`는 기본 테스트에서 발견은 되지만
 `scripts/generate-snapshots.sh`가 스냅샷 생성을 활성화할 때만 실행됩니다.
 따라서 기본 `xcodebuild test` 경로는 매뉴얼 PNG를 렌더링하거나 복사하지 않습니다.
+
+여러 스위트가 모델만이 아니라 실제로 화면에 닿는 것을 지킵니다:
+
+- **`LibrarySidebarRenderingTests`**는 실제 사이드바를 픽스처 라이브러리 위에
+  오프스크린 렌더링하고 AppKit이 만든 `NSOutlineView`(행, 레벨, 어떤 폴더가
+  펼쳐지는지)를 검사합니다. 스캔은 잘 되는데 평평하게 그려지는 트리는 실패.
+- **업데이트 렌더링 테스트**(`LibrarySidebarUpdateRenderingTests`,
+  `ReaderToolbarRenderingTests`, `TranslationEditBarRenderingTests`,
+  `ThumbnailSidebarRenderingTests`, `GoMenuRenderingTests`)는 실제 뷰를 호스팅하고
+  뷰 모델을 바꾼 뒤(페이지 넘김, 다른 책 열기, 진행도 기록, 번역 도착) 호스팅된
+  뷰가 따라오는지 확인합니다. 헬퍼는
+  `PanelyTests/Snapshots/HostedViewInspection.swift`.
+- **`ReaderViewerRenderingTests`**는 실제 뷰어가 각 페이지를 어디에 놓는지(단일,
+  두 쪽, 오른쪽→왼쪽, 표지 단독, 세로 스트립) 확인하고,
+  **`TranslationOverlayDrawingTests`**는 번역 오버레이가 그리는 내용을 읽어 와
+  호버 시 부분 다시 그리기가 전체 다시 그리기와 일치하는지까지 검사합니다.
+- **`VisualRegressionTests`**(opt-in: `scripts/test-visual.sh`)는 여러 화면을
+  렌더링해 `PanelyTests/Snapshots/Reference/`의 기준 PNG와 비교합니다
+  (`SnapshotComparator`: 6단계 넘게 다른 픽셀이 0.1%를 넘으면 실패 — 어두운
+  크롬에는 이 정도 민감도가 필요하고, 폰트 스무딩 노이즈는 ~0.01%). 실패하면
+  렌더링 이미지와 회색 바탕 빨간 diff가 Debug 샌드박스의
+  `Caches/panely-visual-diffs/`에 남습니다. 기준 이미지는 기록한 macOS 메이저
+  버전에 묶여 있고 다른 버전에서는 스위트가 skip됩니다. 의도한 UI 변경 후에는
+  `scripts/update-reference-snapshots.sh`로 다시 기록하고 커밋 전에 PNG를
+  검토하세요.
+
+스위트가 커버하는 범위:
 
 - 순수 데이터 타입 (`ComicPage`, `ComicSource`, `RecentItem`, enum raw 값)
 - 자연 정렬 규약 (Panely가 의존하는 Foundation 동작)
@@ -484,12 +536,13 @@ xcodebuild test \
   유일성, `cleanupStaleEntries()` mtime 게이트(stale 제거, fresh 유지,
   비-panely 항목 무시), 그리고 추출 캐시: 파일별 안정적 `cacheKey`
   (mtime 민감), `cachedEntry` 히트/미스 + 히트 시 mtime touch,
-  `enforceBudget()` 10 GB 초과 시 LRU eviction, `cacheSizeBytes()` /
-  `clearCache(excluding:)` 수동 정리, `cleanup()`이 session dir은 삭제하되
+  `enforceBudget()` 10 GB 초과 시 LRU eviction, `cacheSizeBytes(in:excluding:)` /
+  `clearCache(in:excluding:)` 수동 정리, `cleanup()`이 session dir은 삭제하되
   cache dir은 보존
-- **`ReaderImageLoader`** — reset / `prepareForVerticalRebuild` /
+- **`ReaderImageLoader`** — reset / `prepareForLayoutRebuild` /
   `cancelPreload` 상태 전이, `estimatedBitmapCost`가 Retina 백킹에는 픽셀
-  치수 사용 + 플레이스홀더에는 size fallback, `lazyConcurrencyLimit`이
+  치수 사용 + 플레이스홀더에는 size fallback, RAM 비례 cost 상한이
+  [150 MB, 1 GB]로 클램프, `lazyConcurrencyLimit`이
   [2, 8]로 클램프
 - **`AppKitScrollerCoordinator`** — bounds 옵저버가 연속 레이아웃에서는
   page index + range 콜백 fire하지만 페이지 모드에서는 no-op,
@@ -531,17 +584,27 @@ xcodebuild test \
 - **번역 보조** — OCR 구간 분할과 경계 처리, 말풍선 묶기, 효과음·언어 판별,
   페이지/스트립 작업 계획, 작업 매니저(책 × 언어당 작업 하나, 백그라운드 작업,
   재연결, 대기열, 열려 있어야 하는 책), 캐시 키와 저장, 오버레이 위치와 클릭
-  판정, 시리즈 권 판별, 리더 연동(시리즈별 언어, 원문 ↔ 번역, 화면 이미지를
-  따라가는 오버레이)
+  판정, 시리즈 권 판별, 말풍선 검출과 놓친 텍스트 다시 읽기, 말투 맞추기,
+  말풍선 수정, AI 채팅 왕복, 번역본 내보내기, 리더 연동(시리즈별 언어,
+  원문 ↔ 번역, 화면 이미지를 따라가는 오버레이)
+- **현지화** — `AppLocalization`(시스템 설정 따르기 → Mac의 주 언어, 없으면
+  영어), `AppMenuLocalizer`의 기본 메뉴 제목, 빌드된 `ko.lproj`로 카탈로그 키를
+  확인하는 `KoreanLocalizationTests`
+- **라이브러리 감시 & 저장 데이터** — `LibraryDirectoryWatcher` /
+  `LibraryChangeFilter`(어떤 FSEvents 플래그가 트리 재스캔을 일으키는지, slow
+  티어에서는 실제 스트림), `Debouncer`, 북마크 resolve 시 볼륨을 마운트해도
+  되는 호출 지점, 레거시 `UserDefaults` 형식이 여전히 디코드되는지
 - **`EntitlementsTests` / `FileAssociationTests`** — 저장 패널 대상용 샌드박스
-  entitlement, Info.plist 문서 타입 / exported UTI(폴더, CBZ/ZIP, CBR/RAR)
+  entitlement, Info.plist 문서 타입 / imported UTI(폴더, CBZ/ZIP, CBR/RAR)
 
 테스트는 소스 트리를 그대로 반영합니다: `PanelyTests/Core/{Comic, Diagnostics,
-Extensions}/`, `PanelyTests/Features/Library/`, `PanelyTests/Features/Settings/`,
-`PanelyTests/Features/Translation/`, 그리고
-`PanelyTests/Features/Reader/{Model, Viewer, Thumbnails, ViewModel,
-ViewModel/Collaborators}`. 공유 픽스처(실제 PNG 생성기 포함)는
-`PanelyTests/TestFixtures.swift`에 있고, persistence 테스트는
+Extensions}/`, `PanelyTests/Commands/`, `PanelyTests/Features/Library/`,
+`PanelyTests/Features/Settings/`, `PanelyTests/Features/Translation/`, 그리고
+`PanelyTests/Features/Reader/{Model, Scene, Viewer, Thumbnails, ViewModel,
+ViewModel/Collaborators}`, 그 밖에 `PanelyTests/Localization/`,
+`PanelyTests/Snapshots/`, `PanelyTests/Benchmarks/`. 공유 픽스처(실제 PNG
+생성기 포함)는 `PanelyTests/TestFixtures.swift`에, 커밋된 RAR 아카이브는
+`PanelyTests/Fixtures/Archives/`에 있고, persistence 테스트는
 `PanelyTests/TestKeyValueStore.swift`를 씁니다.
 
 `RecentItem.Codable`은 `isDirectory`용 `decodeIfPresent` 경로를 포함하여
@@ -557,26 +620,44 @@ ViewModel/Collaborators}`. 공유 픽스처(실제 PNG 생성기 포함)는
 Panely/
 ├── PanelyApp.swift                     # @main, 윈도우 스타일, .commands { fileCommands + viewCommands + goCommands }
 ├── ContentView.swift
-├── AppDependencies.swift               # 주입되는 앱 서비스(cache, bookmark, persistence, system settings, 파일 감시)
+├── AppDependencies.swift               # 주입되는 앱 서비스(cache, bookmark, persistence, system settings, 파일 감시,
+│                                       # 파일 선택, UI 언어, 번역 저장소) + collaborator 팩토리
 ├── AppIcon.icns                        # docs/icon/*.svg에서 생성
+├── Assets.xcassets                     # 강조 색상
+├── Credits.rtf                         # About 패널 크레딧 (release.sh가 빌드 커밋 SHA를 기록)
 ├── Localizable.xcstrings               # 문자열 카탈로그: 영어 원문 + 한국어
+├── Resources/
+│   └── ComicTextDetector.mlpackage     # Core ML 말풍선 / 텍스트 검출기 (scripts/convert-text-detector.py로 생성)
 ├── Commands/                           # PanelyApp에 대한 @CommandsBuilder extension
 │   ├── PanelyApp+FileCommands.swift    # Open / Open Recent
 │   ├── PanelyApp+ViewCommands.swift    # chrome / 레이아웃 / 맞춤 / 줌 / autofit
 │   └── PanelyApp+GoCommands.swift      # 페이지 이동 / 북마크 / 즐겨찾기 / 볼륨
 ├── Core/
 │   ├── Comic/                          # loader, ComicSource/Page, natural sort, 이미지 메타데이터
+│   │   ├── ComicPage.swift / ComicSource.swift / ComicPageSource.swift
+│   │   ├── FolderLoader.swift
+│   │   ├── ArchiveLoader.swift         # 평면 + 재귀 중첩 추출 + 5 GB 안전 상한
+│   │   ├── ArchiveReader.swift         # ArchiveReader 프로토콜 + ArchiveFormat(매직 바이트 판별)
+│   │   ├── ZIPArchiveReader.swift      # ZIPFoundation.Archive 감싼 actor
+│   │   │                               # (헤더 전용 읽기용 loadDataPrefix)
+│   │   ├── RARArchiveReader.swift      # UnrarKit URKArchive 감싼 actor
+│   │   │                               # (solid 아카이브는 최초 접근 시 1회 추출)
+│   │   ├── NaturalSort.swift           # 로케일 인식 자연 정렬 헬퍼
+│   │   └── ImageLoader.swift           # async NSImage + dimensions(for:) 헤더 읽기
 │   ├── Diagnostics/
 │   │   ├── AppLog.swift                # swift-log facade + OSLog/file 진단 backend
 │   │   └── DiagnosticLogStore.swift    # rolling recent-log.txt 캐시 파일
 │   ├── SourceChangeMonitor.swift       # DispatchSource 기반 다중 URL 파일/폴더 감시 (세션 가드)
-│   ├── LibraryDirectoryWatcher.swift   # 라이브러리 루트 재귀 FSEvents 감시 (자동 갱신은 현재 비활성)
+│   ├── LibraryDirectoryWatcher.swift   # 라이브러리 루트 재귀 FSEvents 감시 → 사이드바 자동 갱신
 │   ├── Debouncer.swift                 # 공용 트레일링 디바운스 헬퍼 (위치/진행도 저장)
 │   ├── AppLanguage.swift               # 시스템 설정 따르기 / 영어 / 한국어 선택
 │   ├── AppLocalization.swift           # 현재 적용 언어, 즉시 전환용 `Bundle.localized`
 │   ├── AppMenuLocalizer.swift          # macOS 기본 메뉴 언어 즉시 전환
 │   ├── FilePicking.swift               # NSOpenPanel seam (주입) → open / folder-access 흐름 테스트 가능
-│   └── Extensions/                     # 공유 Foundation helper
+│   └── Extensions/                     # 공유 Foundation 유틸 extension (DRY)
+│       ├── URL+IsAncestor.swift        # path-component 단위 접두사 포함 체크
+│       ├── UserDefaults+Codable.swift  # KeyValueStoring + JSON encode/decode 헬퍼
+│       └── Dictionary+CapByRecency.swift # persistence store 공용 최근성 기반 상한
 ├── DesignSystem/
 │   ├── Tokens/                         # Color / Spacing / Typography / Motion
 │   └── Primitives/                     # 아이콘 버튼, 아이콘 메뉴, 슬라이더
@@ -611,7 +692,9 @@ Panely/
 │   │   │   │   ├── ReaderViewModel+ImageLoading.swift # ReaderImageLoader 위 얇은 facade
 │   │   │   │   ├── ReaderViewModel+Bookmarks.swift    # 즐겨찾기 + 페이지 북마크 연동
 │   │   │   │   ├── ReaderViewModel+ReadingProgress.swift # 진행도 기록 → 사이드바 배지 + 이어보기
-│   │   │   │   └── ReaderViewModel+Translation.swift  # 번역 보조: 언어, 작업, 오버레이
+│   │   │   │   ├── ReaderViewModel+Translation.swift  # 번역 보조: 언어, 작업, 오버레이
+│   │   │   │   ├── ReaderViewModel+TranslationExport.swift # 번역본 책 / 시리즈 내보내기 (백그라운드 작업)
+│   │   │   │   └── ReaderViewModel+AIChat.swift       # AI 채팅 왕복: 말풍선 저장, 답변 적용, 되돌리기
 │   │   │   └── Collaborators/                  # ReaderViewModel이 합성, 각각 단일 책임
 │   │   │       ├── ReaderPreferences.swift     # KeyValueStoring 기반 레이아웃 / 맞춤 / 고정
 │   │   │       ├── ReaderPositionStore.swift   # 디바운스된 책별 페이지 메모리
@@ -649,23 +732,28 @@ Panely/
 │   ├── Translation/                    # 실험적 기능: 번역 보조 (macOS 26 이상)
 │   │   ├── TranslationManager.swift    # 앱 전체 작업: 책 × 언어당 하나, 백그라운드 + 대기열
 │   │   ├── TranslationController.swift # 책 하나를 한 언어로: 작업 계획, OCR → 번역, 진행 상황
-│   │   ├── TranslationStore.swift      # 페이지별 JSON 캐시 (페이지 id + 언어 + 범위)
-│   │   ├── TranslationEdits.swift      # 열린 책의 말풍선 수정 내용 (+ TranslationEditStore)
+│   │   ├── TranslationStore.swift      # Caches 아래 페이지별 JSON 캐시 (페이지 id + 언어 + 범위 + 모드)
+│   │   ├── TranslationEdits.swift      # 열린 책의 말풍선 수정 내용
+│   │   ├── TranslationEditStore.swift  # Application Support 아래 수정 내용 저장 (캐시 비우기에도 유지)
 │   │   ├── LanguagePackDownloads.swift # 앱 전체 언어팩 상태와 다운로드
 │   │   ├── SeriesVolumeMatcher.swift   # 같은 시리즈의 다른 권 판별
-│   │   ├── Model/                      # TranslationLanguage, TranslatedPage / TranslatedBubble, PageEdits
+│   │   ├── Model/                      # TranslationLanguage, TranslationMode(빠르게 / 정확하게),
+│   │   │                               # TranslatedPage / TranslatedBubble, PageEdits
+│   │   ├── AIChat/                     # AIChatExchange: 말풍선을 사용자의 AI 채팅으로 보내고 답변을 받아옴
 │   │   ├── Export/                     # 번역본 내보내기: TranslationExportManager(작업, 기록, 저장 폴더),
-│   │   │                               # TranslationExportWriter(CBZ / ZIP / 폴더), TranslatedPageRenderer
+│   │   │                               # TranslationExportJob(옵션, 기록), TranslationExportWriter
+│   │   │                               # (CBZ / ZIP / 폴더), TranslatedPageRenderer
 │   │   ├── Pipeline/                   # OCRTiling, TranslationPlan (page / strip), PageAnalyzer,
 │   │   │                               # PageTextRecognizer (Vision), PageTranslator (Translation),
-│   │   │                               # BubbleGrouper, BalloonDetector(Core ML), SpeechLevel,
+│   │   │                               # BubbleGrouper, BalloonDetector(Core ML), MissedText, SpeechLevel,
 │   │   │                               # BubbleBackgroundSampler, TextClassifiers
 │   │   ├── Viewer/                     # TranslationOverlayView (+ 레이아웃, TranslationPatchPainter), 말풍선 팝오버
 │   │   └── UI/                         # 번역 패널, 언어 행, 진행 표시, 작업 목록, 편집 모드 막대,
-│   │                                   # 내보내기 시트, 작업 창
+│   │                                   # 내보내기 시트, AI 채팅 시트, 작업 창
 │   ├── Settings/
 │   │   ├── SettingsView.swift          # General + Library + Storage + Diagnostics + Experimental 탭
-│   │   ├── ExperimentalSettingsView.swift # 번역 보조: 켜기, 기본 언어, 말투 맞추기, 캐시
+│   │   ├── ExperimentalSettingsView.swift # 번역 보조: 켜기, 번역할 언어, 모드, 말투 맞추기,
+│   │   │                                  # 언어팩, 내 수정 내용, 캐시
 │   │   ├── GeneralSettingsView.swift   # 인터페이스 언어 선택(즉시 적용)
 │   │   ├── LibrarySettingsView.swift   # 마지막 폴더 다시 열기 토글 + Forget Now
 │   │   ├── StorageSettingsView.swift   # Storage 설정 UI + 캐시 용량 / 삭제 컨트롤
@@ -696,22 +784,6 @@ Panely/
 │           ├── VolumeRow.swift
 │           ├── PageBookmarkRow.swift
 │           └── ReadingBadgeView.swift  # 진행 링 / 완독 체크
-└── Core/
-    ├── Extensions/                     # 공유 Foundation 유틸 extension (DRY)
-    │   ├── URL+IsAncestor.swift        # path-component 단위 접두사 포함 체크
-    │   ├── UserDefaults+Codable.swift  # KeyValueStoring + JSON encode/decode 헬퍼
-    │   └── Dictionary+CapByRecency.swift # persistence store 공용 최근성 기반 상한
-    └── Comic/
-        ├── ComicPage.swift / ComicSource.swift / ComicPageSource.swift
-        ├── FolderLoader.swift
-        ├── ArchiveLoader.swift         # 평면 + 재귀 중첩 추출 + 5 GB 안전 상한
-        ├── ArchiveReader.swift         # ArchiveReader 프로토콜 + ArchiveFormat(매직 바이트 판별)
-        ├── ZIPArchiveReader.swift      # ZIPFoundation.Archive 감싼 actor
-        │                               # (헤더 전용 읽기용 loadDataPrefix)
-        ├── RARArchiveReader.swift      # UnrarKit URKArchive 감싼 actor
-        │                               # (solid 아카이브는 최초 접근 시 1회 추출)
-        ├── NaturalSort.swift           # 로케일 인식 자연 정렬 헬퍼
-        └── ImageLoader.swift           # async NSImage + dimensions(for:) 헤더 읽기
 
 PanelyTests/                            # 소스 트리를 미러링
 ├── TestFixtures.swift                  # 공유 temp-dir / zip / PNG 헬퍼
@@ -719,37 +791,56 @@ PanelyTests/                            # 소스 트리를 미러링
 ├── FileAssociationTests.swift
 ├── EntitlementsTests.swift
 ├── TestKeyValueStore.swift             # persistence 테스트용 in-memory KeyValueStoring
-├── Snapshots/                          # docs/screenshots/ 생성기 (CI에서 skip)
+├── TestTiers.swift                     # fast / slow / visual 티어 (환경 변수로 제어)
+├── Fixtures/Archives/                  # 커밋된 RAR4 / RAR5 픽스처 (solid, 중첩, 암호)
+├── Benchmarks/                         # TranslationBenchmarkTests (opt-in: scripts/benchmark-translation.sh)
+├── Commands/                           # GoMenuRenderingTests
+├── Localization/                       # KoreanLocalizationTests
+├── Snapshots/                          # docs/screenshots/ 생성기 (CI에서 skip) + 시각 회귀
 │   ├── SnapshotRenderer.swift          # NSHostingView + offscreen window → PNG
 │   ├── SnapshotSampleContent.swift     # placeholder 페이지 + LibraryFixture
-│   └── SnapshotGalleryTests.swift      # 15개 매뉴얼 시나리오
-├── Core/Comic/                         # ArchiveLoader, ZIP/RAR 리더, FolderLoader, ImageLoader{Load,Dimensions},
-│                                       # ComicModel, LoaderExtension, NaturalSort
-├── Core/Diagnostics/                   # AppLog, DiagnosticLogStore
+│   ├── TranslationSnapshotContent.swift # 번역 스크린샷용으로 직접 그린 만화 페이지 + 번역
+│   ├── SnapshotGalleryTests.swift      # 매뉴얼 시나리오
+│   ├── SnapshotComparator.swift        # 허용 오차 있는 픽셀 diff + diff 이미지
+│   ├── VisualRegressionTests.swift     # 화면 vs Reference/*.png
+│   ├── HostedViewInspection.swift      # 호스팅 뷰 렌더링 테스트용 헬퍼
+│   └── Reference/                      # 기준 PNG + 기록한 macOS 버전
+├── Core/Comic/                         # ArchiveLoader(+ handoff), ZIP/RAR 리더(취소, 손상,
+│                                       # 인덱스 동등성), FolderLoader, ImageLoader{Load,Dimensions},
+│                                       # ComicModel, LoaderExtension, NaturalSort, GatedArchiveReader
+├── Core/Diagnostics/                   # AppLog(+ 레벨), DiagnosticLogStore(+ 복원력)
 ├── Core/Extensions/                    # URL 상대 하위 경로 헬퍼
-├── Core/SourceChangeMonitorTests.swift
-├── Features/Library/                   # FavoritesStore, PageBookmarksStore, RecentItem,
+├── Core/                               # SourceChangeMonitor, LibraryDirectoryWatcher, LibraryChangeFilter,
+│                                       # Debouncer, AppLocalization, AppMenuLocalization
+├── Features/Library/                   # FavoritesStore, PageBookmarksStore(+ memo), RecentItem,
 │                                       # FileNode, FavoriteBook, PageBookmark,
 │                                       # ReadingProgressStore, LastLibraryRootStore,
-│                                       # LibrarySidebarModel, SecurityScopedBookmark
-├── Features/Settings/                  # CacheMaintenance, Settings UI, diagnostic report export
-├── Features/Translation/               # OCR 구간 분할, 말풍선 묶기, 판별기, 작업 계획, 매니저, 캐시,
-│                                       # 오버레이 클릭 판정, 시리즈 판별, 리더 연동
+│                                       # LibrarySidebarModel, SecurityScopedBookmark,
+│                                       # LibraryTreeScan, 북마크 마운트 정책, 레거시 형식,
+│                                       # LibrarySidebar(Update)Rendering
+├── Features/Settings/                  # CacheMaintenance, diagnostic report export
+├── Features/Translation/               # OCR 구간 분할, 말풍선 묶기, 말풍선 검출, 놓친 텍스트, 말투,
+│                                       # 판별기, 작업 계획, 컨트롤러, 매니저, 캐시, 수정, 내보내기,
+│                                       # AI 채팅, 오버레이 그리기 / 클릭 판정, 시리즈 판별, 리더 연동
 └── Features/Reader/
     ├── Model/                          # FitCalculator, PositionKey, ReaderEnum, SidebarMode,
     │                                   # SpreadCalculator
+    ├── Scene/                          # ReaderToolbarRenderingTests
     ├── Viewer/                         # CenteringClipView, FitMagnificationStability,
     │                                   # ImageStackVertical, ScrollZoomCalculator,
     │                                   # ViewerController, ViewerResizeFit,
     │                                   # AppKitScrollerCoordinator, TitleBarPassthrough,
-    │                                   # WheelPageTurnEngine, ZoomCarryOver
-    ├── Thumbnails/                     # ThumbnailLoader
-    └── ViewModel/                      # ReaderViewModel 통합 테스트 14개 (Bookmarks,
-        │                               # BookSwitchStripReset, EndOfVolume, Library,
-        │                               # OpenSource, PagedMode, PositionMemory, QuickJump,
-        │                               # ReadingProgress, SeriesPreferences, SetLayout,
-        │                               # ThumbnailSidebar, ToolbarPin, VerticalMode)
-        │                               # + ReaderSeriesIdentity / SeriesPreferencesStore
+    │                                   # WheelPageTurnEngine, ZoomCarryOver, ReaderViewerRendering
+    ├── Thumbnails/                     # ThumbnailLoader, ThumbnailSidebarRendering
+    └── ViewModel/                      # ReaderViewModel 통합 테스트 18개 (AppLanguage,
+        │                               # Bookmarks, BookmarkList, BookSwitchStripReset,
+        │                               # EndOfVolume, Library, OpenSource, PagedCancellation,
+        │                               # PagedMode, PositionMemory, QuickJump, ReadingProgress,
+        │                               # SeriesPreferences, SetLayout, ThumbnailSidebar,
+        │                               # ToolbarPin, VerticalMode, VolumeStepping)
+        │                               # + ReaderSeriesIdentity / SeriesPreferencesStore,
+        │                               # ContinueReading{Index,Randomized},
+        │                               # PositionKeyConsistency, PositionPersistenceSafety
         └── Collaborators/              # collaborator들의 포커싱된 단위 테스트
 
 docs/
@@ -757,23 +848,32 @@ docs/
 ├── manual.md                           # 영문 사용 설명서 (스크린샷 둘러보기)
 ├── manual.html                         # 매뉴얼 HTML 버전
 ├── manual.ko.md                        # 한글 사용 설명서
-├── screenshots/                        # SnapshotGalleryTests가 생성하는 15개 PNG
+├── screenshots/                        # SnapshotGalleryTests가 생성하는 24개 PNG
 ├── panely_design_system_mac_os.md
 └── icon/panely-icon-stacked.svg
 
 scripts/
 ├── generate-app-icon.sh                # SVG → .icns 파이프라인
+├── test.sh                             # fast 테스트 티어 (CI가 실행하는 것)
+├── test-slow.sh                        # fast + slow 티어 (실제 FSEvents / OCR, 모든 시드)
+├── test-visual.sh                      # 스크린샷 비교만
+├── benchmark-translation.sh            # 번역 단계별 / 작업별 소요 시간 (opt-in 벤치마크)
 ├── generate-snapshots.sh               # SnapshotGalleryTests로 docs/screenshots/*.png 재생성
+├── update-reference-snapshots.sh       # PanelyTests/Snapshots/Reference/*.png 다시 기록
 ├── convert-text-detector.py            # Resources/ComicTextDetector.mlpackage(Core ML) 다시 만들기
 ├── install-local.sh                    # 로컬에서 빌드 + 설치해 직접 테스트 (--debug, --test…)
 └── release.sh                          # 버전 범프 + 태그 + 푸시 자동화
 
-.github/workflows/
-├── ci.yml                              # push/PR에서 빌드 + 테스트
-└── release.yml                         # v* 태그에서 zip + GitHub Release
+Packages/UnrarKit/                      # UnrarKit + RARLAB unrar 소스를 로컬 Swift 패키지로 포함
 
-Info.plist                              # 번들 아이콘 참조
-Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북마크
+.github/
+├── FUNDING.yml                         # GitHub Sponsors (sejoung)
+└── workflows/
+    ├── ci.yml                          # main 대상 push/PR에서 빌드 + fast 티어 테스트
+    └── release.yml                     # v* 태그에서 zip + GitHub Release
+
+Info.plist                              # 번들 아이콘, 문서 타입(폴더, CBZ/ZIP, CBR/RAR), imported UTI
+Panely.entitlements                     # 샌드박스 + 사용자 선택 읽기/쓰기 + 앱 범위 북마크
 ```
 
 ## 아키텍처 노트
@@ -782,35 +882,57 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북�
   상태로 async 로드를 지휘하며, 로딩 오버레이를 위한 명시적 단계 메시지를
   보냅니다. 클래스 본체는 세션 상태와 포커싱된 **collaborator**
   (`ReaderPreferences`, `ReaderSeriesPreferencesStore`, `ReaderPositionStore`,
-  `ReaderImageLoader`, `ReaderTempDirectory`, `ReaderLibraryScope`)와 공유 서비스용
+  `ReaderImageLoader`, `ReaderTempDirectory`, `ReaderLibraryScope`), 라이브러리
+  store들, 번역 담당 객체(`TranslationManager`, `TranslationEdits`,
+  `TranslationExportManager`), 그리고 공유 서비스용
   `AppDependencies`(추출 캐시, security-scoped bookmark, 라이브러리 트리
-  로딩, key-value persistence, 시스템 설정)를 보유합니다. 각 observable
+  로딩, key-value persistence, 시스템 설정, 파일 감시, UI 언어, 번역 저장소)를
+  보유합니다. 각 observable
   프로퍼티를 forwarding으로 노출해서 뷰 호출(`viewModel.layout`,
   `viewModel.currentImages`)이 그대로 동작하면서도 내부 타입들은 독립적으로
   상태를 소유합니다. 관심사별 로직은 extension(`+Navigation`,
   `+Source`, `+LoadPipeline`, `+Cache`, `+Toolbar`, `+Volumes`,
-  `+ImageLoading`, `+Bookmarks`, `+ReadingProgress`)에 분할됩니다.
+  `+ImageLoading`, `+Bookmarks`, `+ReadingProgress`, `+Translation`,
+  `+TranslationExport`, `+AIChat`)에 분할됩니다.
 - **번역 보조** — `TranslationManager`(앱 전체, 메인 액터)가 책 × 번역 언어마다
   `TranslationController`를 하나씩 가지므로, 책을 바꿔도 작업이 유지되고 여러
   언어가 공존합니다. 작업은 한 번에 하나, 화면에 보이는 것부터 실행합니다.
   컨트롤러는 책을 작업 단위로 나누고(`TranslationPlan`: 페이지 하나씩, 또는
   세로 스트립을 겹치는 구간으로 나눠 이미지 조각 경계에서 잘린 말풍선도
   하나로 읽음), 현재 단위를 말풍선 하나씩 번역하는 동안 다음 단위를 OCR하며
-  (Apple Translation은 호출 방식과 무관하게 문장당 약 1초 — 측정값), 항상
+  (Apple Translation은 호출 방식과 무관하게 한 번에 한 문장씩 처리 — 측정값.
+  `TranslationMode`로 저지연 모델(macOS 26.4 이상, 말풍선당 약 0.03초)과
+  고품질 모델(약 0.6초) 중 선택), 항상
   읽고 있는 페이지 이후의 첫 단위를 다음으로 고릅니다. 작업은 detached task에서
-  돌고 generation 카운터로 보호된 채 메인 액터에 결과를 전달합니다. 뷰어는
+  돌고 generation 카운터로 보호된 채 메인 액터에 결과를 전달합니다. 단위마다
+  `PageAnalyzer`(actor)가 `PageTextRecognizer`(Vision 문서 인식기, 긴 페이지는
+  `OCRTiling` 구간으로)로 텍스트를 읽고, `BalloonDetector`(번들된 Core ML
+  `ComicTextDetector`)로 말풍선을 찾아 `BubbleGrouper`로 줄을 말풍선으로 묶고,
+  OCR이 놓친 검출 박스를 다시 읽으며(`MissedText`), 효과음은 그려진 그대로
+  두고(`SoundEffectClassifier`) 말풍선 배경 톤을 샘플링합니다
+  (`BubbleBackgroundSampler`). 이어서 `PageTranslator`가 말풍선마다 번역하고,
+  `SpeechLevel`은 선택적으로 일본어 ↔ 한국어 번역을 온디바이스 모델(Apple
+  Intelligence)로 원문의 말투(존댓말/반말)에 맞춰 고쳐 씁니다. 매니저의
+  `LanguagePackDownloads`가 어떤 언어팩이 설치됐는지·내려받는 중인지 추적합니다. 뷰어는
   `TranslatedPage`만 읽습니다: `ImageStackView`가 화면에 있는 페이지마다
   `TranslationOverlayView`를 모든 이미지 위에 두어, 스트립의 말풍선이 조각
-  경계를 넘어 그려질 수 있습니다. 완료된 페이지는 페이지 id + 언어 + 범위
-  기준으로 캐시됩니다(`TranslationStore`). 내보내기(`TranslationExportManager`)는
+  경계를 넘어 그려질 수 있습니다. 완료된 페이지는 Caches 아래에 페이지 id +
+  언어 + 범위 + 모드 기준으로 캐시됩니다(`TranslationStore`). 사용자의 말풍선
+  수정(`PageEdits`, `TranslationEdits` 경유)은 Application Support 아래
+  `TranslationEditStore`에 따로 보관되고 표시할 때만 위에 덮어 쓰므로, 캐시를
+  비우거나 다시 번역해도 사라지지 않습니다. `AIChatExchange`는 책의 말풍선을
+  텍스트 파일로 사용자의 AI 채팅에 보냈다가 답변을 받아오며, 답변의 번역은
+  수정 내용이 되어 한 번에 되돌릴 수 있습니다. 내보내기(`TranslationExportManager`)는
   같은 대기열로 책의 번역을 기다린 뒤, 메인 액터 밖에서 한 번에 한 권씩
   렌더링해(`TranslationExportWriter` → `TranslatedPageRenderer`, 화면 오버레이와
   `TranslationPatchPainter`를 공유) CBZ, ZIP이나 폴더로 씁니다.
 - **Dependency-injected 앱 서비스** — production은 `AppDependencies.live`를
   쓰고, 테스트는 protocol 기반 서비스(`ExtractionCacheManaging`,
   `SecurityScopedBookmarking`, `LibraryTreeLoading`, `KeyValueStoring`,
-  `SystemSettingsReading`)를 주입해 실제 앱 preference, cache root,
-  sandbox bookmark를 건드리지 않음.
+  `SystemSettingsReading`, `SourceChangeMonitoring`, `LibraryDirectoryWatching`,
+  `FilePicking`, `SpeechLevelCorrecting`), 별도의 `AppLocalization`, 임시
+  디렉터리를 가리키는 `TranslationStore` / `TranslationEditStore`를 주입해 실제
+  앱 preference, cache root, sandbox bookmark, 온디바이스 모델을 건드리지 않음.
 - **`nonisolated` 코어 타입** — `ComicPage`, `FolderLoader`, `ArchiveLoader`,
   `ImageLoader`, `FitCalculator`, `PositionKey`는 `Task.detached`로
   메인 스레드 밖에서 실행.
@@ -832,8 +954,8 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북�
   뷰포트가 더 클 때 문서를 중앙에 둠 — 사이드바 토글 시 이미지 중심 유지.
 - **`TitleBarPassthrough`** — 뷰어 상단 28 px에 얹는 얇은 NSView.
   `mouseDownCanMoveWindow = true`로 네이티브 창 드래그,
-  `NSTrackingArea`를 신호등 영역 외부에만 걸어 open-hand 커서가
-  close/minimize/zoom 버튼 위에 새지 않도록 함, `mouseDown` 오버라이드에서
+  두 개의 `NSTrackingArea`가 띠를 신호등 영역(~78 pt) 경계에서 나눠
+  open-hand 커서가 close/minimize/zoom 버튼 위에 새지 않도록 함, `mouseDown` 오버라이드에서
   주입된 `SystemSettingsReading`을 통해 더블클릭 zoom/minimize/none 처리
   (production에서는 `AppleActionOnDoubleClick`). `.hiddenTitleBar` 아래에서
   실제 창 가장자리와 정렬되도록 `.ignoresSafeArea(edges: .top)` 사용.
@@ -858,7 +980,9 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북�
 - **세로(웹툰) 지연 윈도잉** — 세로 모드 진입 시 모든 페이지의 픽셀
   크기를 동시에 미리 가져옴(헤더만 `CGImageSource` 읽기. 아카이브 엔트리는
   `ArchiveReader.loadDataPrefix(maxBytes: 64 KB)`로 ZIP/RAR 추출을
-  조기 중단해 너비/높이만 읽기 위해 엔트리 전체를 압축 해제 안 함).
+  조기 중단해 너비/높이만 읽기 위해 엔트리 전체를 압축 해제 안 함.
+  `ZIPArchiveReader`는 ZIPFoundation의 선형 `archive[path]` 탐색 대신 한 번
+  만든 경로 인덱스로 엔트리를 찾음).
   크기 페치와 디코드 둘 다 `min(8, cores)`로 제한된 청크 `withTaskGroup`으로
   실행해 큰 폴더에서 cooperative pool을 날려버리지 않음.
   `currentImages`는 같은 크기의 회색 플레이스홀더 `NSImage`로 채워지고
@@ -870,8 +994,18 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북�
   취소를 체크하여 버려진 작업이 즉시 중단됨.
 - **윈도우 eviction** — 가시 범위가 이동하면 `[range ± 10]` 밖 페이지가
   플레이스홀더로 돌아가 1000페이지 스트립이 모든 디코드된 이미지를
-  메모리에 고정하지 않음. 최근 eviction된 페이지는 스크롤 백 시 보통
+  메모리에 고정하지 않음. 윈도는 바이트 예산(`NSCache`와 같은 RAM 비례
+  상한)도 가져서, 이를 넘으면 뷰포트에서 가장 먼 페이지부터 내보내되 보이는
+  페이지와 `± 2` 로드 버퍼는 항상 유지. 최근 eviction된 페이지는 스크롤 백 시 보통
   `NSCache`에서 즉시 복원.
+- **치수 캐시** — 헤더에서 읽은 치수는 책별로 페이지 id 기준으로 보관되어,
+  페이지 ↔ 세로 전환 시 모든 헤더를 다시 읽지 않고 스트립을 재구성. 처음
+  진입할 때는 여전히 전부 미리 가져옴: 스트립에는 스크롤 앵커링이 없어서,
+  복원된 페이지를 보여준 뒤 실제 높이를 채우면 화면 밖으로 밀려나기 때문.
+- **페이지 모드 취소** — 페이지 변경은 추적되는 새로고침 태스크 하나로 처리되고,
+  새 변경이 이전 태스크를 취소. `ImageLoader.load`가 그 취소를 detached 디코드
+  태스크(와 아카이브 읽기)까지 전달하므로, 페이지 슬라이더를 훑어도 최종
+  도착한 spread만 디코드.
 - **`ImageStackView` 뷰 재사용** — 스택은 모든 페이지의 `pageFrames`를
   저장(모든 geometry 쿼리를 구동)하지만 실제 `NSImageView` 인스턴스는
   프레임이 보이는 뷰포트 ± 뷰포트 1개 버퍼와 겹치는 페이지만 생성.
@@ -902,10 +1036,12 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북�
   외장 디스크 mount 경로가 변경돼도 위치 복구. 저장 시 두 키 모두에
   현재 인덱스를 기록하고, 조회 시 path 키 → fileIdentity 키 순서로
   fallback.
-- **결정적 `ComicPage.id`** — 페이지 식별자는 source에서 파생된 결정적
-  문자열(`file:<path>` 또는 `archive:<archiveURL>#<entryPath>`). 책을
-  다시 열어도 같은 `id`가 나오므로 이미지/썸네일 `NSCache`가 그대로
-  히트 — 기존 무작위 UUID 방식은 reopen마다 전량 재디코드 발생.
+- **결정적 `ComicPage.id`** — 페이지 식별자는 source와 파일의 내용
+  시그니처(크기 + 수정 시각)에서 파생된 결정적 문자열
+  (`file:<path>#<signature>` 또는 `archive:<archiveURL>#<signature>#<entryPath>`).
+  책을 다시 열어도 같은 `id`가 나오므로 이미지/썸네일 `NSCache`가 그대로
+  히트하고, 파일을 같은 자리에서 교체하면 id가 바뀌어 캐시(번역 포함)가 낡은
+  페이지를 내주지 않음 — 기존 무작위 UUID 방식은 reopen마다 전량 재디코드 발생.
 - **`NSCache` 기반 이미지 캐시** — 페이지별 디코드된 `NSImage`를 메모리
   압박 시 자동 eviction. `countLimit = 100`로 vertical lazy window의
   `±lazyKeepBuffer` 페이지가 cost 여유에도 LRU eviction 당하는 문제를
@@ -934,7 +1070,7 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북�
   추출은 방금 펼친 폴더의 바이트만 더하고 대체된 아카이브 크기는 빼므로
   전체를 한 번만 합산(O(n), 중첩마다 트리 재walk 안 함). 누적 합계가 상한을
   넘으면 `LoadError.extractedSizeExceeded`를 throw하고 부분 추출물을 정리 —
-  zip-bomb / 비정상 중첩 아카이브로부터 디스크 보호.
+  zip-bomb / `maxNestingDepth`를 빠져나간 비정상 중첩 아카이브로부터 디스크 보호.
 - **앱 시작 시 임시 디렉터리 청소** — `ReaderTempDirectory.cleanupStaleEntries`는
   mtime이 10분 이상 지난 session `panely-<uuid>` 디렉터리만 정리. 첫 실행
   중 진행 중인 추출 디렉터리가 동시에 삭제되는 경쟁 방지.
@@ -986,9 +1122,11 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 + 북�
   (`countLimit = 400`, `totalCostLimit ≈ 60 MB`). 썸네일 사이드바의
   `LazyVStack`이 보이는 셀만 머티리얼라이즈하고, 셀이 스크롤아웃되면
   `.task` 자동 취소로 in-flight 디코드를 자연 제한.
-- **사이드바 2단계 로드** — `LibrarySidebar.reload`가 depth-1 스캔을 UI로
+- **사이드바 2단계 로드** — 새 라이브러리 루트에서는
+  `LibrarySidebarModel.reload`(`LibrarySidebar`가 호출)가 depth-1 스캔을 UI로
   즉시 전달한 뒤, 더 깊은 depth-3 스캔을 백그라운드에서 실행하고 준비
-  완료 시 트리 교체. `FileNode.loadTree`는 최상위 서브트리 스캔을 청크
+  완료 시 트리 교체. 같은 루트 새로고침(수동 또는 FSEvents)은 얕은 스캔을
+  건너뛰고 깊은 트리가 달라졌을 때만 교체해 깜빡임이 없음. `FileNode.loadTree`는 최상위 서브트리 스캔을 청크
   `TaskGroup`으로 병렬화하여 큰 라이브러리가 1–2초 대신 ~100–200 ms에 열림.
 - **설정 배치 읽기** — `ReaderPreferences.init`이 주입된
   `KeyValueStoring.dictionaryRepresentation()`을 한 번 스냅샷하고 메모리
@@ -1036,9 +1174,11 @@ scripts/release.sh         # 인터랙티브 프롬프트
 1. 작업 트리가 깨끗하고, `main`에 있으며, origin과 동기화되어 있고,
    태그가 로컬·원격 모두에 비어있는지 확인.
 2. 로컬 테스트 실행 (`SKIP_TESTS=1`로 건너뛸 수 있음).
-3. `project.pbxproj`의 `MARKETING_VERSION` 범프.
-4. 커밋(`chore: release vX.Y.Z`) 및 주석 태그 생성.
-5. `main`과 태그 푸시 (`NO_PUSH=1`로 푸시 전 중단 가능).
+3. `project.pbxproj`의 `MARKETING_VERSION` 범프, `CURRENT_PROJECT_VERSION`을
+   git 커밋 수로 설정, 현재 커밋의 짧은 SHA를 `Panely/Credits.rtf`에 기록
+   (About 패널에 표시).
+4. diff를 보여주고 확인을 받은 뒤 커밋(`chore: release vX.Y.Z`) 및 주석 태그 생성.
+5. 한 번 더 확인한 뒤 `main`과 태그 푸시 (`NO_PUSH=1`로 푸시 전 중단 가능).
 
 릴리스 커밋과 태그 푸시는 각각 `ci.yml`(Debug 빌드 + 테스트)과
 `release.yml`(Release 빌드 + zip + GitHub Release)을 트리거. 둘 다
@@ -1054,13 +1194,17 @@ git push origin v1.0.0
 
 ### CI / 저장소
 
-- **CI**는 모든 push/PR에서 실행(`**/*.md`와 `docs/**` 제외), ad-hoc
+- **CI**는 `main` 대상 push/PR에서 실행(`**/*.md`, `docs/**`, `LICENSE`
+  제외, 새 push가 진행 중인 실행을 취소), ad-hoc
   서명으로 Debug 빌드, 스냅샷 제외 테스트 suite 실행, 아티팩트 업로드
   없음 — 저장소 풋프린트는 사실상 0. `SnapshotGalleryTests`는 어설션이
   없는 매뉴얼 스크린샷 생성기라서 기본으로 gate off; 매뉴얼 PNG가 필요하면
-  `scripts/generate-snapshots.sh`로 수동 재생성.
-- **릴리스**는 GitHub Releases에 `ditto`로 단일 zip(~5–10 MB)을 첨부하여
-  리소스 포크 보존.
+  `scripts/generate-snapshots.sh`로 수동 재생성. CI는 fast 티어만 실행하고,
+  `VisualRegressionTests`와 slow 티어는 opt-in(`scripts/test-visual.sh`,
+  `scripts/test-slow.sh`).
+- **릴리스**는 GitHub Releases에 `ditto`로 단일 zip(~45 MB, 대부분 번들된
+  Core ML 텍스트 검출기)을 첨부하여 리소스 포크 보존, 자동 생성 릴리스
+  노트와 설치 안내 포함.
 - **SPM 캐시**가 이후 실행을 빠르게 하고, `Package.resolved`나
   `project.pbxproj` 변경 시 무효화.
 

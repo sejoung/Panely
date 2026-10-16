@@ -84,7 +84,8 @@ pages.
   (cleared on quit). Jumping to a different series snaps the new book to its
   own fit; returning later restores that series' zoom
 - **Auto-centering** — image stays centered when the viewport is larger
-- **Preload ±2 pages** in paged modes so the next flip is instant
+- **Preload ±2 pages** (±2 spreads in double-page) in paged modes so the
+  next flip is instant
 - **Series continuous reading** — when the last page of a volume is
   reached and a next sibling exists, an "Up next" card surfaces over the
   bottom of the viewer with the next volume's filename and a one-click
@@ -156,12 +157,12 @@ pages.
 - **Reveal-active in the tree** — opening a book auto-expands its ancestor
   folders so the current volume is always visible in the sidebar, and the
   expansion follows along as you move between volumes
-- **File tree refresh** — a **refresh button** in the sidebar header re-scans
-  the library on demand; the refresh is diffed in place, so the tree never
-  blanks or collapses and expanded folders stay open. (FSEvents-driven
-  *automatic* refresh exists behind a flag but is currently disabled — it
-  could storm re-scans on large/cloud-synced roots — so refresh is manual for
-  now.)
+- **File tree refresh** — the sidebar re-scans on its own when files under
+  the library folder are added, removed, or renamed (FSEvents, debounced
+  1.5 s so a busy or cloud-synced root settles before one re-scan), and a
+  **refresh button** in the sidebar header re-scans on demand. Either way the
+  refresh is diffed in place, so the tree never blanks or collapses and
+  expanded folders stay open
 - **Reading progress** — each tracked book shows a sidebar badge: a progress
   ring while in progress, a check once finished, computed from a persisted
   `{page, total, finished}` record (separate from the exact-restore position
@@ -173,8 +174,9 @@ pages.
   next image in the strip (working from the page currently centered in
   the viewport, not the last one keyboard-navigated)
 - **Volume navigation** between sibling books in the same folder
-- **Recent items** — persistent across launches via security-scoped bookmarks,
-  shown with the same icon scheme
+- **Recent items** — **File → Open Recent** lists the last 10 opened sources
+  (with **Clear Menu**), persistent across launches via security-scoped
+  bookmarks, shown with the same icon scheme
 - **Reopens last library on launch** — the folder you were browsing is
   restored automatically (security-scoped bookmark), so a cold start lands
   in your library instead of an empty sidebar. Launching with a file (Open
@@ -193,6 +195,14 @@ pages.
   plus the bookmarks left in every other book; picking one of those opens
   that book on the bookmarked page. The same list is one click away in the
   toolbar's bookmark menu and under **Go → Bookmarks**
+- **Favorites** — star a book with `⌘⇧D` (or the toolbar star, or **Go → Add
+  to Favorites**) and it's listed in the sidebar's **Favorites** section for
+  one-click reopening; remove it from the row's context menu
+- **Thumbnail sidebar** — `⌃⌘P` (or the toolbar button) opens a right-side
+  strip of lazily loaded page thumbnails; click one to jump to that page.
+  Hidden by default; visibility persists
+- **Go to page** — `⌘G` opens a page-number prompt, or click the page counter
+  above the bottom slider and type a number (Enter jumps, Esc cancels)
 - **Instant toolbar hints** — hovering a toolbar icon shows its name and
   shortcut immediately, rather than after the system tooltip delay
 - **Toolbar that fits the window** — when the row is wider than the window
@@ -219,6 +229,10 @@ written into your files.
 - **On-device** — Vision's document recognizer (OCR, including vertical
   Japanese) + Apple Translation. A missing language pack is downloaded once
   through the system prompt, from the translation panel or the status banner
+- **Fast or Accurate** (Settings → Experimental → **Translation Mode**) —
+  Fast, the default, does a volume in about a minute; Accurate reads idioms
+  better at about 20× the time. Each mode has its own language packs; Fast
+  needs macOS 26.4 (before that every job is Accurate)
 - **One place per job** — the toolbar's translate button switches original ↔
   translation (`⇧⌘T`); the language name beside it ("Korean ▾") is a menu to
   switch or add languages and open the panel or edit mode. The **translation panel** is only about translating this book:
@@ -239,7 +253,8 @@ written into your files.
   translations become your edits, undoable in one go, and balloons the chat
   left out are named. No API key, and nothing leaves the Mac unless you give
   it to a chat
-- **Translate again** — a page (edit bar) or the whole book (panel) is read
+- **Translate again** — a page (right-click, language menu or edit bar) or
+  the whole book (panel) is read
   and translated again the current way, so pages done before an improvement
   get it without clearing the cache
 - **Missed text** — text boxes the detector found but OCR left empty get a
@@ -328,7 +343,8 @@ written into your files.
 
 - **macOS 14** (Sonoma) or later
 - **macOS 26** or later for the experimental translation assist
-- **Xcode 16** or later (for building from source)
+- **Xcode 26.4** or later (for building from source — the translation code
+  uses APIs from the macOS 26.4 SDK)
 
 ## Installing a release
 
@@ -460,7 +476,7 @@ Terminal) and move the result straight to `/Applications`.
 | `⌥⌘J` | Jobs window: background translations and exports, exported books |
 | Click a speech balloon | Translation assist: the translation, other languages and the original (in edit mode: edit, fix the original, hide, revert) |
 | Hover left edge | Reveal sidebar as overlay (auto-hide mode) |
-| `ESC` | Dismiss sidebar overlay (when unpinned) |
+| `ESC` | Dismiss sidebar overlay (when unpinned); leaves balloon edit mode first if it's on |
 | Double-click on image | Toggle 1× ↔ 2× zoom |
 | Scroll wheel / trackpad scroll | Paged layouts: turn the page once it can't pan further (down = next, up = previous; one page per trackpad swipe). Toggle via View → Disable Scroll Page Turning |
 | Trackpad pinch | Zoom in / out |
@@ -477,7 +493,9 @@ scripts/benchmark-translation.sh [--book PATH]   # time each translation stage a
 ```
 
 The tiers are set in `PanelyTests/TestTiers.swift`; the slow and visual tiers
-are opt-in through `PANELY_SLOW_TESTS=1` / `PANELY_VISUAL_TESTS=1`, which the
+are opt-in through `PANELY_SLOW_TESTS=1` / `PANELY_VISUAL_TESTS=1` (the
+benchmark, `PanelyTests/Benchmarks/TranslationBenchmarkTests.swift`, through
+its own `PANELY_BENCHMARK=1`), which the
 scripts pass as `TEST_RUNNER_…` so xcodebuild hands them to the test process.
 The fast tier takes about 6–8 s of test time; the visual tier about 10 s; the
 slow tier adds about 3 s on top of the fast one (its FSEvents tests mostly wait).
@@ -487,8 +505,6 @@ Every test's temp files live under one `tmp/paneltest-run-*` directory per run
 no siblings to list as volumes; a run deletes what runs over an hour old left
 behind. (Leftovers used to accumulate straight in `tmp` — 55k entries — and
 made every folder-opening test slower than the last.)
-
-The suites cover:
 
 `SnapshotGalleryTests` is discovered in normal runs but gated off unless
 `scripts/generate-snapshots.sh` enables snapshot generation, so the default
@@ -519,6 +535,8 @@ Several suites guard what actually reaches the screen, not just the models:
   After an intended UI change, re-record with
   `scripts/update-reference-snapshots.sh` and review the PNGs before
   committing.
+
+The suites cover:
 
 - Pure data types (`ComicPage`, `ComicSource`, `RecentItem`, enum raw values)
 - Natural-sort contract (Foundation behaviour Panely relies on)
@@ -584,12 +602,13 @@ Several suites guard what actually reaches the screen, not just the models:
   uniqueness, `cleanupStaleEntries()` mtime gating (stale removed, fresh kept,
   non-panely entries ignored), and the extraction cache: stable `cacheKey`
   per file (mtime-sensitive), `cachedEntry` hit/miss + mtime touch on hit,
-  `enforceBudget()` LRU eviction when over 10 GB, `cacheSizeBytes()` /
-  `clearCache(excluding:)` manual cleanup, and `cleanup()` preserves cache
+  `enforceBudget()` LRU eviction when over 10 GB, `cacheSizeBytes(in:excluding:)` /
+  `clearCache(in:excluding:)` manual cleanup, and `cleanup()` preserves cache
   dirs while removing session dirs
-- **`ReaderImageLoader`** — reset / `prepareForVerticalRebuild` /
+- **`ReaderImageLoader`** — reset / `prepareForLayoutRebuild` /
   `cancelPreload` state transitions, `estimatedBitmapCost` uses pixel
   dimensions for Retina backing and falls back to size for placeholders,
+  the RAM-scaled cost limit clamps to [150 MB, 1 GB],
   `lazyConcurrencyLimit` clamps to [2, 8]
 - **`AppKitScrollerCoordinator`** — bounds observer fires page-index +
   range callbacks in continuous layout but no-ops in paged, programmatic
@@ -640,20 +659,31 @@ Several suites guard what actually reaches the screen, not just the models:
   sound-effect and language classification, page / strip work planning, the
   job manager (one job per book × language, background jobs, reattach,
   queueing, books that must stay open), cache keys and storage, overlay
-  geometry and hit testing, series volume matching, and the reader wiring
+  geometry and hit testing, series volume matching, balloon detection and
+  missed-text rereads, speech-level matching, balloon edits, AI chat round
+  trips, translated-book export, and the reader wiring
   (per-series languages, original ↔ translation, overlays following the
   images on screen)
+- **Localization** — `AppLocalization` (System Default → the Mac's primary
+  language, English fallback), `AppMenuLocalizer`'s standard-menu titles, and
+  `KoreanLocalizationTests` resolving catalog keys through the built `ko.lproj`
+- **Library watching & stored data** — `LibraryDirectoryWatcher` /
+  `LibraryChangeFilter` (which FSEvents flags rescan the tree; a real stream
+  in the slow tier), `Debouncer`, which call sites may mount a volume when
+  resolving a bookmark, and legacy `UserDefaults` formats still decoding
 - **`EntitlementsTests` / `FileAssociationTests`** — sandbox entitlement for
-  save-panel destinations, and the Info.plist document types / exported UTIs
+  save-panel destinations, and the Info.plist document types / imported UTIs
   (folders, CBZ/ZIP, CBR/RAR)
 
 Tests mirror the source tree: `PanelyTests/Core/{Comic, Diagnostics,
-Extensions}/`, `PanelyTests/Features/Library/`, `PanelyTests/Features/Settings/`,
-`PanelyTests/Features/Translation/`, and
-`PanelyTests/Features/Reader/{Model, Viewer, Thumbnails, ViewModel,
-ViewModel/Collaborators}`. Shared fixtures (including a real PNG generator)
-live in `PanelyTests/TestFixtures.swift`; persistence tests use
-`PanelyTests/TestKeyValueStore.swift`.
+Extensions}/`, `PanelyTests/Commands/`, `PanelyTests/Features/Library/`,
+`PanelyTests/Features/Settings/`, `PanelyTests/Features/Translation/`, and
+`PanelyTests/Features/Reader/{Model, Scene, Viewer, Thumbnails, ViewModel,
+ViewModel/Collaborators}`, plus `PanelyTests/Localization/`,
+`PanelyTests/Snapshots/` and `PanelyTests/Benchmarks/`. Shared fixtures
+(including a real PNG generator) live in `PanelyTests/TestFixtures.swift`,
+checked-in RAR archives in `PanelyTests/Fixtures/Archives/`; persistence tests
+use `PanelyTests/TestKeyValueStore.swift`.
 
 `RecentItem.Codable` includes a `decodeIfPresent` path for `isDirectory` so
 old stored entries survive a schema bump.
@@ -669,26 +699,44 @@ at a glance.
 Panely/
 ├── PanelyApp.swift                     # @main, window style, .commands { fileCommands + viewCommands + goCommands }
 ├── ContentView.swift
-├── AppDependencies.swift               # injected app services (cache, bookmarks, persistence, system settings, file watching)
+├── AppDependencies.swift               # injected app services (cache, bookmarks, persistence, system settings, file watching,
+│                                       # file picking, UI language, translation stores) + collaborator factories
 ├── AppIcon.icns                        # generated from docs/icon/*.svg
+├── Assets.xcassets                     # accent color
+├── Credits.rtf                         # About panel credits (release.sh stamps the build's commit SHA)
 ├── Localizable.xcstrings               # string catalog: English source + Korean
+├── Resources/
+│   └── ComicTextDetector.mlpackage     # Core ML balloon / text detector (built by scripts/convert-text-detector.py)
 ├── Commands/                           # @CommandsBuilder extensions on PanelyApp
 │   ├── PanelyApp+FileCommands.swift    # Open / Open Recent
 │   ├── PanelyApp+ViewCommands.swift    # chrome / layout / fit / zoom / autofit
 │   └── PanelyApp+GoCommands.swift      # page jump / bookmarks / favorites / volumes
 ├── Core/
 │   ├── Comic/                          # loaders, ComicSource/Page, natural sort, image metadata
+│   │   ├── ComicPage.swift / ComicSource.swift / ComicPageSource.swift
+│   │   ├── FolderLoader.swift
+│   │   ├── ArchiveLoader.swift         # flat + recursive-nested extraction + 5 GB safety cap
+│   │   ├── ArchiveReader.swift         # ArchiveReader protocol + ArchiveFormat (magic-byte sniffing)
+│   │   ├── ZIPArchiveReader.swift      # actor around ZIPFoundation.Archive
+│   │   │                               # (loadDataPrefix for header-only reads)
+│   │   ├── RARArchiveReader.swift      # actor around UnrarKit's URKArchive
+│   │   │                               # (solid archives served from a one-time extraction)
+│   │   ├── NaturalSort.swift           # locale-aware natural ordering helper
+│   │   └── ImageLoader.swift           # async NSImage + dimensions(for:) header read
 │   ├── Diagnostics/
 │   │   ├── AppLog.swift                # swift-log facade + OSLog/file diagnostic backend
 │   │   └── DiagnosticLogStore.swift    # rolling recent-log.txt cache file
 │   ├── SourceChangeMonitor.swift       # DispatchSource-backed multi-URL file/folder watcher (session-guarded)
-│   ├── LibraryDirectoryWatcher.swift   # FSEvents recursive watch on the library root (auto-refresh currently disabled)
+│   ├── LibraryDirectoryWatcher.swift   # FSEvents recursive watch on the library root → sidebar auto-refresh
 │   ├── Debouncer.swift                 # shared trailing-debounce helper (position / progress saves)
 │   ├── AppLanguage.swift               # System Default / English / Korean choice
 │   ├── AppLocalization.swift           # language in effect; `Bundle.localized` for live switching
 │   ├── AppMenuLocalizer.swift          # live translations for standard macOS menus
 │   ├── FilePicking.swift               # NSOpenPanel seam (injected) → open / folder-access flows stay testable
-│   └── Extensions/                     # shared Foundation helpers
+│   └── Extensions/                     # shared Foundation utility extensions (DRY)
+│       ├── URL+IsAncestor.swift        # path-component-aware prefix containment
+│       ├── UserDefaults+Codable.swift  # KeyValueStoring + JSON encode/decode helpers
+│       └── Dictionary+CapByRecency.swift # recency-based cap shared by persistence stores
 ├── DesignSystem/
 │   ├── Tokens/                         # Color / Spacing / Typography / Motion
 │   └── Primitives/                     # Icon button, icon menu, slider
@@ -723,7 +771,9 @@ Panely/
 │   │   │   │   ├── ReaderViewModel+ImageLoading.swift # facade over ReaderImageLoader
 │   │   │   │   ├── ReaderViewModel+Bookmarks.swift    # favorites + page bookmarks integration
 │   │   │   │   ├── ReaderViewModel+ReadingProgress.swift # progress records → sidebar badges + Continue Reading
-│   │   │   │   └── ReaderViewModel+Translation.swift  # translation assist: languages, jobs, overlays
+│   │   │   │   ├── ReaderViewModel+Translation.swift  # translation assist: languages, jobs, overlays
+│   │   │   │   ├── ReaderViewModel+TranslationExport.swift # export translated books / series (background jobs)
+│   │   │   │   └── ReaderViewModel+AIChat.swift       # AI chat round trip: save balloons, apply the reply, undo
 │   │   │   └── Collaborators/                  # composed by ReaderViewModel; each single-responsibility
 │   │   │       ├── ReaderPreferences.swift     # KeyValueStoring-backed layout / fit / pins
 │   │   │       ├── ReaderPositionStore.swift   # debounced per-book page memory
@@ -761,23 +811,28 @@ Panely/
 │   ├── Translation/                    # experimental translation assist (macOS 26+)
 │   │   ├── TranslationManager.swift    # app-wide jobs: one per book × language, background + queue
 │   │   ├── TranslationController.swift # one book into one language: plan, OCR → translate, progress
-│   │   ├── TranslationStore.swift      # per-page JSON cache (page id + languages + scope)
-│   │   ├── TranslationEdits.swift      # the reader's balloon edits for the open book (+ TranslationEditStore)
+│   │   ├── TranslationStore.swift      # per-page JSON cache under Caches (page id + languages + scope + mode)
+│   │   ├── TranslationEdits.swift      # the reader's balloon edits for the open book
+│   │   ├── TranslationEditStore.swift  # edits on disk under Application Support (survive cache clears)
 │   │   ├── LanguagePackDownloads.swift # app-wide language pack status and downloads
 │   │   ├── SeriesVolumeMatcher.swift   # which neighbours are volumes of the same series
-│   │   ├── Model/                      # TranslationLanguage, TranslatedPage / TranslatedBubble, PageEdits
+│   │   ├── Model/                      # TranslationLanguage, TranslationMode (fast / accurate),
+│   │   │                               # TranslatedPage / TranslatedBubble, PageEdits
+│   │   ├── AIChat/                     # AIChatExchange: balloons out to the reader's AI chat, its reply back in
 │   │   ├── Export/                     # translated copies: TranslationExportManager (jobs, history, folder),
-│   │   │                               # TranslationExportWriter (CBZ / ZIP / folder), TranslatedPageRenderer
+│   │   │                               # TranslationExportJob (options, records), TranslationExportWriter
+│   │   │                               # (CBZ / ZIP / folder), TranslatedPageRenderer
 │   │   ├── Pipeline/                   # OCRTiling, TranslationPlan (page / strip), PageAnalyzer,
 │   │   │                               # PageTextRecognizer (Vision), PageTranslator (Translation),
-│   │   │                               # BubbleGrouper, BalloonDetector (Core ML), SpeechLevel,
+│   │   │                               # BubbleGrouper, BalloonDetector (Core ML), MissedText, SpeechLevel,
 │   │   │                               # BubbleBackgroundSampler, TextClassifiers
 │   │   ├── Viewer/                     # TranslationOverlayView (+ layout, TranslationPatchPainter), balloon popover
 │   │   └── UI/                         # TranslationPanel, language rows, progress pill, job list, edit-mode bar,
-│   │                                   # export sheet, Jobs window
+│   │                                   # export sheet, AI chat sheet, Jobs window
 │   ├── Settings/
 │   │   ├── SettingsView.swift          # General + Library + Storage + Diagnostics + Experimental tabs
-│   │   ├── ExperimentalSettingsView.swift # translation assist: on/off, default language, sound effects, cache
+│   │   ├── ExperimentalSettingsView.swift # translation assist: on/off, target language, mode, speech level,
+│   │   │                                  # language packs, your edits, cache
 │   │   ├── GeneralSettingsView.swift   # interface language picker (live)
 │   │   ├── LibrarySettingsView.swift   # reopen-last-folder toggle + Forget Now
 │   │   ├── StorageSettingsView.swift   # Storage settings UI + cache size / clear controls
@@ -808,22 +863,6 @@ Panely/
 │           ├── VolumeRow.swift
 │           ├── PageBookmarkRow.swift
 │           └── ReadingBadgeView.swift  # progress ring / finished check
-└── Core/
-    ├── Extensions/                     # shared Foundation utility extensions (DRY)
-    │   ├── URL+IsAncestor.swift        # path-component-aware prefix containment
-    │   ├── UserDefaults+Codable.swift  # KeyValueStoring + JSON encode/decode helpers
-    │   └── Dictionary+CapByRecency.swift # recency-based cap shared by persistence stores
-    └── Comic/
-        ├── ComicPage.swift / ComicSource.swift / ComicPageSource.swift
-        ├── FolderLoader.swift
-        ├── ArchiveLoader.swift         # flat + recursive-nested extraction + 5 GB safety cap
-        ├── ArchiveReader.swift         # ArchiveReader protocol + ArchiveFormat (magic-byte sniffing)
-        ├── ZIPArchiveReader.swift      # actor around ZIPFoundation.Archive
-        │                               # (loadDataPrefix for header-only reads)
-        ├── RARArchiveReader.swift      # actor around UnrarKit's URKArchive
-        │                               # (solid archives served from a one-time extraction)
-        ├── NaturalSort.swift           # locale-aware natural ordering helper
-        └── ImageLoader.swift           # async NSImage + dimensions(for:) header read
 
 PanelyTests/                            # mirrors the source tree
 ├── TestFixtures.swift                  # shared temp-dir / zip / PNG helpers
@@ -831,40 +870,56 @@ PanelyTests/                            # mirrors the source tree
 ├── FileAssociationTests.swift
 ├── EntitlementsTests.swift
 ├── TestKeyValueStore.swift             # in-memory KeyValueStoring for persistence tests
+├── TestTiers.swift                     # fast / slow / visual tiers (env-gated)
+├── Fixtures/Archives/                  # checked-in RAR4 / RAR5 fixtures (solid, nested, password)
+├── Benchmarks/                         # TranslationBenchmarkTests (opt-in: scripts/benchmark-translation.sh)
+├── Commands/                           # GoMenuRenderingTests
+├── Localization/                       # KoreanLocalizationTests
 ├── Snapshots/                          # docs/screenshots/ generator (skipped in CI) + visual regression
 │   ├── SnapshotRenderer.swift          # NSHostingView + offscreen window → PNG
 │   ├── SnapshotSampleContent.swift     # placeholder pages + LibraryFixture
+│   ├── TranslationSnapshotContent.swift # drawn sample manga pages + translations for the translation shots
 │   ├── SnapshotGalleryTests.swift      # manual scenarios
 │   ├── SnapshotComparator.swift        # tolerant pixel diff + diff image
 │   ├── VisualRegressionTests.swift     # screens vs Reference/*.png
+│   ├── HostedViewInspection.swift      # helpers for the hosted-view rendering tests
 │   └── Reference/                      # reference PNGs + recording macOS version
-├── Core/Comic/                         # ArchiveLoader, ZIP/RAR readers, FolderLoader, ImageLoader{Load,Dimensions},
-│                                       # ComicModel, LoaderExtension, NaturalSort
-├── Core/Diagnostics/                   # AppLog, DiagnosticLogStore
+├── Core/Comic/                         # ArchiveLoader (+ handoff), ZIP/RAR readers (cancellation, corruption,
+│                                       # index equivalence), FolderLoader, ImageLoader{Load,Dimensions},
+│                                       # ComicModel, LoaderExtension, NaturalSort, GatedArchiveReader
+├── Core/Diagnostics/                   # AppLog (+ levels), DiagnosticLogStore (+ resilience)
 ├── Core/Extensions/                    # URL relative-subpath helpers
-├── Core/SourceChangeMonitorTests.swift
-├── Features/Library/                   # FavoritesStore, PageBookmarksStore, RecentItem,
+├── Core/                               # SourceChangeMonitor, LibraryDirectoryWatcher, LibraryChangeFilter,
+│                                       # Debouncer, AppLocalization, AppMenuLocalization
+├── Features/Library/                   # FavoritesStore, PageBookmarksStore (+ memo), RecentItem,
 │                                       # FileNode, FavoriteBook, PageBookmark,
 │                                       # ReadingProgressStore, LastLibraryRootStore,
-│                                       # LibrarySidebarModel, SecurityScopedBookmark
-├── Features/Settings/                  # CacheMaintenance, Settings UI, diagnostic report export
-├── Features/Translation/               # OCR tiling, grouping, classifiers, plan, manager, store,
-│                                       # overlay hit testing, series matching, reader wiring
+│                                       # LibrarySidebarModel, SecurityScopedBookmark,
+│                                       # LibraryTreeScan, bookmark mount policy, legacy formats,
+│                                       # LibrarySidebar(Update)Rendering
+├── Features/Settings/                  # CacheMaintenance, diagnostic report export
+├── Features/Translation/               # OCR tiling, grouping, balloon detection, missed text, speech level,
+│                                       # classifiers, plan, controller, manager, store, edits, export,
+│                                       # AI chat, overlay drawing / hit testing, series matching, reader wiring
 └── Features/Reader/
     ├── Model/                          # FitCalculator, PositionKey, ReaderEnum, SidebarMode,
     │                                   # SpreadCalculator
+    ├── Scene/                          # ReaderToolbarRenderingTests
     ├── Viewer/                         # CenteringClipView, FitMagnificationStability,
     │                                   # ImageStackVertical, ScrollZoomCalculator,
     │                                   # ViewerController, ViewerResizeFit,
     │                                   # AppKitScrollerCoordinator, TitleBarPassthrough,
-    │                                   # WheelPageTurnEngine, ZoomCarryOver
-    ├── Thumbnails/                     # ThumbnailLoader
-    └── ViewModel/                      # 14 ReaderViewModel integration files (Bookmarks,
-        │                               # BookSwitchStripReset, EndOfVolume, Library,
-        │                               # OpenSource, PagedMode, PositionMemory, QuickJump,
-        │                               # ReadingProgress, SeriesPreferences, SetLayout,
-        │                               # ThumbnailSidebar, ToolbarPin, VerticalMode)
-        │                               # + ReaderSeriesIdentity / SeriesPreferencesStore
+    │                                   # WheelPageTurnEngine, ZoomCarryOver, ReaderViewerRendering
+    ├── Thumbnails/                     # ThumbnailLoader, ThumbnailSidebarRendering
+    └── ViewModel/                      # 18 ReaderViewModel integration files (AppLanguage,
+        │                               # Bookmarks, BookmarkList, BookSwitchStripReset,
+        │                               # EndOfVolume, Library, OpenSource, PagedCancellation,
+        │                               # PagedMode, PositionMemory, QuickJump, ReadingProgress,
+        │                               # SeriesPreferences, SetLayout, ThumbnailSidebar,
+        │                               # ToolbarPin, VerticalMode, VolumeStepping)
+        │                               # + ReaderSeriesIdentity / SeriesPreferencesStore,
+        │                               # ContinueReading{Index,Randomized},
+        │                               # PositionKeyConsistency, PositionPersistenceSafety
         └── Collaborators/              # focused unit tests for the collaborators
 
 docs/
@@ -872,28 +927,32 @@ docs/
 ├── manual.md                           # English user manual (screenshot walkthrough)
 ├── manual.html                         # HTML build of the manual
 ├── manual.ko.md                        # Korean user manual
-├── screenshots/                        # 15 PNGs generated by SnapshotGalleryTests
+├── screenshots/                        # 24 PNGs generated by SnapshotGalleryTests
 ├── panely_design_system_mac_os.md
 └── icon/panely-icon-stacked.svg
 
 scripts/
 ├── generate-app-icon.sh                # SVG → .icns pipeline
-├── test.sh                            # fast test tier (what CI runs)
-├── test-slow.sh                       # fast + slow tiers (real FSEvents / OCR, all seeds)
-├── test-visual.sh                     # screenshot comparisons only
-├── benchmark-translation.sh           # translation timings per stage / per job (opt-in benchmark)
+├── test.sh                             # fast test tier (what CI runs)
+├── test-slow.sh                        # fast + slow tiers (real FSEvents / OCR, all seeds)
+├── test-visual.sh                      # screenshot comparisons only
+├── benchmark-translation.sh            # translation timings per stage / per job (opt-in benchmark)
 ├── generate-snapshots.sh               # rebuild docs/screenshots/*.png from SnapshotGalleryTests
 ├── update-reference-snapshots.sh       # re-record PanelyTests/Snapshots/Reference/*.png
 ├── convert-text-detector.py            # rebuild Resources/ComicTextDetector.mlpackage (Core ML)
 ├── install-local.sh                    # build + install locally for hands-on testing (--debug, --test…)
 └── release.sh                          # bump + tag + push automation
 
-.github/workflows/
-├── ci.yml                              # build + test on push/PR
-└── release.yml                         # zip + GitHub Release on v* tag
+Packages/UnrarKit/                      # vendored UnrarKit + RARLAB unrar source as a local Swift package
 
-Info.plist                              # bundle icon reference
-Panely.entitlements                     # sandbox + user-selected + bookmarks
+.github/
+├── FUNDING.yml                         # GitHub Sponsors (sejoung)
+└── workflows/
+    ├── ci.yml                          # build + fast-tier tests on push/PR to main
+    └── release.yml                     # zip + GitHub Release on v* tag
+
+Info.plist                              # bundle icon, document types (folders, CBZ/ZIP, CBR/RAR), imported UTIs
+Panely.entitlements                     # sandbox + user-selected read-write + app-scoped bookmarks
 ```
 
 ## Architecture Notes
@@ -903,27 +962,49 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   loading overlay. The class file holds session state + composition of focused
   **collaborators** (`ReaderPreferences`,
   `ReaderSeriesPreferencesStore`, `ReaderPositionStore`, `ReaderImageLoader`,
-  `ReaderTempDirectory`, `ReaderLibraryScope`) plus `AppDependencies` for shared services
+  `ReaderTempDirectory`, `ReaderLibraryScope`), the library stores and the
+  translation owners (`TranslationManager`, `TranslationEdits`,
+  `TranslationExportManager`), plus `AppDependencies` for shared services
   (extraction cache, security-scoped bookmarks, library tree loading,
-  key-value persistence, and system settings). It forwards collaborator
+  key-value persistence, system settings, file watching, UI language and the
+  translation stores). It forwards collaborator
   properties so view callsites (`viewModel.layout`, `viewModel.currentImages`)
   stay unchanged while the underlying types own their state independently.
   Per-concern logic is split across extensions (`+Navigation`, `+Source`,
   `+LoadPipeline`, `+Cache`, `+Toolbar`, `+Volumes`, `+ImageLoading`,
-  `+Bookmarks`, `+ReadingProgress`).
+  `+Bookmarks`, `+ReadingProgress`, `+Translation`, `+TranslationExport`,
+  `+AIChat`).
 - **Translation assist** — `TranslationManager` (app-wide, main-actor) owns
   one `TranslationController` per book × target language, so jobs survive book
   switches and several languages coexist; it runs one job at a time, the one
   on screen first. A controller cuts the book into units (`TranslationPlan`:
   one page each, or overlapping bands of the vertical strip so balloons split
   across image slices are read whole), OCRs the next unit while translating the
-  current one balloon by balloon (Apple Translation takes ~1 s per sentence
-  however it's called — measured), and always picks the next unit at or after
+  current one balloon by balloon (Apple Translation handles one sentence at a
+  time however it's called — measured; `TranslationMode` picks its
+  low-latency model, ~0.03 s a balloon on macOS 26.4+, or the high-fidelity
+  one, ~0.6 s), and always picks the next unit at or after
   the page being read. Work runs in a detached task and reports back to the
-  main actor under a generation counter. The viewer only reads
+  main actor under a generation counter. Per unit, `PageAnalyzer` (an actor)
+  reads the text with `PageTextRecognizer` (Vision's document recognizer, tall
+  pages in `OCRTiling` bands), finds balloons with `BalloonDetector` (the
+  bundled Core ML `ComicTextDetector`), groups lines into balloons with
+  `BubbleGrouper`, rereads detector boxes OCR missed (`MissedText`), leaves
+  sound effects as drawn (`SoundEffectClassifier`) and samples each balloon's
+  background tone (`BubbleBackgroundSampler`); `PageTranslator`
+  then translates each balloon, and `SpeechLevel` optionally rewrites
+  Japanese ↔ Korean translations to the original's politeness level with the
+  on-device model (Apple Intelligence). `LanguagePackDownloads` (on the
+  manager) tracks which language packs are installed or downloading. The viewer only reads
   `TranslatedPage`s: `ImageStackView` hosts a `TranslationOverlayView` per live
   page, above every image so strip balloons can cross slice boundaries.
-  Finished pages are cached per page id + languages + scope (`TranslationStore`).
+  Finished pages are cached under Caches per page id + languages + scope +
+  mode (`TranslationStore`); the reader's balloon edits (`PageEdits`, via
+  `TranslationEdits`) are kept apart in `TranslationEditStore` under
+  Application Support and laid over them for display, so clearing the cache
+  or translating again never loses them. `AIChatExchange` round-trips a
+  book's balloons through the reader's own AI chat as a text file; the reply's
+  translations become edits, undoable in one go.
   Exports (`TranslationExportManager`) wait on a book's controller through the
   same queue, then render one book at a time off the main actor
   (`TranslationExportWriter` → `TranslatedPageRenderer`, sharing
@@ -931,8 +1012,10 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
 - **Dependency-injected app services** — production uses `AppDependencies.live`,
   while tests can inject protocol-backed services (`ExtractionCacheManaging`,
   `SecurityScopedBookmarking`, `LibraryTreeLoading`, `KeyValueStoring`,
-  `SystemSettingsReading`) without touching real app preferences, cache roots,
-  or sandbox bookmarks.
+  `SystemSettingsReading`, `SourceChangeMonitoring`, `LibraryDirectoryWatching`,
+  `FilePicking`, `SpeechLevelCorrecting`), their own `AppLocalization`, and
+  temp-dir `TranslationStore` / `TranslationEditStore` roots without touching
+  real app preferences, cache roots, sandbox bookmarks, or the on-device model.
 - **`nonisolated` core types** — `ComicPage`, `FolderLoader`, `ArchiveLoader`,
   `ImageLoader`, `FitCalculator`, `PositionKey` run off-main via
   `Task.detached`.
@@ -1049,9 +1132,12 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   `/Volumes/X 1`) still recover the saved position. Writes record under
   both keys; reads try the path key first and fall back to file-identity.
 - **Deterministic `ComicPage.id`** — the page identifier is a deterministic
-  string derived from its source (`file:<path>` or
-  `archive:<archiveURL>#<entryPath>`). Re-opening the same book yields
-  the same `id`, so image and thumbnail `NSCache` entries stay warm —
+  string derived from its source plus the file's content signature (size +
+  modification date): `file:<path>#<signature>` or
+  `archive:<archiveURL>#<signature>#<entryPath>`. Re-opening the same book yields
+  the same `id`, so image and thumbnail `NSCache` entries stay warm, while
+  replacing a file in place changes it so caches (translations included)
+  don't serve stale pages —
   the previous random-`UUID()` scheme caused a full thumbnail re-decode
   on every reopen.
 - **`NSCache`-backed image cache** — per-page decoded `NSImage`s with
@@ -1146,9 +1232,12 @@ Panely.entitlements                     # sandbox + user-selected + bookmarks
   The thumbnail sidebar's `LazyVStack` only materializes visible cells;
   `.task` auto-cancels on scroll-out, so in-flight decodes naturally cap
   at the viewport depth.
-- **Sidebar two-phase load** — `LibrarySidebar.reload` ships a depth-1
+- **Sidebar two-phase load** — on a new library root,
+  `LibrarySidebarModel.reload` (driven by `LibrarySidebar`) ships a depth-1
   scan to the UI immediately, then runs the deeper depth-3 scan in the
-  background and replaces the tree once ready. `FileNode.loadTree`
+  background and replaces the tree once ready. A same-root refresh (manual or
+  FSEvents-driven) skips the shallow pass and swaps in the deep tree only if
+  it differs, so nothing flickers. `FileNode.loadTree`
   parallelizes top-level subtree scans via chunked `TaskGroup` so big
   libraries open in ~100–200 ms instead of 1–2 s.
 - **Settings batch-read** — `ReaderPreferences.init` snapshots the injected
@@ -1198,9 +1287,13 @@ The script:
 1. Checks the working tree is clean, on `main`, in sync with origin, and the
    tag is free on both local and remote.
 2. Runs local tests (set `SKIP_TESTS=1` to skip).
-3. Bumps `MARKETING_VERSION` in `project.pbxproj`.
-4. Commits (`chore: release vX.Y.Z`) and creates an annotated tag.
-5. Pushes `main` and the tag (set `NO_PUSH=1` to stop before pushing).
+3. Bumps `MARKETING_VERSION` in `project.pbxproj`, sets
+   `CURRENT_PROJECT_VERSION` to the git commit count, and stamps the current
+   commit's short SHA into `Panely/Credits.rtf` (shown in the About panel).
+4. Shows the diff, asks for confirmation, then commits
+   (`chore: release vX.Y.Z`) and creates an annotated tag.
+5. Asks again, then pushes `main` and the tag (set `NO_PUSH=1` to stop
+   before pushing).
 
 The release commit and the tag push trigger `ci.yml` (Debug build + tests)
 and `release.yml` (Release build + zip + GitHub Release) respectively.
@@ -1217,15 +1310,17 @@ git push origin v1.0.0
 
 ### CI / storage
 
-- **CI** runs on every push/PR (skips `**/*.md` and `docs/**`), builds
+- **CI** runs on pushes and PRs to `main` (skips `**/*.md`, `docs/**` and
+  `LICENSE`; a newer push cancels the run in progress), builds
   Debug with ad-hoc signing, runs the non-snapshot test suite, and uploads
   no artifacts — storage footprint is essentially zero.
   `SnapshotGalleryTests` is gated off by default because it is a PNG
   generator; regenerate the manual's PNGs with `scripts/generate-snapshots.sh`
   when needed. CI runs the fast tier only: `VisualRegressionTests` and the
   slow tier are opt-in (`scripts/test-visual.sh`, `scripts/test-slow.sh`).
-- **Releases** attach a single zip (~5–10 MB) to GitHub Releases using
-  `ditto` so resource forks are preserved.
+- **Releases** attach a single zip (~45 MB, most of it the bundled Core ML
+  text detector) to GitHub Releases using `ditto` so resource forks are
+  preserved, with generated release notes and install steps.
 - **SPM cache** speeds up subsequent runs; invalidates on `Package.resolved`
   or `project.pbxproj` changes.
 

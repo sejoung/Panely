@@ -27,7 +27,10 @@
 
 ---
 
-### 🌕 Light Theme (Optional)
+### 🌕 Light Theme (미구현)
+
+> 현재 앱은 다크 전용입니다 (`.preferredColorScheme(.dark)`). 아래 값은 코드에
+> 토큰으로 존재하지 않는 참고용 제안입니다.
 
 | Token | Value |
 |------|------|
@@ -78,18 +81,20 @@
 ### 구조
 
 ```
-┌──────────────────────────────┐
-│ Toolbar (auto-hide)          │
-├───────────────┬──────────────┤
-│ Sidebar       │ Viewer       │
-│ (thumbnails)  │ (image)      │
-└───────────────┴──────────────┘
+┌──────────┬────────────────────────────┬───────────┐
+│ Library  │ Toolbar (floating, hide)   │ Thumbnail │
+│ Sidebar  │                            │ Sidebar   │
+│ (240pt)  │ Viewer (image)             │ (148pt)   │
+│          │                            │           │
+│          │ Page slider (auto-hide)    │           │
+└──────────┴────────────────────────────┴───────────┘
 ```
 
 ### 규칙
 - Viewer 영역은 항상 최대
-- Sidebar는 toggle 가능
-- Toolbar는 hover 시 표시
+- Library sidebar(왼쪽)는 고정하거나 왼쪽 가장자리 hover 시 오버레이로 표시
+- Thumbnail sidebar(오른쪽)는 toggle 가능 (`⌃⌘P`)
+- Toolbar와 페이지 슬라이더는 뷰어 위/아래 가장자리(80pt) hover 시 표시
 
 ---
 
@@ -100,10 +105,15 @@
 - 중앙 정렬
 - padding 최소화
 
-### 📚 Thumbnail Sidebar
+### 📚 Library Sidebar
 - 배경: `bg.secondary`
-- width: 200~260px
-- hover 시 강조
+- width: 240pt
+- 섹션 헤더: `caption`, `text.secondary`
+
+### 🖼 Thumbnail Sidebar
+- 배경: `bg.secondary`
+- width: 148pt (썸네일 셀 폭 112pt, placeholder `bg.tertiary`, radius 4)
+- 현재 페이지: `accent.primary` 2pt 외곽선 + 페이지 번호 accent
 
 ### 🔘 Buttons
 
@@ -111,13 +121,18 @@
 |------|------|
 | Default | 투명 |
 | Hover | `bg.tertiary` |
-| Active | accent |
+| Active | accent 배경 + 흰색 아이콘 |
+
+- 크기 32×32pt, corner radius 6 (continuous)
+- 아이콘: SF Symbols 14pt medium, 기본 색 `text.primary`
+- 상태 변화 애니메이션: `uiReveal`
 
 ---
 
 ### 📊 Slider (페이지 이동)
-- 얇은 라인 스타일
-- thumb는 작게
+- 얇은 라인 스타일: track 2pt (`bg.tertiary`), 진행 구간 `accent.primary`
+- thumb는 작게: 10pt 원 (`text.primary`)
+- 터치 영역 높이 20pt, 드래그 종료 시 페이지 단위로 스냅
 
 ---
 
@@ -141,10 +156,10 @@
 - 빠르고 짧게
 - 과하지 않게
 
-| Action | Duration |
-|------|------|
-| 페이지 전환 | 150ms |
-| UI 표시/숨김 | 120ms |
+| Token | Action | Duration |
+|------|------|------|
+| `pageTransition` | 페이지 전환 | 150ms (easeOut) |
+| `uiReveal` | UI 표시/숨김 | 120ms (easeOut) |
 
 ---
 
@@ -167,10 +182,10 @@
 ## 11. SwiftUI Token Example
 
 ```swift
-struct PanelyColors {
-    static let bgPrimary = Color(hex: "#0F1115")
-    static let bgSecondary = Color(hex: "#1C1F26")
-    static let accent = Color(hex: "#0A84FF")
+enum PanelyColor {
+    static let bgPrimary = Color(hex: 0x0F1115)
+    static let bgSecondary = Color(hex: 0x1C1F26)
+    static let accentPrimary = Color(hex: 0x0A84FF)
 }
 ```
 

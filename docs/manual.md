@@ -16,9 +16,9 @@ The reader keeps a layout-agnostic chrome that gets out of your way:
 
 ![Reading a single page with library pinned](screenshots/01-hero-single-page.png)
 
-- **Library sidebar** (left, pinnable) — folder tree, favorites, and per-book bookmarks.
+- **Library sidebar** (left, pinnable) — continue reading, folder tree, favorites, and per-book bookmarks.
 - **Floating toolbar** (top, auto-hides) — layout / fit / zoom / favorite / bookmark / navigation.
-- **Viewer** — the page itself, auto-centered with pinch + scroll-wheel zoom.
+- **Viewer** — the page itself, auto-centered with pinch or `⌘`-scroll zoom.
 - **Page slider** (bottom, auto-hides) — quick-jump field plus volume + page counter.
 
 ---
@@ -29,22 +29,32 @@ On first launch the library is empty:
 
 ![Empty sidebar prompting folder selection](screenshots/06-sidebar-empty.png)
 
-Choose **Pick Folder…** (or press `⌘O`, or drag a folder onto the app
-icon) to grant access. Once granted, the sidebar populates with your tree
-and any per-book state:
+Choose **Open Folder…** (or press `⌘O`, or drag a folder onto the app
+icon) to grant access. `⌘O` also opens a single CBZ / ZIP / CBR / RAR
+file. Once granted, the sidebar populates with your tree and any per-book
+state:
 
 ![Populated sidebar with favorites and bookmarks](screenshots/05-sidebar-populated.png)
 
-The sidebar surfaces up to three sections automatically:
+The sidebar shows these sections whenever they have something in them:
 
+- **Continue Reading** — the unfinished book you read most recently, with its progress; click to pick up where you left off (right-click → **Remove from Continue Reading** to clear it).
+- **Volumes** — the volumes inside a zip-in-zip archive, which don't appear in the folder tree.
 - **Favorites** — books you've starred (`⌘⇧D` or the ★ toolbar button).
 - **Bookmarks** — pages you've marked (`⌘D` or the 🔖 toolbar button) in the current book.
 - **Bookmarks in Other Books** — bookmarks you left in other books; click one to open that book on the page.
-- **Files** — your library folder tree. Folders and archives (`.cbz` / `.zip`) are visually distinguished.
+- **Files** — your library folder tree. Folders and archives (`.cbz` / `.zip` / `.cbr` / `.rar`) are visually distinguished, and books you've started show a progress ring (a check mark once finished).
 
-The pin icon at the top of the sidebar (or `⌃⌘S`) keeps it open
-permanently; without pinning, the sidebar slides in as an overlay when
-you hover the left edge and slides back out when you move away.
+The header's library button (**Change Library Root…**) picks a different
+folder, and **Refresh File Tree** rescans it — the tree also refreshes on
+its own when files are added, removed, or renamed. The pin icon (or
+`⌃⌘S`) keeps the sidebar open permanently; without pinning, the sidebar
+slides in as an overlay when you hover the left edge and slides back out
+when you move away (or press `Esc`).
+
+**File → Open Recent** lists the books and folders you opened last, and
+**File → Reload Book** (`⌘R`) re-reads the current one. If the open book
+changes on disk, a banner offers **Reload**.
 
 ---
 
@@ -95,6 +105,9 @@ memory.
 Toggle reading direction (toolbar arrow button) to flip the order for
 manga. RTL applies to paged layouts only — vertical scroll always reads
 top-to-bottom, so the direction toggle disables itself in vertical mode.
+
+In right-to-left reading the arrow keys follow the page: `←` goes to the
+next page and `→` to the previous one (`Space` still goes forward).
 
 ---
 
@@ -185,8 +198,9 @@ volume's filename so you know what you're about to start. Pressing
 
 ![Previous-volume card](screenshots/09-previous-volume-card.png)
 
-Pressing back (`←`) at page 0 of any volume past the first arms the
-**Previous** card. A second back press opens the previous volume.
+Pressing back (`←`) at page 0 of any volume past the first — or paging
+back onto page 0 — arms the **Previous** card. A second back press opens
+the previous volume.
 
 The card is intent-gated — it doesn't auto-appear on every fresh open
 at page 0, so opening Volume 2 cold doesn't badger you about Volume 1.
@@ -234,7 +248,7 @@ so reopening the same archive is instant on subsequent launches.
 
 ## General settings
 
-![General settings: interface language with the restart prompt](screenshots/16-general-settings.png)
+![General settings: interface language](screenshots/16-general-settings.png)
 
 Panely follows your Mac's primary language when it's English or Korean,
 and shows English for any other language. To choose yourself, open
@@ -242,10 +256,9 @@ and shows English for any other language. To choose yourself, open
 **English**, or **한국어**. Language names are always shown in their own
 language, so the right one is easy to find whichever language is on screen.
 
-The switch happens immediately — the window, menus, and settings change as
-soon as you pick. A few menu items that macOS draws itself (the Edit and
-Window menus, Quit, and so on) keep the previous language until Panely
-restarts; **Restart Now** does that and reopens the book you were reading.
+The switch happens immediately — the window, settings, and every menu,
+including the standard macOS ones (Edit, Window, Quit, and so on), change
+as soon as you pick. No restart is needed.
 
 ---
 
@@ -317,7 +330,8 @@ favorites, or reading position.
 The file log is intentionally bounded: Panely keeps one `recent-log.txt` file
 up to 768 KB, trims it back to roughly 384 KB when it grows past that limit,
 and includes the latest 256 KB in diagnostic reports. Use **Open Logs Folder**
-in **Settings → Diagnostics** to inspect the file directly.
+in **Settings → Diagnostics** (or **File → Open Diagnostic Logs Folder**) to
+inspect the file directly.
 
 The **Log level** control changes which future Panely diagnostic events are
 written to OSLog and the file log. It does not rewrite or filter logs that
@@ -333,7 +347,8 @@ Press `⌘⇧D` (or the ★ toolbar button) while a book is open to add it
 to the **Favorites** section of the sidebar. Favorites persist across
 launches via security-scoped bookmarks — moving the underlying file
 within the same volume continues to work because stale bookmarks are
-regenerated on the fly.
+regenerated on the fly. Right-click a favorite → **Remove from Favorites**
+to drop it.
 
 ### Bookmarking a page
 
@@ -353,14 +368,17 @@ Step between bookmarks within the current book with `⌘⇧[` / `⌘⇧]`.
 
 Bookmarks aren't lost when you move on to another book. The sidebar's
 **Bookmarks in Other Books** section lists every other bookmarked book;
-expand one and click a page to open that book right on it.
+expand one and click a page to open that book right on it. Right-click a
+book → **Remove This Book's Bookmarks…** to clear just that book.
 
 The same list is available without the sidebar:
 
 - the **bookmark list** button in the toolbar (next to 🔖), and
 - **Go → Bookmarks** in the menu bar.
 
-**Go → Remove All Bookmarks…** clears the bookmarks in every book.
+**Go → Remove All Bookmarks in This Book…** clears the open book's
+bookmarks, and **Go → Remove All Bookmarks…** clears the bookmarks in
+every book.
 
 ---
 
@@ -384,7 +402,13 @@ Assist**. The same tab sets:
 ![Experimental settings: Translation Assist, default language, mode and speech level](screenshots/23-experimental-settings.png)
 
 - **Default Language** — the language new series are shown in. **System
-  Default** follows Panely's interface language.
+  Default** follows Panely's interface language. Panely translates between
+  Japanese, Chinese (Simplified and Traditional), Korean and English.
+- **Translation Mode** — **Fast** (the default) translates a volume in
+  about a minute; **Accurate** reads idioms and nuance better but takes
+  about 20 times as long. Each mode downloads its own language packs, and a
+  running job restarts in the new mode. Fast needs macOS 26.4 or later;
+  before that every book is translated with Accurate.
 - **Match Speech Level** — on by default (Japanese ↔ Korean, needs Apple
   Intelligence). Apple Translation tends to make every line polite, so a
   king's commands come out as requests and "안 돼" as "だめです". Panely reads
@@ -416,12 +440,16 @@ Translation is spread over a few places, each for one job:
   item translates it into Korean.
 - **The translation panel** is for translating this book: what to do next,
   which language to view, and the book's own settings.
-- **The pill over the page** shows progress while a job runs.
+- **The pill over the page** shows progress while a job runs, with pause
+  and stop.
 - **Edit mode** (`⇧⌘E`) is for correcting balloons, right on the page.
-- **Window → Jobs** (`⌥⌘J`) lists everything running in the background —
-  other books' translations and exports — and the books you've exported.
-  The pill over the page opens it.
+- **Window → Jobs** (`⌥⌘J`) lists every translation and export in
+  progress — this book's and other books' — and the books you've exported.
+  The small pill for other books and exports opens it.
 - **Settings → Experimental** holds app-wide choices; the panel's ⚙︎ opens it.
+- **The View menu** has the same commands: **Show Translation** / **Hide
+  Translation** (`⇧⌘T`), **Translate This Book** / **Pause Translating**
+  (`⌥⌘T`), **Edit Balloons** (`⇧⌘E`) and **Show Hidden Balloons**.
 
 ### Translating a book
 
@@ -446,7 +474,11 @@ Translation starts at the page you're on and keeps ahead of you as you read:
   page slider.
 
 The same line says whether the language pack is installed. If it's missing,
-the big button becomes **Download Language Pack…**.
+the big button becomes **Download Language Pack…** (the banner over the page
+offers **Download…** too). Packs are large, so this can take several
+minutes, and the system window's progress bar may not move for a while.
+Downloaded packs are managed in System Settings › General › Language &
+Region › Translation Languages.
 
 The first time you translate a series, Panely works out which language the
 book is in and remembers it for the series. If it guessed wrong, open **This
@@ -481,8 +513,10 @@ Fix a balloon right where you see the problem — no mode to find first:
 - **Click it**: its popover offers **Edit**, **Fix Original** and **Hide**
   next to the translation.
 - **Right-click it** (two-finger click): **Edit Translation…**, **Fix
-  Original…** and **Hide This Balloon**, plus, anywhere on the page,
-  **Translate This Page Again** and **Add a Balloon Here…**.
+  Original…** and **Hide This Balloon** (**Remove This Balloon** for one you
+  added, **Show This Balloon** for a hidden one), plus, anywhere on the page,
+  **Translate This Page Again**, **Improve with an AI Chat…**, **Add a
+  Balloon Here…** and **Edit Balloons**.
 
 **Edit mode** (`⇧⌘E`, the language menu, the panel or the right-click menu)
 is for looking over a book's edits: edited balloons carry a pencil, hidden
@@ -497,7 +531,8 @@ A balloon's popover offers:
 - **Edit** — rewrite the translation. Your translation applies to that
   language only.
 - **Fix Original** — when OCR misread the text, correct it and it's
-  translated again, into every language the book is translated into.
+  translated again, into every language the book is translated into (one
+  that has no translation of it yet shows **Translate Again** here).
 - **Hide** — for a "balloon" OCR made up out of artwork or background. The
   banner that follows offers **Undo**.
 - **Revert** — undo that balloon alone; when both its translation and its
@@ -521,7 +556,7 @@ at text boxes the detector found but OCR left empty.)
 **Pages translated before an improvement** — a balloon split into two
 halves, polite speech where the original is casual — can be redone without
 clearing the cache: **Translate This Page Again** — right-click the page, or
-in the language menu or the edit bar — reads and translates it again, the
+in the language menu, or **Translate Page Again** in the edit bar — reads and translates it again, the
 current way; **Translate This Book Again…** (under **This Book & Series** in
 the panel) does every page. Your
 edits stay, though one on a balloon that's now found differently may no
@@ -578,7 +613,8 @@ ignored, and the panel lists them before you start.
 A few limits are shown where they apply:
 
 - A book inside an archive (zip-in-zip) pauses when you open another book and
-  continues when you come back.
+  continues when you come back. **Translate Entire Series** skips such
+  volumes and names them in the panel — open each one to translate it.
 - Quitting Panely stops translating and exporting. Finished pages are kept,
   and the rest continues when you start again.
 - If a job in the background stops on an error, it stays in the list with the
@@ -600,14 +636,17 @@ Start it from:
 - **File → Export Translated Book…**;
 - the panel's **This Book & Series**, under **Translate Entire Series**;
 - the library: right-click a book for **Export Translated Book…**, or a
-  folder of volumes for **Export Translated Series (N Volumes)…**. The book
+  folder of volumes for **Export Translated Series (N Volumes)…** (the
+  **Volumes** header offers **Export Translated Series…** too). The book
   needn't be open.
 
 ![The export sheet](screenshots/21-translation-export-sheet.png)
 
 A short sheet asks for the language, the format, what to do with **Pages Not
 Translated Yet** (**Translate Them First**, or **Export As They Are**) and
-where to save — chosen once and remembered, like the rest of the sheet.
+where to save (**Save To**) — chosen once and remembered, like the format
+and the choice for untranslated pages. The language starts as the one the
+series is shown in.
 
 ![Window → Jobs: an export running, one stopped, and exported books](screenshots/22-jobs-window.png)
 
@@ -617,7 +656,9 @@ left (through the same queue as other translations), then writing the pages —
 and can be cancelled there. A job that stops (a missing language pack, say)
 stays listed with the reason and **Try Again**. Finished books stay listed,
 across launches, with **Show in Finder** and **Open**; the pill over the page
-says when one is done.
+says when one is done. A volume inside another archive exists only while
+that archive is open, so keep it open until the export finishes — the sheet
+says so.
 
 Pages come out numbered in reading order (`001.jpg`, `002.jpg`…). Pages with
 nothing translated are copied unchanged; translated ones keep their format
@@ -634,7 +675,7 @@ The most-used:
 
 | Action | Shortcut |
 |---|---|
-| Next / previous page | `→` / `←` (also `Space` for next) |
+| Next / previous page | `→` / `←` (swapped in right-to-left; also `Space` for next) |
 | Next / previous volume | `]` / `[` (also `⌘]` / `⌘[`) |
 | Next / previous bookmark | `⌘⇧]` / `⌘⇧[` |
 | Open file | `⌘O` |
@@ -645,7 +686,7 @@ The most-used:
 | Layout: single / double / vertical | `⌘⇧1` / `⌘⇧2` / `⌘⇧3` |
 | Fit: screen / width / height | `⌘1` / `⌘2` / `⌘3` |
 | Zoom in / out / reset | `⌘+` / `⌘−` / `⌘0` |
-| Pin library / toolbar / thumbnails | `⌃⌘S` / `⌃⌘T` / `⌃⌘P` |
+| Pin library / pin toolbar / show thumbnails | `⌃⌘S` / `⌃⌘T` / `⌃⌘P` |
 | Lock view size | `⌘L` |
 | Translation: original ↔ translation | `⇧⌘T` |
 | Translation: translate this book / pause | `⌥⌘T` |
