@@ -7,6 +7,18 @@ import AppKit
 final class PanelyScrollView: NSScrollView {
     override var acceptsFirstResponder: Bool { false }
 
+    /// Always overlay, whatever the system prefers. Pages are fitted to the
+    /// whole viewport; a legacy scroller takes ~17 pt of it, so a spread is
+    /// fitted short (the fit runs while the scroller still shows, then it
+    /// autohides) and a strip sits off-centre. AppKit resets scroll views to
+    /// `NSScroller.preferredScrollerStyle` whenever that changes (a mouse
+    /// connected, the "Show scroll bars" setting toggled), overriding the
+    /// style set at creation.
+    override var scrollerStyle: NSScroller.Style {
+        get { super.scrollerStyle }
+        set { super.scrollerStyle = .overlay }
+    }
+
     /// Gates wheel-driven page turning. Set by `AppKitImageScroller` from the
     /// user preference AND the layout — always false in continuous/vertical
     /// mode, where scrolling *is* reading and must never be intercepted.
