@@ -199,7 +199,8 @@ nonisolated enum TranslationOverlayLayout {
     /// `maxFontSize` (the source glyph size — a translation shouldn't shout
     /// louder than the original). Returns the string, its laid-out size and,
     /// when `outline` is given, the same text as an outline to draw *under*
-    /// it.
+    /// it. Prefers whole words, but allows them to wrap when keeping them
+    /// whole would make the text less than 60% of the size the area can hold.
     ///
     /// The outline is a separate pass on purpose: the system font's glyphs are
     /// built from overlapping contours, and stroking the filled text (a
@@ -217,7 +218,8 @@ nonisolated enum TranslationOverlayLayout {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
         paragraph.lineBreakMode = .byWordWrapping
-        // Korean breaks between words (eojeol), not mid-word syllables.
+        // Prefer Korean word boundaries; the text system can still break a
+        // long word when it cannot fit a line at the chosen size.
         paragraph.lineBreakStrategy = .hangulWordPriority
         func make(_ fontSize: CGFloat) -> NSAttributedString {
             NSAttributedString(string: text, attributes: [
@@ -233,39 +235,58 @@ nonisolated enum TranslationOverlayLayout {
             ).size
         }
 
-        // Measured against the width it's wrapped to, a word too long for a
-        // line is broken mid-word ("dreamin / g.") and still reports as
-        // fitting — so each word must fit a line on its own. Only for text
-        // that breaks at spaces: Japanese or Chinese wraps anywhere.
+        // Preserve words where possible (rather than "dreamin / g."). Han
+        // and kana can wrap within a space-delimited chunk: a translator's
+        // occasional space mustn't force the rest of a Japanese or Chinese
+        // sentence onto one line. The shared script check covers both.
         let words = text.split(whereSeparator: \.isWhitespace).map(String.init)
+            .filter { !TranslationLanguage.japanese.containsOwnScript($0) }
         func wordsFit(_ fontSize: CGFloat) -> Bool {
             guard words.count > 1 else { return true }
             let font = NSFont.systemFont(ofSize: fontSize, weight: .semibold)
             return words.allSatisfy { (($0 as NSString).size(withAttributes: [.font: font]).width) <= size.width + 0.5 }
         }
 
-        var low = minFontSize
-        var high = max(minFontSize, maxFontSize)
-        var best = make(low)
-        var bestSize = measure(best)
-        while high - low > 0.5 {
-            let mid = (low + high) / 2
-            // The word check first: it's the cheap one, and a size it rules
-            // out needn't be laid out at all.
-            guard wordsFit(mid) else {
-                high = mid
-                continue
+        func fit(keepingWordsWhole: Bool) -> (string: NSAttributedString, size: CGSize, fontSize: CGFloat) {
+            var low = minFontSize
+            var high = max(minFontSize, maxFontSize)
+            var best = make(low)
+            var bestSize = measure(best)
+            var bestFontSize = low
+            while high - low > 0.5 {
+                let mid = (low + high) / 2
+                // Rule out overlong words before laying out the paragraph.
+                if keepingWordsWhole && !wordsFit(mid) {
+                    high = mid
+                    continue
+                }
+                let candidate = make(mid)
+                let candidateSize = measure(candidate)
+                if candidateSize.height <= size.height && candidateSize.width <= size.width + 0.5 {
+                    best = candidate
+                    bestSize = candidateSize
+                    bestFontSize = mid
+                    low = mid
+                } else {
+                    high = mid
+                }
             }
-            let candidate = make(mid)
-            let candidateSize = measure(candidate)
-            if candidateSize.height <= size.height && candidateSize.width <= size.width + 0.5 {
-                best = candidate
-                bestSize = candidateSize
-                low = mid
-            } else {
-                high = mid
+            return (best, bestSize, bestFontSize)
+        }
+
+        var fitted = fit(keepingWordsWhole: true)
+        // A long compound or a list of names can otherwise shrink an entire
+        // balloon despite plenty of vertical room. Reflow only when it makes
+        // a substantial difference, measured against what actually fits —
+        // never force a minimum size that spills outside the patch.
+        let minimumWholeWordShare: CGFloat = 0.6
+        if !words.isEmpty && fitted.fontSize < maxFontSize * minimumWholeWordShare {
+            let wrapped = fit(keepingWordsWhole: false)
+            if fitted.fontSize < wrapped.fontSize * minimumWholeWordShare {
+                fitted = wrapped
             }
         }
+        let best = fitted.string
         // Over artwork the patch is feathered, so an outline keeps the
         // letters legible against whatever shows through. Stroke only (a
         // positive width, centred on the contour): half of it shows outside
@@ -280,7 +301,7 @@ nonisolated enum TranslationOverlayLayout {
             ], range: range)
             return NSAttributedString(attributedString: string)
         }
-        return (best, outlined, bestSize)
+        return (best, outlined, fitted.size)
     }
 }
 

@@ -241,8 +241,8 @@ struct TranslationOverlayLayoutTests {
         #expect(fitted.outline == nil)
     }
 
-    /// A word is never broken across lines to fit a bigger size: the font
-    /// shrinks until the longest word fits a line.
+    /// Ordinary English words still stay whole when only a modest size
+    /// reduction is needed.
     @Test func fittedTextKeepsWordsWhole() {
         let size = CGSize(width: 140, height: 160)
         let fitted = TranslationOverlayLayout.fittedText(
@@ -255,6 +255,67 @@ struct TranslationOverlayLayoutTests {
         let font = fitted.string.attribute(.font, at: 0, effectiveRange: nil) as? NSFont ?? .systemFont(ofSize: 99)
         let longest = ("dreaming." as NSString).size(withAttributes: [.font: font]).width
         #expect(longest <= size.width + 0.5)
+    }
+
+    /// A space in CJK output mustn't turn the rest of the sentence into one
+    /// unbreakable word. These areas have room for several readable lines.
+    @Test(arguments: [
+        "そう。 学校でも、ちょっとしたことがあれば、物を壊してしまいます。",
+        "是的。 在学校里，只要遇到一点小事，就会把东西弄坏。",
+        "是的。 在學校裡，只要遇到一點小事，就會把東西弄壞。",
+    ])
+    func cjkWithSpacesUsesTheAvailableHeight(_ translation: String) throws {
+        let size = CGSize(width: 176, height: 185)
+        let fitted = TranslationOverlayLayout.fittedText(
+            translation, in: size, maxFontSize: 38, color: .black, outline: nil
+        )
+        let font = try #require(fitted.string.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
+        #expect(font.pointSize > 24)
+        #expect(font.pointSize <= 38)
+        #expect(fitted.size.width <= size.width + 0.5)
+        #expect(fitted.size.height <= size.height)
+    }
+
+    /// A long space-delimited Korean compound mustn't make all the other
+    /// lines tiny just to put that compound on one line.
+    @Test func overlongKoreanCompoundWrapsBeforeMakingTheBalloonTiny() throws {
+        let size = CGSize(width: 325, height: 383)
+        let fitted = TranslationOverlayLayout.fittedText(
+            "과거 4건이 아라카와구·시나가와구·나카노구·세타가야구의 쇼핑몰·도내라는 이유만으로 장소를 좁힐 수 없어.",
+            in: size, maxFontSize: 38.5, color: .black, outline: nil
+        )
+        let font = try #require(fitted.string.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
+        #expect(font.pointSize > 34)
+        #expect(font.pointSize <= 38.5)
+        #expect(fitted.size.width <= size.width + 0.5)
+        #expect(fitted.size.height <= size.height)
+    }
+
+    /// Relaxing word preservation is only useful when the larger text also
+    /// fits vertically; a short patch still needs a small font.
+    @Test func emergencyWrappingStillRespectsLimitedHeight() throws {
+        let size = CGSize(width: 140, height: 40)
+        let fitted = TranslationOverlayLayout.fittedText(
+            "아라카와구·시나가와구·나카노구·세타가야구의 쇼핑몰에서 만났습니다.",
+            in: size, maxFontSize: 40, color: .black, outline: nil
+        )
+        let font = try #require(fitted.string.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
+        #expect(font.pointSize < 20)
+        #expect(fitted.size.width <= size.width + 0.5)
+        #expect(fitted.size.height <= size.height)
+    }
+
+    /// A short standalone reply already wrapped naturally before this fix;
+    /// adding word preservation mustn't make those replies smaller.
+    @Test func standaloneKoreanReplyKeepsItsReadableSize() throws {
+        let size = CGSize(width: 100, height: 120)
+        let fitted = TranslationOverlayLayout.fittedText(
+            "그렇다면", in: size, maxFontSize: 40, color: .black, outline: nil
+        )
+        let font = try #require(fitted.string.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
+        #expect(font.pointSize > 36)
+        #expect(fitted.size.width <= size.width + 0.5)
+        #expect(fitted.size.height <= size.height)
     }
 
     /// Stroking the filled text traces the system font's overlapping inner
