@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-MXMKG07WRB"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { dataLayer.push(arguments); }
+  gtag("js", new Date());
+  gtag("config", "G-MXMKG07WRB");
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Panely — User Manual</title>
@@ -218,18 +226,36 @@
   <div class="container">
     <div class="links">
       <a href="index.html">Home</a>
-      <a href="https://github.com/sejoung/Panely">GitHub</a>
-      <a href="https://github.com/sejoung/Panely/releases">Releases</a>
-      <a href="https://github.com/sejoung/Panely/blob/main/LICENSE">License</a>
+      <a id="ft-repo" href="https://github.com/sejoung/Panely">GitHub</a>
+      <a id="ft-releases" href="https://github.com/sejoung/Panely/releases">Releases</a>
+      <a id="ft-license" href="https://github.com/sejoung/Panely/blob/main/LICENSE">License</a>
     </div>
-    <p>Apache License 2.0 · Built with Swift &amp; AppKit</p>
+    <p>Apache License 2.0 · Built with <span id="ft-stack">Swift &amp; AppKit</span></p>
   </div>
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
 <script>
-  var REPO_BLOB = "https://github.com/sejoung/Panely/blob/main/";
+  // ?platform=windows renders the Windows manual straight from its own repo,
+  // so it stays the single source of truth.
+  var PLATFORMS = {
+    mac: {
+      repo: "https://github.com/sejoung/Panely",
+      raw: "",
+      stack: "Swift &amp; AppKit",
+      title: { en: "Panely — User Manual", ko: "Panely — 사용 설명서" }
+    },
+    windows: {
+      repo: "https://github.com/sejoung/PanelyWindows",
+      raw: "https://raw.githubusercontent.com/sejoung/PanelyWindows/main/docs/",
+      stack: "C# &amp; WPF",
+      title: { en: "Panely for Windows — User Manual", ko: "Panely for Windows — 사용 설명서" }
+    }
+  };
   var SOURCES = { en: "manual.md", ko: "manual.ko.md" };
+  var PLATFORM = PLATFORMS[new URLSearchParams(location.search).get("platform")] || PLATFORMS.mac;
+  var REPO_BLOB = PLATFORM.repo + "/blob/main/";
+  var DOCS_BLOB = REPO_BLOB + "docs/";
 
   function currentLang() {
     var p = new URLSearchParams(location.search).get("lang");
@@ -249,19 +275,45 @@
       a.setAttribute("target", "_blank");
       a.setAttribute("rel", "noopener");
     });
+    if (PLATFORM.raw) {
+      // Other docs next to a remote manual aren't on Pages either.
+      container.querySelectorAll("a[href]").forEach(function (a) {
+        if (/^(#|[a-z]+:|\/)/i.test(a.getAttribute("href"))) return;
+        a.setAttribute("href", DOCS_BLOB + a.getAttribute("href"));
+        a.setAttribute("target", "_blank");
+        a.setAttribute("rel", "noopener");
+      });
+      container.querySelectorAll("img[src]").forEach(function (img) {
+        if (!/^([a-z]+:|\/)/i.test(img.getAttribute("src")))
+          img.setAttribute("src", PLATFORM.raw + img.getAttribute("src"));
+      });
+    }
     container.querySelectorAll("img").forEach(function (img) {
       img.setAttribute("loading", "lazy");
     });
+    // GitHub alerts ("> [!NOTE]") come through marked as literal text.
+    var ALERTS = {
+      NOTE: { en: "Note", ko: "참고" },
+      TIP: { en: "Tip", ko: "팁" },
+      IMPORTANT: { en: "Important", ko: "중요" },
+      WARNING: { en: "Warning", ko: "경고" },
+      CAUTION: { en: "Caution", ko: "주의" }
+    };
+    container.querySelectorAll("blockquote > p:first-child").forEach(function (p) {
+      var m = p.innerHTML.match(/^\s*\[!(\w+)\]\s*/);
+      if (!m || !ALERTS[m[1]]) return;
+      p.innerHTML = "<strong>" + ALERTS[m[1]][lang] + "</strong><br>" + p.innerHTML.slice(m[0].length);
+    });
     // Linkable sections (marked doesn't add heading ids): "Translation
     // assist (experimental)" → #translation-assist-experimental.
-    container.querySelectorAll("h2, h3").forEach(function (h) {
+    container.querySelectorAll("h2, h3, h4").forEach(function (h) {
       if (h.id) return;
       h.id = h.textContent.toLowerCase().trim()
         .replace(/[^\p{L}\p{N}\s-]/gu, "")
         .replace(/\s+/g, "-");
     });
     document.documentElement.lang = lang;
-    document.title = lang === "ko" ? "Panely — 사용 설명서" : "Panely — User Manual";
+    document.title = PLATFORM.title[lang];
     document.querySelector(".topbar-brand").setAttribute("href", "index.html?lang=" + lang);
   }
 
@@ -274,14 +326,17 @@
   function load(lang) {
     var doc = document.getElementById("doc");
     setActive(lang);
-    fetch(SOURCES[lang], { cache: "no-cache" })
+    fetch(PLATFORM.raw + SOURCES[lang], { cache: "no-cache" })
       .then(function (r) {
         if (!r.ok) throw new Error(r.status);
         return r.text();
       })
       .then(function (md) {
-        doc.innerHTML = marked.parse(md);
-        rewrite(doc, lang);
+        // Rewrite in an inert template so relative images never load from the wrong place.
+        var tpl = document.createElement("template");
+        tpl.innerHTML = marked.parse(md);
+        rewrite(tpl.content, lang);
+        doc.replaceChildren(tpl.content);
         // The page was empty when the browser looked for the #section.
         if (location.hash) {
           var target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
@@ -291,7 +346,7 @@
       .catch(function () {
         doc.innerHTML =
           '<div class="doc-loading">Couldn\'t load the manual. ' +
-          'Read it on <a href="' + REPO_BLOB + SOURCES[lang] + '">GitHub</a> instead.</div>';
+          'Read it on <a href="' + DOCS_BLOB + SOURCES[lang] + '">GitHub</a> instead.</div>';
       });
   }
 
@@ -304,6 +359,11 @@
       load(lang);
     });
   });
+
+  document.getElementById("ft-repo").href = PLATFORM.repo;
+  document.getElementById("ft-releases").href = PLATFORM.repo + "/releases";
+  document.getElementById("ft-license").href = REPO_BLOB + "LICENSE";
+  document.getElementById("ft-stack").innerHTML = PLATFORM.stack;
 
   load(currentLang());
 </script>
