@@ -31,6 +31,20 @@
 
 ---
 
+## Downloads and repositories
+
+Choose macOS or Windows on the [download page](https://sejoung.github.io/Panely/).
+Each platform has its own repository and releases.
+
+| Platform | Source code | Download |
+| --- | --- | --- |
+| macOS | [sejoung/Panely](https://github.com/sejoung/Panely) | [Latest macOS release](https://github.com/sejoung/Panely/releases/latest) |
+| Windows | [sejoung/PanelyWindows](https://github.com/sejoung/PanelyWindows) | [Latest Windows release](https://github.com/sejoung/PanelyWindows/releases/latest) |
+
+This repository and the instructions below cover **macOS**. For Windows
+requirements, installation, and known limitations, see the
+[Windows manual](https://github.com/sejoung/PanelyWindows/blob/main/docs/manual.md).
+
 ## Overview
 
 Panely is a distraction-free comic reader that gets out of your way. The UI

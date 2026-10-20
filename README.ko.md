@@ -31,6 +31,20 @@
 
 ---
 
+## 다운로드와 저장소
+
+[다운로드 페이지](https://sejoung.github.io/Panely/?lang=ko)에서 macOS 또는
+Windows용을 선택하세요. 플랫폼별로 저장소와 릴리스를 따로 관리합니다.
+
+| 플랫폼 | 소스 코드 | 다운로드 |
+| --- | --- | --- |
+| macOS | [sejoung/Panely](https://github.com/sejoung/Panely) | [macOS 최신 릴리스](https://github.com/sejoung/Panely/releases/latest) |
+| Windows | [sejoung/PanelyWindows](https://github.com/sejoung/PanelyWindows) | [Windows 최신 릴리스](https://github.com/sejoung/PanelyWindows/releases/latest) |
+
+이 저장소와 아래 설명은 **macOS용**입니다. Windows의 요구 사항, 설치 방법,
+알려진 제약은 [Windows 설명서](https://github.com/sejoung/PanelyWindows/blob/main/docs/manual.ko.md)를
+확인하세요.
+
 ## 개요
 
 Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을 때는 UI가

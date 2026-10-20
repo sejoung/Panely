@@ -1,803 +1,1454 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-MXMKG07WRB"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
+    <head>
+        <!-- Google tag (gtag.js) -->
+        <script
+            async
+            src="https://www.googletagmanager.com/gtag/js?id=G-MXMKG07WRB"
+        ></script>
+        <script>
+            window.dataLayer = window.dataLayer || [];
+            function gtag() {
+                dataLayer.push(arguments);
+            }
+            gtag("js", new Date());
+            gtag("config", "G-MXMKG07WRB");
+        </script>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Panely — Comic &amp; image viewer for macOS and Windows</title>
+        <meta
+            name="description"
+            content="Download Panely for macOS and Windows. A fast, open-source comic and image viewer with single-page, spread and webtoon layouts, bookmarks, and experimental on-device translation."
+        />
+        <meta
+            property="og:title"
+            content="Panely — Comic &amp; image viewer for macOS and Windows"
+        />
+        <meta
+            property="og:description"
+            content="Download Panely for macOS and Windows. A fast, open-source comic and image viewer with single-page, spread and webtoon layouts, bookmarks, and experimental on-device translation."
+        />
+        <meta property="og:type" content="website" />
+        <link
+            rel="icon"
+            type="image/svg+xml"
+            href="icon/panely-icon-stacked.svg"
+        />
+        <style>
+            :root {
+                color-scheme: dark;
+                --bg-primary: #0f1115;
+                --bg-secondary: #1c1f26;
+                --bg-tertiary: #2a2e36;
+                --text-primary: #e6eaf2;
+                --text-secondary: #aab2c0;
+                --accent: #69b1ff;
+                --border: rgba(255, 255, 255, 0.12);
+                --radius: 12px;
+            }
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            [hidden] {
+                display: none !important;
+            }
+            html {
+                scroll-behavior: smooth;
+            }
+            body {
+                font-family:
+                    -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui,
+                    sans-serif;
+                background: var(--bg-primary);
+                color: var(--text-primary);
+                line-height: 1.6;
+                -webkit-font-smoothing: antialiased;
+            }
+            .container {
+                max-width: 1000px;
+                margin: 0 auto;
+                padding: 0 24px;
+            }
+            a {
+                color: var(--accent);
+                text-decoration: none;
+            }
+            a:hover {
+                text-decoration: underline;
+            }
+            a:focus-visible,
+            button:focus-visible,
+            summary:focus-visible,
+            [tabindex]:focus-visible {
+                outline: 3px solid var(--accent);
+                outline-offset: 4px;
+            }
+            .hero {
+                position: relative;
+                padding: 80px 0 56px;
+                text-align: center;
+                background: radial-gradient(
+                    1000px 550px at 50% -100px,
+                    rgba(10, 132, 255, 0.18),
+                    transparent 65%
+                );
+                border-bottom: 1px solid var(--border);
+            }
+            .hero-icon {
+                width: 96px;
+                height: 96px;
+                margin-bottom: 16px;
+                filter: drop-shadow(0 12px 32px rgba(10, 132, 255, 0.2));
+            }
+            .hero h1 {
+                font-size: 52px;
+                line-height: 1.2;
+                letter-spacing: -0.03em;
+                margin-bottom: 16px;
+            }
+            .tagline {
+                font-size: 20px;
+                color: var(--text-secondary);
+                max-width: 660px;
+                margin: 0 auto 8px;
+            }
+            .tagline-sub {
+                font-size: 14px;
+                color: var(--text-secondary);
+                margin-bottom: 32px;
+            }
+            .lang-toggle {
+                position: absolute;
+                top: 20px;
+                right: 24px;
+                display: inline-flex;
+                border: 1px solid var(--border);
+                border-radius: 8px;
+            }
+            .lang-toggle button {
+                background: transparent;
+                color: var(--text-secondary);
+                border: none;
+                border-radius: 7px;
+                padding: 7px 12px;
+                font-family: inherit;
+                font-size: 13px;
+                font-weight: 600;
+                line-height: 1.5;
+                cursor: pointer;
+            }
+            .lang-toggle button.active {
+                background: #086aca;
+                color: white;
+            }
+            .lang-toggle button:hover {
+                color: white;
+            }
+            .platform-grid {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 24px;
+            }
+            .download-card,
+            .info-card {
+                min-width: 0;
+                padding: 28px;
+                background: var(--bg-secondary);
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+                text-align: left;
+            }
+            .download-card {
+                display: flex;
+                flex-direction: column;
+            }
+            .download-card h2 {
+                font-size: 26px;
+                letter-spacing: -0.02em;
+            }
+            .platform-requirement {
+                color: var(--text-secondary);
+                font-size: 14px;
+                margin: 6px 0 22px;
+            }
+            .download-actions {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                margin-bottom: 14px;
+            }
+            .btn {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                padding: 11px 18px;
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 600;
+                line-height: 1.5;
+                background: var(--bg-tertiary);
+                color: var(--text-primary);
+            }
+            .btn:hover {
+                background: #353a44;
+                text-decoration: none;
+            }
+            .btn-primary {
+                background: #086aca;
+                border-color: transparent;
+                color: white;
+            }
+            .btn-primary:hover {
+                background: #0873da;
+            }
+            .download-note,
+            .platform-note,
+            .release-status,
+            figcaption {
+                color: var(--text-secondary);
+                font-size: 13px;
+            }
+            .download-note {
+                margin-bottom: 12px;
+            }
+            .platform-note {
+                padding-top: 12px;
+                border-top: 1px solid var(--border);
+                margin-bottom: 18px;
+            }
+            .release-status {
+                display: flex;
+                align-items: center;
+                gap: 8px 12px;
+                flex-wrap: wrap;
+                margin-bottom: 14px;
+            }
+            .version-pill {
+                padding: 2px 9px;
+                background: rgba(10, 132, 255, 0.12);
+                border: 1px solid rgba(105, 177, 255, 0.35);
+                border-radius: 999px;
+                color: var(--text-primary);
+                font-weight: 600;
+            }
+            .platform-links {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px 16px;
+                margin-top: auto;
+                font-size: 13px;
+            }
+            .hero-meta {
+                font-size: 13px;
+                color: var(--text-secondary);
+                margin-top: 24px;
+            }
+            section {
+                padding: 64px 0;
+            }
+            .section-head {
+                text-align: center;
+                margin-bottom: 32px;
+            }
+            .section-head h2 {
+                font-size: 30px;
+                font-weight: 600;
+                letter-spacing: -0.02em;
+                margin-bottom: 8px;
+            }
+            .section-head p {
+                color: var(--text-secondary);
+                font-size: 15px;
+                max-width: 740px;
+                margin: 0 auto;
+            }
+            .features {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 16px;
+            }
+            .feature {
+                padding: 24px;
+                background: var(--bg-secondary);
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+            }
+            .feature-icon {
+                width: 30px;
+                height: 30px;
+                margin-bottom: 14px;
+                color: var(--accent);
+            }
+            .feature h3,
+            .info-card h3 {
+                font-size: 17px;
+                margin-bottom: 8px;
+            }
+            .feature p,
+            .info-card p {
+                color: var(--text-secondary);
+                font-size: 14px;
+            }
+            .info-card p + p {
+                margin-top: 12px;
+            }
+            .info-card .platform-links {
+                margin-top: 20px;
+            }
+            .guide,
+            .shortcuts {
+                background: #14171d;
+                border-top: 1px solid var(--border);
+                border-bottom: 1px solid var(--border);
+            }
+            .guide-steps {
+                padding-left: 22px;
+                font-size: 14px;
+            }
+            .guide-steps li {
+                margin-bottom: 14px;
+                padding-left: 4px;
+            }
+            .guide-steps li::marker {
+                color: var(--accent);
+                font-weight: 600;
+            }
+            .guide-note {
+                margin-top: 20px;
+                padding-top: 16px;
+                border-top: 1px solid var(--border);
+            }
+            .guide-note summary {
+                cursor: pointer;
+                font-size: 13px;
+                color: var(--text-secondary);
+            }
+            .guide-note pre {
+                margin-top: 12px;
+                padding: 12px;
+                background: var(--bg-primary);
+                border-radius: 6px;
+                overflow-x: auto;
+                font-size: 12px;
+            }
+            code,
+            kbd {
+                font-family: ui-monospace, "SF Mono", monospace;
+            }
+            .showcase-shot {
+                display: block;
+                width: 100%;
+                height: auto;
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+            }
+            figcaption {
+                text-align: center;
+                margin: 12px 0 24px;
+            }
+            .feedback .platform-grid {
+                max-width: 800px;
+                margin: 0 auto;
+            }
+            .table-scroll {
+                overflow-x: auto;
+                border: 1px solid var(--border);
+                border-radius: var(--radius);
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 14px;
+            }
+            th,
+            td {
+                text-align: left;
+                padding: 14px 18px;
+                border-bottom: 1px solid var(--border);
+            }
+            th {
+                font-weight: 600;
+                background: var(--bg-secondary);
+            }
+            td:first-child {
+                color: var(--text-secondary);
+            }
+            tbody tr:last-child td {
+                border-bottom: none;
+            }
+            kbd {
+                display: inline-block;
+                padding: 2px 6px;
+                background: var(--bg-tertiary);
+                border: 1px solid var(--border);
+                border-radius: 5px;
+                font-size: 12px;
+                white-space: nowrap;
+            }
+            footer {
+                padding: 36px 0;
+                text-align: center;
+                color: var(--text-secondary);
+                font-size: 13px;
+            }
+            footer .links {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px 20px;
+                justify-content: center;
+                margin-bottom: 12px;
+            }
+            @media (max-width: 700px) {
+                .platform-grid {
+                    grid-template-columns: 1fr;
+                    gap: 16px;
+                }
+                .hero {
+                    padding: 72px 0 40px;
+                }
+                .hero h1 {
+                    font-size: 42px;
+                }
+                .tagline {
+                    font-size: 18px;
+                }
+                .download-card,
+                .info-card {
+                    padding: 24px;
+                }
+                section {
+                    padding: 44px 0;
+                }
+                .section-head h2 {
+                    font-size: 25px;
+                }
+                th,
+                td {
+                    padding: 12px;
+                }
+                .lang-toggle {
+                    right: 16px;
+                    top: 16px;
+                }
+            }
+            @media (max-width: 400px) {
+                .container {
+                    padding: 0 16px;
+                }
+                .download-card,
+                .info-card {
+                    padding: 20px;
+                }
+                .download-actions .btn {
+                    width: 100%;
+                }
+                .features {
+                    grid-template-columns: 1fr;
+                }
+                table {
+                    font-size: 12px;
+                }
+                th,
+                td {
+                    padding: 10px 8px;
+                }
+            }
+            @media (prefers-reduced-motion: reduce) {
+                html {
+                    scroll-behavior: auto;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <header class="hero">
+            <div class="container">
+                <div class="lang-toggle" role="group" aria-label="Language">
+                    <button type="button" data-lang="en" aria-pressed="true">
+                        EN
+                    </button>
+                    <button type="button" data-lang="ko" aria-pressed="false">
+                        한국어
+                    </button>
+                </div>
+                <img
+                    class="hero-icon"
+                    src="icon/panely-icon-stacked.svg"
+                    width="96"
+                    height="96"
+                    alt="Panely"
+                />
+                <h1>Panely</h1>
+                <p data-i18n="hero.tagline" class="tagline">
+                    A minimal, fast comic &amp; image viewer for macOS and
+                    Windows.
+                </p>
+                <p data-i18n="hero.taglineSub" class="tagline-sub">
+                    Read your comics, your way. Free and open source.
+                </p>
+                <div class="platform-grid" id="downloads">
+                    <article
+                        class="download-card"
+                        aria-labelledby="macos-title"
+                    >
+                        <h2 id="macos-title">macOS</h2>
+                        <p
+                            data-i18n="dl.mac.requirement"
+                            class="platform-requirement"
+                        >
+                            macOS 14 (Sonoma) or later
+                        </p>
+                        <div class="download-actions">
+                            <a
+                                data-i18n="dl.mac.download"
+                                href="https://github.com/sejoung/Panely/releases/latest"
+                                class="btn btn-primary"
+                                id="download-macos"
+                                >Download for macOS</a
+                            >
+                        </div>
+                        <p data-i18n="dl.mac.note" class="download-note">
+                            ZIP archive · Unzip and move Panely.app to
+                            Applications.
+                        </p>
+                        <div
+                            class="release-status"
+                            id="release-macos"
+                            aria-live="polite"
+                            hidden
+                        >
+                            <span class="version-pill" id="version-macos"></span
+                            ><span id="date-macos"></span>
+                        </div>
+                        <p data-i18n="dl.mac.translation" class="platform-note">
+                            Experimental translation requires macOS 26 or later.
+                        </p>
+                        <div class="platform-links">
+                            <a
+                                data-i18n="dl.mac.notes"
+                                href="https://github.com/sejoung/Panely/releases/latest"
+                                id="notes-macos"
+                                >Release notes</a
+                            >
+                            <a
+                                data-i18n="dl.mac.manual"
+                                href="manual.html"
+                                data-href-ko="manual.html?lang=ko"
+                                >macOS manual</a
+                            >
+                            <a
+                                data-i18n="dl.mac.source"
+                                href="https://github.com/sejoung/Panely"
+                                >Source code</a
+                            >
+                        </div>
+                    </article>
+                    <article
+                        class="download-card"
+                        aria-labelledby="windows-title"
+                    >
+                        <h2 id="windows-title">Windows</h2>
+                        <p
+                            data-i18n="dl.win.requirement"
+                            class="platform-requirement"
+                        >
+                            Windows 10 version 2004 (build 19041) or later ·
+                            Windows 11
+                        </p>
+                        <div class="download-actions">
+                            <a
+                                data-i18n="dl.win.x64"
+                                href="https://github.com/sejoung/PanelyWindows/releases/latest"
+                                class="btn btn-primary"
+                                id="download-windows-x64"
+                                >Windows x64</a
+                            >
+                            <a
+                                data-i18n="dl.win.arm64"
+                                href="https://github.com/sejoung/PanelyWindows/releases/latest"
+                                class="btn"
+                                id="download-windows-arm64"
+                                >Windows ARM64</a
+                            >
+                        </div>
+                        <p data-i18n="dl.win.note" class="download-note">
+                            Portable ZIP · Choose x64 for Intel / AMD PCs.
+                            Extract and run Panely.exe; no .NET install needed.
+                        </p>
+                        <div
+                            class="release-status"
+                            id="release-windows"
+                            aria-live="polite"
+                            hidden
+                        >
+                            <span
+                                class="version-pill"
+                                id="version-windows"
+                            ></span
+                            ><span id="date-windows"></span>
+                        </div>
+                        <p data-i18n="dl.win.armNote" class="platform-note">
+                            ARM64 is for Windows on ARM (e.g. Snapdragon); it
+                            has not been tested on an ARM device yet.
+                        </p>
+                        <div class="platform-links">
+                            <a
+                                data-i18n="dl.win.notes"
+                                href="https://github.com/sejoung/PanelyWindows/releases/latest"
+                                id="notes-windows"
+                                >Release notes &amp; checksums</a
+                            >
+                            <a
+                                data-i18n="dl.win.manual"
+                                href="https://github.com/sejoung/PanelyWindows/blob/main/docs/manual.md"
+                                data-href-ko="https://github.com/sejoung/PanelyWindows/blob/main/docs/manual.ko.md"
+                                >Windows manual</a
+                            >
+                            <a
+                                data-i18n="dl.win.source"
+                                href="https://github.com/sejoung/PanelyWindows"
+                                >Source code</a
+                            >
+                        </div>
+                    </article>
+                </div>
+                <p data-i18n="hero.meta" class="hero-meta">
+                    Independent releases for each platform · Apache 2.0
+                </p>
+            </div>
+        </header>
+        <main>
+            <section aria-labelledby="features-title">
+                <div class="container">
+                    <div class="section-head">
+                        <h2 data-i18n="features.title" id="features-title">
+                            Built to get out of your way
+                        </h2>
+                        <p data-i18n="features.lead">
+                            A quiet reader for your local comic collection, on
+                            Mac and PC.
+                        </p>
+                    </div>
+                    <div class="features">
+                        <article class="feature">
+                            <svg
+                                class="feature-icon"
+                                aria-hidden="true"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <rect
+                                    x="4"
+                                    y="3"
+                                    width="7"
+                                    height="18"
+                                    rx="1"
+                                />
+                                <rect
+                                    x="13"
+                                    y="3"
+                                    width="7"
+                                    height="18"
+                                    rx="1"
+                                />
+                            </svg>
+                            <h3 data-i18n="f1.title">Three reading modes</h3>
+                            <p data-i18n="f1.body">
+                                Single page, double-page spread, or vertical
+                                scroll for webtoons. Read left to right or right
+                                to left.
+                            </p>
+                        </article>
+                        <article class="feature">
+                            <svg
+                                class="feature-icon"
+                                aria-hidden="true"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path d="M3 7l2-3h5l2 3h9v12H3z" />
+                                <path d="M10 12h4" />
+                            </svg>
+                            <h3 data-i18n="f2.title">
+                                Folders, CBZ/ZIP, CBR/RAR
+                            </h3>
+                            <p data-i18n="f2.body">
+                                Open folders or archives, including nested
+                                archives up to three levels deep. Pages follow
+                                natural filename order.
+                            </p>
+                        </article>
+                        <article class="feature">
+                            <svg
+                                class="feature-icon"
+                                aria-hidden="true"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <rect
+                                    x="3"
+                                    y="6"
+                                    width="18"
+                                    height="12"
+                                    rx="2"
+                                />
+                                <path
+                                    d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"
+                                />
+                            </svg>
+                            <h3 data-i18n="f3.title">Keyboard-first</h3>
+                            <p data-i18n="f3.body">
+                                Turn pages, jump to a page, bookmark a favorite
+                                scene, and change layouts from the keyboard. See
+                                shortcuts for each platform below.
+                            </p>
+                        </article>
+                        <article class="feature">
+                            <svg
+                                class="feature-icon"
+                                aria-hidden="true"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <circle cx="12" cy="12" r="9" />
+                                <path d="M12 7v5l3 3" />
+                            </svg>
+                            <h3 data-i18n="f4.title">Smooth reading</h3>
+                            <p data-i18n="f4.body">
+                                Zoom, fit to screen, width or height, and browse
+                                page thumbnails without leaving the reader.
+                            </p>
+                        </article>
+                        <article class="feature">
+                            <svg
+                                class="feature-icon"
+                                aria-hidden="true"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path
+                                    d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"
+                                />
+                            </svg>
+                            <h3 data-i18n="f5.title">
+                                Bookmarks &amp; favorites
+                            </h3>
+                            <p data-i18n="f5.body">
+                                Save a page bookmark or star a book for quick
+                                access from the library.
+                            </p>
+                        </article>
+                        <article class="feature">
+                            <svg
+                                class="feature-icon"
+                                aria-hidden="true"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <rect
+                                    x="3"
+                                    y="4"
+                                    width="18"
+                                    height="16"
+                                    rx="2"
+                                />
+                                <path d="M3 9h18" />
+                                <path d="M9 4v5" />
+                            </svg>
+                            <h3 data-i18n="f6.title">
+                                Resume where you left off
+                            </h3>
+                            <p data-i18n="f6.body">
+                                Each app remembers your reading position and
+                                per-series reading settings on that device.
+                            </p>
+                        </article>
+                        <article class="feature">
+                            <svg
+                                class="feature-icon"
+                                aria-hidden="true"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.8"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path d="M3 7l2-3h5l2 3h9v12H3z" />
+                                <path d="M9 13l2 2 4-4" />
+                            </svg>
+                            <h3 data-i18n="f7.title">
+                                Open from your file manager
+                            </h3>
+                            <p data-i18n="f7.body">
+                                On macOS, use Finder’s Open With menu. On
+                                Windows, add the optional “Open with Panely”
+                                entry in Settings.
+                            </p>
+                        </article>
+                    </div>
+                </div>
+            </section>
+            <section class="showcase" aria-labelledby="translation-title">
+                <div class="container">
+                    <div class="section-head">
+                        <h2 data-i18n="tr.title" id="translation-title">
+                            Read comics in a language you don’t know
+                        </h2>
+                        <p data-i18n="tr.lead">
+                            Experimental on-device translation reads speech
+                            balloons and places a machine translation over the
+                            page. Both apps let you correct balloons and export
+                            translated books; quality and available features
+                            vary by platform.
+                        </p>
+                    </div>
+                    <figure>
+                        <img
+                            class="showcase-shot"
+                            src="screenshots/18-translation-before-after.png"
+                            alt="Panely for macOS showing a comic before and after translation"
+                            data-alt-ko="macOS용 Panely의 만화 번역 전후 화면"
+                            loading="lazy"
+                        />
 
-  gtag('config', 'G-MXMKG07WRB');
-</script>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Panely — Minimal, fast comic &amp; image viewer for macOS</title>
-<meta name="description" content="A minimal, fast comic and image viewer for macOS. Open folders, CBZ/ZIP, or CBR/RAR. Single, double, or vertical (webtoon) layouts. Keyboard-first, sandbox-safe, open source.">
-<meta property="og:title" content="Panely">
-<meta property="og:description" content="A minimal, fast comic &amp; image viewer for macOS.">
-<meta property="og:type" content="website">
-<link rel="icon" type="image/svg+xml" href="icon/panely-icon-stacked.svg">
-<style>
-  :root {
-    --bg-primary: #0F1115;
-    --bg-secondary: #1C1F26;
-    --bg-tertiary: #2A2E36;
-    --text-primary: #E6EAF2;
-    --text-secondary: #AAB2C0;
-    --accent: #0A84FF;
-    --accent-hover: #2a94ff;
-    --border: rgba(255, 255, 255, 0.08);
-    --radius: 10px;
-  }
+                        <figcaption data-i18n="tr.caption">
+                            Shown: Panely for macOS. The Windows interface and
+                            translation engine differ.
+                        </figcaption>
+                    </figure>
+                    <div class="platform-grid">
+                        <article class="info-card">
+                            <h3>macOS</h3>
+                            <p data-i18n="tr.mac">
+                                Requires macOS 26 or later. Uses Apple’s
+                                on-device text recognition and Translation, with
+                                system language packs.
+                            </p>
+                            <div class="platform-links">
+                                <a
+                                    data-i18n="tr.mac.guide"
+                                    href="manual.html#translation-assist-experimental"
+                                    data-href-ko="manual.html?lang=ko#번역-보조-실험적-기능"
+                                    >macOS translation guide →</a
+                                >
+                            </div>
+                        </article>
+                        <article class="info-card">
+                            <h3>Windows</h3>
+                            <p data-i18n="tr.win">
+                                Download the language pack once, then translate
+                                offline. Uses local OCR and M2M100 models.
+                                Translation is experimental; short lines and
+                                idioms can be inaccurate. Use Fast mode;
+                                Accurate mode is untested.
+                            </p>
+                            <div class="platform-links">
+                                <a
+                                    data-i18n="tr.win.guide"
+                                    href="https://github.com/sejoung/PanelyWindows/blob/main/docs/manual.md#6-getting-started-with-translation"
+                                    data-href-ko="https://github.com/sejoung/PanelyWindows/blob/main/docs/manual.ko.md#6-번역-시작하기"
+                                    >Windows translation guide →</a
+                                >
+                            </div>
+                        </article>
+                    </div>
+                </div>
+            </section>
+            <section class="guide" id="install" aria-labelledby="install-title">
+                <div class="container">
+                    <div class="section-head">
+                        <h2 data-i18n="install.title" id="install-title">
+                            Install &amp; open Panely
+                        </h2>
+                        <p data-i18n="install.lead">
+                            Choose the instructions for your platform. Both apps
+                            run without administrator installation.
+                        </p>
+                    </div>
+                    <div class="platform-grid">
+                        <article class="info-card">
+                            <h3>macOS</h3>
+                            <ol class="guide-steps">
+                                <li data-i18n="install.mac.1">
+                                    Download and unzip the macOS release. Move
+                                    <strong>Panely.app</strong> into
+                                    <strong>Applications</strong>.
+                                </li>
+                                <li data-i18n="install.mac.2">
+                                    Panely is not notarized by Apple. If
+                                    Gatekeeper blocks it, open
+                                    <strong
+                                        >System Settings → Privacy &amp;
+                                        Security</strong
+                                    >
+                                    and choose
+                                    <strong>Open Anyway</strong> beside the
+                                    Panely notice.
+                                </li>
+                                <li data-i18n="install.mac.3">
+                                    Confirm the system prompt, then open a
+                                    folder or comic archive in Panely.
+                                </li>
+                            </ol>
+                            <details class="guide-note">
+                                <summary data-i18n="install.mac.terminal">
+                                    Terminal alternative (after moving the app
+                                    to Applications)
+                                </summary>
+                                <pre><code>xattr -dr com.apple.quarantine /Applications/Panely.app</code></pre>
+                            </details>
+                        </article>
+                        <article class="info-card">
+                            <h3>Windows</h3>
+                            <ol class="guide-steps">
+                                <li data-i18n="install.win.1">
+                                    Choose <strong>x64</strong> for most Intel /
+                                    AMD PCs, or <strong>ARM64</strong> for
+                                    Windows on ARM. Extract the ZIP to a folder
+                                    you keep.
+                                </li>
+                                <li data-i18n="install.win.2">
+                                    Run <strong>Panely.exe</strong>. No
+                                    installer, administrator rights, or separate
+                                    .NET runtime is needed.
+                                </li>
+                                <li data-i18n="install.win.3">
+                                    The app is not code-signed. If SmartScreen
+                                    shows “Windows protected your PC,” choose
+                                    <strong>More info → Run anyway</strong>.
+                                </li>
+                            </ol>
+                            <div class="guide-note">
+                                <p data-i18n="install.win.update">
+                                    To update, close Panely and replace the
+                                    folder’s contents with the new ZIP.
+                                    Checksums are in
+                                    <strong>SHA256SUMS.txt</strong> on the
+                                    release page.
+                                </p>
+                            </div>
+                        </article>
+                    </div>
+                </div>
+            </section>
+            <section class="feedback" aria-labelledby="feedback-title">
+                <div class="container">
+                    <div class="section-head">
+                        <h2 data-i18n="fb.title" id="feedback-title">
+                            Feedback is welcome
+                        </h2>
+                        <p data-i18n="fb.lead">
+                            Report a problem or request a feature in the
+                            repository for your platform.
+                        </p>
+                    </div>
+                    <div class="platform-grid">
+                        <article class="info-card">
+                            <h3>macOS</h3>
+                            <div class="platform-links">
+                                <a
+                                    data-i18n="fb.macos.new"
+                                    href="https://github.com/sejoung/Panely/issues/new"
+                                    >Open an issue →</a
+                                >
+                                <a
+                                    data-i18n="fb.macos.browse"
+                                    href="https://github.com/sejoung/Panely/issues"
+                                    >Browse issues</a
+                                >
+                            </div>
+                        </article>
+                        <article class="info-card">
+                            <h3>Windows</h3>
+                            <div class="platform-links">
+                                <a
+                                    data-i18n="fb.windows.new"
+                                    href="https://github.com/sejoung/PanelyWindows/issues/new"
+                                    >Open an issue →</a
+                                >
+                                <a
+                                    data-i18n="fb.windows.browse"
+                                    href="https://github.com/sejoung/PanelyWindows/issues"
+                                    >Browse issues</a
+                                >
+                            </div>
+                        </article>
+                    </div>
+                </div>
+            </section>
+            <section class="shortcuts" aria-labelledby="shortcuts-title">
+                <div class="container">
+                    <div class="section-head">
+                        <h2 data-i18n="sc.title" id="shortcuts-title">
+                            Shortcuts for each platform
+                        </h2>
+                        <p data-i18n="sc.lead">
+                            The same reading actions, with shortcuts that fit
+                            your OS. More commands are available in each app’s
+                            menus.
+                        </p>
+                    </div>
+                    <div
+                        class="table-scroll"
+                        tabindex="0"
+                        role="region"
+                        aria-labelledby="shortcuts-title"
+                    >
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th data-i18n="sc.action" scope="col">
+                                        Action
+                                    </th>
+                                    <th scope="col">macOS</th>
+                                    <th scope="col">Windows</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td data-i18n="sc.open">
+                                        Open folder / archive
+                                    </td>
+                                    <td><kbd>⌘O</kbd></td>
+                                    <td><kbd>Ctrl+O</kbd></td>
+                                </tr>
+                                <tr>
+                                    <td data-i18n="sc.page">
+                                        Previous / next page
+                                    </td>
+                                    <td><kbd>← / →</kbd></td>
+                                    <td><kbd>← / →</kbd></td>
+                                </tr>
+                                <tr>
+                                    <td data-i18n="sc.goto">Go to page</td>
+                                    <td><kbd>⌘G</kbd></td>
+                                    <td><kbd>Ctrl+G</kbd></td>
+                                </tr>
+                                <tr>
+                                    <td data-i18n="sc.bookmark">
+                                        Toggle page bookmark
+                                    </td>
+                                    <td><kbd>⌘D</kbd></td>
+                                    <td><kbd>Ctrl+D</kbd></td>
+                                </tr>
+                                <tr>
+                                    <td data-i18n="sc.layout">
+                                        Single / spread / vertical
+                                    </td>
+                                    <td><kbd>⌘⇧1 / 2 / 3</kbd></td>
+                                    <td><kbd>Ctrl+Shift+1 / 2 / 3</kbd></td>
+                                </tr>
+                                <tr>
+                                    <td data-i18n="sc.fit">
+                                        Fit screen / width / height
+                                    </td>
+                                    <td><kbd>⌘1 / 2 / 3</kbd></td>
+                                    <td><kbd>Ctrl+1 / 2 / 3</kbd></td>
+                                </tr>
+                                <tr>
+                                    <td data-i18n="sc.sidebar">
+                                        Pin library sidebar
+                                    </td>
+                                    <td><kbd>⌃⌘S</kbd></td>
+                                    <td><kbd>Ctrl+Alt+S</kbd></td>
+                                </tr>
+                                <tr>
+                                    <td data-i18n="sc.thumbs">
+                                        Show thumbnails
+                                    </td>
+                                    <td><kbd>⌃⌘P</kbd></td>
+                                    <td><kbd>Ctrl+Alt+P</kbd></td>
+                                </tr>
+                                <tr>
+                                    <td data-i18n="sc.translation">
+                                        Original ↔ translation
+                                    </td>
+                                    <td><kbd>⇧⌘T</kbd></td>
+                                    <td><kbd>Ctrl+Shift+T</kbd></td>
+                                </tr>
+                                <tr>
+                                    <td data-i18n="sc.jobs">Jobs window</td>
+                                    <td><kbd>⌥⌘J</kbd></td>
+                                    <td><kbd>Ctrl+Alt+J</kbd></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+        <footer>
+            <div class="container">
+                <div class="links">
+                    <a data-i18n="ft.downloads" href="#downloads">Downloads</a>
+                    <a
+                        data-i18n="ft.mac.source"
+                        href="https://github.com/sejoung/Panely"
+                        >macOS repository</a
+                    >
+                    <a
+                        data-i18n="ft.win.source"
+                        href="https://github.com/sejoung/PanelyWindows"
+                        >Windows repository</a
+                    >
+                    <a
+                        data-i18n="ft.mac.manual"
+                        href="manual.html"
+                        data-href-ko="manual.html?lang=ko"
+                        >macOS manual</a
+                    >
+                    <a
+                        data-i18n="ft.win.guide"
+                        href="https://github.com/sejoung/PanelyWindows/blob/main/docs/manual.md"
+                        data-href-ko="https://github.com/sejoung/PanelyWindows/blob/main/docs/manual.ko.md"
+                        >Windows manual</a
+                    >
+                    <a
+                        data-i18n="ft.license"
+                        href="https://github.com/sejoung/Panely/blob/main/LICENSE"
+                        >License</a
+                    >
+                </div>
+                <p data-i18n="ft.built">
+                    Apache License 2.0 · macOS: Swift &amp; AppKit · Windows:
+                    .NET &amp; WPF
+                </p>
+            </div>
+        </footer>
+        <script>
+            // English comes from the markup; Korean uses the same content keys.
+            var KO = {
+                "hero.tagline":
+                    "macOS와 Windows를 위한 미니멀하고 빠른 만화 / 이미지 뷰어",
+                "hero.taglineSub":
+                    "나에게 맞는 방식으로 읽으세요. 무료 오픈 소스입니다.",
+                "dl.mac.requirement": "macOS 14 (Sonoma) 이상",
+                "dl.mac.download": "macOS용 다운로드",
+                "dl.mac.note":
+                    "ZIP 파일 · 압축을 풀고 Panely.app을 응용 프로그램으로 옮기세요.",
+                "dl.mac.translation":
+                    "실험적 번역 기능은 macOS 26 이상에서 사용할 수 있습니다.",
+                "dl.mac.notes": "릴리스 노트",
+                "dl.mac.manual": "macOS 설명서",
+                "dl.mac.source": "소스 코드",
+                "dl.win.requirement":
+                    "Windows 10 버전 2004(빌드 19041) 이상 · Windows 11",
+                "dl.win.x64": "Windows x64",
+                "dl.win.arm64": "Windows ARM64",
+                "dl.win.note":
+                    "포터블 ZIP · Intel / AMD PC는 x64를 선택하세요. 압축을 풀고 Panely.exe를 실행하면 됩니다. .NET 설치는 필요 없습니다.",
+                "dl.win.armNote":
+                    "ARM64는 Snapdragon 등 ARM 기반 Windows용이며, 실제 ARM 기기에서는 아직 검증하지 않았습니다.",
+                "dl.win.notes": "릴리스 노트와 체크섬",
+                "dl.win.manual": "Windows 설명서",
+                "dl.win.source": "소스 코드",
+                "hero.meta": "플랫폼별로 독립적으로 릴리스합니다 · Apache 2.0",
+                "features.title": "읽는 데만 집중하도록",
+                "features.lead":
+                    "Mac과 PC에서 내 만화 컬렉션을 편안하게 읽으세요.",
+                "f1.title": "세 가지 보기 방식",
+                "f1.body":
+                    "한 쪽 보기, 두 쪽 펼침, 웹툰용 세로 스크롤을 지원합니다. 왼쪽 또는 오른쪽부터 읽을 수 있습니다.",
+                "f2.title": "폴더, CBZ/ZIP, CBR/RAR",
+                "f2.body":
+                    "폴더와 압축 파일을 열고, 압축 안의 압축도 세 단계까지 풉니다. 파일 이름의 숫자 순서대로 페이지를 정렬합니다.",
+                "f3.title": "키보드 중심",
+                "f3.body":
+                    "키보드로 페이지를 넘기고, 원하는 쪽으로 이동하고, 북마크와 보기 방식을 바꿀 수 있습니다. 아래에서 플랫폼별 단축키를 확인하세요.",
+                "f4.title": "쾌적한 읽기",
+                "f4.body":
+                    "화면·너비·높이에 맞추거나 확대하고, 페이지 썸네일로 원하는 장면을 찾으세요.",
+                "f5.title": "북마크와 즐겨찾기",
+                "f5.body":
+                    "페이지에 북마크를 남기고, 책을 즐겨찾기에 추가해 라이브러리에서 바로 여세요.",
+                "f6.title": "읽던 곳에서 이어 읽기",
+                "f6.body":
+                    "각 앱이 해당 기기의 읽던 위치와 시리즈별 읽기 설정을 기억합니다.",
+                "f7.title": "파일 관리자에서 바로 열기",
+                "f7.body":
+                    "macOS에서는 Finder의 다음으로 열기를 사용하세요. Windows에서는 설정에서 “Panely로 열기” 메뉴를 추가할 수 있습니다.",
+                "tr.title": "모르는 언어로 된 만화 읽기",
+                "tr.lead":
+                    "실험적 온디바이스 번역이 말풍선을 읽고 페이지 위에 기계 번역을 겹쳐 보여줍니다. 두 앱 모두 말풍선 수정과 번역본 내보내기를 지원하며, 번역 품질과 제공 기능은 플랫폼마다 다릅니다.",
+                "tr.caption":
+                    "macOS용 Panely 화면입니다. Windows용은 인터페이스와 번역 엔진이 다릅니다.",
+                "tr.mac":
+                    "macOS 26 이상이 필요합니다. Apple의 온디바이스 텍스트 인식과 번역, 시스템 언어 팩을 사용합니다.",
+                "tr.mac.guide": "macOS 번역 안내 →",
+                "tr.win":
+                    "언어 팩을 한 번 내려받은 뒤 오프라인으로 번역합니다. 로컬 OCR과 M2M100 모델을 사용합니다. 실험적 기능으로 짧은 대사나 관용 표현이 부정확할 수 있습니다. 검증하지 않은 정확 모드 대신 빠름 모드를 사용하세요.",
+                "tr.win.guide": "Windows 번역 안내 →",
+                "install.title": "설치와 첫 실행",
+                "install.lead":
+                    "플랫폼에 맞는 안내를 확인하세요. 두 앱 모두 관리자 권한으로 설치할 필요가 없습니다.",
+                "install.mac.1":
+                    "macOS 릴리스를 내려받아 압축을 풀고 <strong>Panely.app</strong>을 <strong>응용 프로그램</strong>으로 옮깁니다.",
+                "install.mac.2":
+                    "Panely는 Apple 공증을 받지 않았습니다. Gatekeeper가 차단하면 <strong>시스템 설정 → 개인정보 보호 및 보안</strong>에서 Panely 안내 옆의 <strong>그래도 열기</strong>를 선택합니다.",
+                "install.mac.3":
+                    "시스템 확인 창에서 실행을 허용한 뒤 Panely에서 폴더나 만화 압축 파일을 엽니다.",
+                "install.mac.terminal":
+                    "터미널로 허용하기 (앱을 응용 프로그램으로 옮긴 뒤)",
+                "install.win.1":
+                    "대부분의 Intel / AMD PC에서는 <strong>x64</strong>, ARM 기반 Windows에서는 <strong>ARM64</strong>를 선택합니다. ZIP을 사용할 폴더에 풉니다.",
+                "install.win.2":
+                    "<strong>Panely.exe</strong>를 실행합니다. 설치 프로그램, 관리자 권한, 별도의 .NET 런타임 설치가 필요 없습니다.",
+                "install.win.3":
+                    "앱에 코드 서명이 없어 SmartScreen의 “Windows의 PC 보호” 창이 나오면 <strong>추가 정보 → 실행</strong>을 선택합니다.",
+                "install.win.update":
+                    "업데이트할 때는 Panely를 종료하고 새 ZIP의 내용으로 기존 폴더를 교체합니다. 체크섬은 릴리스 페이지의 <strong>SHA256SUMS.txt</strong>에 있습니다.",
+                "fb.title": "피드백을 환영합니다",
+                "fb.lead":
+                    "사용 중인 플랫폼의 저장소에 문제나 원하는 기능을 알려 주세요.",
+                "fb.macos.new": "이슈 남기기 →",
+                "fb.macos.browse": "이슈 둘러보기",
+                "fb.windows.new": "이슈 남기기 →",
+                "fb.windows.browse": "이슈 둘러보기",
+                "sc.title": "플랫폼별 주요 단축키",
+                "sc.lead":
+                    "운영체제에 맞는 단축키로 같은 읽기 동작을 실행합니다. 나머지 명령은 각 앱의 메뉴에서 확인하세요.",
+                "sc.action": "동작",
+                "sc.open": "폴더 / 압축 파일 열기",
+                "sc.page": "이전 / 다음 페이지",
+                "sc.goto": "페이지로 이동",
+                "sc.bookmark": "페이지 북마크 켜기/끄기",
+                "sc.layout": "한 쪽 / 두 쪽 / 세로 보기",
+                "sc.fit": "화면 / 너비 / 높이에 맞춤",
+                "sc.sidebar": "라이브러리 사이드바 고정",
+                "sc.thumbs": "썸네일 보기",
+                "sc.translation": "원문 ↔ 번역",
+                "sc.jobs": "작업 창",
+                "ft.downloads": "다운로드",
+                "ft.mac.source": "macOS 저장소",
+                "ft.win.source": "Windows 저장소",
+                "ft.mac.manual": "macOS 설명서",
+                "ft.win.guide": "Windows 설명서",
+                "ft.license": "라이선스",
+                "ft.built":
+                    "Apache License 2.0 · macOS: Swift와 AppKit · Windows: .NET과 WPF",
+            };
+            var META = {
+                en: {
+                    title: document.title,
+                    description: document.querySelector(
+                        'meta[name="description"]',
+                    ).content,
+                },
+                ko: {
+                    title: "Panely — macOS와 Windows용 만화 / 이미지 뷰어",
+                    description:
+                        "macOS와 Windows용 Panely를 다운로드하세요. 한 쪽, 두 쪽 펼침, 웹툰 보기와 북마크, 실험적 온디바이스 번역을 지원하는 빠른 오픈 소스 만화·이미지 뷰어입니다.",
+                },
+            };
+            var ENGLISH = {};
+            var currentLang = "en";
+            var releases = {};
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    line-height: 1.55;
-    -webkit-font-smoothing: antialiased;
-  }
-  .container { max-width: 920px; margin: 0 auto; padding: 0 24px; }
-  a { color: var(--accent); text-decoration: none; }
-  a:hover { color: var(--accent-hover); }
+            function pickLang() {
+                var lang = new URLSearchParams(location.search).get("lang");
+                if (lang === "ko" || lang === "en") return lang;
+                return /^ko\b/i.test(navigator.language || "") ? "ko" : "en";
+            }
 
-  /* Hero */
-  .hero {
-    padding: 96px 0 72px;
-    text-align: center;
-    background:
-      radial-gradient(1200px 500px at 50% -100px, rgba(10, 132, 255, 0.18), transparent 60%),
-      var(--bg-primary);
-    border-bottom: 1px solid var(--border);
-  }
-  .hero-icon {
-    width: 128px;
-    height: 128px;
-    margin-bottom: 28px;
-    filter: drop-shadow(0 16px 48px rgba(10, 132, 255, 0.25));
-  }
-  .hero h1 {
-    font-size: 56px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    margin-bottom: 12px;
-  }
-  .hero .tagline {
-    font-size: 20px;
-    color: var(--text-secondary);
-    max-width: 560px;
-    margin: 0 auto 8px;
-  }
-  .hero .tagline-sub {
-    font-size: 15px;
-    color: var(--text-secondary);
-    opacity: 0.65;
-    margin-bottom: 36px;
-  }
-  .cta-row {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-    flex-wrap: wrap;
-    margin-bottom: 12px;
-  }
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 22px;
-    border-radius: var(--radius);
-    font-size: 15px;
-    font-weight: 600;
-    text-decoration: none;
-    transition: transform 0.12s ease, background 0.12s ease;
-  }
-  .btn:hover { transform: translateY(-1px); }
-  .btn-primary {
-    background: var(--accent);
-    color: white;
-  }
-  .btn-primary:hover {
-    background: var(--accent-hover);
-    color: white;
-  }
-  .btn-secondary {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
-    border: 1px solid var(--border);
-  }
-  .btn-secondary:hover {
-    background: #353a44;
-    color: var(--text-primary);
-  }
-  .hero-version {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    justify-content: center;
-    margin-top: 18px;
-    font-size: 13px;
-    color: var(--text-secondary);
-  }
-  .version-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 3px 10px;
-    background: rgba(10, 132, 255, 0.12);
-    border: 1px solid rgba(10, 132, 255, 0.35);
-    border-radius: 999px;
-    color: var(--text-primary);
-    font-weight: 600;
-    font-size: 12px;
-  }
-  .version-pill::before {
-    content: "";
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: #30d158;
-  }
-  .hero-version a { font-weight: 600; }
-  .hero-meta {
-    font-size: 13px;
-    color: var(--text-secondary);
-    margin-top: 16px;
-  }
+            function renderReleases() {
+                Object.keys(releases).forEach(function (platform) {
+                    var release = releases[platform];
+                    var ko = currentLang === "ko";
+                    document.getElementById("version-" + platform).textContent =
+                        (ko ? "최신: " : "Latest: ") + release.tag_name;
+                    var date = new Date(release.published_at);
+                    if (release.published_at && !isNaN(date.getTime())) {
+                        var formatted = date.toLocaleDateString(
+                            ko ? "ko-KR" : "en-US",
+                            {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                            },
+                        );
+                        document.getElementById(
+                            "date-" + platform,
+                        ).textContent = ko
+                            ? formatted + " 출시"
+                            : "Released " + formatted;
+                    }
+                    document.getElementById("release-" + platform).hidden =
+                        false;
+                });
+            }
 
-  /* Features */
-  section { padding: 72px 0; }
-  .section-head {
-    text-align: center;
-    margin-bottom: 48px;
-  }
-  .section-head h2 {
-    font-size: 32px;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-    margin-bottom: 8px;
-  }
-  .section-head p {
-    color: var(--text-secondary);
-    font-size: 15px;
-  }
-  .features {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 16px;
-  }
-  .feature {
-    padding: 24px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-  }
-  .feature-icon {
-    width: 32px;
-    height: 32px;
-    margin-bottom: 16px;
-    color: var(--accent);
-  }
-  .feature h3 {
-    font-size: 16px;
-    font-weight: 600;
-    margin-bottom: 6px;
-  }
-  .feature p {
-    color: var(--text-secondary);
-    font-size: 14px;
-  }
+            function applyLang(lang) {
+                currentLang = lang;
+                document.querySelectorAll("[data-i18n]").forEach(function (el) {
+                    var key = el.dataset.i18n;
+                    if (!(key in ENGLISH))
+                        ENGLISH[key] = {
+                            html: el.innerHTML,
+                            href: el.getAttribute("href"),
+                        };
+                    el.innerHTML = lang === "ko" ? KO[key] : ENGLISH[key].html;
+                    if (el.dataset.hrefKo)
+                        el.setAttribute(
+                            "href",
+                            lang === "ko"
+                                ? el.dataset.hrefKo
+                                : ENGLISH[key].href,
+                        );
+                });
+                document
+                    .querySelectorAll("[data-alt-ko]")
+                    .forEach(function (el) {
+                        if (!el.dataset.altEn) el.dataset.altEn = el.alt;
+                        el.alt =
+                            lang === "ko" ? el.dataset.altKo : el.dataset.altEn;
+                    });
+                document.documentElement.lang = lang;
+                document.title = META[lang].title;
+                document.querySelector('meta[name="description"]').content =
+                    META[lang].description;
+                document.querySelector('meta[property="og:title"]').content =
+                    META[lang].title;
+                document.querySelector(
+                    'meta[property="og:description"]',
+                ).content = META[lang].description;
+                document
+                    .querySelectorAll(".lang-toggle button")
+                    .forEach(function (button) {
+                        var active = button.dataset.lang === lang;
+                        button.classList.toggle("active", active);
+                        button.setAttribute("aria-pressed", String(active));
+                    });
+                renderReleases();
+            }
 
-  /* Shortcuts block */
-  .shortcuts {
-    background: var(--bg-secondary);
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-  }
-  .shortcut-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 10px 24px;
-    max-width: 720px;
-    margin: 0 auto;
-  }
-  .shortcut {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border);
-    font-size: 14px;
-  }
-  .shortcut:last-child { border-bottom: none; }
-  .shortcut .keys {
-    display: inline-flex;
-    gap: 4px;
-  }
-  kbd {
-    display: inline-block;
-    min-width: 22px;
-    padding: 2px 6px;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    font-family: "SF Mono", ui-monospace, monospace;
-    font-size: 12px;
-    text-align: center;
-    color: var(--text-primary);
-  }
-  .shortcut .label { color: var(--text-secondary); }
+            document
+                .querySelectorAll(".lang-toggle button")
+                .forEach(function (button) {
+                    button.addEventListener("click", function () {
+                        var url = new URL(location.href);
+                        url.searchParams.set("lang", button.dataset.lang);
+                        history.replaceState(null, "", url);
+                        applyLang(button.dataset.lang);
+                    });
+                });
 
-  /* Finder help */
-  .guide {
-    background: var(--bg-secondary);
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-  }
-  .guide-card {
-    max-width: 720px;
-    margin: 0 auto;
-    padding: 28px;
-    background: var(--bg-primary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-  }
-  .guide-steps {
-    list-style: none;
-    counter-reset: step;
-    padding: 0;
-    margin: 0;
-  }
-  .guide-steps > li {
-    counter-increment: step;
-    margin-bottom: 18px;
-    padding-left: 36px;
-    position: relative;
-  }
-  .guide-steps > li:last-child { margin-bottom: 0; }
-  .guide-steps > li::before {
-    content: counter(step);
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 24px;
-    height: 24px;
-    background: var(--accent);
-    color: white;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    font-weight: 600;
-  }
-  .guide-steps .step-label {
-    display: block;
-    font-size: 14px;
-    color: var(--text-primary);
-    margin-bottom: 8px;
-  }
-  .guide-steps pre,
-  .guide-note pre {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px 14px;
-    overflow-x: auto;
-    font-size: 12px;
-    line-height: 1.5;
-    color: var(--text-primary);
-    -webkit-overflow-scrolling: touch;
-  }
-  .guide-steps code,
-  .guide-note code {
-    font-family: "SF Mono", ui-monospace, monospace;
-  }
-  .guide-note {
-    margin-top: 22px;
-    padding-top: 18px;
-    border-top: 1px solid var(--border);
-    color: var(--text-secondary);
-    font-size: 13px;
-  }
-  .guide-note code {
-    background: var(--bg-tertiary);
-    padding: 1px 6px;
-    border-radius: 4px;
-    font-size: 12px;
-  }
-  .guide-note pre code {
-    background: none;
-    padding: 0;
-    border-radius: 0;
-  }
-  .guide-note p { margin-bottom: 12px; }
+            applyLang(pickLang());
 
-  /* Translation showcase */
-  .showcase-shot {
-    display: block;
-    max-width: 100%;
-    height: auto;
-    margin: 0 auto;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
-  }
-  .showcase-points {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 10px 24px;
-    margin-top: 22px;
-    color: var(--text-secondary);
-    font-size: 14px;
-  }
-  .showcase-points strong { color: var(--text-primary); }
-
-  /* Requirements */
-  .requirements {
-    text-align: center;
-  }
-  .requirements-card {
-    max-width: 560px;
-    margin: 0 auto;
-    padding: 24px;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-  }
-  .requirements-card p { color: var(--text-secondary); font-size: 14px; }
-  .requirements-card strong { color: var(--text-primary); }
-
-  /* Footer */
-  footer {
-    padding: 40px 0;
-    text-align: center;
-    border-top: 1px solid var(--border);
-    color: var(--text-secondary);
-    font-size: 13px;
-  }
-  footer .links {
-    display: flex;
-    gap: 20px;
-    justify-content: center;
-    margin-bottom: 12px;
-  }
-
-  @media (max-width: 640px) {
-    .hero { padding: 64px 0 48px; }
-    .hero h1 { font-size: 40px; }
-    .hero .tagline { font-size: 17px; }
-    section { padding: 48px 0; }
-    .section-head h2 { font-size: 26px; }
-  }
-  /* Language toggle */
-  .hero { position: relative; }
-  .lang-toggle {
-    position: absolute;
-    top: 20px;
-    right: 24px;
-    display: inline-flex;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-  .lang-toggle button {
-    background: transparent;
-    color: var(--text-secondary);
-    border: none;
-    padding: 6px 12px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .lang-toggle button.active {
-    background: var(--accent);
-    color: white;
-  }
-  .lang-toggle button:not(.active):hover { color: var(--text-primary); }
-  @media (max-width: 640px) {
-    .lang-toggle { top: 14px; right: 16px; }
-  }
-</style>
-</head>
-<body>
-
-<header class="hero">
-  <div class="container">
-    <div class="lang-toggle" role="group" aria-label="Language">
-      <button type="button" data-lang="en">EN</button>
-      <button type="button" data-lang="ko">한국어</button>
-    </div>
-    <img class="hero-icon" src="icon/panely-icon-stacked.svg" alt="Panely icon">
-    <h1>Panely</h1>
-    <p class="tagline" data-i18n="hero.tagline">A minimal, fast comic &amp; image viewer for macOS.</p>
-    <p class="tagline-sub" data-i18n="hero.taglineSub">macOS를 위한 미니멀하고 빠른 만화 / 이미지 뷰어</p>
-
-    <div class="cta-row">
-      <a class="btn btn-primary" href="https://github.com/sejoung/Panely/releases/latest" data-i18n="hero.download">
-        Download for macOS
-      </a>
-      <a class="btn btn-secondary" href="manual.html" data-i18n="hero.manual" data-href-ko="manual.html?lang=ko">
-        Read the Manual
-      </a>
-      <a class="btn btn-secondary" href="https://github.com/sejoung/Panely" data-i18n="hero.github">
-        View on GitHub
-      </a>
-    </div>
-    <p class="hero-version" id="latest-release" hidden>
-      <span class="version-pill" id="latest-version"></span>
-      <span class="version-date" id="latest-date"></span>
-      <a id="latest-notes" href="https://github.com/sejoung/Panely/releases/latest" data-i18n="hero.notes">Release notes →</a>
-    </p>
-    <p class="hero-meta" data-i18n="hero.meta">Requires macOS 14 (Sonoma) or later · Apache 2.0</p>
-  </div>
-</header>
-
-<section>
-  <div class="container">
-    <div class="section-head">
-      <h2 data-i18n="features.title">Built to get out of your way</h2>
-      <p data-i18n="features.lead">Chrome hides when you're reading. The viewer always takes the max space.</p>
-    </div>
-
-    <div class="features">
-      <div class="feature">
-        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="4" y="3" width="7" height="18" rx="1"/>
-          <rect x="13" y="3" width="7" height="18" rx="1"/>
-        </svg>
-        <h3 data-i18n="f1.title">Three reading modes</h3>
-        <p data-i18n="f1.body">Single page, double-page spread, or vertical scroll for webtoons. Pick one straight from the toolbar or with <kbd>⌘⇧1</kbd>–<kbd>⌘⇧3</kbd>.</p>
-      </div>
-
-      <div class="feature">
-        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 7l2-3h5l2 3h9v12H3z"/>
-          <path d="M10 12h4"/>
-        </svg>
-        <h3 data-i18n="f2.title">Folders, CBZ/ZIP, CBR/RAR</h3>
-        <p data-i18n="f2.body">Open a single file, a volume folder, or a series root. Nested archives extract automatically, up to three levels deep.</p>
-      </div>
-
-      <div class="feature">
-        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="6" width="18" height="12" rx="2"/>
-          <path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"/>
-        </svg>
-        <h3 data-i18n="f3.title">Keyboard-first</h3>
-        <p data-i18n="f3.body">Every core action has a shortcut. Arrow keys for pages, <kbd>⌘G</kbd> to jump, <kbd>⌘D</kbd> to bookmark, <kbd>⌃⌘P</kbd> for thumbnails.</p>
-      </div>
-
-      <div class="feature">
-        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="9"/>
-          <path d="M12 7v5l3 3"/>
-        </svg>
-        <h3 data-i18n="f4.title">Fast on big books</h3>
-        <p data-i18n="f4.body">Lazy windowing in vertical mode loads header-only dimensions up front, then streams pages only where you're looking.</p>
-      </div>
-
-      <div class="feature">
-        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/>
-        </svg>
-        <h3 data-i18n="f5.title">Bookmarks &amp; favorites</h3>
-        <p data-i18n="f5.body">Star books for quick access in the sidebar. Pin individual pages and jump between them with <kbd>⌘⇧[</kbd> / <kbd>⌘⇧]</kbd>.</p>
-      </div>
-
-      <div class="feature">
-        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="4" width="18" height="16" rx="2"/>
-          <path d="M3 9h18"/>
-          <path d="M9 4v5"/>
-        </svg>
-        <h3 data-i18n="f6.title">Resume where you left off</h3>
-        <p data-i18n="f6.body">Per-book page memory survives archive re-extraction. Layout, direction, fit mode, and sidebar state are all persisted.</p>
-      </div>
-
-      <div class="feature">
-        <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 7l2-3h5l2 3h9v12H3z"/>
-          <path d="M9 13l2 2 4-4"/>
-        </svg>
-        <h3 data-i18n="f7.title">Open straight from Finder</h3>
-        <p data-i18n="f7.body">Right-click any <code>.cbz</code>, <code>.zip</code>, <code>.cbr</code> or <code>.rar</code> &rarr; <strong>Open With &rarr; Panely</strong>. Drop a folder onto the app icon to open it directly.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="showcase">
-  <div class="container">
-    <div class="section-head">
-      <h2 data-i18n="tr.title">Read comics in a language you don&rsquo;t know</h2>
-      <p data-i18n="tr.lead">Experimental, macOS 26 or later. Panely reads the speech balloons on your Mac and lays a machine translation over the page &mdash; nothing leaves your Mac unless you choose to, and the original is one click away.</p>
-    </div>
-    <img class="showcase-shot" src="screenshots/18-translation-before-after.png" alt="A comic page before and after translation" data-alt-ko="번역 전과 후의 만화 페이지" loading="lazy">
-    <div class="showcase-points">
-      <span data-i18n="tr.correct"><strong>Correct it</strong> &mdash; fix a translation or a misread balloon, right on the page</span>
-      <span data-i18n="tr.polish"><strong>Polish it</strong> &mdash; hand the whole book to ChatGPT, Claude or any AI chat as a text file, open its reply</span>
-      <span data-i18n="tr.keep"><strong>Keep it</strong> &mdash; export a translated copy as CBZ, ZIP or images</span>
-      <span data-i18n="tr.reading"><strong>Keep reading</strong> &mdash; whole series translate and export in the background</span>
-    </div>
-    <div class="cta-row" style="margin-top: 22px;">
-      <a class="btn btn-secondary" href="manual.html#translation-assist-experimental" data-i18n="tr.how" data-href-ko="manual.html?lang=ko#번역-보조-실험적-기능">How it works</a>
-    </div>
-  </div>
-</section>
-
-<section class="guide">
-  <div class="container">
-    <div class="section-head">
-      <h2 data-i18n="gk.title">&ldquo;Panely can&rsquo;t be opened&rdquo;?</h2>
-      <p data-i18n="gk.lead">Panely is open source but not notarized by Apple, so Gatekeeper warns on first launch. It&rsquo;s safe to open — here&rsquo;s how.</p>
-    </div>
-    <div class="guide-card">
-      <ol class="guide-steps">
-        <li>
-          <span class="step-label" data-i18n="gk.step1">Drag <strong>Panely.app</strong> into your <strong>/Applications</strong> folder.</span>
-        </li>
-        <li>
-          <span class="step-label" data-i18n="gk.step2">Right-click (or Control-click) <strong>Panely.app</strong> and choose <strong>Open</strong>. Unlike a double-click, this gives you an <strong>Open</strong> button that launches it.</span>
-        </li>
-        <li>
-          <span class="step-label" data-i18n="gk.step3">If macOS still blocks it, open <strong>System Settings → Privacy &amp; Security</strong>, scroll to the Security section, and click <strong>Open Anyway</strong> next to the Panely notice.</span>
-        </li>
-      </ol>
-      <div class="guide-note">
-        <p data-i18n="gk.terminal">Prefer the terminal? Remove the quarantine flag after moving Panely to <code>/Applications</code>:</p>
-        <pre><code>xattr -dr com.apple.quarantine /Applications/Panely.app</code></pre>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="feedback">
-  <div class="container">
-    <div class="section-head">
-      <h2 data-i18n="fb.title">Feedback is welcome</h2>
-      <p data-i18n="fb.lead">If you find any issues or have feature requests, please open an issue on GitHub.</p>
-    </div>
-    <div class="cta-row">
-      <a class="btn btn-primary" href="https://github.com/sejoung/Panely/issues/new" data-i18n="fb.open">
-        Open an issue
-      </a>
-      <a class="btn btn-secondary" href="https://github.com/sejoung/Panely/issues" data-i18n="fb.browse">
-        Browse issues
-      </a>
-    </div>
-  </div>
-</section>
-
-<section class="shortcuts">
-  <div class="container">
-    <div class="section-head">
-      <h2 data-i18n="sc.title">A few shortcuts</h2>
-      <p data-i18n="sc.lead">The rest live in the menu bar.</p>
-    </div>
-    <div class="shortcut-grid">
-      <div class="shortcut">
-        <span class="label" data-i18n="sc.open">Open folder / CBZ / ZIP / CBR / RAR</span>
-        <span class="keys"><kbd>⌘</kbd><kbd>O</kbd></span>
-      </div>
-      <div class="shortcut">
-        <span class="label" data-i18n="sc.page">Previous / next page</span>
-        <span class="keys"><kbd>←</kbd><kbd>→</kbd></span>
-      </div>
-      <div class="shortcut">
-        <span class="label" data-i18n="sc.goto">Go to page…</span>
-        <span class="keys"><kbd>⌘</kbd><kbd>G</kbd></span>
-      </div>
-      <div class="shortcut">
-        <span class="label" data-i18n="sc.bookmark">Toggle page bookmark</span>
-        <span class="keys"><kbd>⌘</kbd><kbd>D</kbd></span>
-      </div>
-      <div class="shortcut">
-        <span class="label" data-i18n="sc.fit">Fit to screen / width / height</span>
-        <span class="keys"><kbd>⌘1</kbd><kbd>⌘2</kbd><kbd>⌘3</kbd></span>
-      </div>
-      <div class="shortcut">
-        <span class="label" data-i18n="sc.zoom">Zoom in / out / reset</span>
-        <span class="keys"><kbd>⌘+</kbd><kbd>⌘−</kbd><kbd>⌘0</kbd></span>
-      </div>
-      <div class="shortcut">
-        <span class="label" data-i18n="sc.sidebar">Pin library sidebar</span>
-        <span class="keys"><kbd>⌃</kbd><kbd>⌘</kbd><kbd>S</kbd></span>
-      </div>
-      <div class="shortcut">
-        <span class="label" data-i18n="sc.thumbs">Show thumbnails</span>
-        <span class="keys"><kbd>⌃</kbd><kbd>⌘</kbd><kbd>P</kbd></span>
-      </div>
-      <div class="shortcut">
-        <span class="label" data-i18n="sc.translation">Original &harr; translation</span>
-        <span class="keys"><kbd>⇧</kbd><kbd>⌘</kbd><kbd>T</kbd></span>
-      </div>
-      <div class="shortcut">
-        <span class="label" data-i18n="sc.jobs">Jobs window</span>
-        <span class="keys"><kbd>⌥</kbd><kbd>⌘</kbd><kbd>J</kbd></span>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="requirements">
-  <div class="container">
-    <div class="requirements-card">
-      <p data-i18n="req"><strong>Requirements</strong> · macOS 14 (Sonoma) or later · Apple silicon &amp; Intel · Sandbox-compliant</p>
-    </div>
-  </div>
-</section>
-
-<footer>
-  <div class="container">
-    <div class="links">
-      <a href="manual.html" data-i18n="ft.manual" data-href-ko="manual.html?lang=ko">Manual</a>
-      <a href="https://github.com/sejoung/Panely">GitHub</a>
-      <a href="https://github.com/sejoung/Panely/releases" data-i18n="ft.releases">Releases</a>
-      <a href="https://github.com/sejoung/Panely/blob/main/README.ko.md" data-i18n="ft.readme" data-href-ko="https://github.com/sejoung/Panely/blob/main/README.md">한국어 README</a>
-      <a href="https://github.com/sejoung/Panely/blob/main/LICENSE" data-i18n="ft.license">License</a>
-    </div>
-    <p data-i18n="ft.built">Apache License 2.0 · Built with Swift &amp; AppKit</p>
-  </div>
-</footer>
-
-<script>
-  // English is the page as written; Korean comes from this table. The
-  // language is ?lang=ko|en, else the browser's.
-  var KO = {
-      "hero.tagline": "macOS를 위한 미니멀하고 빠른 만화 / 이미지 뷰어",
-      "hero.taglineSub": "A minimal, fast comic &amp; image viewer for macOS.",
-      "hero.download": "\n        macOS용 다운로드\n      ",
-      "hero.manual": "\n        사용 설명서 보기\n      ",
-      "hero.github": "\n        GitHub에서 보기\n      ",
-      "hero.notes": "릴리스 노트 →",
-      "hero.meta": "macOS 14 (Sonoma) 이상 · Apache 2.0",
-      "features.title": "읽는 데만 집중하도록",
-      "features.lead": "읽는 동안에는 도구 막대가 숨고, 뷰어가 언제나 화면을 가장 넓게 씁니다.",
-      "f1.title": "세 가지 보기 방식",
-      "f1.body": "한 쪽 보기, 두 쪽 펼침, 웹툰을 위한 세로 스크롤. 도구 막대나 <kbd>⌘⇧1</kbd>–<kbd>⌘⇧3</kbd>로 바로 고릅니다.",
-      "f2.title": "폴더, CBZ/ZIP, CBR/RAR",
-      "f2.body": "파일 하나, 권 폴더, 시리즈 최상위 폴더 무엇이든 엽니다. 압축 안의 압축도 세 단계까지 자동으로 풉니다.",
-      "f3.title": "키보드 중심",
-      "f3.body": "주요 동작마다 단축키가 있습니다. 화살표 키로 페이지 이동, <kbd>⌘G</kbd>로 페이지 이동, <kbd>⌘D</kbd>로 북마크, <kbd>⌃⌘P</kbd>로 썸네일.",
-      "f4.title": "두꺼운 책도 빠르게",
-      "f4.body": "세로 모드에서는 이미지 크기만 먼저 읽어 두고, 보고 있는 곳의 페이지만 불러옵니다.",
-      "f5.title": "북마크와 즐겨찾기",
-      "f5.body": "책에 별표를 달아 사이드바에서 바로 열고, 페이지를 북마크해 <kbd>⌘⇧[</kbd> / <kbd>⌘⇧]</kbd>로 오갑니다.",
-      "f6.title": "읽던 곳에서 이어 읽기",
-      "f6.body": "책마다 읽던 페이지를 기억하고, 압축을 다시 풀어도 유지됩니다. 보기 방식, 넘김 방향, 맞춤, 사이드바 상태도 모두 저장됩니다.",
-      "f7.title": "Finder에서 바로 열기",
-      "f7.body": "<code>.cbz</code>, <code>.zip</code>, <code>.cbr</code>, <code>.rar</code>을 우클릭 &rarr; <strong>다음으로 열기 &rarr; Panely</strong>. 폴더를 앱 아이콘에 끌어다 놓아도 바로 열립니다.",
-      "tr.title": "모르는 언어로 된 만화 읽기",
-      "tr.lead": "실험적 기능, macOS 26 이상. Panely가 Mac 안에서 말풍선을 읽고 페이지 위에 기계 번역을 겹쳐 보여줍니다 &mdash; 직접 보내지 않는 한 아무것도 Mac 밖으로 나가지 않고, 원문은 클릭 한 번이면 다시 볼 수 있습니다.",
-      "tr.correct": "<strong>고치기</strong> &mdash; 잘못된 번역이나 잘못 읽은 말풍선을 페이지에서 바로 수정",
-      "tr.polish": "<strong>다듬기</strong> &mdash; 책 전체를 텍스트 파일로 ChatGPT, Claude 등 AI 채팅에 맡기고 답 파일을 열기",
-      "tr.keep": "<strong>간직하기</strong> &mdash; 번역본을 CBZ, ZIP 또는 이미지로 내보내기",
-      "tr.reading": "<strong>계속 읽기</strong> &mdash; 시리즈 전체 번역과 내보내기는 백그라운드에서",
-      "tr.how": "작동 방식 보기",
-      "gk.title": "Panely가 열리지 않나요?",
-      "gk.lead": "Panely는 오픈 소스지만 Apple 공증을 받지 않아 처음 실행할 때 Gatekeeper가 경고합니다. 안심하고 열어도 됩니다 — 방법은 다음과 같습니다.",
-      "gk.step1": "<strong>Panely.app</strong>을 <strong>/응용 프로그램</strong>(Applications) 폴더로 끌어다 놓습니다.",
-      "gk.step2": "<strong>Panely.app</strong>을 우클릭(또는 Control-클릭)하고 <strong>열기</strong>를 선택합니다. 더블클릭과 달리 실행할 수 있는 <strong>열기</strong> 버튼이 나옵니다.",
-      "gk.step3": "그래도 막히면 <strong>시스템 설정 → 개인정보 보호 및 보안</strong>을 열고 보안 항목까지 내려가, Panely 안내 옆의 <strong>그래도 열기</strong>를 누릅니다.",
-      "gk.terminal": "터미널이 편하다면 Panely를 <code>/Applications</code>로 옮긴 뒤 격리 속성을 지우세요:",
-      "fb.title": "피드백을 환영합니다",
-      "fb.lead": "문제를 발견했거나 원하는 기능이 있다면 GitHub에 이슈를 남겨 주세요.",
-      "fb.open": "\n        이슈 남기기\n      ",
-      "fb.browse": "\n        이슈 둘러보기\n      ",
-      "sc.title": "주요 단축키",
-      "sc.lead": "나머지는 메뉴 막대에 있습니다.",
-      "sc.open": "폴더 / CBZ / ZIP / CBR / RAR 열기",
-      "sc.page": "이전 / 다음 페이지",
-      "sc.goto": "페이지로 이동…",
-      "sc.bookmark": "페이지 북마크 켜기/끄기",
-      "sc.fit": "화면 / 너비 / 높이에 맞춤",
-      "sc.zoom": "확대 / 축소 / 원래 크기",
-      "sc.sidebar": "라이브러리 사이드바 고정",
-      "sc.thumbs": "썸네일 보기",
-      "sc.translation": "원문 &harr; 번역",
-      "sc.jobs": "작업 윈도우",
-      "req": "<strong>요구 사항</strong> · macOS 14 (Sonoma) 이상 · Apple silicon 및 Intel · 샌드박스 준수",
-      "ft.manual": "사용 설명서",
-      "ft.releases": "릴리스",
-      "ft.readme": "English README",
-      "ft.license": "라이선스",
-      "ft.built": "Apache License 2.0 · Swift와 AppKit으로 제작"
-  };
-  var META = {
-    en: {
-      title: document.title,
-      description: document.querySelector('meta[name="description"]').content
-    },
-    ko: {
-      title: "Panely — macOS를 위한 미니멀하고 빠른 만화 / 이미지 뷰어",
-      description: "macOS를 위한 미니멀하고 빠른 만화·이미지 뷰어. 폴더, CBZ/ZIP, CBR/RAR을 열고 한 쪽, 두 쪽, 세로(웹툰) 보기를 지원합니다. 키보드 중심, 샌드박스 지원, 오픈 소스."
-    }
-  };
-  var ENGLISH = {};
-  var currentLang = "en";
-
-  function pickLang() {
-    var p = new URLSearchParams(location.search).get("lang");
-    if (p === "ko" || p === "en") return p;
-    return /^ko\b/i.test(navigator.language || "") ? "ko" : "en";
-  }
-
-  function applyLang(lang) {
-    currentLang = lang;
-    document.querySelectorAll("[data-i18n]").forEach(function (el) {
-      var key = el.dataset.i18n;
-      if (!(key in ENGLISH)) ENGLISH[key] = { html: el.innerHTML, href: el.getAttribute("href") };
-      el.innerHTML = lang === "ko" ? KO[key] : ENGLISH[key].html;
-      if (el.dataset.hrefKo) el.setAttribute("href", lang === "ko" ? el.dataset.hrefKo : ENGLISH[key].href);
-    });
-    document.querySelectorAll("[data-alt-ko]").forEach(function (el) {
-      if (!el.dataset.altEn) el.dataset.altEn = el.alt;
-      el.alt = lang === "ko" ? el.dataset.altKo : el.dataset.altEn;
-    });
-    document.documentElement.lang = lang;
-    document.title = META[lang].title;
-    document.querySelector('meta[name="description"]').content = META[lang].description;
-    document.querySelectorAll(".lang-toggle button").forEach(function (b) {
-      b.classList.toggle("active", b.dataset.lang === lang);
-    });
-    renderRelease();
-  }
-
-  document.querySelectorAll(".lang-toggle button").forEach(function (b) {
-    b.addEventListener("click", function () {
-      var url = new URL(location.href);
-      url.searchParams.set("lang", b.dataset.lang);
-      history.replaceState(null, "", url);
-      applyLang(b.dataset.lang);
-    });
-  });
-</script>
-
-<script>
-  // Show the latest published release so visitors can tell at a glance whether
-  // they're on the current build. Fetched live from the GitHub API so the page
-  // never goes stale; on any failure the block just stays hidden and the
-  // Download button (which always points at /releases/latest) still works.
-  var release = null;
-
-  function renderRelease() {
-    if (!release) return;
-    var ko = currentLang === "ko";
-    document.getElementById("latest-version").textContent = (ko ? "최신: " : "Latest: ") + release.tag_name;
-    if (release.published_at) {
-      var date = new Date(release.published_at).toLocaleDateString(ko ? "ko-KR" : "en-US", {
-        year: "numeric", month: "short", day: "numeric"
-      });
-      document.getElementById("latest-date").textContent = ko ? date + " 출시" : "released " + date;
-    }
-  }
-
-  applyLang(pickLang());
-
-  (function () {
-    fetch("https://api.github.com/repos/sejoung/Panely/releases/latest", {
-      headers: { Accept: "application/vnd.github+json" }
-    })
-      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
-      .then(function (rel) {
-        if (!rel.tag_name) return;
-        release = rel;
-        if (rel.html_url) {
-          document.getElementById("latest-notes").href = rel.html_url;
-        }
-        renderRelease();
-        document.getElementById("latest-release").hidden = false;
-      })
-      .catch(function () { /* keep the block hidden on rate-limit / offline */ });
-  })();
-</script>
-
-</body>
+            // Each platform is independent. Static /releases/latest links work even
+            // without JavaScript or when the API is unavailable or rate-limited.
+            [
+                {
+                    platform: "macos",
+                    repo: "Panely",
+                    downloads: [
+                        { id: "download-macos", name: /^Panely-[\d.]+\.zip$/i },
+                    ],
+                },
+                {
+                    platform: "windows",
+                    repo: "PanelyWindows",
+                    downloads: [
+                        {
+                            id: "download-windows-x64",
+                            name: /^Panely-.*-win-x64\.zip$/i,
+                        },
+                        {
+                            id: "download-windows-arm64",
+                            name: /^Panely-.*-win-arm64\.zip$/i,
+                        },
+                    ],
+                },
+            ].forEach(function (config) {
+                var repoUrl = "https://github.com/sejoung/" + config.repo;
+                fetch(
+                    "https://api.github.com/repos/sejoung/" +
+                        config.repo +
+                        "/releases/latest",
+                    {
+                        headers: { Accept: "application/vnd.github+json" },
+                    },
+                )
+                    .then(function (response) {
+                        return response.ok
+                            ? response.json()
+                            : Promise.reject(response.status);
+                    })
+                    .then(function (release) {
+                        if (
+                            !release ||
+                            typeof release.tag_name !== "string" ||
+                            !release.tag_name ||
+                            release.draft ||
+                            release.prerelease
+                        )
+                            return;
+                        releases[config.platform] = release;
+                        if (
+                            typeof release.html_url === "string" &&
+                            release.html_url.startsWith(
+                                repoUrl + "/releases/tag/",
+                            )
+                        ) {
+                            document.getElementById(
+                                "notes-" + config.platform,
+                            ).href = release.html_url;
+                        }
+                        if (Array.isArray(release.assets)) {
+                            config.downloads.forEach(function (download) {
+                                var asset = release.assets.find(
+                                    function (asset) {
+                                        return (
+                                            asset &&
+                                            download.name.test(asset.name) &&
+                                            typeof asset.browser_download_url ===
+                                                "string" &&
+                                            asset.browser_download_url.startsWith(
+                                                repoUrl + "/releases/download/",
+                                            )
+                                        );
+                                    },
+                                );
+                                if (asset)
+                                    document.getElementById(download.id).href =
+                                        asset.browser_download_url;
+                            });
+                        }
+                        renderReleases();
+                    })
+                    .catch(function () {
+                        /* Leave this platform’s release links usable. */
+                    });
+            });
+        </script>
+    </body>
 </html>
