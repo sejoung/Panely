@@ -1,0 +1,187 @@
+{
+  "captures": [
+    {
+      "id": "single-page",
+      "test": "heroSinglePage",
+      "files": [
+        "01-hero-single-page.png"
+      ]
+    },
+    {
+      "id": "double-page",
+      "test": "heroDoublePage",
+      "files": [
+        "02-hero-double-page.png"
+      ]
+    },
+    {
+      "id": "vertical-strip",
+      "test": "heroVerticalStrip",
+      "files": [
+        "03-hero-vertical-strip.png"
+      ]
+    },
+    {
+      "id": "rtl-manga",
+      "test": "heroRightToLeft",
+      "files": [
+        "04-hero-rtl-manga.png"
+      ]
+    },
+    {
+      "id": "sidebar",
+      "test": "sidebarWithFavoritesAndBookmarks",
+      "files": [
+        "05-sidebar-populated.png"
+      ]
+    },
+    {
+      "id": "empty-sidebar",
+      "test": "sidebarEmptyState",
+      "files": [
+        "06-sidebar-empty.png"
+      ]
+    },
+    {
+      "id": "toolbar",
+      "test": "toolbarLoaded",
+      "files": [
+        "07-toolbar-loaded.png"
+      ]
+    },
+    {
+      "id": "spread-offset",
+      "test": "toolbarSpreadOffset",
+      "files": [
+        "14-toolbar-spread-offset.png"
+      ]
+    },
+    {
+      "id": "next-volume",
+      "test": "endOfVolumeCard",
+      "files": [
+        "08-end-of-volume-card.png"
+      ]
+    },
+    {
+      "id": "previous-volume",
+      "test": "previousVolumeCard",
+      "files": [
+        "09-previous-volume-card.png"
+      ]
+    },
+    {
+      "id": "loading",
+      "test": "loadingOverlay",
+      "files": [
+        "10-loading-overlay.png"
+      ]
+    },
+    {
+      "id": "page-slider",
+      "test": "sliderAndQuickJump",
+      "files": [
+        "11-slider-quickjump.png"
+      ]
+    },
+    {
+      "id": "storage-settings",
+      "test": "storageCacheSettings",
+      "files": [
+        "12-storage-cache.png"
+      ]
+    },
+    {
+      "id": "general-settings",
+      "test": "generalSettings",
+      "files": [
+        "16-general-settings.png"
+      ]
+    },
+    {
+      "id": "library-settings",
+      "test": "librarySettings",
+      "files": [
+        "15-library-settings.png"
+      ]
+    },
+    {
+      "id": "diagnostics-settings",
+      "test": "diagnosticsSettings",
+      "files": [
+        "13-diagnostics-settings.png"
+      ]
+    },
+    {
+      "id": "translation-reading",
+      "test": "translationReading",
+      "files": [
+        "17-translation-reading.png"
+      ]
+    },
+    {
+      "id": "translation-comparison",
+      "test": "translationBeforeAfter",
+      "files": [
+        "18-translation-before-after.png"
+      ]
+    },
+    {
+      "id": "translation-panel",
+      "test": "translationPanel",
+      "files": [
+        "19-translation-panel.png"
+      ]
+    },
+    {
+      "id": "balloon-popover",
+      "test": "translationBalloonPopover",
+      "files": [
+        "20-translation-balloon-popover.png"
+      ]
+    },
+    {
+      "id": "translation-export",
+      "test": "translationExportSheet",
+      "files": [
+        "21-translation-export-sheet.png"
+      ]
+    },
+    {
+      "id": "jobs",
+      "test": "jobsWindow",
+      "files": [
+        "22-jobs-window.png"
+      ]
+    },
+    {
+      "id": "translation-settings",
+      "test": "experimentalSettings",
+      "files": [
+        "23-experimental-settings.png"
+      ]
+    },
+    {
+      "id": "ai-chat",
+      "test": "aiChatSheet",
+      "files": [
+        "24-ai-chat-sheet.png"
+      ]
+    },
+    {
+      "id": "balloon-add",
+      "test": "addingMissedBalloon",
+      "files": [
+        "25-translation-drag-selection.png",
+        "26-translation-added-balloon.png"
+      ]
+    },
+    {
+      "id": "thumbnails",
+      "test": "thumbnailNavigation",
+      "files": [
+        "27-thumbnail-navigation.png"
+      ]
+    }
+  ]
+}

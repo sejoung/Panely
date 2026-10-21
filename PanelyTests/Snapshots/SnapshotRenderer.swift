@@ -50,14 +50,7 @@ enum SnapshotRenderer {
         named relativePath: String
     ) async throws -> URL {
         let pngData = try await renderPNG(view, size: size)
-        let destination = try outputDirectory().appendingPathComponent(relativePath)
-        try FileManager.default.createDirectory(
-            at: destination.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try pngData.write(to: destination)
-        print("📸 \(destination.path)")
-        return destination
+        return try writePNG(pngData, named: relativePath)
     }
 
     /// Render `view` at `size` and return the PNG bytes, for callers that
@@ -126,6 +119,39 @@ enum SnapshotRenderer {
             window.close()
         }
 
+        /// Capture this view after changing its model or interacting with it.
+        /// Wait for any asynchronous changes to settle before calling.
+        @discardableResult
+        func capture(named name: String) throws -> URL {
+            try SnapshotRenderer.writePNG(pngData(), named: name)
+        }
+
+        /// Coordinates are local to `view`; callers needn't convert to the
+        /// window or recreate NSEvent plumbing for each capture scenario.
+        func sendMouse(_ type: NSEvent.EventType, in view: NSView, at point: CGPoint) throws {
+            guard view.window === window else { throw RenderError.viewNotHosted }
+            guard let event = NSEvent.mouseEvent(
+                with: type, location: view.convert(point, to: nil), modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime,
+                windowNumber: window.windowNumber, context: nil,
+                eventNumber: 0, clickCount: 1, pressure: 1
+            ) else { throw RenderError.eventCreationFailed }
+            switch type {
+            case .leftMouseDown: view.mouseDown(with: event)
+            case .leftMouseDragged: view.mouseDragged(with: event)
+            case .leftMouseUp: view.mouseUp(with: event)
+            default: throw RenderError.unsupportedMouseEvent
+            }
+        }
+
+        /// `release: false` leaves the selection visible for a capture;
+        /// send `.leftMouseUp` afterwards to finish the gesture.
+        func drag(in view: NSView, from start: CGPoint, to end: CGPoint, release: Bool = true) throws {
+            try sendMouse(.leftMouseDown, in: view, at: start)
+            try sendMouse(.leftMouseDragged, in: view, at: end)
+            if release { try sendMouse(.leftMouseUp, in: view, at: end) }
+        }
+
         /// First view of type `T` in the hosted hierarchy, depth-first —
         /// e.g. the `NSOutlineView` that backs a SwiftUI `List`.
         func firstSubview<T: NSView>(of type: T.Type) -> T? {
@@ -186,11 +212,33 @@ enum SnapshotRenderer {
             .urls(for: .cachesDirectory, in: .userDomainMask)
             .first ?? FileManager.default.temporaryDirectory
         let dir = caches.appendingPathComponent("panely-snapshots", isDirectory: true)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir
+        let output: URL
+        if let runID = ProcessInfo.processInfo.environment["PANELY_SNAPSHOT_RUN_ID"] {
+            guard UUID(uuidString: runID) != nil else { throw RenderError.invalidRunID }
+            output = dir.appendingPathComponent("runs", isDirectory: true)
+                .appendingPathComponent(runID, isDirectory: true)
+        } else {
+            output = dir
+        }
+        try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+        return output
+    }
+
+    private static func writePNG(_ data: Data, named name: String) throws -> URL {
+        let destination = try outputDirectory().appendingPathComponent(name)
+        try FileManager.default.createDirectory(
+            at: destination.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try data.write(to: destination, options: .atomic)
+        print("📸 \(destination.path)")
+        return destination
     }
 
     enum RenderError: Error {
         case encodingFailed
+        case viewNotHosted
+        case eventCreationFailed
+        case unsupportedMouseEvent
+        case invalidRunID
     }
 }

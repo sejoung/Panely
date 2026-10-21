@@ -8,6 +8,10 @@ A visual walkthrough of Panely's reader interface. For the full feature
 list, shortcuts table, and build instructions, see the
 [README](../README.md).
 
+Quick links: [Zoom and pan](#zoom-and-pan) · [Thumbnail navigation](#finding-pages-with-thumbnails) ·
+[Correct balloons](#correcting-balloons) · [Add text OCR missed](#drag-to-translate-text-ocr-missed) ·
+[Translate again](#translating-pages-and-books-again)
+
 ---
 
 ## At a glance
@@ -55,6 +59,12 @@ when you move away (or press `Esc`).
 **File → Open Recent** lists the books and folders you opened last, and
 **File → Reload Book** (`⌘R`) re-reads the current one. If the open book
 changes on disk, a banner offers **Reload**.
+
+Image folders are read in filename order (`1, 2, 10`). Opening a parent
+folder containing volumes starts with its first book. Archives containing
+other archives can be opened too; choose a nested volume from the sidebar's
+**Volumes** section. Changes to images in an open folder also show a reload
+banner.
 
 ---
 
@@ -134,6 +144,24 @@ The toolbar auto-hides when your cursor leaves the top edge. Pin it with
 
 ---
 
+## Zoom and pan
+
+- **Fit to Screen** (`⌘1`) shows the whole page; **Fit to Width** (`⌘2`) and
+  **Fit to Height** (`⌘3`) match that dimension. Clicking the current fit
+  button in the toolbar returns to that fit after zooming or panning.
+- Use `⌘+` / `⌘−` or a trackpad pinch to zoom. Hold `⌘` while scrolling to
+  zoom around the pointer. Double-click the image to switch between 1× and
+  2×; `⌘0` returns to the current fit mode.
+- Scroll or drag the image to reach parts outside the window. **In balloon
+  edit mode, dragging selects an area**: scroll to pan, or choose **Done**
+  before dragging the image.
+- **Lock View Size** (`⌘L`) keeps the scale when resizing the window,
+  opening a sidebar or switching layouts. Unlock it to fit again on window
+  resize. Opening a new book or explicitly choosing a fit mode still applies
+  that fit while locked.
+
+---
+
 ## Page navigation
 
 ![Bottom page slider with quick-jump field](screenshots/11-slider-quickjump.png)
@@ -149,6 +177,19 @@ bottom edge to bring it back, or pin both via `⌃⌘T`.
 
 For larger jumps the **Go to Page…** prompt (`⌘G`) takes a number from
 1 to the page count and clamps silently on out-of-range input.
+
+### Finding pages with thumbnails
+
+Use the toolbar's thumbnails button, **View → Show Thumbnails**, or `⌃⌘P`
+to open the page list on the right. Click a thumbnail to jump there. A blue
+border marks the current page; the list follows when you navigate with the
+keyboard or slider too.
+
+![Page thumbnails with the current page outlined and translated pages badged](screenshots/27-thumbnail-navigation.png)
+
+A blue speech-balloon badge marks a page fully translated into the current
+translation language; it does not mark your edits. Close the list with its
+**×** or `⌃⌘P`. Its visibility is remembered across launches.
 
 ### Scroll to turn pages
 
@@ -387,8 +428,9 @@ every book.
 For comics in a language you don't read. Panely reads the text in the speech
 balloons and shows an on-device machine translation over the page. It's meant
 to help you follow the story — not to replace a real translation — so the
-original is always one click away. Nothing leaves your Mac, and your files
-are never changed.
+original is always one click away. OCR and machine translation run on your
+Mac, and your original files are never changed. **Improve with an AI Chat**
+below is a separate workflow where you choose to give text to an external chat.
 
 Requires **macOS 26** or later. It's off by default.
 
@@ -465,6 +507,9 @@ Translation starts at the page you're on and keeps ahead of you as you read:
   room inside its balloon — when nothing else is drawn there — so a long one
   isn't squeezed into the original's narrow lines. **Hide** is for whatever still
   slips through (see below).
+- If the detector finds a text area but OCR returns no text, Panely automatically
+  reads that area again, enlarged. Use the drag-to-add steps below for anything
+  still missed.
 - Balloons appear with a pulsing outline and "…" as soon as they're found, and
   fill in one by one.
 - The line under the button, and the pill over the page, show progress and the
@@ -508,63 +553,115 @@ original together. The text is selectable, so you can copy it or look a word up.
 
 ### Correcting balloons
 
-Fix a balloon right where you see the problem — no mode to find first:
+Choose the action that matches what went wrong:
 
-- **Click it**: its popover offers **Edit**, **Fix Original** and **Hide**
-  next to the translation.
-- **Right-click it** (two-finger click): **Edit Translation…**, **Fix
-  Original…** and **Hide This Balloon** (**Remove This Balloon** for one you
-  added, **Show This Balloon** for a hidden one), plus, anywhere on the page,
-  **Translate This Page Again**, **Improve with an AI Chat…**, **Add a
-  Balloon Here…** and **Edit Balloons**.
+| Problem on the page | Action |
+|---|---|
+| The original is right but the translation is awkward | Click the balloon → **Edit** |
+| OCR misread the original | Click the balloon → **Fix Original** |
+| Text has no translation balloon at all | **Edit Balloons** → [drag a box over the text](#drag-to-translate-text-ocr-missed) |
+| Artwork or background was mistaken for text | **Hide** |
+| An area you added is wrong | Click your balloon → **Remove**, then add the right area |
 
-**Edit mode** (`⇧⌘E`, the language menu, the panel or the right-click menu)
-is for looking over a book's edits: edited balloons carry a pencil, hidden
-ones show as dashed outlines, and missed text can be dragged over to add a
-balloon. A bar over the page shows you're editing; `esc` or **Done** goes back
-to reading.
+#### Rewriting a translation or fixing the original
 
-A balloon's popover offers:
+![A balloon's translation, original and editing buttons](screenshots/20-translation-balloon-popover.png)
 
-![A balloon's popover in edit mode](screenshots/20-translation-balloon-popover.png)
+1. Click the balloon. You can correct it while reading, without entering
+   edit mode first. Right-click → **Edit Translation…** / **Fix Original…**
+   opens the text editor directly.
+2. For a translation alone, choose **Edit**, type your translation and
+   press **Save**. What you write applies only to the current language.
+3. For an OCR mistake, choose **Fix Original**, type the correct original
+   and press **Translate Again**. The correction also applies to the book's
+   other translated languages; a language with no new translation yet offers
+   **Translate Again** in the popover.
 
-- **Edit** — rewrite the translation. Your translation applies to that
-  language only.
-- **Fix Original** — when OCR misread the text, correct it and it's
-  translated again, into every language the book is translated into (one
-  that has no translation of it yet shows **Translate Again** here).
-- **Hide** — for a "balloon" OCR made up out of artwork or background. The
-  banner that follows offers **Undo**.
-- **Revert** — undo that balloon alone; when both its translation and its
-  original were changed, pick either or both.
+While typing, `↩` saves, `⇧↩` starts a new line (`⌥↩` and `⌃↩` work too),
+and `esc` or **Cancel** discards the current draft. A translation you wrote
+still takes priority over a corrected original: choose **Revert → Use
+Machine Translation** if you want the automatic translation instead.
 
-Edited balloons carry a small pencil in their corner, and hidden balloons show
-as dashed outlines — click one to bring it back. The bar counts what's edited,
-lists hidden balloons by page (pick one to go there, or show them all), and
-**Revert This Book…** undoes everything changed in this book only.
+#### Edit mode, hiding and reverting
 
-**Text that wasn't translated** — a line OCR passed over, a title in
-decorative lettering — can be added: in edit mode, drag a box over it. Panely
-reads that area on its own, enlarged (which often works where the whole page
-didn't), and translates it into a balloon of yours. If nothing can be read
-there, the balloon is added empty: click its dashed outline and type the text
-with **Fix Original** — or write the translation with **Edit**. A balloon
-you added has **Remove** instead of Hide, and is kept, reverted and exported
-like any other edit. (Panely already takes a second, enlarged look by itself
-at text boxes the detector found but OCR left empty.)
+Enter from **View → Edit Balloons** (`⇧⌘E`), the toolbar's language menu,
+the panel's **Edit Balloons** button, or the page's right-click menu.
+Translation Assist must be enabled and this book must have translated pages.
+If the button is disabled, run **Translate This Book** first. Entering edit
+mode also turns the translation display on.
 
-**Pages translated before an improvement** — a balloon split into two
-halves, polite speech where the original is casual — can be redone without
-clearing the cache: **Translate This Page Again** — right-click the page, or
-in the language menu, or **Translate Page Again** in the edit bar — reads and translates it again, the
-current way; **Translate This Book Again…** (under **This Book & Series** in
-the panel) does every page. Your
-edits stay, though one on a balloon that's now found differently may no
-longer apply.
+- **Pencil badges** mark balloons you changed or added. Click to inspect one.
+- **Hide** removes a false detection from reading. The banner immediately
+  afterwards offers **Undo**. In edit mode a hidden balloon appears as a
+  dashed outline; click it to show it again.
+- **The hidden-balloon menu** in the edit bar lists them by page: pick one
+  to go there, or choose **Show All Hidden Balloons**. **View → Show Hidden
+  Balloons** also restores them all.
+- **Revert** restores just the clicked balloon. If both its translation and
+  original were changed, choose **Use Machine Translation**, **Restore
+  Original**, or **Revert Both**.
+- **Revert This Book…** in the edit bar asks for confirmation, then undoes
+  this book's corrections, hiding and added balloons. To reset every book,
+  use **Settings → Experimental → Your Edits → Delete All Edits…**.
 
-`↩` saves, `⇧↩` starts a new line (`⌥↩` and `⌃↩` work too), `esc` cancels.
-Edits are stored apart from the translation cache, so clearing the cache or
-switching modes keeps them.
+Choose **Done**, `⇧⌘E` or `esc` to return to reading. Done does not discard
+saved changes. Edits save automatically apart from the translation cache,
+survive reopening the book or clearing the cache, and appear in exported books.
+
+### Drag to translate text OCR missed
+
+When whole-page OCR misses dialogue or a title, you can mark its area to
+read and translate it again. This adds a new balloon.
+
+1. Pick the language to view in the toolbar's language menu and enter
+   **Edit Balloons** (`⇧⌘E`). Alternatively, right-click the page → **Add a
+   Balloon Here…**. That command opens edit mode and prompts you to drag;
+   it does not immediately create a balloon where you right-clicked.
+2. Zoom in if needed. Start **outside an existing translation balloon**,
+   hold the mouse down and drag diagonally to enclose all the missed text.
+   Mark one line of dialogue or title at a time, leaving out unrelated text.
+
+![A blue selection box dragged over untranslated Japanese dialogue in edit mode](screenshots/25-translation-drag-selection.png)
+
+3. Release the mouse. Panely enlarges and reads just that area with OCR.
+   If text is recognized, it **automatically translates into the language
+   currently shown** and displays the new balloon. This can recover text
+   the whole-page pass could not read.
+4. Click the added balloon to check its original and translation. Correct
+   OCR mistakes with **Fix Original → Translate Again**, or change just the
+   translation with **Edit → Save**.
+
+![The same area translated, with its original and Remove button in the popover](screenshots/26-translation-added-balloon.png)
+
+If it does not work as expected:
+
+| What happens | What to do |
+|---|---|
+| Dragging pans the page | Turn on **Edit Balloons**. |
+| You get a click rather than a selection box | Start outside existing balloons and draw a larger box. Very small drags do not select an area. |
+| A balloon was added but no text was read | Click its dashed area in edit mode, type the original with **Fix Original**, then **Translate Again**. You can also write the translation directly with **Edit**. |
+| There is an original but no translation | If prompted, download the language pack, then click the balloon's **Translate Again**. Check **Book's Language** in the panel too. |
+| You marked the wrong area or added a duplicate | Choose **Remove** on your added balloon (**Remove This Balloon** on right-click), then draw again. |
+| The translation is missing after switching languages | In edit mode, click that area and choose **Translate Again**, or write its translation in that language. |
+
+Added balloons are saved, included in book-level reverting and painted into
+exports. Their recognized original and area carry across languages; each
+language has its own translation.
+
+### Translating pages and books again
+
+Use a full-page retry when you want to re-read the whole page, rather than
+add one area. It also updates older results such as a balloon previously
+split into two. There is no need to clear the cache first.
+
+- **Pages on screen** — right-click or use the toolbar's language menu →
+  **Translate This Page Again**, or **Translate Page Again** in the edit bar.
+  In double-page layout, this processes both displayed pages.
+- **The whole book** — translation panel → **This Book & Series → Translate
+  This Book Again…**, then confirm. It can take as long as the first pass.
+
+Your edits stay, though an edit may no longer apply if recognition changes
+how a balloon is grouped or placed. Check the results afterwards.
 
 ### Improving with an AI chat
 

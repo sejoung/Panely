@@ -240,7 +240,7 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   개선 전에 번역된 페이지도 캐시를 지우지 않고 적용
 - **놓친 글자** — 감지 모델이 찾았는데 OCR이 비워 둔 글자 상자는 자동으로 확대해서 다시
   읽음. 그래도 남은 글자는 편집 모드에서 드래그로 상자를 그려 추가(확대해서 읽고 번역,
-  못 읽으면 원문 고치기로 입력)
+  못 읽으면 원문 고치기로 입력). [드래그 인식·번역 사용법과 화면](docs/manual.ko.md#ocr이-놓친-글자-드래그해서-번역하기)
 - **본 자리에서 바로 고치기** — 말풍선 클릭 팝오버나 페이지 우클릭 메뉴에서 번역·원문
   고치기, 숨기기, 이 페이지 다시 번역, 말풍선 추가 시작까지 모드 없이 바로
 - **읽기 / 편집 모드** — 읽을 때는 번역만 보임. 편집 모드(`⇧⌘E`, 패널, 언어 메뉴, 우클릭
@@ -462,6 +462,56 @@ scripts/benchmark-translation.sh [--book PATH]   # 번역 단계별·작업 전�
 `SnapshotGalleryTests`는 기본 테스트에서 발견은 되지만
 `scripts/generate-snapshots.sh`가 스냅샷 생성을 활성화할 때만 실행됩니다.
 따라서 기본 `xcodebuild test` 경로는 매뉴얼 PNG를 렌더링하거나 복사하지 않습니다.
+
+
+### 매뉴얼 화면 캡처 유틸
+
+매뉴얼 이미지는 `scripts/generate-snapshots.sh`로 다시 만들 수 있습니다.
+macOS·Xcode와 Python 3(표준 라이브러리만 사용)가 필요합니다.
+
+```bash
+scripts/generate-snapshots.sh --list                         # 화면 ID와 PNG 목록
+scripts/generate-snapshots.sh --only balloon-add             # 드래그 선택 + 추가 후 번역
+scripts/generate-snapshots.sh --only 25,27                    # 이미지 번호로 선택
+scripts/generate-snapshots.sh --only translation-panel --output build/manual-preview
+scripts/generate-snapshots.sh --only balloon-add --dry-run   # 실행 명령만 확인
+scripts/generate-snapshots.sh                                # 전체 27장 재생성
+```
+
+기본 저장 위치는 `docs/screenshots/`입니다. `--only`에는 화면 ID, 테스트 이름,
+PNG 파일명 또는 두 자리 번호를 넣으며, 쉼표로 나누거나 옵션을 반복할 수 있습니다.
+한 시나리오가 여러 장을 만들면 함께 생성합니다(25번 또는 26번을 골라도 두 장 모두).
+선택하지 않은 이미지는 바꾸지 않습니다. `--output`으로 임시 폴더에 먼저 생성해
+검토할 수 있고, `--derived-data` 또는 `PANELY_DERIVED_DATA_PATH`로 빌드 캐시를 지정합니다.
+
+실제 UI를 샘플 데이터와 함께 별도 창에 렌더링하므로 화면 녹화 권한이나 실제 책,
+다운로드된 번역 언어팩이 필요하지 않습니다. 샘플 번역 문구는 미리 준비한 값이며
+OCR·기계 번역 품질을 검증하는 테스트와는 목적이 다릅니다. 실행마다 출력 폴더를
+분리하고, 선택한 PNG가 모두 생성됐는지와 PNG 구조·체크섬을 검사한 뒤 복사합니다.
+성공한 실행의 임시 이미지는 지웁니다. 실패하면 전체 Xcode 로그와 임시 이미지
+위치를 출력하므로, 이전 실행의 이미지를 새 캡처로 착각하지 않고 확인할 수 있습니다.
+
+새 캡처를 추가하는 순서:
+
+1. `PanelyTests/Snapshots/SnapshotGalleryTests.swift`에 `@Test func` 시나리오를
+   추가합니다. 공통 `SnapshotRenderer.render(_:size:named:)`로 화면을 저장합니다.
+2. 클릭·드래그나 모델 변경 후 찍어야 하면 `SnapshotRenderer.host(_:size:)`로
+   띄우고, `defer { hosted.close() }`로 정리합니다. `hosted.drag(in:from:to:release:)`,
+   `hosted.sendMouse(_:in:at:)`로 조작하고 `hosted.capture(named:)`로 저장합니다.
+   좌표는 대상 뷰 기준이며, `release: false`는 드래그 상자가 보이는 상태를 유지합니다.
+   비동기 상태가 바뀌는 화면은 기존 `hosted.settle`로 준비 완료를 기다린 뒤 찍으세요.
+3. `scripts/manual-snapshots.json`에 고유 `id`, 메서드 이름인 `test`(괄호 제외),
+   생성하는 PNG 목록 `files`를 등록합니다. 실행 스크립트의 별도 목록은 고칠 필요가 없습니다.
+4. `--only 새-ID --output build/manual-preview`로 생성해 이미지 내용을 확인한 뒤,
+   기본 위치에 생성하고 한글·영문 매뉴얼에 연결합니다.
+
+유틸의 선택·실패 처리와 목록 일치 검증은 다음 명령으로 실행합니다.
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -p 'test_*.py'
+```
+
+### 화면 렌더링 검증
 
 여러 스위트가 모델만이 아니라 실제로 화면에 닿는 것을 지킵니다:
 
@@ -862,7 +912,7 @@ docs/
 ├── manual.md                           # 영문 사용 설명서 (스크린샷 둘러보기)
 ├── manual.html                         # 매뉴얼 HTML 버전
 ├── manual.ko.md                        # 한글 사용 설명서
-├── screenshots/                        # SnapshotGalleryTests가 생성하는 24개 PNG
+├── screenshots/                        # SnapshotGalleryTests가 생성하는 27개 PNG
 ├── panely_design_system_mac_os.md
 └── icon/panely-icon-stacked.svg
 
@@ -872,7 +922,10 @@ scripts/
 ├── test-slow.sh                        # fast + slow 티어 (실제 FSEvents / OCR, 모든 시드)
 ├── test-visual.sh                      # 스크린샷 비교만
 ├── benchmark-translation.sh            # 번역 단계별 / 작업별 소요 시간 (opt-in 벤치마크)
-├── generate-snapshots.sh               # SnapshotGalleryTests로 docs/screenshots/*.png 재생성
+├── generate-snapshots.sh               # 매뉴얼 캡처 실행 (--list / --only / --output)
+├── manual-snapshots.py                 # 선택 실행·PNG 검증·저장 (Python 표준 라이브러리)
+├── manual-snapshots.json               # 캡처 ID → 시나리오·PNG 목록
+├── tests/test_manual_snapshots.py      # 캡처 선택·실패 처리·목록 일치 검증
 ├── update-reference-snapshots.sh       # PanelyTests/Snapshots/Reference/*.png 다시 기록
 ├── convert-text-detector.py            # Resources/ComicTextDetector.mlpackage(Core ML) 다시 만들기
 ├── install-local.sh                    # 로컬에서 빌드 + 설치해 직접 테스트 (--debug, --test…)

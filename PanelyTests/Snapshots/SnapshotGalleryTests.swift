@@ -7,9 +7,12 @@ import Testing
 ///
 /// The tests stage PNGs in the Debug app sandbox. Regenerate the checked-in
 /// manual screenshots via `scripts/generate-snapshots.sh`.
+/// Register each scenario and its outputs in `scripts/manual-snapshots.json`;
+/// use `--list` / `--only <id>` to find and regenerate individual scenarios.
 @MainActor
 @Suite(
     "Manual Snapshots",
+    .serialized,
     .enabled(if: SnapshotGenerationGate.isEnabled)
 )
 struct SnapshotGalleryTests {
@@ -413,6 +416,98 @@ struct SnapshotGalleryTests {
         )
     }
 
+    /// Capture the real AppKit selection outline, then the same sample area
+    /// as an added balloon. Text is seeded, like the other manual captures,
+    /// so regenerating documentation doesn't need a downloaded language pack.
+    @Test func addingMissedBalloon() async throws {
+        let vm = try await TranslationSnapshotContent.translatedViewModel()
+        vm.setEditingTranslations(true)
+        vm.isAddingTranslationBalloon = true
+        let sample = TranslationSnapshotContent.pages[0]
+        var page = TranslationSnapshotContent.translated(sample)
+        let last = page.bubbles.popLast()
+        let missed = try #require(last)
+        page.pageID = vm.source.pages[0].id
+        let size = CGSize(width: 1120, height: 760)
+        let hosted = await SnapshotRenderer.host(
+            VStack(spacing: 20) {
+                ManualBalloonPage(page: page)
+                    .frame(width: 400, height: 600)
+                TranslationEditBar().environment(vm)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(PanelyColor.bgPrimary)
+            .environment(\.locale, Locale(identifier: "en")),
+            size: size
+        )
+        defer { hosted.close() }
+        let overlay = try #require(hosted.firstSubview(of: TranslationOverlayView.self))
+        let area = CGRect(x: 470, y: 650, width: 230, height: 290)
+        let start = CGPoint(x: area.minX / 2, y: area.minY / 2)
+        let end = CGPoint(x: area.maxX / 2, y: area.maxY / 2)
+        try hosted.drag(in: overlay, from: start, to: end, release: false)
+        try hosted.capture(named: "25-translation-drag-selection.png")
+
+        var requested: CGRect?
+        overlay.onEdit = { request in
+            if case .addBalloon(let rect) = request.change { requested = rect }
+        }
+        try hosted.sendMouse(.leftMouseUp, in: overlay, at: end)
+        #expect(requested == area)
+
+        let added = BubbleEdit(
+            recognizedSource: missed.source, rect: area.insetBy(dx: 12, dy: 12),
+            retranslations: [TranslationLanguage.english.rawValue: missed.translation ?? ""],
+            added: AddedBalloon(glyphSize: missed.glyphSize, isVertical: true, background: .white)
+        )
+        vm.translationEdits.add(pageID: vm.source.pages[0].id, edit: added)
+        vm.isAddingTranslationBalloon = false
+        let result = PageEdits(bubbles: [added]).apply(to: page, target: .english)
+        let balloon = try #require(result.bubbles.last)
+        try await render(
+            VStack(spacing: 20) {
+                HStack(spacing: 24) {
+                    ManualBalloonPage(page: result)
+                        .frame(width: 400, height: 600)
+                    TranslationBubblePopover(
+                        source: balloon.source, translation: balloon.translation,
+                        edit: balloon.edit, onEdit: { _ in }
+                    )
+                    .background(PanelyColor.bgSecondary, in: RoundedRectangle(cornerRadius: 10))
+                }
+                TranslationEditBar().environment(vm)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(PanelyColor.bgPrimary)
+            .environment(\.locale, Locale(identifier: "en")),
+            size: size,
+            named: "26-translation-added-balloon.png"
+        )
+    }
+
+    @Test func thumbnailNavigation() async throws {
+        let dir = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let pages = try (1...4).map { number -> ComicPage in
+            let image = SnapshotSampleContent.makeSamplePage(number: number, of: 4)
+            let url = dir.appendingPathComponent("page-\(number).png")
+            let png = try #require(image.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:))?
+                .representation(using: .png, properties: [:]))
+            try png.write(to: url)
+            return ComicPage(source: .file(url), displayName: "page-\(number)")
+        }
+        try await render(
+            ThumbnailSidebar(
+                pages: pages,
+                pageDimensions: Array(repeating: SnapshotSampleContent.pageSize, count: pages.count),
+                currentPageIndex: 1, translatedPages: [0, 1], onJump: { _ in }, onClose: {}
+            )
+            .environment(\.locale, Locale(identifier: "en")),
+            size: CGSize(width: 148, height: 650),
+            named: "27-thumbnail-navigation.png"
+        )
+    }
+
     private func labelled(_ title: LocalizedStringKey, _ image: NSImage) -> some View {
         VStack(spacing: 12) {
             Image(nsImage: image)
@@ -429,13 +524,36 @@ struct SnapshotGalleryTests {
     // MARK: - Helpers
 
     private func render<V: View>(_ view: V, size: CGSize, named name: String) async throws {
-        let url = try await SnapshotRenderer.render(view, size: size, named: name)
-        print("📸 wrote \(url.path)")
+        try await SnapshotRenderer.render(view, size: size, named: name)
     }
 
     private func writeCacheEntry(_ dir: URL, byteCount: Int) throws {
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         try Data(repeating: 0xAB, count: byteCount).write(to: dir.appendingPathComponent("pages.bin"))
+    }
+}
+
+/// The production translation overlay over a locally drawn sample page.
+/// The overlay handles the selection mouse events and draws the added badge.
+private struct ManualBalloonPage: NSViewRepresentable {
+    let page: TranslatedPage
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: CGRect(x: 0, y: 0, width: 400, height: 600))
+        let image = NSImageView(frame: view.bounds)
+        image.image = TranslationSnapshotContent.original(TranslationSnapshotContent.pages[0])
+        image.imageScaling = .scaleAxesIndependently
+        image.autoresizingMask = [.width, .height]
+        view.addSubview(image)
+        let overlay = TranslationOverlayView(frame: view.bounds)
+        overlay.autoresizingMask = [.width, .height]
+        view.addSubview(overlay)
+        return view
+    }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        let overlay = view.subviews.compactMap { $0 as? TranslationOverlayView }.first
+        overlay?.update(page: page, showsTranslation: true, isEditing: true, pageOrigin: .zero, scale: 0.5)
     }
 }
 
