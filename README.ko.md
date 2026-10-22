@@ -928,6 +928,7 @@ docs/
 ├── manual.html                         # 매뉴얼 HTML 버전
 ├── manual.ko.md                        # 한글 사용 설명서
 ├── screenshots/                        # SnapshotGalleryTests가 생성하는 27개 PNG
+├── releases/                           # 태그별 릴리스 노트 (vX.Y.Z.md)
 ├── panely_design_system_mac_os.md
 └── icon/panely-icon-stacked.svg
 
@@ -1247,6 +1248,11 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 읽기
 [`.github/workflows/release.yml`](.github/workflows/release.yml)에 의해
 자동 빌드 및 공개됩니다.
 
+먼저 태그에 맞춰 `docs/releases/vX.Y.Z.md`로 릴리스 노트를 쓰고
+([`v1.7.0.md`](docs/releases/v1.7.0.md) 참고) 커밋합니다. `release.yml`은
+이 파일을 GitHub 릴리스 설명으로 쓰고, 그 뒤에 자동 생성된 변경 목록을
+붙입니다. 파일이 없으면 설치 안내만 들어가고 실행 로그에 경고가 남습니다.
+
 가장 쉬운 방법은 헬퍼 스크립트:
 
 ```bash
@@ -1260,7 +1266,8 @@ scripts/release.sh         # 인터랙티브 프롬프트
 스크립트 동작:
 
 1. 작업 트리가 깨끗하고, `main`에 있으며, origin과 동기화되어 있고,
-   태그가 로컬·원격 모두에 비어있는지 확인.
+   태그가 로컬·원격 모두에 비어있는지 확인. 태그의 릴리스 노트가 없으면
+   계속할지 다시 확인.
 2. 로컬 테스트 실행 (`SKIP_TESTS=1`로 건너뛸 수 있음).
 3. `project.pbxproj`의 `MARKETING_VERSION` 범프, `CURRENT_PROJECT_VERSION`을
    git 커밋 수로 설정, 현재 커밋의 짧은 SHA를 `Panely/Credits.rtf`에 기록
@@ -1273,7 +1280,7 @@ scripts/release.sh         # 인터랙티브 프롬프트
 의도된 것으로, 범프 커밋 CI가 릴리스 소스 트리가 Debug에서 깨끗이
 빌드되는지 검증하고, `release.yml`이 출시할 아티팩트를 생성.
 
-수동으로 하고 싶다면:
+수동으로 하고 싶다면 (`docs/releases/v1.0.0.md`를 먼저 커밋):
 
 ```bash
 git tag v1.0.0
@@ -1290,9 +1297,10 @@ git push origin v1.0.0
   `scripts/generate-snapshots.sh`로 수동 재생성. CI는 fast 티어만 실행하고,
   `VisualRegressionTests`와 slow 티어는 opt-in(`scripts/test-visual.sh`,
   `scripts/test-slow.sh`).
-- **릴리스**는 GitHub Releases에 `ditto`로 단일 zip(~45 MB, 대부분 번들된
-  Core ML 텍스트 검출기)을 첨부하여 리소스 포크 보존, 자동 생성 릴리스
-  노트와 설치 안내 포함.
+- **릴리스**는 GitHub Releases에 `ditto`로 단일 zip(~52 MB, 대부분 번들된
+  Core ML 텍스트 검출기와 llama.cpp; 번역 모델은 앱이 내려받음)을 첨부하여
+  리소스 포크 보존. 설명은 태그의 `docs/releases/vX.Y.Z.md`와 자동 생성
+  릴리스 노트.
 - **SPM 캐시**가 이후 실행을 빠르게 하고, `Package.resolved`나
   `project.pbxproj` 변경 시 무효화.
 
