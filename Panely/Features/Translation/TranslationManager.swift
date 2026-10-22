@@ -14,8 +14,8 @@ import Observation
 ///   and all. Finished background controllers are dropped — their results
 ///   live in the cache.
 ///
-/// Apple Translation works through one sentence at a time anyway, so only one
-/// job runs at once and the rest wait as `.queued`. The job for what's on
+/// There's one model and it answers one request at a time, so only one job
+/// runs at once and the rest wait as `.queued`. The job for what's on
 /// screen takes precedence: starting it pauses a running job back into the
 /// queue, and queued jobs resume as soon as the running one ends.
 @Observable
@@ -27,7 +27,12 @@ final class TranslationManager {
     private(set) var openBookKey = ""
 
     let store: TranslationStore
-    let languagePacks = LanguagePackDownloads()
+    /// The model's download — shared by every book, the panel and Settings.
+    let model: TranslationModelStore
+    /// The model itself, for every controller.
+    @ObservationIgnored let translator: any BalloonTranslating
+    /// Handed to each controller (`TranslationController.makeAnalyzer`).
+    @ObservationIgnored private let makeAnalyzer: (@Sendable ([ComicPage], TranslationLanguage) -> any PageAnalyzing)?
     @ObservationIgnored private let defaults: any KeyValueStoring
     @ObservationIgnored private var openBookTitle = ""
     @ObservationIgnored private var openBookURL: URL?
@@ -37,20 +42,21 @@ final class TranslationManager {
     /// starting the next one before the manager's own choice.
     @ObservationIgnored private var isScheduling = false
 
-    /// Matches speech levels for each new controller (`SpeechLevel`).
-    @ObservationIgnored private let makeSpeechLevelCorrector: (TranslationLanguage, TranslationLanguage) -> (any SpeechLevelCorrecting)?
-
     init(
         store: TranslationStore,
         defaults: any KeyValueStoring,
-        makeSpeechLevelCorrector: @escaping (TranslationLanguage, TranslationLanguage) -> (any SpeechLevelCorrecting)? = SpeechLevelCorrectors.make
+        translator: any BalloonTranslating = GemmaTranslator.shared,
+        model: TranslationModelStore? = nil,
+        makeAnalyzer: (@Sendable ([ComicPage], TranslationLanguage) -> any PageAnalyzing)? = nil
     ) {
         self.store = store
         self.defaults = defaults
-        self.makeSpeechLevelCorrector = makeSpeechLevelCorrector
-        placeholder = TranslationController(store: store, defaults: defaults)
-        languagePacks.onInstalled = { [weak self] pack in
-            self?.languagePackInstalled(pack)
+        self.translator = translator
+        self.makeAnalyzer = makeAnalyzer
+        self.model = model ?? TranslationModelStore()
+        placeholder = TranslationController(store: store, defaults: defaults, translator: translator)
+        self.model.onInstalled = { [weak self] in
+            self?.modelInstalled()
         }
     }
 
@@ -190,11 +196,22 @@ final class TranslationManager {
         return removed
     }
 
+    /// Delete the model (Settings): jobs using it stop, and it's let go
+    /// from memory.
+    func deleteModel() async {
+        for controller in openBook + background where controller.isWorking || controller.phase == .queued {
+            controller.stop()
+        }
+        dropFinishedBackground()
+        await (translator as? GemmaTranslator)?.unload()
+        await model.remove()
+    }
+
     // MARK: - Internals
 
     private func makeController(bookKey: String, title: String, bookURL: URL?) -> TranslationController {
-        let controller = TranslationController(store: store, defaults: defaults, bookKey: bookKey, title: title, bookURL: bookURL)
-        controller.makeSpeechLevelCorrector = makeSpeechLevelCorrector
+        let controller = TranslationController(store: store, defaults: defaults, translator: translator, bookKey: bookKey, title: title, bookURL: bookURL)
+        controller.makeAnalyzer = makeAnalyzer
         controller.onJobEnded = { [weak self] in self?.jobEnded() }
         controller.requestStart = { [weak self, weak controller] in
             guard let self, let controller else { return }
@@ -203,10 +220,9 @@ final class TranslationManager {
         return controller
     }
 
-    /// Jobs that stopped for want of `pack` — in any book — start again.
-    private func languagePackInstalled(_ pack: LanguagePackDownloads.Pack) {
-        for controller in openBook + background
-        where controller.notice == .needsLanguageDownload(pack.source, pack.target) && controller.mode.effective == pack.mode {
+    /// Jobs that stopped for want of the model — in any book — start again.
+    private func modelInstalled() {
+        for controller in openBook + background where controller.notice == .needsModelDownload {
             controller.notice = nil
             start(controller)
         }

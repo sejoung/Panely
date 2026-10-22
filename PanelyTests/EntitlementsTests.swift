@@ -10,6 +10,15 @@ struct EntitlementsTests {
         #expect(entitlements["com.apple.security.files.user-selected.read-only"] == nil)
     }
 
+    /// The translation model is downloaded from the app (Hugging Face).
+    /// Outgoing connections only — Panely serves nothing.
+    @Test func sandboxAllowsDownloadingTheTranslationModel() throws {
+        let entitlements = try loadEntitlements()
+
+        #expect(entitlements["com.apple.security.network.client"] as? Bool == true)
+        #expect(entitlements["com.apple.security.network.server"] == nil)
+    }
+
     private func loadEntitlements() throws -> [String: Any] {
         let testFile = URL(fileURLWithPath: #filePath)
         let root = testFile

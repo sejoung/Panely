@@ -12,6 +12,7 @@
 		B27F3C012FAA000100000001 /* Logging in Frameworks */ = {isa = PBXBuildFile; productRef = B27F3C012FAA000100000004 /* Logging */; };
 		B27F3C012FAA000100000002 /* Logging in Frameworks */ = {isa = PBXBuildFile; productRef = B27F3C012FAA000100000004 /* Logging */; };
 		B2C0A1012FB0000100000001 /* UnrarKit in Frameworks */ = {isa = PBXBuildFile; productRef = B2C0A1012FB0000100000002 /* UnrarKit */; };
+		B2D1A0012FC0000100000001 /* LlamaCpp in Frameworks */ = {isa = PBXBuildFile; productRef = B2D1A0012FC0000100000002 /* LlamaCpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -70,6 +71,7 @@
 				B27F3C012FAA000100000001 /* Logging in Frameworks */,
 				B263CE8A2F94F819006DD5A0 /* ZIPFoundation in Frameworks */,
 				B2C0A1012FB0000100000001 /* UnrarKit in Frameworks */,
+				B2D1A0012FC0000100000001 /* LlamaCpp in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -142,6 +144,7 @@
 				B27F3C012FAA000100000004 /* Logging */,
 				B263CE892F94F819006DD5A0 /* ZIPFoundation */,
 				B2C0A1012FB0000100000002 /* UnrarKit */,
+				B2D1A0012FC0000100000002 /* LlamaCpp */,
 			);
 			productName = Panely;
 			productReference = B263CE162F94EE33006DD5A0 /* Panely.app */;
@@ -205,6 +208,7 @@
 				B27F3C012FAA000100000003 /* XCRemoteSwiftPackageReference "swift-log" */,
 				B263CE812F94F1E3006DD5A0 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
 				B2C0A1012FB0000100000003 /* XCLocalSwiftPackageReference "Packages/UnrarKit" */,
+				B2D1A0012FC0000100000003 /* XCLocalSwiftPackageReference "Packages/LlamaCpp" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B263CE172F94EE33006DD5A0 /* Products */;
@@ -521,6 +525,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/UnrarKit;
 		};
+		B2D1A0012FC0000100000003 /* XCLocalSwiftPackageReference "Packages/LlamaCpp" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/LlamaCpp;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -556,6 +564,10 @@
 		B2C0A1012FB0000100000002 /* UnrarKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = UnrarKit;
+		};
+		B2D1A0012FC0000100000002 /* LlamaCpp */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LlamaCpp;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

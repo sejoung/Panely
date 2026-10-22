@@ -371,7 +371,9 @@ final class ReaderViewModel {
         self.translationManager = TranslationManager(
             store: dependencies.translationStore,
             defaults: dependencies.keyValueStore,
-            makeSpeechLevelCorrector: dependencies.makeSpeechLevelCorrector
+            translator: dependencies.translator,
+            model: dependencies.makeTranslationModelStore(),
+            makeAnalyzer: dependencies.makePageAnalyzer
         )
         self.translationEdits = TranslationEdits(store: dependencies.translationEditStore)
         self.translationExports = TranslationExportManager(defaults: dependencies.keyValueStore)

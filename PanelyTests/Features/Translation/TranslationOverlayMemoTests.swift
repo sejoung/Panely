@@ -23,11 +23,13 @@ struct TranslationOverlayMemoTests {
         let pages: [ComicPage]
     }
 
-    /// Speech levels are matched (`GatedSpeechLevelCorrector`) into
-    /// `matching` — any pair, so other languages' pages change too.
-    private func makeViewModel(gate: TranslationPermitGate, matching: Set<TranslationLanguage> = Set(languages)) -> ReaderViewModel {
+    /// Jobs find `bubbles` balloons on every page they read and translate
+    /// them one pass of `gate` at a time — pages filling in place.
+    private func makeViewModel(gate: TranslationPermitGate, bubbles: Int = 3) -> ReaderViewModel {
+        let analyzer = StubPageAnalyzer(bubbles: bubbles)
         let vm = ReaderViewModel(dependencies: makeTestDependencies(
-            makeSpeechLevelCorrector: { _, target in matching.contains(target) ? GatedSpeechLevelCorrector(gate: gate) : nil }
+            translator: ScriptedTranslator(gate: gate),
+            makePageAnalyzer: { _, _ in analyzer }
         ))
         vm.translationEnabled = true
         vm.translationTargetLanguage = .korean
@@ -114,8 +116,8 @@ struct TranslationOverlayMemoTests {
         vm.translationManager.openBook.flatMap { $0.pageRevisions.values }.sorted()
     }
 
-    /// Give background work (speech levels matched page by page) a moment
-    /// to land, without failing if it has nothing to do.
+    /// Give background work (a job filling pages in) a moment to land,
+    /// without failing if it has nothing to do.
     private func settle(_ vm: ReaderViewModel, changingFrom signature: [Int]) async {
         let deadline = ContinuousClock.now + .milliseconds(300)
         while revisionSignature(vm) == signature, ContinuousClock.now < deadline {
@@ -252,15 +254,16 @@ struct TranslationOverlayMemoTests {
                 await controller.cacheTask?.value
                 description = "\(target.rawValue) gaining pages \(indices)"
             case 15:
+                let controller = vm.translation
+                if !controller.isWorking { vm.translationManager.start(controller) }
                 let signature = revisionSignature(vm)
                 await gate.release(Int.random(in: 1...3, using: &random))
                 await settle(vm, changingFrom: signature)
-                description = "speech levels matched"
+                description = "\(controller.target.rawValue) translating"
             case 16:
-                vm.translationMatchesSpeechLevel.toggle()
-                check(vm, "speech-level matching switched, before the caches")
-                for controller in vm.translationManager.openBook { await controller.cacheTask?.value }
-                description = "speech-level matching \(vm.translationMatchesSpeechLevel ? "on" : "off")"
+                guard let controller = vm.translationManager.openBook.first(where: \.isWorking) else { continue }
+                vm.translationManager.pause(controller)
+                description = "\(controller.target.rawValue) paused"
             case 17:
                 var updates: [TranslationEdits.BubbleUpdate] = []
                 for _ in 0..<Int.random(in: 1...5, using: &random) {
@@ -293,18 +296,15 @@ struct TranslationOverlayMemoTests {
     @Test(.enabled(if: TranslationController.isSupportedOnThisMac))
     func overlayPagesFromTheMemoStillNotifyOfEveryChange() async throws {
         let gate = TranslationPermitGate()
-        // Only the shown language's pages change in place, from the page on screen.
-        let vm = makeViewModel(gate: gate, matching: [.korean])
+        // The shown language's page on screen is translated in place.
+        let vm = makeViewModel(gate: gate, bubbles: 1)
         let book = Book(url: URL(fileURLWithPath: "/series/observe/vol1.cbz"), pages: Fixture.makeImagePages(count: 4, title: "o"))
-        try save(vm, book, pages: [0, 1, 2, 3], into: .korean, label: "한국어", bubbles: 1)
+        try save(vm, book, pages: [1, 2, 3], into: .korean, label: "한국어", bubbles: 1)
         try save(vm, book, pages: [0, 1], into: .english, label: "English", bubbles: 1)
         try await open(vm, book)
         await vm.translationEdits.load(pageIDs: book.pages.map(\.id), scope: .page)
-        vm.translationMatchesSpeechLevel = true
-        for controller in vm.translationManager.openBook { await controller.cacheTask?.value }
         let korean = try #require(vm.translationManager.openBook.first { $0.target == .korean })
         let english = try #require(vm.translationManager.openBook.first { $0.target == .english })
-        let bubble = try #require(korean.pages[book.pages[0].id]?.bubbles.first)
 
         func expectNotified(_ what: String, _ change: () async throws -> Void) async throws {
             _ = vm.translationOverlayPages
@@ -315,11 +315,16 @@ struct TranslationOverlayMemoTests {
             check(vm, what)
         }
 
-        try await expectNotified("a balloon's speech level matched") {
-            let before = korean.pages[book.pages[0].id]
-            await gate.release(1)
-            try await waitUntil { korean.pages[book.pages[0].id] != before }
+        try await expectNotified("the page's balloons found") {
+            vm.translationManager.start(korean)
+            try await waitUntil { korean.pages[book.pages[0].id] != nil }
         }
+        try await expectNotified("a balloon translated") {
+            await gate.release(1)
+            try await waitUntil { korean.pages[book.pages[0].id]?.bubbles.first?.translation != nil }
+        }
+        try await waitUntil { korean.phase == .idle }
+        let bubble = try #require(korean.pages[book.pages[0].id]?.bubbles.first)
         try await expectNotified("the reader's translation") {
             vm.translationEdits.update(pageID: book.pages[0].id, bubble: bubble) { $0.translations["ko"] = "내 번역" }
         }
@@ -359,13 +364,14 @@ struct TranslationOverlayMemoTests {
     @Test(.enabled(if: TranslationController.isSupportedOnThisMac))
     func whetherThereIsATranslationDoesNotNotifyAsAPageChanges() async throws {
         let gate = TranslationPermitGate()
-        let vm = makeViewModel(gate: gate)
-        let book = Book(url: URL(fileURLWithPath: "/series/flag/vol1.cbz"), pages: Fixture.makeImagePages(count: 2, title: "f"))
+        let vm = makeViewModel(gate: gate, bubbles: 2)
+        let book = Book(url: URL(fileURLWithPath: "/series/flag/vol1.cbz"), pages: Fixture.makeImagePages(count: 3, title: "f"))
         try save(vm, book, pages: [0, 1], into: .korean, label: "한국어", bubbles: 1)
         try save(vm, book, pages: [0], into: .english, label: "English", bubbles: 1)
         try await open(vm, book)
-        vm.translationMatchesSpeechLevel = true
-        for controller in vm.translationManager.openBook { await controller.cacheTask?.value }
+        // A job reading page 2, its balloons waiting to be translated.
+        vm.translationManager.start(vm.translation)
+        try await waitUntil { vm.translation.pages[book.pages[2].id] != nil }
         #expect(vm.translationIsShowing && vm.canEditTranslations && vm.canTranslateAgain)
 
         let probe = ObservationProbe {
@@ -377,14 +383,15 @@ struct TranslationOverlayMemoTests {
         }
         let pages = ObservationProbe { _ = vm.translationManager.openBook.map(\.pages) }
         let signature = revisionSignature(vm)
-        await gate.release(2)
+        // One of the page's two balloons: the job is still running after.
+        await gate.release(1)
         try await waitUntil { revisionSignature(vm) != signature }
         #expect(pages.fired)
         #expect(!probe.fired)
 
         // …but does when the shown language empties.
         let emptied = ObservationProbe { _ = vm.translationIsShowing }
-        await vm.translation.translateAgain(pageIndices: [0, 1])
+        await vm.translation.translateAgain(pageIndices: [0, 1, 2])
         #expect(!vm.translationIsShowing)
         #expect(emptied.fired)
         await gate.open()

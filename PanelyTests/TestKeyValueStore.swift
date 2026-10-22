@@ -258,7 +258,10 @@ func makeTestDependencies(
         root: Fixture.runDirectory
             .appendingPathComponent("panely-translation-edit-tests-\(UUID().uuidString)", isDirectory: true)
     ),
-    makeSpeechLevelCorrector: @escaping @Sendable (TranslationLanguage, TranslationLanguage) -> (any SpeechLevelCorrecting)? = { _, _ in nil },
+    translator: any BalloonTranslating = ScriptedTranslator(),
+    translationModelRoot: URL = Fixture.runDirectory
+        .appendingPathComponent("panely-model-tests-\(UUID().uuidString)", isDirectory: true),
+    makePageAnalyzer: (@Sendable ([ComicPage], TranslationLanguage) -> any PageAnalyzing)? = nil,
     readerLibraryScopeFactory: @MainActor @escaping () -> ReaderLibraryScope = { ReaderLibraryScope() }
 ) -> AppDependencies {
     AppDependencies(
@@ -274,7 +277,9 @@ func makeTestDependencies(
         localization: localization,
         translationStore: translationStore,
         translationEditStore: translationEditStore,
-        makeSpeechLevelCorrector: makeSpeechLevelCorrector,
+        translator: translator,
+        makeTranslationModelStore: { TranslationModelStore(files: TranslationModelFiles(root: translationModelRoot), downloader: FailingModelDownloader()) },
+        makePageAnalyzer: makePageAnalyzer,
         makeReaderPreferences: { ReaderPreferences(defaults: keyValueStore) },
         makeReaderPositions: { ReaderPositionStore(defaults: keyValueStore) },
         makeReadingProgress: { ReadingProgressStore(defaults: keyValueStore) },

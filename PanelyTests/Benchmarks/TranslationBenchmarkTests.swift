@@ -7,9 +7,9 @@ import Testing
 
 /// How fast the translation pipeline runs, stage by stage and as a whole job.
 ///
-/// Opt-in: it takes minutes and needs Apple Translation's language packs (and
-/// Apple Intelligence for speech levels), so it never runs in an ordinary
-/// `xcodebuild test`. `scripts/benchmark-translation.sh` turns it on with
+/// Opt-in: it takes minutes and needs the translation model downloaded (in
+/// the test host's sandbox — the script can link one in with `--model`), so
+/// it never runs in an ordinary `xcodebuild test`. `scripts/benchmark-translation.sh` turns it on with
 /// `TEST_RUNNER_PANELY_BENCHMARK=1` (xcodebuild hands `TEST_RUNNER_`-prefixed
 /// variables to the tests without the prefix).
 ///
@@ -34,10 +34,10 @@ nonisolated enum TranslationBenchmark {
     }
     static var bookFirstPage: Int { environment["PANELY_BENCHMARK_BOOK_FIRST"].flatMap(Int.init) ?? 0 }
     static var bookPageCount: Int { environment["PANELY_BENCHMARK_BOOK_PAGES"].flatMap(Int.init) ?? 60 }
-    static var matchSpeechLevel: Bool { environment["PANELY_BENCHMARK_SPEECH_LEVEL"] != "0" }
-    /// Which parts to run: `stages`, `job` (both by default) and
-    /// `speechConcurrency` (with `stages`: the model answering 1–4 rewrites
-    /// at a time).
+    /// Balloons of the job's output to print as `sample` lines, to read the
+    /// translations themselves.
+    static var sampleCount: Int { environment["PANELY_BENCHMARK_SAMPLES"].flatMap(Int.init) ?? 0 }
+    /// Which parts to run: `stages`, `job` (both by default).
     static var parts: Set<String> {
         Set((environment["PANELY_BENCHMARK_PARTS"] ?? "stages,job").split(separator: ",").map(String.init))
     }
@@ -83,48 +83,6 @@ nonisolated enum TranslationBenchmark {
         } else {
             try? data.write(to: resultsURL)
         }
-    }
-}
-
-/// The real on-device corrector, timed: how many balloons actually went to
-/// the model, and how long those took.
-private actor SpeechLevelTiming {
-    var modelCalls = 0
-    var accepted = 0
-    var modelSeconds: [Double] = []
-    var skipSeconds = 0.0
-
-    func record(calledModel: Bool, seconds: Double, accepted wasAccepted: Bool) {
-        if calledModel {
-            modelCalls += 1
-            modelSeconds.append(seconds)
-        } else {
-            skipSeconds += seconds
-        }
-        if wasAccepted { accepted += 1 }
-    }
-}
-
-private nonisolated struct TimedSpeechLevelCorrector: SpeechLevelCorrecting {
-    let inner: any SpeechLevelCorrecting
-    let timing: SpeechLevelTiming
-    let source: TranslationLanguage
-    let target: TranslationLanguage
-
-    /// Whether `correct` will ask the model — the corrector's own gate.
-    static func asksModel(_ translation: String, source text: String, from source: TranslationLanguage, to target: TranslationLanguage) -> Bool {
-        guard let wanted = SpeechLevelRules.level(ofSource: text, language: source),
-              let have = SpeechLevelRules.level(ofTranslation: translation, language: target)
-        else { return false }
-        return SpeechLevelRules.needsRewrite(translation: have, original: wanted)
-    }
-
-    func correct(_ translation: String, source text: String) async -> String? {
-        let asks = Self.asksModel(translation, source: text, from: source, to: target)
-        let start = ContinuousClock.now
-        let result = await inner.correct(translation, source: text)
-        await timing.record(calledModel: asks, seconds: TranslationBenchmark.seconds(start.duration(to: .now)), accepted: result != nil)
-        return result
     }
 }
 
@@ -234,19 +192,17 @@ struct TranslationBenchmarkTests {
 
     @available(macOS 26.0, *)
     private func run(name: String, pages: [ComicPage], source: TranslationLanguage, target: TranslationLanguage) async throws {
-        let status = await TranslationAvailability.status(from: source, to: target, mode: .fast)
-        let speech = SpeechLevelAvailability.current
+        let modelReady = GemmaTranslator.shared.isReady()
         TranslationBenchmark.emit(
-            "part=\(name).env pages=\(pages.count) pair=\(source.rawValue)-\(target.rawValue) translation=\(status) fastMode=\(TranslationMode.isFastAvailable) "
-                + "speechLevel=\(speech) speechLevelPair=\(SpeechLevelRules.supports(from: source, to: target)) matchSpeechLevel=\(TranslationBenchmark.matchSpeechLevel) "
+            "part=\(name).env pages=\(pages.count) pair=\(source.rawValue)-\(target.rawValue) model=\(TranslationModel.cacheRevision) modelReady=\(modelReady) "
                 + "cores=\(ProcessInfo.processInfo.activeProcessorCount) thermal=\(ProcessInfo.processInfo.thermalState.rawValue) debugAssertions=\(_isDebugAssertConfiguration())"
         )
         if TranslationBenchmark.parts.contains("stages") {
-            try await stages(name: name, pages: pages, source: source, target: target, canTranslate: status == .installed)
+            try await stages(name: name, pages: pages, source: source, target: target, canTranslate: modelReady)
         }
         if TranslationBenchmark.parts.contains("job") {
-            guard status == .installed else {
-                TranslationBenchmark.emit("part=\(name).job skipped=translation-\(status)")
+            guard modelReady else {
+                TranslationBenchmark.emit("part=\(name).job skipped=noModel")
                 return
             }
             try await job(name: name, pages: pages, source: source, target: target)
@@ -298,8 +254,8 @@ struct TranslationBenchmarkTests {
         }.value
         TranslationBenchmark.emit(line)
 
-        // The job's way: one analyzer, `fastLookahead` pages at once, utility priority.
-        let width = TranslationController.fastLookahead
+        // The job's way: one analyzer, `lookahead` pages at once, utility priority.
+        let width = TranslationController.lookahead
         let (parallel, analyses) = try await Task.detached(priority: .utility) { () -> (Double, [PageAnalysis]) in
             let analyzer = PageAnalyzer(pages: pages, language: source)
             let start = ContinuousClock.now
@@ -322,73 +278,37 @@ struct TranslationBenchmarkTests {
             TranslationBenchmark.emit("part=\(name).translate skipped=translation-unavailable")
             return
         }
-        // Each distinct line once, as the job does.
+        // Each distinct line once, in reading order, `chunkSize` at a time
+        // with the last few translations as context — as the job does.
         var seen = Set<String>()
         let sources = balloons.map(\.source).filter { seen.insert($0).inserted }
-        let translated = try await Task.detached(priority: .utility) { () -> ([(String, String)], [Double]) in
-            let translator = PageTranslator(from: source, to: target, mode: .fast)
-            _ = try await translator.translate(sources.first ?? "テスト")
-            var times: [Double] = []
-            var pairs: [(String, String)] = []
-            for text in sources {
-                let start = ContinuousClock.now
-                let translation = try await translator.translate(text)
-                times.append(TranslationBenchmark.seconds(start.duration(to: .now)))
-                pairs.append((text, translation))
-            }
-            return (pairs, times)
-        }.value
-        TranslationBenchmark.emit("part=\(name).translate \(TranslationBenchmark.summary("balloon", translated.1))")
-
-        guard let corrector = SpeechLevelCorrectors.make(from: source, to: target) else {
-            TranslationBenchmark.emit("part=\(name).speechLevel skipped=unavailable")
-            return
-        }
-        let pairs = translated.0
-        let speechLine = await Task.detached(priority: .utility) { () -> String in
-            var model: [Double] = []
-            var skipped = 0.0
-            var accepted = 0
-            if let first = pairs.first(where: { TimedSpeechLevelCorrector.asksModel($0.1, source: $0.0, from: source, to: target) }) {
-                _ = await corrector.correct(first.1, source: first.0)
-            }
-            for (text, translation) in pairs {
-                let asks = TimedSpeechLevelCorrector.asksModel(translation, source: text, from: source, to: target)
-                let start = ContinuousClock.now
-                let result = await corrector.correct(translation, source: text)
-                let elapsed = TranslationBenchmark.seconds(start.duration(to: .now))
-                if asks { model.append(elapsed) } else { skipped += elapsed }
-                if result != nil { accepted += 1 }
-            }
-            return "part=\(name).speechLevel balloons=\(pairs.count) accepted=\(accepted) skipSeconds=\(TranslationBenchmark.format(skipped)) "
-                + TranslationBenchmark.summary("modelCall", model)
-        }.value
-        TranslationBenchmark.emit(speechLine)
-
-        // Whether the model answers faster several at a time, and the same.
-        guard TranslationBenchmark.parts.contains("speechConcurrency") else { return }
-        let asked = pairs.filter { TimedSpeechLevelCorrector.asksModel($0.1, source: $0.0, from: source, to: target) }
-        var reference: [String?] = []
-        for width in [1, 2, 3, 4] {
-            let (wall, answers) = await Task.detached(priority: .utility) { () -> (Double, [String?]) in
-                var answers = [String?](repeating: nil, count: asked.count)
-                let start = ContinuousClock.now
-                await withTaskGroup(of: (Int, String?).self) { group in
-                    for (index, (text, translation)) in asked.enumerated() {
-                        if index >= width, let (done, answer) = await group.next() { answers[done] = answer }
-                        group.addTask { (index, await corrector.correct(translation, source: text)) }
-                    }
-                    for await (done, answer) in group { answers[done] = answer }
+        let (loadSeconds, chunkSeconds, firstLineSeconds) = try await Task.detached(priority: .utility) { () -> (Double, [Double], [Double]) in
+            let translator = GemmaTranslator.shared
+            await translator.unload()
+            var start = ContinuousClock.now
+            try await translator.prepare()
+            let load = TranslationBenchmark.seconds(start.duration(to: .now))
+            var chunks: [Double] = [], firstLines: [Double] = []
+            var recent: [TranslationContextLine] = []
+            for offset in stride(from: 0, to: sources.count, by: TranslationController.chunkSize) {
+                let chunk = Array(sources[offset..<min(offset + TranslationController.chunkSize, sources.count)])
+                start = .now
+                var first: Double?
+                for try await line in translator.translate(chunk, context: Array(recent.suffix(TranslationController.contextLines)), from: source, to: target) {
+                    if first == nil { first = TranslationBenchmark.seconds(start.duration(to: .now)) }
+                    recent.append(TranslationContextLine(source: chunk[line.index], translation: line.text))
                 }
-                return (TranslationBenchmark.seconds(start.duration(to: .now)), answers)
-            }.value
-            if width == 1 { reference = answers }
-            let differing = zip(answers, reference).filter { $0 != $1 }.count
-            TranslationBenchmark.emit(
-                "part=\(name).speechConcurrency width=\(width) calls=\(asked.count) wall=\(TranslationBenchmark.format(wall)) "
-                    + "perCall=\(TranslationBenchmark.format(wall / Double(max(1, asked.count)))) differFromSerial=\(differing)"
-            )
-        }
+                chunks.append(TranslationBenchmark.seconds(start.duration(to: .now)))
+                firstLines.append(first ?? 0)
+            }
+            return (load, chunks, firstLines)
+        }.value
+        let total = chunkSeconds.reduce(0, +)
+        TranslationBenchmark.emit(
+            "part=\(name).translate loadSeconds=\(TranslationBenchmark.format(loadSeconds)) balloons=\(sources.count) "
+                + "perBalloon=\(TranslationBenchmark.format(total / Double(max(1, sources.count)))) "
+                + "\(TranslationBenchmark.summary("chunk", chunkSeconds)) \(TranslationBenchmark.summary("firstLine", firstLineSeconds))"
+        )
     }
 
     /// A whole translation job, the way the app runs one, with its own stats line.
@@ -396,19 +316,15 @@ struct TranslationBenchmarkTests {
     private func job(name: String, pages: [ComicPage], source: TranslationLanguage, target: TranslationLanguage) async throws {
         let store = TranslationStore(root: try Fixture.makeTempDir().appendingPathComponent("translations", isDirectory: true))
         let controller = TranslationController(store: store, defaults: InMemoryKeyValueStore())
-        let timing = SpeechLevelTiming()
-        controller.makeSpeechLevelCorrector = { source, target in
-            SpeechLevelCorrectors.make(from: source, to: target).map {
-                TimedSpeechLevelCorrector(inner: $0, timing: timing, source: source, target: target)
-            }
-        }
+        // From a cold start, as when a book is first translated.
+        await GemmaTranslator.shared.unload()
         let statsBefore = await jobStatsLines().count
         let monitor = MainActorLagMonitor()
         monitor.start()
         let start = ContinuousClock.now
         controller.reload(
-            pages: pages, pageSizes: [], scope: .page, source: source, target: target, mode: .fast,
-            matchSpeechLevel: TranslationBenchmark.matchSpeechLevel, enabled: true, autoStart: true, focusPage: 0
+            pages: pages, pageSizes: [], scope: .page, source: source, target: target,
+            enabled: true, autoStart: true, focusPage: 0
         )
         await controller.cacheTask?.value
         let deadline = ContinuousClock.now + .seconds(60 * 60)
@@ -433,6 +349,13 @@ struct TranslationBenchmarkTests {
             }
         }
         let outputDigest = digest.finalize().prefix(8).map { String(format: "%02x", $0) }.joined()
+        let samples = pages.enumerated().flatMap { index, page in
+            (controller.pages[page.id]?.bubbles ?? []).map { (index, $0) }
+        }
+        for (index, bubble) in samples.prefix(TranslationBenchmark.sampleCount) {
+            let oneLine = { (text: String?) in (text ?? "∅").replacingOccurrences(of: "\n", with: " / ") }
+            TranslationBenchmark.emit("part=\(name).sample page=\(index) source=\(oneLine(bubble.source)) translation=\(oneLine(bubble.translation))")
+        }
 
         var stats = ""
         for _ in 0..<100 {
@@ -443,13 +366,8 @@ struct TranslationBenchmarkTests {
             }
             try await Task.sleep(for: .milliseconds(50))
         }
-        let modelCalls = await timing.modelCalls
-        let modelSeconds = await timing.modelSeconds
-        let accepted = await timing.accepted
-        let skip = await timing.skipSeconds
         TranslationBenchmark.emit(
             "part=\(name).job wall=\(TranslationBenchmark.format(wall)) balloons=\(balloons) translatedBalloons=\(translatedBalloons) outputDigest=\(outputDigest) "
-                + "speechModelCalls=\(modelCalls) speechAccepted=\(accepted) speechSkipSeconds=\(TranslationBenchmark.format(skip)) \(TranslationBenchmark.summary("speechModelCall", modelSeconds)) "
                 + "mainMaxLag=\(TranslationBenchmark.format(monitor.maxLag)) mainHitches=\(monitor.hitches) mainSamples=\(monitor.samples) "
                 + "stats[\(stats)]"
         )

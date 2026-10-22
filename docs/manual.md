@@ -441,24 +441,21 @@ Requires **macOS 26** or later. It's off by default.
 Open **File → Settings… → Experimental** and switch on **Translation
 Assist**. The same tab sets:
 
-![Experimental settings: Translation Assist, default language, mode and speech level](screenshots/23-experimental-settings.png)
+![Experimental settings: Translation Assist, default language and the translation model](screenshots/23-experimental-settings.png)
 
 - **Default Language** — the language new series are shown in. **System
   Default** follows Panely's interface language. Panely translates between
   Japanese, Chinese (Simplified and Traditional), Korean and English.
-- **Translation Mode** — **Fast** (the default) translates a volume in
-  about a minute; **Accurate** reads idioms and nuance better but takes
-  about 20 times as long. Each mode downloads its own language packs, and a
-  running job restarts in the new mode. Fast needs macOS 26.4 or later;
-  before that every book is translated with Accurate.
-- **Match Speech Level** — on by default (Japanese ↔ Korean, needs Apple
-  Intelligence). Apple Translation tends to make every line polite, so a
-  king's commands come out as requests and "안 돼" as "だめです". Panely reads
-  the original's level from its own endings and has the on-device model
-  rewrite just the endings to match. A rewrite is used only if it keeps the
-  words, tense, negation and sentence type; otherwise the translation stays
-  as it was. Pages translated before are matched the next time the book
-  opens.
+- **Translation Model** — Google's Gemma 4 E2B, run on your Mac's GPU. One
+  model translates every pair, with no modes to choose: it reads a page's
+  balloons together with the lines before them, so names and each speaker's
+  speech level carry over — a king's commands stay commands, casual lines stay
+  casual, polite ones polite. It's downloaded once (3.35 GB, from Hugging
+  Face) — here, or from the translation panel the first time you translate —
+  with a progress bar and **Cancel**, and checked before it's used. **Delete
+  Translation Model…** frees the space; books already translated stay
+  translated. Nothing you read leaves your Mac. While translating it uses
+  about 3.5 GB of memory, and lets it go two minutes after the last balloon.
 - **Your Edits** — how many pages you've corrected, and a button to delete
   the edits. They're stored apart from the cache.
 - **Translation Cache** — how much space finished translations take, and a
@@ -515,15 +512,14 @@ Translation starts at the page you're on and keeps ahead of you as you read:
 - The line under the button, and the pill over the page, show progress and the
   time left. The first translation after installing takes a minute or two
   while the models load — the pill says so.
-- Finished pages get a badge in the thumbnail sidebar and a mark under the
-  page slider.
+- Finished pages get a badge in the thumbnail sidebar.
 
-The same line says whether the language pack is installed. If it's missing,
-the big button becomes **Download Language Pack…** (the banner over the page
-offers **Download…** too). Packs are large, so this can take several
-minutes, and the system window's progress bar may not move for a while.
-Downloaded packs are managed in System Settings › General › Language &
-Region › Translation Languages.
+Before the first translation, the big button is **Download Translation Model
+(3.35 GB)** (the banner over the page offers **Download** too). It shows a
+progress bar with **Cancel** while the model downloads, then becomes
+**Translate This Book**; a job that was waiting for the model starts by
+itself. On an M1 Pro a balloon takes about a quarter of a second, a page a
+few seconds; each balloon fills in as soon as its translation is written.
 
 The first time you translate a series, Panely works out which language the
 book is in and remembers it for the series. If it guessed wrong, open **This
@@ -640,7 +636,7 @@ If it does not work as expected:
 | Dragging pans the page | Turn on **Edit Balloons**. |
 | You get a click rather than a selection box | Start outside existing balloons and draw a larger box. Very small drags do not select an area. |
 | A balloon was added but no text was read | Click its dashed area in edit mode, type the original with **Fix Original**, then **Translate Again**. You can also write the translation directly with **Edit**. |
-| There is an original but no translation | If prompted, download the language pack, then click the balloon's **Translate Again**. Check **Book's Language** in the panel too. |
+| There is an original but no translation | If prompted, download the translation model, then click the balloon's **Translate Again**. Check **Book's Language** in the panel too. |
 | You marked the wrong area or added a duplicate | Choose **Remove** on your added balloon (**Remove This Balloon** on right-click), then draw again. |
 | The translation is missing after switching languages | In edit mode, click that area and choose **Translate Again**, or write its translation in that language. |
 
@@ -750,7 +746,7 @@ series is shown in.
 Exporting runs in the background: keep reading, or open another book. Each
 book is its own job in **Window → Jobs** (`⌥⌘J`) — first translating what's
 left (through the same queue as other translations), then writing the pages —
-and can be cancelled there. A job that stops (a missing language pack, say)
+and can be cancelled there. A job that stops (the model not downloaded, say)
 stays listed with the reason and **Try Again**. Finished books stay listed,
 across launches, with **Show in Finder** and **Open**; the pill over the page
 says when one is done. A volume inside another archive exists only while

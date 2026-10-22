@@ -1,13 +1,12 @@
 import SwiftUI
-import Translation
 
 /// The translation panel: translating the open book, nothing else. Opened
 /// from the toolbar's ▾ menu (or the button itself before there's anything
 /// to show).
 ///
 /// Top to bottom, by how often each is needed:
-/// - **What to do next** — one big button (translate, download the pack,
-///   pause, resume) and one status line (progress, the pack).
+/// - **What to do next** — one big button (download the model, translate,
+///   pause, resume) and one status line (progress, the model).
 /// - **View** — the original or one of the book's languages; other languages
 ///   start, pause or stop from their `⋯` menu.
 /// - **This book & series** — collapsed: the book's language, auto-translate,
@@ -46,7 +45,7 @@ struct TranslationPanel: View {
         VStack(alignment: .leading, spacing: PanelySpacing.md) {
             header
 
-            if #available(macOS 26.0, *), viewModel.translationSourceLanguage != viewModel.translationDisplayLanguage {
+            if viewModel.translationSourceLanguage != viewModel.translationDisplayLanguage {
                 TranslationPrimaryAction()
             }
 
@@ -193,7 +192,7 @@ struct TranslationPanel: View {
                         viewModel.translateBookAgain()
                     }
                 } message: {
-                    Text("Every page is read and translated again, the way Panely does it now — balloons a page split in two are joined, speech levels matched. It takes as long as the first time. Your edits stay, but one on a balloon that's now found differently may no longer apply.")
+                    Text("Every page is read and translated again, the way Panely does it now — balloons a page split in two are joined. It takes as long as the first time. Your edits stay, but one on a balloon that's now found differently may no longer apply.")
                 }
             }
 
@@ -485,80 +484,28 @@ struct TranslationProgressHUD: View {
     }
 }
 
-/// Thin bar marking translated pages across the book, under the page slider.
-struct TranslatedPagesBar: View {
-    let pageCount: Int
-    let translated: Set<Int>
-
-    var body: some View {
-        Canvas { context, size in
-            guard pageCount > 0 else { return }
-            let width = size.width / CGFloat(pageCount)
-            var runStart: Int?
-            for index in 0...pageCount {
-                let isTranslated = index < pageCount && translated.contains(index)
-                if isTranslated, runStart == nil { runStart = index }
-                if !isTranslated, let start = runStart {
-                    let rect = CGRect(x: CGFloat(start) * width, y: 0, width: CGFloat(index - start) * width, height: size.height)
-                    context.fill(Path(rect), with: .color(PanelyColor.accentPrimary.opacity(0.55)))
-                    runStart = nil
-                }
-            }
-        }
-        .frame(height: 2)
-        .accessibilityHidden(true)
-    }
-}
-
 /// The one thing to do next for the language the book is shown in, as a
-/// full-width button — translate, download the language pack, pause or
-/// resume — with one status line under it (progress, the pack), so neither
-/// has to be hunted for.
-///
-/// Downloading needs SwiftUI's `translationTask` — the only API that may
-/// prompt for a language pack — so it starts here, not in the background job;
-/// `LanguagePackDownloads` keeps track of it from then on.
-@available(macOS 26.0, *)
+/// full-width button — download the model, translate, pause or resume — with
+/// one status line under it (progress, the model), so neither has to be
+/// hunted for.
 struct TranslationPrimaryAction: View {
     @Environment(ReaderViewModel.self) private var viewModel
-
-    @State private var downloadConfiguration: TranslationSession.Configuration?
-    /// Which pack `downloadConfiguration` asks for.
-    @State private var downloadRequest: LanguagePackDownloads.Pack?
 
     private enum Action {
         case translate
         case resume
         case pause
-        case downloadPack(LanguagePackDownloads.Pack)
-        case downloadingPack
-        case unsupported
+        case downloadModel
+        case downloadingModel
         case done(Int)
     }
 
-    private var downloads: LanguagePackDownloads { viewModel.translationManager.languagePacks }
-
-    /// The pack the shown language needs; `nil` until the book's language is known.
-    private var pack: LanguagePackDownloads.Pack? {
-        viewModel.translationSourceLanguage.map {
-            .init(source: $0, target: viewModel.translationDisplayLanguage, mode: viewModel.translationMode)
-        }
-    }
+    private var model: TranslationModelStore { viewModel.translationManager.model }
 
     private var action: Action {
+        if model.isDownloading { return .downloadingModel }
+        if !model.isInstalled { return .downloadModel }
         let controller = viewModel.translation
-        if case let .needsLanguageDownload(source, target) = controller.notice {
-            let needed = LanguagePackDownloads.Pack(source: source, target: target, mode: viewModel.translationMode)
-            return downloads.isDownloading(needed) ? .downloadingPack : .downloadPack(needed)
-        }
-        if let pack {
-            if downloads.isDownloading(pack) { return .downloadingPack }
-            switch downloads.status(of: pack) {
-            case .needsDownload: return .downloadPack(pack)
-            case .unsupported: return .unsupported
-            case .installed, nil: break
-            }
-        }
         let done = controller.completedPageCount
         let total = controller.bookPageCount
         if total > 0, done >= total { return .done(total) }
@@ -570,17 +517,8 @@ struct TranslationPrimaryAction: View {
         VStack(alignment: .leading, spacing: PanelySpacing.xs) {
             actionButton
             statusLine
-            if let pack, downloads.isDownloading(pack) {
-                TranslationCaveat(systemImage: "clock", text: LanguagePackDownloadingLabel.note)
-            }
         }
-        .task(id: pack) {
-            if let pack { await downloads.refresh(pack) }
-        }
-        .translationTask(downloadConfiguration) { [pack = downloadRequest, downloads] session in
-            guard let pack else { return }
-            await LanguagePackDownloads.download(pack, using: session, into: downloads)
-        }
+        .onAppear { model.refresh() }
     }
 
     @ViewBuilder
@@ -610,25 +548,12 @@ struct TranslationPrimaryAction: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
-        case let .downloadPack(pack):
-            prominentButton("Download Language Pack…", systemImage: "arrow.down.circle") {
-                requestDownload(pack)
+        case .downloadModel:
+            prominentButton("Download Translation Model (\(TranslationModelSize.text(model.model.bytes)))", systemImage: "arrow.down.circle") {
+                model.download()
             }
-        case .downloadingPack:
-            Button {} label: {
-                HStack(spacing: PanelySpacing.xs) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Downloading Language Pack…")
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.large)
-            .disabled(true)
-        case .unsupported:
-            prominentButton("Translate This Book", systemImage: "play.fill") {}
-                .disabled(true)
+        case .downloadingModel:
+            TranslationModelDownloadProgress(model: model)
         case let .done(total):
             Label("All \(total) pages translated", systemImage: "checkmark.circle.fill")
                 .foregroundStyle(PanelyColor.textSecondary)
@@ -645,9 +570,9 @@ struct TranslationPrimaryAction: View {
     }
 
     /// Where things stand, in one line: the job (or why it stopped) and the
-    /// language pack — always mentioned, so it's clear it exists.
+    /// model — always mentioned, so it's clear what translates.
     private var statusLine: some View {
-        (jobStatus + packStatus)
+        (jobStatus + modelStatus)
             .font(.caption)
             .foregroundStyle(PanelyColor.textSecondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -657,91 +582,96 @@ struct TranslationPrimaryAction: View {
         let controller = viewModel.translation
         let separator = Text(verbatim: " · ")
         switch controller.notice {
-        case .needsLanguageDownload?:
+        case .needsModelDownload?:
             // The big button says it.
             return Text(verbatim: "")
         case let notice?:
             return Text(verbatim: notice.message(locale: viewModel.localization.locale)) + separator
         case nil:
-            if !controller.hasActiveJob, let progress = controller.speechLevelProgress {
-                return Text("Matching speech levels · \(progress.done)/\(progress.total) pages") + separator
-            }
             guard controller.hasActiveJob else { return Text(verbatim: "") }
             return TranslationStatusText.text(for: controller) + separator
         }
     }
 
-    private var packStatus: Text {
-        guard let pack else { return Text("Language pack checked once the book's language is known") }
-        if downloads.isDownloading(pack) { return Text("Downloading Language Pack…") }
-        switch downloads.status(of: pack) {
-        case nil: return Text("Checking the language pack…")
-        case .installed: return Text("Language pack installed")
-        case .needsDownload: return Text("Language pack not installed")
-        case .unsupported: return Text("This language pair isn't supported")
-        }
-    }
-
-    private func requestDownload(_ pack: LanguagePackDownloads.Pack) {
-        downloads.begin(pack)
-        if downloadConfiguration != nil, downloadRequest == pack {
-            // Same pack again (e.g. the first prompt was dismissed): re-run.
-            downloadConfiguration?.invalidate()
-        } else {
-            downloadRequest = pack
-            downloadConfiguration = TranslationAvailability.configuration(from: pack.source, to: pack.target, mode: pack.mode)
+    private var modelStatus: Text {
+        switch model.state {
+        case .installed:
+            return Text("Translated on this Mac by \(model.model.displayName)")
+        case .notInstalled:
+            return Text("Downloaded once, then everything is translated on this Mac")
+        case .downloading, .verifying:
+            return Text(verbatim: "")
+        case let .failed(reason):
+            return Text("The download stopped: \(reason)")
         }
     }
 }
 
-/// "Download…" for a missing language pack, for the status banner. Once the
-/// pack is in, `TranslationManager` restarts the jobs that were waiting for it.
-@available(macOS 26.0, *)
-struct LanguagePackDownloadButton: View {
-    @Environment(ReaderViewModel.self) private var viewModel
-    let source: TranslationLanguage
-    let target: TranslationLanguage
-    let mode: TranslationMode
-
-    @State private var configuration: TranslationSession.Configuration?
-
-    private var downloads: LanguagePackDownloads { viewModel.translationManager.languagePacks }
-    private var pack: LanguagePackDownloads.Pack { .init(source: source, target: target, mode: mode) }
+/// The model's download under way: a bar, how much is in, and Cancel.
+/// Shared by the panel and Settings.
+struct TranslationModelDownloadProgress: View {
+    let model: TranslationModelStore
 
     var body: some View {
-        Group {
-            if downloads.isDownloading(pack) {
-                LanguagePackDownloadingLabel()
-                    .help(Text(LanguagePackDownloadingLabel.note))
-            } else {
-                Button("Download…") {
-                    downloads.begin(pack)
-                    if configuration == nil {
-                        configuration = TranslationAvailability.configuration(from: source, to: target, mode: mode)
-                    } else {
-                        configuration?.invalidate()
-                    }
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: PanelySpacing.xs) {
+                if let fraction = model.fractionDownloaded {
+                    ProgressView(value: fraction)
+                        .tint(PanelyColor.accentPrimary)
+                } else {
+                    ProgressView()
+                        .progressViewStyle(.linear)
+                }
+                Button("Cancel") { model.cancelDownload() }
+                    .controlSize(.small)
+            }
+            Group {
+                switch model.state {
+                case let .downloading(received, total):
+                    Text("Downloading the translation model · \(TranslationModelSize.text(received)) of \(TranslationModelSize.text(total))")
+                case .verifying:
+                    Text("Checking the download…")
+                case .notInstalled, .installed, .failed:
+                    Text(verbatim: "")
                 }
             }
-        }
-        .translationTask(configuration) { [pack, downloads] session in
-            await LanguagePackDownloads.download(pack, using: session, into: downloads)
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(PanelyColor.textSecondary)
         }
     }
 }
 
-/// Stands in for "Download…" while a pack downloads. Apple Translation's own
-/// download window shows no real progress — its bar can sit still for
-/// minutes — so this says the download is under way and why it may look stuck.
-struct LanguagePackDownloadingLabel: View {
-    static let note: LocalizedStringKey = "Language packs are large, so this can take several minutes. The progress bar in the system window may not move for a while."
+/// "Download…" for the model, for the status banner. Once it's in,
+/// `TranslationManager` restarts the jobs that were waiting for it.
+struct TranslationModelDownloadButton: View {
+    @Environment(ReaderViewModel.self) private var viewModel
+
+    private var model: TranslationModelStore { viewModel.translationManager.model }
 
     var body: some View {
-        HStack(spacing: PanelySpacing.xs) {
-            ProgressView()
-                .controlSize(.small)
-            Text("Downloading…")
+        if model.isDownloading {
+            HStack(spacing: PanelySpacing.xs) {
+                ProgressView()
+                    .controlSize(.small)
+                if let fraction = model.fractionDownloaded {
+                    Text(verbatim: fraction.formatted(.percent.precision(.fractionLength(0))))
+                        .monospacedDigit()
+                } else {
+                    Text("Downloading…")
+                }
+            }
+        } else {
+            Button("Download (\(TranslationModelSize.text(model.model.bytes)))…") {
+                model.download()
+            }
         }
+    }
+}
+
+/// "3.35 GB" — decimal, as the download size is quoted on the web.
+enum TranslationModelSize {
+    static func text(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
     }
 }
 

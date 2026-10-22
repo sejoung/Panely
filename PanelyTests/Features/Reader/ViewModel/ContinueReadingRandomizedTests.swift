@@ -88,7 +88,9 @@ struct ContinueReadingRandomizedTests {
                 localization: base.localization,
                 translationStore: base.translationStore,
                 translationEditStore: base.translationEditStore,
-                makeSpeechLevelCorrector: base.makeSpeechLevelCorrector,
+                translator: base.translator,
+                makeTranslationModelStore: base.makeTranslationModelStore,
+                makePageAnalyzer: base.makePageAnalyzer,
                 makeReaderPreferences: base.makeReaderPreferences,
                 makeReaderPositions: base.makeReaderPositions,
                 // Strictly increasing timestamps: no ties, so the expected

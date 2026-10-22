@@ -842,8 +842,8 @@
                         />
 
                         <figcaption data-i18n="tr.caption">
-                            Shown: Panely for macOS. The Windows interface and
-                            translation engine differ.
+                            Shown: Panely for macOS. Both apps translate with
+                            the same model; the Windows interface differs.
                         </figcaption>
                     </figure>
                     <div class="platform-grid">
@@ -851,8 +851,9 @@
                             <h3>macOS</h3>
                             <p data-i18n="tr.mac">
                                 Requires macOS 26 or later. Uses Apple’s
-                                on-device text recognition and Translation, with
-                                system language packs.
+                                on-device text recognition and Google’s Gemma 4
+                                E2B, run on your Mac’s GPU after a one-time
+                                3.35 GB download.
                             </p>
                             <div class="platform-links">
                                 <a
@@ -866,11 +867,12 @@
                         <article class="info-card">
                             <h3>Windows</h3>
                             <p data-i18n="tr.win">
-                                Download the language pack once, then translate
-                                offline. Uses local OCR and M2M100 models.
-                                Translation is experimental; short lines and
-                                idioms can be inaccurate. Use Fast mode;
-                                Accurate mode is untested.
+                                Download the models once (about 3.7 GB), then
+                                translate offline with local OCR and Google’s
+                                Gemma 4 E2B. Runs on the GPU (Vulkan); without a
+                                usable GPU it runs several times slower on the
+                                CPU. Translation is
+                                experimental; misread text can be mistranslated.
                             </p>
                             <div class="platform-links">
                                 <a
@@ -1201,12 +1203,12 @@
                 "tr.lead":
                     "실험적 온디바이스 번역이 말풍선을 읽고 페이지 위에 기계 번역을 겹쳐 보여줍니다. 두 앱 모두 말풍선 수정과 번역본 내보내기를 지원하며, 번역 품질과 제공 기능은 플랫폼마다 다릅니다.",
                 "tr.caption":
-                    "macOS용 Panely 화면입니다. Windows용은 인터페이스와 번역 엔진이 다릅니다.",
+                    "macOS용 Panely 화면입니다. 두 앱은 같은 모델로 번역하며, Windows용은 인터페이스가 다릅니다.",
                 "tr.mac":
-                    "macOS 26 이상이 필요합니다. Apple의 온디바이스 텍스트 인식과 번역, 시스템 언어 팩을 사용합니다.",
+                    "macOS 26 이상이 필요합니다. Apple의 온디바이스 텍스트 인식과, 한 번 내려받은(3.35GB) Google Gemma 4 E2B를 Mac의 GPU에서 사용합니다.",
                 "tr.mac.guide": "macOS 번역 안내 →",
                 "tr.win":
-                    "언어 팩을 한 번 내려받은 뒤 오프라인으로 번역합니다. 로컬 OCR과 M2M100 모델을 사용합니다. 실험적 기능으로 짧은 대사나 관용 표현이 부정확할 수 있습니다. 검증하지 않은 정확 모드 대신 빠름 모드를 사용하세요.",
+                    "모델을 한 번 내려받은 뒤(약 3.7GB) 로컬 OCR과 Google Gemma 4 E2B로 오프라인 번역합니다. GPU(Vulkan)에서 실행하며, 쓸 수 있는 GPU가 없으면 CPU로 몇 배 느리게 번역합니다. 실험적 기능이라 원문을 잘못 읽으면 번역도 틀릴 수 있습니다.",
                 "tr.win.guide": "Windows 번역 안내 →",
                 "install.title": "설치와 첫 실행",
                 "install.lead":

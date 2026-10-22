@@ -198,8 +198,6 @@ extension ReaderViewModel {
                     scope: layout.isContinuous ? .strip : .page,
                     source: seriesPreferences.translationSource(forSeries: seriesID),
                     target: target,
-                    mode: translationMode,
-                    matchSpeechLevel: translationMatchesSpeechLevel,
                     enabled: true,
                     autoStart: false,
                     focusPage: 0
@@ -216,11 +214,6 @@ extension ReaderViewModel {
                 translationManager.start(controller)
             }
             try await waitForTranslation(controller)
-        }
-
-        // Speech levels being matched on cached pages land in the export too.
-        while controller.speechLevelProgress != nil {
-            try await Task.sleep(for: .milliseconds(500))
         }
 
         // Taken at once: the controller may be cleared when its book closes.

@@ -32,17 +32,31 @@ struct TranslationControllerPageStateTests {
         }
     }
 
-    private func reload(_ controller: TranslationController, pages: [ComicPage], target: TranslationLanguage = .korean, match: Bool) {
+    private func reload(_ controller: TranslationController, pages: [ComicPage], target: TranslationLanguage = .korean) {
         controller.reload(
             pages: pages, pageSizes: [], scope: .page, source: .japanese, target: target,
-            matchSpeechLevel: match, enabled: true, autoStart: false, focusPage: 0
+            enabled: true, autoStart: false, focusPage: 0
         )
     }
 
-    /// Every way the controller's pages change outside a job: the cache
-    /// loading, speech levels matched page by page, pages translated again,
-    /// the language changed, the cache cleared, the book closed.
-    @Test func everyChangeToAPageGetsANewRevision() async throws {
+    /// A controller whose jobs read `analyzer`'s balloons and translate them
+    /// one pass of `gate` at a time.
+    private func makeController(store: TranslationStore, gate: TranslationPermitGate, analyzer: StubPageAnalyzer = StubPageAnalyzer()) -> TranslationController {
+        let controller = TranslationController(store: store, defaults: InMemoryKeyValueStore(), translator: ScriptedTranslator(gate: gate))
+        controller.makeAnalyzer = { _, _ in analyzer }
+        controller.requestStart = {}
+        return controller
+    }
+
+    private func translatedCount(_ page: TranslatedPage?) -> Int {
+        page?.bubbles.filter { $0.translation != nil }.count ?? 0
+    }
+
+    /// Every way the controller's pages change: the cache loading, a job
+    /// filling a page in balloon by balloon, pages translated again, the
+    /// language changed, the cache cleared, the book closed.
+    @Test(.enabled(if: TranslationController.isSupportedOnThisMac))
+    func everyChangeToAPageGetsANewRevision() async throws {
         let store = try makeTemporaryTranslationStore()
         let pages = Fixture.makeImagePages(count: 4)
         for index in 0..<3 {
@@ -52,36 +66,39 @@ struct TranslationControllerPageStateTests {
             )
         }
         let gate = TranslationPermitGate()
-        let controller = TranslationController(store: store, defaults: InMemoryKeyValueStore())
-        controller.makeSpeechLevelCorrector = { _, _ in GatedSpeechLevelCorrector(gate: gate) }
-        controller.requestStart = {}
+        let controller = makeController(store: store, gate: gate)
         checkInStep(controller, since: nil, "new")
         #expect(!controller.hasPages)
 
-        reload(controller, pages: pages, match: true)
+        reload(controller, pages: pages)
         checkInStep(controller, since: nil, "reload")
         await controller.cacheTask?.value
         #expect(controller.pages.count == 3)
         checkInStep(controller, since: nil, "cache loaded")
 
-        // Matched one page at a time, each saved over its entry.
+        // The job finds page 3's balloons, then translates them one at a time.
+        var before = Snapshot(controller)
+        controller.start()
+        try await waitUntil { controller.pages[pages[3].id] != nil }
+        checkInStep(controller, since: before, "balloons found")
         for done in 1...3 {
             let before = Snapshot(controller)
             await gate.release()
-            try await waitUntil { controller.pages.values.filter { $0.speechLevelChecked == true }.count == done }
-            checkInStep(controller, since: before, "matched \(done)")
+            try await waitUntil { translatedCount(controller.pages[pages[3].id]) == done }
+            checkInStep(controller, since: before, "translated \(done)")
             let changed = controller.pages.filter { before.pages[$0.key] != $0.value }.map(\.key)
-            #expect(changed.count == 1, "one page per match")
+            #expect(changed == [pages[3].id], "only the page being translated")
             let unchanged = controller.pageRevisions.filter { !changed.contains($0.key) }
             #expect(unchanged == before.revisions.filter { !changed.contains($0.key) }, "the others keep theirs")
         }
-        try await waitUntil { controller.speechLevelProgress == nil }
+        try await waitUntil { controller.phase == .idle }
+        #expect(controller.completedPageIndices == [0, 1, 2, 3])
 
-        var before = Snapshot(controller)
+        before = Snapshot(controller)
         await controller.translateAgain(pageIndices: [1])
         checkInStep(controller, since: before, "translate one again")
         #expect(controller.pages[pages[1].id] == nil && controller.hasPages)
-        #expect(controller.pageRevisions.filter { $0.key != pages[0].id && $0.key != pages[2].id }.isEmpty)
+        #expect(Set(controller.pageRevisions.keys) == [pages[0].id, pages[2].id, pages[3].id])
         #expect(controller.pageRevisions[pages[0].id] == before.revisions[pages[0].id])
 
         before = Snapshot(controller)
@@ -91,7 +108,8 @@ struct TranslationControllerPageStateTests {
         #expect(!controller.hasPages)
         controller.setSource(.japanese)
         await controller.cacheTask?.value
-        #expect(controller.pages.count == 2)
+        // Page 3 too: the job saved it.
+        #expect(controller.pages.count == 3)
         checkInStep(controller, since: nil, "language back")
         for (id, revision) in controller.pageRevisions {
             #expect(before.revisions[id] != revision, "reloaded pages are new")
@@ -101,7 +119,7 @@ struct TranslationControllerPageStateTests {
         checkInStep(controller, since: nil, "cache cleared")
         #expect(!controller.hasPages)
 
-        reload(controller, pages: pages, match: false)
+        reload(controller, pages: pages)
         controller.clear()
         checkInStep(controller, since: nil, "closed")
         #expect(controller.pageRevisions.isEmpty)
@@ -120,8 +138,8 @@ struct TranslationControllerPageStateTests {
         }
         let korean = TranslationController(store: store, defaults: InMemoryKeyValueStore())
         let english = TranslationController(store: store, defaults: InMemoryKeyValueStore())
-        reload(korean, pages: pages, match: false)
-        reload(english, pages: pages, target: .english, match: false)
+        reload(korean, pages: pages)
+        reload(english, pages: pages, target: .english)
         await korean.cacheTask?.value
         await english.cacheTask?.value
 
@@ -132,35 +150,38 @@ struct TranslationControllerPageStateTests {
 
     /// `hasPages` is observed on its own so the toolbar and menus don't
     /// re-render with every balloon: it notifies when it flips, and only then.
-    @Test func hasPagesNotifiesOnlyWhenItFlips() async throws {
+    @Test(.enabled(if: TranslationController.isSupportedOnThisMac))
+    func hasPagesNotifiesOnlyWhenItFlips() async throws {
         let store = try makeTemporaryTranslationStore()
-        let pages = Fixture.makeImagePages(count: 2)
+        let pages = Fixture.makeImagePages(count: 3)
         for index in 0..<2 {
             try store.save(makeTranslationTestPage(pageIndex: index, bubbles: 1, label: "번역"), key: TranslationStore.key(pageID: pages[index].id, from: .japanese, to: .korean))
         }
         let gate = TranslationPermitGate()
-        let controller = TranslationController(store: store, defaults: InMemoryKeyValueStore())
-        controller.makeSpeechLevelCorrector = { _, _ in GatedSpeechLevelCorrector(gate: gate) }
-        controller.requestStart = {}
+        let controller = makeController(store: store, gate: gate)
 
         let loaded = ObservationProbe { _ = controller.hasPages }
-        reload(controller, pages: pages, match: true)
+        reload(controller, pages: pages)
         await controller.cacheTask?.value
         #expect(controller.hasPages)
         #expect(loaded.fired)
 
-        // A page's content changes (its speech level matched): `pages`
+        // A page's content changes (a balloon translated): `pages`
         // observers hear of it, `hasPages` observers don't.
+        controller.start()
+        try await waitUntil { controller.pages[pages[2].id] != nil }
         let flag = ObservationProbe { _ = controller.hasPages }
         let content = ObservationProbe { _ = controller.pages }
         await gate.release()
-        try await waitUntil { controller.pages.values.contains { $0.speechLevelChecked == true } }
+        try await waitUntil { translatedCount(controller.pages[pages[2].id]) == 1 }
         #expect(content.fired)
         #expect(!flag.fired)
+        await gate.open()
+        try await waitUntil { controller.phase == .idle }
 
-        // One of two pages goes: still something to show.
+        // Two of three pages go: still something to show.
         let stillFlag = ObservationProbe { _ = controller.hasPages }
-        await controller.translateAgain(pageIndices: [0])
+        await controller.translateAgain(pageIndices: [0, 2])
         #expect(controller.hasPages)
         #expect(!stillFlag.fired)
 
@@ -169,7 +190,6 @@ struct TranslationControllerPageStateTests {
         await controller.translateAgain(pageIndices: [1])
         #expect(!controller.hasPages)
         #expect(emptied.fired)
-        await gate.open()
     }
 }
 

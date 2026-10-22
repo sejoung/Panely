@@ -41,10 +41,9 @@ struct TranslationTextPatternTests {
     /// `TranslationStore.key` before the hex encoding was hand-rolled.
     private static func referenceKey(
         pageID: String, from source: TranslationLanguage, to target: TranslationLanguage,
-        scope: TranslationScope, mode: TranslationMode
+        scope: TranslationScope, translator: String
     ) -> String {
-        let modeTag = mode == .accurate ? "" : "|\(mode.rawValue)"
-        let composite = "\(pageID)|\(source.rawValue)>\(target.rawValue)|\(scope.rawValue)\(modeTag)|v\(TranslatedPage.formatVersion)"
+        let composite = "\(pageID)|\(source.rawValue)>\(target.rawValue)|\(scope.rawValue)|\(translator)|v\(TranslatedPage.formatVersion)"
         return SHA256.hash(data: Data(composite.utf8)).prefix(16).map { String(format: "%02x", $0) }.joined()
     }
 
@@ -135,10 +134,10 @@ struct TranslationTextPatternTests {
 
     // MARK: - Cache keys
 
-    /// Every pair, scope and mode, over page ids with the characters real
+    /// Every pair, scope and translator, over page ids with the characters real
     /// ones carry (paths, archive entries, non-ASCII names): the names
     /// cached translations are stored under mustn't change.
-    @Test func cacheKeysAreUnchangedForEveryPairScopeAndMode() {
+    @Test func cacheKeysAreUnchangedForEveryPairScopeAndTranslator() {
         let pageIDs = [
             "", "p1", "file:/Comics/One Piece/v01/001.png#1024:1700000000",
             "archive:/Comics/세평유 1화.cbz!/01.jpg#2:3", "file:/漫画/ワンピース/第1巻/０１.png", "🔥|>|v2", String(repeating: "x", count: 600),
@@ -148,9 +147,9 @@ struct TranslationTextPatternTests {
             for source in TranslationLanguage.allCases {
                 for target in TranslationLanguage.allCases {
                     for scope in [TranslationScope.page, .strip] {
-                        for mode in TranslationMode.allCases {
-                            let key = TranslationStore.key(pageID: pageID, from: source, to: target, scope: scope, mode: mode)
-                            #expect(key == Self.referenceKey(pageID: pageID, from: source, to: target, scope: scope, mode: mode))
+                        for translator in [TranslationModel.cacheRevision, "other@1+p2"] {
+                            let key = TranslationStore.key(pageID: pageID, from: source, to: target, scope: scope, translator: translator)
+                            #expect(key == Self.referenceKey(pageID: pageID, from: source, to: target, scope: scope, translator: translator))
                             checked += 1
                         }
                     }

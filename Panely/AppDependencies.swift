@@ -21,9 +21,14 @@ nonisolated struct AppDependencies {
     let translationStore: TranslationStore
     /// The reader's balloon edits. Tests point it at a temp dir.
     let translationEditStore: TranslationEditStore
-    /// Matches translations' speech levels (Apple Intelligence). Tests get
-    /// none, so they never run the on-device model.
-    let makeSpeechLevelCorrector: @Sendable (TranslationLanguage, TranslationLanguage) -> (any SpeechLevelCorrecting)?
+    /// Translates the balloons (Gemma, `GemmaTranslator`). Tests get
+    /// stand-ins, so they never load the model.
+    let translator: any BalloonTranslating
+    /// The translation model's download state. Tests point it at a temp dir.
+    let makeTranslationModelStore: @MainActor () -> TranslationModelStore
+    /// Reads balloons off pages for translation jobs; `nil` is OCR. Tests
+    /// hand jobs their balloons through this.
+    let makePageAnalyzer: (@Sendable ([ComicPage], TranslationLanguage) -> any PageAnalyzing)?
 
     // Reader collaborators are surfaced as factories so tests can swap in
     // doubles without subclassing `ReaderViewModel`. The live implementations
@@ -52,7 +57,9 @@ nonisolated struct AppDependencies {
             localization: .shared,
             translationStore: TranslationStore(),
             translationEditStore: TranslationEditStore(),
-            makeSpeechLevelCorrector: { SpeechLevelCorrectors.make(from: $0, to: $1) },
+            translator: GemmaTranslator.shared,
+            makeTranslationModelStore: { TranslationModelStore(files: GemmaTranslator.shared.files) },
+            makePageAnalyzer: nil,
             makeReaderPreferences: { ReaderPreferences(defaults: keyValueStore) },
             makeReaderPositions: { ReaderPositionStore(defaults: keyValueStore) },
             makeReadingProgress: { ReadingProgressStore(defaults: keyValueStore) },

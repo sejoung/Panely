@@ -57,11 +57,12 @@ struct KoreanLocalizationTests {
                 == "번역 중 · 3/20페이지 · 약 4분 남음"
         )
         #expect(String(localized: "\(done) of \(total) pages translated", bundle: ko) == "20페이지 중 3페이지 번역됨")
-        let from = "일본어"
-        let to = "한국어"
+        #expect(String(localized: "Download the translation model to translate.", bundle: ko) == "번역하려면 번역 모델을 다운로드하세요.")
+        let downloaded = "1.2 GB"
+        let size = "3.35 GB"
         #expect(
-            String(localized: "Download the \(from) → \(to) language pack to translate.", bundle: ko)
-                == "번역하려면 일본어 → 한국어 언어팩을 다운로드하세요."
+            String(localized: "Downloading the translation model · \(downloaded) of \(size)", bundle: ko)
+                == "번역 모델 다운로드 중 · 3.35 GB 중 1.2 GB"
         )
     }
 

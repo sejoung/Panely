@@ -235,9 +235,23 @@ enum TranslationSnapshotContent {
                 key: TranslationStore.key(pageID: vm.source.pages[index].id, from: .japanese, to: .english)
             )
         }
+        try installModel(in: vm)
         vm.translationEnabled = true
         try await waitUntil { vm.translation.completedPageCount >= pages.count }
         vm.imageLoader.currentImages = pages.map(translatedImage)
         return vm
+    }
+
+    /// The translation model "downloaded", as most readers will see the
+    /// panel and Settings: a file of the pinned size — sparse, so it takes no
+    /// disk space — which is all they look at.
+    static func installModel(in vm: ReaderViewModel) throws {
+        let files = vm.translationManager.model.files
+        try FileManager.default.createDirectory(at: files.directory, withIntermediateDirectories: true)
+        FileManager.default.createFile(atPath: files.fileURL.path, contents: nil)
+        let handle = try FileHandle(forWritingTo: files.fileURL)
+        try handle.truncate(atOffset: UInt64(files.model.bytes))
+        try handle.close()
+        vm.translationManager.model.refresh()
     }
 }

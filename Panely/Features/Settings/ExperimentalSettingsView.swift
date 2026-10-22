@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Experimental features — currently the translation assist. Off by default;
 /// the toggle is disabled below macOS 26, where Vision can't read vertical
-/// text and Apple Translation can't run outside SwiftUI.
+/// text.
 @MainActor
 struct ExperimentalSettingsView: View {
     let viewModel: ReaderViewModel
@@ -12,6 +12,7 @@ struct ExperimentalSettingsView: View {
     @State private var editedPageCount: Int?
     @State private var isDeletingEdits = false
     @State private var confirmsDeletingEdits = false
+    @State private var confirmsDeletingModel = false
 
     private var locale: Locale { viewModel.localization.locale }
 
@@ -22,35 +23,7 @@ struct ExperimentalSettingsView: View {
         )
     }
 
-    private var matchesSpeechLevel: Binding<Bool> {
-        Binding(
-            get: { viewModel.translationMatchesSpeechLevel },
-            set: { viewModel.translationMatchesSpeechLevel = $0 }
-        )
-    }
-
-    private var mode: Binding<TranslationMode> {
-        Binding(
-            get: { viewModel.translationMode.effective },
-            set: { viewModel.translationMode = $0 }
-        )
-    }
-
-    /// What matching does, or why it can't run here.
-    private var speechLevelNote: LocalizedStringKey {
-        switch SpeechLevelAvailability.current {
-        case .available:
-            "Japanese ↔ Korean: Apple Translation tends to make every line polite. Apple Intelligence rewrites the endings to match the original — casual stays casual — on your Mac. A rewrite is used only if it keeps the same words."
-        case .appleIntelligenceOff:
-            "Needs Apple Intelligence — turn it on in System Settings › Apple Intelligence & Siri."
-        case .notEligible:
-            "Needs Apple Intelligence, which this Mac doesn't support."
-        case .notReady:
-            "Apple Intelligence is still getting ready. Try again in a little while."
-        case .unsupportedSystem:
-            "Requires macOS 26 or later."
-        }
-    }
+    private var model: TranslationModelStore { viewModel.translationManager.model }
 
     var body: some View {
         Form {
@@ -70,43 +43,51 @@ struct ExperimentalSettingsView: View {
             if viewModel.translationFeatureAvailable {
                 Section("Translation") {
                     TranslationTargetPicker(viewModel: viewModel)
-                    Picker("Translation Mode", selection: mode) {
-                        Text("Fast").tag(TranslationMode.fast)
-                        Text("Accurate").tag(TranslationMode.accurate)
-                    }
-                    .disabled(!TranslationMode.isFastAvailable)
-                    Text(TranslationMode.isFastAvailable
-                        ? "Fast translates a volume in about a minute. Accurate reads idioms and nuance better but takes about 20 times as long. Each mode downloads its own language packs."
-                        : "Fast translation requires macOS 26.4 or later.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text("Language packs are downloaded from the translation panel the first time a book is translated. Manage downloaded packs in System Settings › General › Language & Region › Translation Languages.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Toggle("Match Speech Level", isOn: matchesSpeechLevel)
-                        .disabled(SpeechLevelAvailability.current != .available)
-                    Text(speechLevelNote)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                     Text("The default language is what new series are shown in. Each series can be shown in another language, and each book's own language is detected the first time it's translated — both from the translation button in the toolbar, remembered per series.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
-                let downloading = viewModel.translationManager.languagePacks.downloading
-                if !downloading.isEmpty {
-                    Section("Language Packs") {
-                        ForEach(downloading, id: \.self) { pack in
-                            LabeledContent {
-                                LanguagePackDownloadingLabel()
-                            } label: {
-                                Text(verbatim: "\(pack.source.displayName(in: locale)) → \(pack.target.displayName(in: locale))")
-                            }
+                Section("Translation Model") {
+                    LabeledContent(model.model.displayName) {
+                        switch model.state {
+                        case .installed:
+                            Text("Downloaded · \(TranslationModelSize.text(model.model.bytes))")
+                        case .notInstalled, .failed:
+                            Text("Not downloaded")
+                        case .downloading, .verifying:
+                            EmptyView()
                         }
-                        Text(LanguagePackDownloadingLabel.note)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                     }
+                    if model.isDownloading {
+                        TranslationModelDownloadProgress(model: model)
+                    } else if model.isInstalled {
+                        Button("Delete Translation Model…", role: .destructive) {
+                            confirmsDeletingModel = true
+                        }
+                        .confirmationDialog("Delete the translation model?", isPresented: $confirmsDeletingModel) {
+                            Button("Delete Model", role: .destructive) {
+                                Task { await deleteModel() }
+                            }
+                        } message: {
+                            Text("Books already translated stay translated. Translating anything else downloads the model again (\(TranslationModelSize.text(model.model.bytes))).")
+                        }
+                    } else {
+                        Button("Download (\(TranslationModelSize.text(model.model.bytes)))") {
+                            model.download()
+                        }
+                    }
+                    if case let .failed(reason) = model.state {
+                        Text("The download stopped: \(reason)")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                    Text("One model translates every language pair on your Mac. It reads each page's balloons together with the lines before them, so names and each speaker's speech level — polite or casual — carry over. Downloaded once from Hugging Face; nothing you read leaves your Mac. Uses about 3.5 GB of memory while translating.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("Gemma 4 by Google (Apache License 2.0), run with llama.cpp (MIT License).")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 Section("Your Edits") {
@@ -156,9 +137,14 @@ struct ExperimentalSettingsView: View {
         .frame(width: 420)
         .padding(.vertical, 12)
         .task(id: viewModel.translationFeatureAvailable) {
+            model.refresh()
             await refreshCacheSize()
             await refreshEditedPageCount()
         }
+    }
+
+    private func deleteModel() async {
+        await viewModel.translationManager.deleteModel()
     }
 
     private func refreshEditedPageCount() async {

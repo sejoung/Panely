@@ -158,7 +158,6 @@ struct ReaderViewModelTranslationTests {
         #expect(vm.translationOverlayPages.isEmpty)
         #expect(vm.translatedPageIndices.isEmpty)
         #expect(vm.toolbarState().translation == nil)
-        #expect(vm.translationMode == .fast)
     }
 
     @Test func globalSettingsPersist() {
@@ -166,12 +165,10 @@ struct ReaderViewModelTranslationTests {
         let vm = makeTestViewModel(keyValueStore: defaults)
         vm.translationEnabled = true
         vm.translationTargetLanguage = .english
-        vm.translationMode = .accurate
 
         let reloaded = makeTestViewModel(keyValueStore: defaults)
         #expect(reloaded.translationEnabled)
         #expect(reloaded.translationTargetLanguage == .english)
-        #expect(reloaded.translationMode == .accurate)
     }
 
     @Test func targetFollowsTheInterfaceLanguageUntilChosen() {

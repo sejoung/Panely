@@ -4,6 +4,12 @@ import Foundation
 import ImageIO
 import Vision
 
+/// Reads a unit's balloons. `PageAnalyzer` in the app; tests hand balloons
+/// to a job directly.
+nonisolated protocol PageAnalyzing: Sendable {
+    func analyze(_ unit: TranslationUnit, plan: TranslationPlan) async throws -> [PageAnalysis]
+}
+
 /// Balloons found on one page by one unit of work, still untranslated.
 nonisolated struct PageAnalysis: Sendable {
     let pageIndex: Int
@@ -23,7 +29,7 @@ nonisolated struct PageAnalysis: Sendable {
 /// — and bands read side by side (fast mode) share a page being decoded.
 /// Page scope reads each page once, so it keeps none.
 @available(macOS 26.0, *)
-actor PageAnalyzer {
+actor PageAnalyzer: PageAnalyzing {
     private let pages: [ComicPage]
     private let language: TranslationLanguage
     private var decoded: [(index: Int, image: CGImage)] = []

@@ -23,17 +23,17 @@ nonisolated struct TranslationStore: Sendable {
 
     /// The scope is part of the key: a slice analyzed on its own and the same
     /// slice read as part of a strip give different (cut vs whole) balloons.
-    /// So is the mode, so switching to accurate translates again; accurate
-    /// keeps the key it had before modes existed.
+    /// So is what translated it (`TranslationModel.cacheRevision`): another
+    /// model or prompt translates the book again rather than mixing in old
+    /// results.
     static func key(
         pageID: String,
         from source: TranslationLanguage,
         to target: TranslationLanguage,
         scope: TranslationScope = .page,
-        mode: TranslationMode = .accurate
+        translator: String = TranslationModel.cacheRevision
     ) -> String {
-        let modeTag = mode == .accurate ? "" : "|\(mode.rawValue)"
-        let composite = "\(pageID)|\(source.rawValue)>\(target.rawValue)|\(scope.rawValue)\(modeTag)|v\(TranslatedPage.formatVersion)"
+        let composite = "\(pageID)|\(source.rawValue)>\(target.rawValue)|\(scope.rawValue)|\(translator)|v\(TranslatedPage.formatVersion)"
         return hex(SHA256.hash(data: Data(composite.utf8)).prefix(16))
     }
 

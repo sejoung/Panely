@@ -27,8 +27,6 @@ final class ReaderPreferences {
     static let wheelPageTurnKey = "panely.wheelPageTurn"
     static let appLanguageKey = "panely.appLanguage"
     static let translationEnabledKey = "panely.translation.enabled"
-    static let translationMatchesSpeechLevelKey = "panely.translation.matchSpeechLevel"
-    static let translationModeKey = "panely.translation.mode"
     static let translationTargetLanguageKey = "panely.translation.targetLanguage"
     static let translationOverlayVisibleKey = "panely.translation.overlayVisible"
     static let translationBalloonTipDismissedKey = "panely.translation.balloonTipDismissed"
@@ -134,25 +132,6 @@ final class ReaderPreferences {
         }
     }
 
-    /// Match each translation's speech level to the original's with the
-    /// on-device model (`SpeechLevel`). On by default: it only ever changes
-    /// a balloon when the rewrite checks out, and only where Apple
-    /// Intelligence is available.
-    var translationMatchesSpeechLevel: Bool = true {
-        didSet {
-            defaults.set(translationMatchesSpeechLevel, forKey: Self.translationMatchesSpeechLevelKey)
-        }
-    }
-
-    /// Which translation model runs. Fast by default: the assist is for
-    /// following the story, and the accurate model takes ~20× as long (see
-    /// `TranslationMode`).
-    var translationMode: TranslationMode = .fast {
-        didSet {
-            defaults.set(translationMode.rawValue, forKey: Self.translationModeKey)
-        }
-    }
-
     /// Language to translate into; `nil` follows the interface language
     /// (see `ReaderViewModel.translationTargetLanguage`).
     var translationTargetLanguage: TranslationLanguage? {
@@ -242,13 +221,6 @@ final class ReaderPreferences {
         }
         if let value = storedDefaults[Self.translationEnabledKey] as? Bool {
             translationEnabled = value
-        }
-        if let value = storedDefaults[Self.translationMatchesSpeechLevelKey] as? Bool {
-            translationMatchesSpeechLevel = value
-        }
-        if let raw = storedDefaults[Self.translationModeKey] as? String,
-           let stored = TranslationMode(rawValue: raw) {
-            translationMode = stored
         }
         if let raw = storedDefaults[Self.translationTargetLanguageKey] as? String,
            let stored = TranslationLanguage(rawValue: raw) {

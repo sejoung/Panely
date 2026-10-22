@@ -43,14 +43,14 @@ struct TranslationStoreTests {
         #expect(base != TranslationStore.key(pageID: "p2", from: .japanese, to: .korean))
         #expect(base != TranslationStore.key(pageID: "p1", from: .japanese, to: .english))
         #expect(base != TranslationStore.key(pageID: "p1", from: .chineseSimplified, to: .korean))
-        // Accurate keeps the key from before modes existed; fast has its own.
-        #expect(base == TranslationStore.key(pageID: "p1", from: .japanese, to: .korean, mode: .accurate))
-        #expect(base != TranslationStore.key(pageID: "p1", from: .japanese, to: .korean, mode: .fast))
+        // What translated it: another model or prompt translates again.
+        #expect(base == TranslationStore.key(pageID: "p1", from: .japanese, to: .korean, translator: TranslationModel.cacheRevision))
+        #expect(base != TranslationStore.key(pageID: "p1", from: .japanese, to: .korean, translator: "other@1+p1"))
     }
 
     @Test func keysAreTheHashsFirstHalfInHex() {
         let key = TranslationStore.key(pageID: "p1", from: .japanese, to: .korean)
-        let composite = "p1|\(TranslationLanguage.japanese.rawValue)>\(TranslationLanguage.korean.rawValue)|\(TranslationScope.page.rawValue)|v\(TranslatedPage.formatVersion)"
+        let composite = "p1|\(TranslationLanguage.japanese.rawValue)>\(TranslationLanguage.korean.rawValue)|\(TranslationScope.page.rawValue)|\(TranslationModel.cacheRevision)|v\(TranslatedPage.formatVersion)"
         let expected = SHA256.hash(data: Data(composite.utf8)).prefix(16).map { String(format: "%02x", $0) }.joined()
         // Cached entries are found by these names: they mustn't change.
         #expect(key == expected)

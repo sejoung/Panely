@@ -241,16 +241,21 @@ always one click (or `⇧⌘T`) away. Nothing leaves the Mac and nothing is
 written into your files.
 
 - **On-device** — Vision's document recognizer (OCR, including vertical
-  Japanese) + Apple Translation. A missing language pack is downloaded once
-  through the system prompt, from the translation panel or the status banner
-- **Fast or Accurate** (Settings → Experimental → **Translation Mode**) —
-  Fast, the default, does a volume in about a minute; Accurate reads idioms
-  better at about 20× the time. Each mode has its own language packs; Fast
-  needs macOS 26.4 (before that every job is Accurate)
+  Japanese) + Google's **Gemma 4 E2B** run in the app with llama.cpp on the
+  GPU. The model (3.35 GB) is downloaded once, with a progress bar, from the
+  translation panel, the status banner or **Settings → Experimental**, and
+  checked against a pinned SHA-256 before it's used
+- **One model, in context** — every language pair, no modes. A page's
+  balloons go to the model together (up to 16 at a time) with the last few
+  lines already translated, so names, who's speaking and each speaker's
+  speech level carry over: casual lines stay casual, polite ones polite.
+  About 0.25 s a balloon on an M1 Pro, each balloon shown as soon as its line
+  is written; the model is loaded while OCR reads the first page and let go
+  after two idle minutes
 - **One place per job** — the toolbar's translate button switches original ↔
   translation (`⇧⌘T`); the language name beside it ("Korean ▾") is a menu to
   switch or add languages and open the panel or edit mode. The **translation panel** is only about translating this book:
-  one big button (translate / download the pack / pause / resume) with a
+  one big button (download the model / translate / pause / resume) with a
   single status line, the **View** list (the original or the book's
   languages; other languages start and stop from their **⋯** menu), and a
   collapsed **This Book & Series** (the book's language, auto-translate,
@@ -309,8 +314,8 @@ written into your files.
   overlapping bands
 - **Visible progress** — balloons appear as soon as OCR finds them and fill in
   one by one (pending ones pulse); a progress pill with a time estimate, a
-  first-run notice while models load, page badges in the thumbnail sidebar
-  and a bar under the page slider
+  first-run notice while models load, and page badges in the thumbnail
+  sidebar
 - **Balloons found by a detector** — a model trained on comics (bundled,
   run on the GPU, ~0.1 s a page alongside OCR) tells which OCR lines share a
   balloon: columns of one balloon are joined in reading order and
@@ -320,12 +325,6 @@ written into your files.
   room is empty, so a line OCR missed is never painted over. Without the
   detector (or where it finds nothing) the layout rules group the text as
   before
-- **Speech level matched** (Japanese ↔ Korean, Apple Intelligence) — Apple
-  Translation leans polite whatever the original says; Panely reads the
-  original's level from its endings and has the on-device model rewrite only
-  the endings, keeping a rewrite only if the words, tense, negation and
-  sentence type survive (checked in code). Cached pages are matched when
-  opened
 - **Sound effects** (スッ, パチパチ…) are left untranslated — OCR reads few
   of the drawn ones, and only as fragments (11 on 48 pages measured)
 - **Limits are shown where they apply** — a book inside an archive pauses
@@ -358,8 +357,9 @@ written into your files.
 
 - **macOS 14** (Sonoma) or later
 - **macOS 26** or later for the experimental translation assist
-- **Xcode 26.4** or later (for building from source — the translation code
-  uses APIs from the macOS 26.4 SDK)
+- **Xcode 26.4** or later (for building from source)
+- For the translation assist, an Apple Silicon Mac is recommended: the model
+  runs on the GPU and uses about 3.5 GB of memory while translating
 
 ## Installing a release
 
@@ -417,6 +417,10 @@ Panely uses Swift Package Manager:
   Vendored as a local package in `Packages/UnrarKit` (upstream ships no
   SwiftPM manifest) and built against RARLAB's current UnRAR source; see
   `Packages/UnrarKit/README.md` for versions and local patches
+- **[llama.cpp](https://github.com/ggml-org/llama.cpp)** (MIT) — runs the
+  translation model in the app, on the GPU (Metal). Its own prebuilt
+  XCFramework, pinned to one release by URL and checksum in
+  `Packages/LlamaCpp/Package.swift`
 
 Bundled model (translation assist):
 
@@ -426,6 +430,14 @@ Bundled model (translation assist):
   as `Panely/Resources/ComicTextDetector.mlpackage` (8-bit, ~42 MB) by
   `scripts/convert-text-detector.py`; the script's header explains the
   workarounds and how its boxes were checked against the original
+
+Downloaded model (translation assist, once, from the translation panel or
+Settings — not part of the app):
+
+- **[Gemma 4 E2B](https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf)**
+  by Google (Apache-2.0) — instruction-tuned, QAT 4-bit GGUF, 3.35 GB.
+  Pinned to one revision, size and SHA-256 in `TranslationModel` (the same
+  file the Windows version uses) and checked before it's installed
 
 Xcode resolves them automatically on first build.
 
@@ -504,13 +516,17 @@ Terminal) and move the result straight to `/Applications`.
 scripts/test.sh          # fast tier (= plain `xcodebuild test`, what CI runs)
 scripts/test-slow.sh     # + slow tier: real FSEvents, real Vision OCR, every random seed
 scripts/test-visual.sh   # screenshot comparisons against PanelyTests/Snapshots/Reference/
+scripts/test-model.sh [--model PATH]             # the real translation model (Gemma via llama.cpp)
 scripts/benchmark-translation.sh [--book PATH]   # time each translation stage and whole jobs
 ```
 
 The tiers are set in `PanelyTests/TestTiers.swift`; the slow and visual tiers
 are opt-in through `PANELY_SLOW_TESTS=1` / `PANELY_VISUAL_TESTS=1` (the
 benchmark, `PanelyTests/Benchmarks/TranslationBenchmarkTests.swift`, through
-its own `PANELY_BENCHMARK=1`), which the
+its own `PANELY_BENCHMARK=1`; the real model's tests,
+`GemmaTranslatorIntegrationTests`, through `PANELY_MODEL_TESTS=1` and only
+with the model downloaded — `--model` hard-links a GGUF you already have into
+the Debug app's sandbox), which the
 scripts pass as `TEST_RUNNER_…` so xcodebuild hands them to the test process.
 The fast tier takes about 6–8 s of test time; the visual tier about 10 s; the
 slow tier adds about 3 s on top of the fast one (its FSEvents tests mostly wait).
@@ -730,7 +746,8 @@ The suites cover:
   job manager (one job per book × language, background jobs, reattach,
   queueing, books that must stay open), cache keys and storage, overlay
   geometry and hit testing, series volume matching, balloon detection and
-  missed-text rereads, speech-level matching, balloon edits, AI chat round
+  missed-text rereads, the Gemma prompt and reading its answer, batched
+  jobs with context, the model's download and checks, balloon edits, AI chat round
   trips, translated-book export, and the reader wiring
   (per-series languages, original ↔ translation, overlays following the
   images on screen)
@@ -881,28 +898,28 @@ Panely/
 │   ├── Translation/                    # experimental translation assist (macOS 26+)
 │   │   ├── TranslationManager.swift    # app-wide jobs: one per book × language, background + queue
 │   │   ├── TranslationController.swift # one book into one language: plan, OCR → translate, progress
-│   │   ├── TranslationStore.swift      # per-page JSON cache under Caches (page id + languages + scope + mode)
+│   │   ├── TranslationStore.swift      # per-page JSON cache under Caches (page id + languages + scope + model)
 │   │   ├── TranslationEdits.swift      # the reader's balloon edits for the open book
 │   │   ├── TranslationEditStore.swift  # edits on disk under Application Support (survive cache clears)
-│   │   ├── LanguagePackDownloads.swift # app-wide language pack status and downloads
+│   │   ├── TranslationModelStore.swift # the model's download: progress, hash check, install, delete
 │   │   ├── SeriesVolumeMatcher.swift   # which neighbours are volumes of the same series
-│   │   ├── Model/                      # TranslationLanguage, TranslationMode (fast / accurate),
+│   │   ├── Model/                      # TranslationLanguage, TranslationModel (pinned Gemma GGUF + files),
 │   │   │                               # TranslatedPage / TranslatedBubble, PageEdits
 │   │   ├── AIChat/                     # AIChatExchange: balloons out to the reader's AI chat, its reply back in
 │   │   ├── Export/                     # translated copies: TranslationExportManager (jobs, history, folder),
 │   │   │                               # TranslationExportJob (options, records), TranslationExportWriter
 │   │   │                               # (CBZ / ZIP / folder), TranslatedPageRenderer
 │   │   ├── Pipeline/                   # OCRTiling, TranslationPlan (page / strip), PageAnalyzer,
-│   │   │                               # PageTextRecognizer (Vision), PageTranslator (Translation),
-│   │   │                               # BubbleGrouper, BalloonDetector (Core ML), MissedText, SpeechLevel,
+│   │   │                               # PageTextRecognizer (Vision), GemmaTranslator (llama.cpp + prompt),
+│   │   │                               # BubbleGrouper, BalloonDetector (Core ML), MissedText,
 │   │   │                               # BubbleBackgroundSampler, TextClassifiers
 │   │   ├── Viewer/                     # TranslationOverlayView (+ layout, TranslationPatchPainter), balloon popover
 │   │   └── UI/                         # TranslationPanel, language rows, progress pill, job list, edit-mode bar,
 │   │                                   # export sheet, AI chat sheet, Jobs window
 │   ├── Settings/
 │   │   ├── SettingsView.swift          # General + Library + Storage + Diagnostics + Experimental tabs
-│   │   ├── ExperimentalSettingsView.swift # translation assist: on/off, target language, mode, speech level,
-│   │   │                                  # language packs, your edits, cache
+│   │   ├── ExperimentalSettingsView.swift # translation assist: on/off, target language, the model
+│   │   │                                  # (download / delete), your edits, cache
 │   │   ├── GeneralSettingsView.swift   # interface language picker (live)
 │   │   ├── LibrarySettingsView.swift   # reopen-last-folder toggle + Forget Now
 │   │   ├── StorageSettingsView.swift   # Storage settings UI + cache size / clear controls
@@ -968,7 +985,8 @@ PanelyTests/                            # mirrors the source tree
 │                                       # LibraryTreeScan, bookmark mount policy, legacy formats,
 │                                       # LibrarySidebar(Update)Rendering
 ├── Features/Settings/                  # CacheMaintenance, diagnostic report export
-├── Features/Translation/               # OCR tiling, grouping, balloon detection, missed text, speech level,
+├── Features/Translation/               # OCR tiling, grouping, balloon detection, missed text, Gemma prompt,
+│                                       # model download, batched jobs (stand-in translator),
 │                                       # classifiers, plan, controller, manager, store, edits, export,
 │                                       # AI chat, overlay drawing / hit testing, series matching, reader wiring
 └── Features/Reader/
@@ -1006,6 +1024,7 @@ scripts/
 ├── test.sh                             # fast test tier (what CI runs)
 ├── test-slow.sh                        # fast + slow tiers (real FSEvents / OCR, all seeds)
 ├── test-visual.sh                      # screenshot comparisons only
+├── test-model.sh                       # the real translation model's tests (opt-in, needs the model)
 ├── benchmark-translation.sh            # translation timings per stage / per job (opt-in benchmark)
 ├── generate-snapshots.sh               # manual capture launcher (--list / --only / --output)
 ├── manual-snapshots.py                 # selection, PNG validation and copying (Python stdlib)
@@ -1017,6 +1036,7 @@ scripts/
 └── release.sh                          # bump + tag + push automation
 
 Packages/UnrarKit/                      # vendored UnrarKit + RARLAB unrar source as a local Swift package
+Packages/LlamaCpp/                      # llama.cpp's prebuilt XCFramework, pinned by URL + checksum
 
 .github/
 ├── FUNDING.yml                         # GitHub Sponsors (sejoung)
@@ -1052,27 +1072,32 @@ Panely.entitlements                     # sandbox + user-selected read-write + a
   switches and several languages coexist; it runs one job at a time, the one
   on screen first. A controller cuts the book into units (`TranslationPlan`:
   one page each, or overlapping bands of the vertical strip so balloons split
-  across image slices are read whole), OCRs the next unit while translating the
-  current one balloon by balloon (Apple Translation handles one sentence at a
-  time however it's called — measured; `TranslationMode` picks its
-  low-latency model, ~0.03 s a balloon on macOS 26.4+, or the high-fidelity
-  one, ~0.6 s), and always picks the next unit at or after
-  the page being read. Work runs in a detached task and reports back to the
+  across image slices are read whole), OCRs the next units while translating the
+  current one, and always picks the next unit at or after the page being
+  read. A unit's new lines go to the model together, up to 16 at a time, with
+  the job's last six translations as context; lines seen earlier in the book
+  are reused. Work runs in a detached task and reports back to the
   main actor under a generation counter. Per unit, `PageAnalyzer` (an actor)
   reads the text with `PageTextRecognizer` (Vision's document recognizer, tall
   pages in `OCRTiling` bands), finds balloons with `BalloonDetector` (the
   bundled Core ML `ComicTextDetector`), groups lines into balloons with
   `BubbleGrouper`, rereads detector boxes OCR missed (`MissedText`), leaves
   sound effects as drawn (`SoundEffectClassifier`) and samples each balloon's
-  background tone (`BubbleBackgroundSampler`); `PageTranslator`
-  then translates each balloon, and `SpeechLevel` optionally rewrites
-  Japanese ↔ Korean translations to the original's politeness level with the
-  on-device model (Apple Intelligence). `LanguagePackDownloads` (on the
-  manager) tracks which language packs are installed or downloading. The viewer only reads
+  background tone (`BubbleBackgroundSampler`). `GemmaTranslator` (an actor on
+  its own thread) then runs Gemma 4 E2B with llama.cpp on the GPU: one model
+  for the app, loaded while OCR reads the first page and let go after two idle
+  minutes, one context reused with its memory cleared per request, greedy
+  decoding. The prompt (`GemmaPrompt`, the same as the Windows version's) asks
+  for numbered `[n] translation` lines and for each speaker's speech level to
+  be kept; lines are read off the output as they're written, so each balloon
+  shows the moment it's done, and a line the model skips is asked for again
+  on its own. `TranslationModelStore` (on the manager) downloads the pinned
+  GGUF with progress, checks its size and SHA-256 and moves it into
+  Application Support; jobs waiting for it restart once it's in. The viewer only reads
   `TranslatedPage`s: `ImageStackView` hosts a `TranslationOverlayView` per live
   page, above every image so strip balloons can cross slice boundaries.
   Finished pages are cached under Caches per page id + languages + scope +
-  mode (`TranslationStore`); the reader's balloon edits (`PageEdits`, via
+  model revision and prompt version (`TranslationStore`); the reader's balloon edits (`PageEdits`, via
   `TranslationEdits`) are kept apart in `TranslationEditStore` under
   Application Support and laid over them for display, so clearing the cache
   or translating again never loses them. `AIChatExchange` round-trips a
@@ -1086,7 +1111,7 @@ Panely.entitlements                     # sandbox + user-selected read-write + a
   while tests can inject protocol-backed services (`ExtractionCacheManaging`,
   `SecurityScopedBookmarking`, `LibraryTreeLoading`, `KeyValueStoring`,
   `SystemSettingsReading`, `SourceChangeMonitoring`, `LibraryDirectoryWatching`,
-  `FilePicking`, `SpeechLevelCorrecting`), their own `AppLocalization`, and
+  `FilePicking`, `BalloonTranslating`, `PageAnalyzing`), their own `AppLocalization`, and
   temp-dir `TranslationStore` / `TranslationEditStore` roots without touching
   real app preferences, cache roots, sandbox bookmarks, or the on-device model.
 - **`nonisolated` core types** — `ComicPage`, `FolderLoader`, `ArchiveLoader`,

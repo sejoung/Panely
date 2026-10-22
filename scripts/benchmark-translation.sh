@@ -1,21 +1,24 @@
 #!/usr/bin/env bash
 #
 # Time the translation pipeline: each stage on its own (page read, decode,
-# balloon detection, OCR, the full analysis, translation and speech-level
-# rewrites per balloon) and whole translation jobs, the way the app runs them.
+# balloon detection, OCR, the full analysis, loading the model and
+# translating balloons in chunks) and whole translation jobs, the way the app
+# runs them.
 #
 # Runs PanelyTests/TranslationBenchmarkTests, which is off in every ordinary
 # test run: it's enabled for this run's test process only, through
 # TEST_RUNNER_-prefixed variables (xcodebuild passes them on to the tests
 # with the prefix dropped).
 #
-# Needs Apple Translation's language packs for the pairs measured (ja→ko for
-# the synthetic pages, the book's pair for --book; fast mode) and Apple
-# Intelligence for speech levels. What couldn't run is reported as skipped.
+# Needs the translation model (Gemma 4 E2B GGUF) in the test host's sandbox:
+# downloaded once in the Debug app (Settings › Experimental), or linked in
+# from a file you already have with --model. What couldn't run is reported
+# as skipped.
 #
 # The test host is sandboxed, so a --book is copied into the sandbox's
 # temporary folder for the run and deleted afterwards. The book itself is
-# only read.
+# only read. --model is hard-linked (no copy) into the sandbox's Application
+# Support, where the Debug app finds it too.
 #
 # Usage:
 #   scripts/benchmark-translation.sh [options]
@@ -26,10 +29,9 @@
 #   --book-first N       first page (default 0)
 #   --book-pair SRC-DST  the book's language pair (default ko-ja)
 #   --pages N            synthetic pages (default 40)
-#   --parts LIST         any of stages, job, speechConcurrency (default
-#                        stages,job; speechConcurrency times the model
-#                        answering 1–4 rewrites at a time, after stages)
-#   --no-speech-level    jobs don't match speech levels
+#   --parts LIST         any of stages, job (default stages,job)
+#   --model PATH         the model file (gemma-4-E2B_q4_0-it.gguf) to link in
+#   --samples N          print N of the job's balloons and their translations
 #   --runs N             repeat the test run N times (default 1)
 #   --label TEXT         tag on every result line
 #   --optimize           build with SWIFT_OPTIMIZATION_LEVEL=-O (Debug otherwise)
@@ -53,7 +55,8 @@ BOOK_FIRST=0
 BOOK_PAIR="ko-ja"
 PAGES=40
 PARTS="stages,job"
-SPEECH_LEVEL=1
+MODEL=""
+SAMPLES=0
 RUNS=1
 LABEL="run"
 OPTIMIZE=0
@@ -68,7 +71,8 @@ while [[ $# -gt 0 ]]; do
     --book-pair) BOOK_PAIR="$2"; shift 2 ;;
     --pages) PAGES="$2"; shift 2 ;;
     --parts) PARTS="$2"; shift 2 ;;
-    --no-speech-level) SPEECH_LEVEL=0; shift ;;
+    --model) MODEL="$2"; shift 2 ;;
+    --samples) SAMPLES="$2"; shift 2 ;;
     --runs) RUNS="$2"; shift 2 ;;
     --label) LABEL="$2"; shift 2 ;;
     --optimize) OPTIMIZE=1; shift ;;
@@ -102,8 +106,17 @@ export TEST_RUNNER_PANELY_BENCHMARK=1
 export TEST_RUNNER_PANELY_BENCHMARK_LABEL="$LABEL"
 export TEST_RUNNER_PANELY_BENCHMARK_PAGES="$PAGES"
 export TEST_RUNNER_PANELY_BENCHMARK_PARTS="$PARTS"
-export TEST_RUNNER_PANELY_BENCHMARK_SPEECH_LEVEL="$SPEECH_LEVEL"
+export TEST_RUNNER_PANELY_BENCHMARK_SAMPLES="$SAMPLES"
 export TEST_RUNNER_PANELY_BENCHMARK_BOOK=""
+
+if [[ -n "$MODEL" ]]; then
+  # Where TranslationModelFiles looks (its id and file name).
+  MODEL_DIR="$SANDBOX/Library/Application Support/panely-models/gemma-4-e2b-it-q4_0"
+  mkdir -p "$MODEL_DIR"
+  if [[ ! -e "$MODEL_DIR/gemma-4-E2B_q4_0-it.gguf" ]]; then
+    ln "$MODEL" "$MODEL_DIR/gemma-4-E2B_q4_0-it.gguf" 2>/dev/null || cp "$MODEL" "$MODEL_DIR/gemma-4-E2B_q4_0-it.gguf"
+  fi
+fi
 
 SANDBOX_BOOK_DIR=""
 cleanup() {

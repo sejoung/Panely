@@ -379,7 +379,7 @@ struct SnapshotGalleryTests {
         )
         exports.add(oneShot)
         oneShot.setStage(.failed(
-            TranslationController.Notice.needsLanguageDownload(.japanese, .korean).message(locale: Locale(identifier: "en"))
+            TranslationController.Notice.needsModelDownload.message(locale: Locale(identifier: "en"))
         ))
         try await render(
             JobsWindowView()

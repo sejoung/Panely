@@ -29,11 +29,6 @@ struct ReaderSliderOverlay: View {
                     value: sliderBinding,
                     range: 0...Double(viewModel.totalPages - 1)
                 )
-
-                let translated = viewModel.translatedPageIndices
-                if !translated.isEmpty {
-                    TranslatedPagesBar(pageCount: viewModel.totalPages, translated: translated)
-                }
             }
             .padding(.horizontal, PanelySpacing.xl)
             .padding(.bottom, PanelySpacing.lg)

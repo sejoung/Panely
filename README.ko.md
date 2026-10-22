@@ -217,15 +217,17 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
 대신하지 않음. 원문은 언제나 클릭 한 번(또는 `⇧⌘T`)으로 볼 수 있고, 어떤
 데이터도 Mac 밖으로 나가지 않으며 원본 파일도 건드리지 않음.
 
-- **기기 내 처리** — Vision 문서 인식(OCR, 세로쓰기 일본어 포함) + Apple
-  Translation. 언어팩이 없으면 번역 패널이나 상태 배너에서 시스템 안내로 한 번
-  다운로드
-- **빠르게 / 정확하게**(설정 → 실험적 기능 → **번역 방식**) — 기본인 빠르게는 한 권을
-  1분 정도에, 정확하게는 관용 표현을 더 잘 옮기지만 20배 정도 걸림. 방식마다 언어팩이
-  따로이며, 빠르게는 macOS 26.4 이상 필요(그 전에는 모두 정확하게)
+- **기기 내 처리** — Vision 문서 인식(OCR, 세로쓰기 일본어 포함) + Google의
+  **Gemma 4 E2B**를 llama.cpp로 앱 안에서 GPU로 실행. 모델(3.35GB)은 번역 패널,
+  상태 배너, **설정 → 실험적 기능**에서 진행 막대와 함께 한 번 다운로드하고,
+  고정된 SHA-256으로 검증한 뒤에만 사용
+- **모델 하나, 문맥까지** — 모든 언어 조합을 옵션 없이 한 모델로. 페이지의 말풍선을
+  한꺼번에(최대 16개) 앞서 번역한 몇 줄과 함께 넘기므로 이름, 화자, 인물마다의 말투가
+  이어짐(반말은 반말, 존댓말은 존댓말). M1 Pro에서 말풍선당 약 0.25초, 줄이 써지는
+  대로 말풍선에 바로 표시. 모델은 첫 페이지 OCR 동안 올리고 2분간 쓰지 않으면 내림
 - **할 일마다 한 곳** — 툴바 번역 버튼은 원문 ↔ 번역 전환(`⇧⌘T`), 옆의 언어 이름
   ("한국어 ▾")은 언어 전환·추가와 패널·편집 모드를 여는 메뉴. **번역 패널**은 이 책 번역에만 집중: 큰 버튼 하나
-  (번역 / 언어팩 다운로드 / 일시정지 / 이어서)와 상태 한 줄, **보기** 목록(원문
+  (모델 다운로드 / 번역 / 일시정지 / 이어서)와 상태 한 줄, **보기** 목록(원문
   또는 책의 번역 언어, 다른 언어는 **⋯** 메뉴로 시작·중지), 접혀 있는 **이 책과
   시리즈**(책의 언어, 자동 번역, 시리즈 전체 번역). 진행은 페이지 위 표시,
   백그라운드의 모든 일은 **윈도우 → 작업**(`⌥⌘J`), 앱 전체 설정은 ⚙︎ → 설정. 언어 선택과 책의 언어(자동 감지)는
@@ -265,16 +267,13 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   조각 경계에서 잘린 말풍선도 하나로 인식. 긴 스트립은 겹치는 구간으로 나눠 읽음
 - **눈에 보이는 진행** — OCR이 찾은 말풍선이 바로 나타나고 번역이 하나씩
   채워짐(대기 중인 말풍선은 깜빡임). 남은 시간이 표시되는 진행 표시, 모델을
-  처음 불러올 때의 안내, 썸네일 사이드바 배지, 페이지 슬라이더 아래 막대
+  처음 불러올 때의 안내, 썸네일 사이드바 배지
 - **말풍선 감지 모델** — 만화로 학습한 모델(앱에 포함, GPU에서 페이지당 약 0.1초,
   OCR과 동시에 실행)이 어떤 글자 줄이 같은 말풍선인지, 어떤 "글자"가 사실은 그림인지
   판단. 한 말풍선의 여러 줄은 읽는 순서대로 합치고, 붙어 있는 말풍선은 나눔. 모델이 놓친
   글자도 기존 방식으로 묶어 번역함. 번역은 원문 글자 영역만이 아니라 말풍선 안쪽
   공간을 넓게 씀 — 그 공간이 비어 있을 때만이라, OCR이 놓친 줄을 덮어버리지 않음. 모델이
   없거나 아무것도 못 찾은 페이지는 기존 규칙으로 묶음
-- **말투 맞추기**(일본어 ↔ 한국어, Apple Intelligence) — Apple 번역은 원문과 상관없이
-  존댓말로 기우는데, 원문 어미로 말투를 판단해 기기 내 모델이 어미만 고침. 단어·시제·
-  부정·문장 종류가 그대로인지 코드로 확인한 뒤에만 반영. 캐시된 페이지는 열 때 맞춰짐
 - **효과음**(スッ, パチパチ…)은 번역하지 않음 — 그려진 효과음은 OCR이 거의 읽지 못하고
   읽어도 조각뿐(48페이지 측정 시 11개, 대부분 한 글자)
 - **제약은 해당 위치에 표시** — 압축 파일 안의 책은 백그라운드로 이어가지 않고
@@ -302,7 +301,9 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
 
 - **macOS 14** (Sonoma) 이상
 - 실험적 기능인 번역 보조는 **macOS 26** 이상
-- **Xcode 26.4** 이상 (소스 빌드 시 — 번역 코드가 macOS 26.4 SDK의 API를 사용)
+- **Xcode 26.4** 이상 (소스 빌드 시)
+- 번역 보조에는 Apple Silicon Mac 권장: 모델이 GPU에서 돌고 번역 중 메모리를 약
+  3.5GB 사용
 
 ## 릴리스 설치
 
@@ -359,6 +360,9 @@ Panely는 Swift Package Manager를 사용합니다:
   업스트림에 SwiftPM 매니페스트가 없어 `Packages/UnrarKit`에 로컬 패키지로
   vendoring했고, RARLAB의 최신 UnRAR 소스로 빌드. 버전과 로컬 패치는
   `Packages/UnrarKit/README.md` 참고
+- **[llama.cpp](https://github.com/ggml-org/llama.cpp)** (MIT) — 번역 모델을 앱
+  안에서 GPU(Metal)로 실행. llama.cpp가 직접 배포하는 XCFramework를
+  `Packages/LlamaCpp/Package.swift`에 URL과 체크섬으로 고정
 
 포함된 모델(번역 보조):
 
@@ -367,6 +371,12 @@ Panely는 Swift Package Manager를 사용합니다:
   (RT-DETR-v2). `scripts/convert-text-detector.py`로 Core ML(8비트, 약 42MB)로 변환해
   `Panely/Resources/ComicTextDetector.mlpackage`에 둠. 변환 시 우회한 부분과 원본과의
   비교 방법은 스크립트 머리말 참고
+
+다운로드하는 모델(번역 보조, 번역 패널이나 설정에서 한 번 — 앱에 포함되지 않음):
+
+- **[Gemma 4 E2B](https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf)**
+  (Google, Apache-2.0) — 지시 튜닝, QAT 4비트 GGUF, 3.35GB. `TranslationModel`에
+  revision·크기·SHA-256을 고정했고(Windows 버전과 같은 파일), 설치 전에 검증
 
 Xcode가 첫 빌드에서 자동 해결합니다.
 
@@ -442,13 +452,16 @@ LaunchServices 캐시에 남을 수 있으니, 우클릭 → "다음으로 압�
 scripts/test.sh          # fast 티어 (= 일반 `xcodebuild test`, CI가 실행하는 것)
 scripts/test-slow.sh     # + slow 티어: 실제 FSEvents, 실제 Vision OCR, 모든 랜덤 시드
 scripts/test-visual.sh   # PanelyTests/Snapshots/Reference/ 기준 스크린샷 비교
+scripts/test-model.sh [--model PATH]             # 실제 번역 모델(llama.cpp로 돌리는 Gemma) 테스트
 scripts/benchmark-translation.sh [--book PATH]   # 번역 단계별·작업 전체 소요 시간 측정
 ```
 
 티어는 `PanelyTests/TestTiers.swift`에서 정합니다. slow와 visual 티어는
 `PANELY_SLOW_TESTS=1` / `PANELY_VISUAL_TESTS=1`로 켜는 opt-in이며(벤치마크
 `PanelyTests/Benchmarks/TranslationBenchmarkTests.swift`는 자체
-`PANELY_BENCHMARK=1`), 스크립트가 이를 `TEST_RUNNER_…`로 넘겨 xcodebuild가
+`PANELY_BENCHMARK=1`, 실제 모델을 쓰는 `GemmaTranslatorIntegrationTests`는
+`PANELY_MODEL_TESTS=1`이면서 모델이 다운로드돼 있을 때만 — `--model`은 이미 가진
+GGUF를 Debug 앱 샌드박스에 하드 링크), 스크립트가 이를 `TEST_RUNNER_…`로 넘겨 xcodebuild가
 테스트 프로세스에 전달합니다. fast 티어는 테스트 시간 약 6–8초, visual
 티어는 약 10초, slow 티어는 fast 위에 약 3초를 더합니다(FSEvents 테스트는
 대부분 기다리는 시간).
@@ -485,7 +498,7 @@ PNG 파일명 또는 두 자리 번호를 넣으며, 쉼표로 나누거나 옵�
 검토할 수 있고, `--derived-data` 또는 `PANELY_DERIVED_DATA_PATH`로 빌드 캐시를 지정합니다.
 
 실제 UI를 샘플 데이터와 함께 별도 창에 렌더링하므로 화면 녹화 권한이나 실제 책,
-다운로드된 번역 언어팩이 필요하지 않습니다. 샘플 번역 문구는 미리 준비한 값이며
+다운로드한 번역 모델이 필요하지 않습니다. 샘플 번역 문구는 미리 준비한 값이며
 OCR·기계 번역 품질을 검증하는 테스트와는 목적이 다릅니다. 실행마다 출력 폴더를
 분리하고, 선택한 PNG가 모두 생성됐는지와 PNG 구조·체크섬을 검사한 뒤 복사합니다.
 성공한 실행의 임시 이미지는 지웁니다. 실패하면 전체 Xcode 로그와 임시 이미지
@@ -648,7 +661,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -p 'test
 - **번역 보조** — OCR 구간 분할과 경계 처리, 말풍선 묶기, 효과음·언어 판별,
   페이지/스트립 작업 계획, 작업 매니저(책 × 언어당 작업 하나, 백그라운드 작업,
   재연결, 대기열, 열려 있어야 하는 책), 캐시 키와 저장, 오버레이 위치와 클릭
-  판정, 시리즈 권 판별, 말풍선 검출과 놓친 텍스트 다시 읽기, 말투 맞추기,
+  판정, 시리즈 권 판별, 말풍선 검출과 놓친 텍스트 다시 읽기, Gemma 프롬프트와
+  답 읽기, 묶음·문맥 번역 작업, 모델 다운로드와 검증,
   말풍선 수정, AI 채팅 왕복, 번역본 내보내기, 리더 연동(시리즈별 언어,
   원문 ↔ 번역, 화면 이미지를 따라가는 오버레이)
 - **현지화** — `AppLocalization`(시스템 설정 따르기 → Mac의 주 언어, 없으면
@@ -796,28 +810,28 @@ Panely/
 │   ├── Translation/                    # 실험적 기능: 번역 보조 (macOS 26 이상)
 │   │   ├── TranslationManager.swift    # 앱 전체 작업: 책 × 언어당 하나, 백그라운드 + 대기열
 │   │   ├── TranslationController.swift # 책 하나를 한 언어로: 작업 계획, OCR → 번역, 진행 상황
-│   │   ├── TranslationStore.swift      # Caches 아래 페이지별 JSON 캐시 (페이지 id + 언어 + 범위 + 모드)
+│   │   ├── TranslationStore.swift      # Caches 아래 페이지별 JSON 캐시 (페이지 id + 언어 + 범위 + 모델)
 │   │   ├── TranslationEdits.swift      # 열린 책의 말풍선 수정 내용
 │   │   ├── TranslationEditStore.swift  # Application Support 아래 수정 내용 저장 (캐시 비우기에도 유지)
-│   │   ├── LanguagePackDownloads.swift # 앱 전체 언어팩 상태와 다운로드
+│   │   ├── TranslationModelStore.swift # 모델 다운로드: 진행률, 해시 확인, 설치, 삭제
 │   │   ├── SeriesVolumeMatcher.swift   # 같은 시리즈의 다른 권 판별
-│   │   ├── Model/                      # TranslationLanguage, TranslationMode(빠르게 / 정확하게),
+│   │   ├── Model/                      # TranslationLanguage, TranslationModel(고정된 Gemma GGUF + 파일 위치),
 │   │   │                               # TranslatedPage / TranslatedBubble, PageEdits
 │   │   ├── AIChat/                     # AIChatExchange: 말풍선을 사용자의 AI 채팅으로 보내고 답변을 받아옴
 │   │   ├── Export/                     # 번역본 내보내기: TranslationExportManager(작업, 기록, 저장 폴더),
 │   │   │                               # TranslationExportJob(옵션, 기록), TranslationExportWriter
 │   │   │                               # (CBZ / ZIP / 폴더), TranslatedPageRenderer
 │   │   ├── Pipeline/                   # OCRTiling, TranslationPlan (page / strip), PageAnalyzer,
-│   │   │                               # PageTextRecognizer (Vision), PageTranslator (Translation),
-│   │   │                               # BubbleGrouper, BalloonDetector(Core ML), MissedText, SpeechLevel,
+│   │   │                               # PageTextRecognizer (Vision), GemmaTranslator (llama.cpp + 프롬프트),
+│   │   │                               # BubbleGrouper, BalloonDetector(Core ML), MissedText,
 │   │   │                               # BubbleBackgroundSampler, TextClassifiers
 │   │   ├── Viewer/                     # TranslationOverlayView (+ 레이아웃, TranslationPatchPainter), 말풍선 팝오버
 │   │   └── UI/                         # 번역 패널, 언어 행, 진행 표시, 작업 목록, 편집 모드 막대,
 │   │                                   # 내보내기 시트, AI 채팅 시트, 작업 창
 │   ├── Settings/
 │   │   ├── SettingsView.swift          # General + Library + Storage + Diagnostics + Experimental 탭
-│   │   ├── ExperimentalSettingsView.swift # 번역 보조: 켜기, 번역할 언어, 모드, 말투 맞추기,
-│   │   │                                  # 언어팩, 내 수정 내용, 캐시
+│   │   ├── ExperimentalSettingsView.swift # 번역 보조: 켜기, 번역할 언어, 모델(다운로드 / 삭제),
+│   │   │                                  # 내 수정 내용, 캐시
 │   │   ├── GeneralSettingsView.swift   # 인터페이스 언어 선택(즉시 적용)
 │   │   ├── LibrarySettingsView.swift   # 마지막 폴더 다시 열기 토글 + Forget Now
 │   │   ├── StorageSettingsView.swift   # Storage 설정 UI + 캐시 용량 / 삭제 컨트롤
@@ -883,7 +897,8 @@ PanelyTests/                            # 소스 트리를 미러링
 │                                       # LibraryTreeScan, 북마크 마운트 정책, 레거시 형식,
 │                                       # LibrarySidebar(Update)Rendering
 ├── Features/Settings/                  # CacheMaintenance, diagnostic report export
-├── Features/Translation/               # OCR 구간 분할, 말풍선 묶기, 말풍선 검출, 놓친 텍스트, 말투,
+├── Features/Translation/               # OCR 구간 분할, 말풍선 묶기, 말풍선 검출, 놓친 텍스트, Gemma 프롬프트,
+│                                       # 모델 다운로드, 묶음 번역 작업(대역 번역기),
 │                                       # 판별기, 작업 계획, 컨트롤러, 매니저, 캐시, 수정, 내보내기,
 │                                       # AI 채팅, 오버레이 그리기 / 클릭 판정, 시리즈 판별, 리더 연동
 └── Features/Reader/
@@ -921,6 +936,7 @@ scripts/
 ├── test.sh                             # fast 테스트 티어 (CI가 실행하는 것)
 ├── test-slow.sh                        # fast + slow 티어 (실제 FSEvents / OCR, 모든 시드)
 ├── test-visual.sh                      # 스크린샷 비교만
+├── test-model.sh                       # 실제 번역 모델 테스트 (opt-in, 모델 필요)
 ├── benchmark-translation.sh            # 번역 단계별 / 작업별 소요 시간 (opt-in 벤치마크)
 ├── generate-snapshots.sh               # 매뉴얼 캡처 실행 (--list / --only / --output)
 ├── manual-snapshots.py                 # 선택 실행·PNG 검증·저장 (Python 표준 라이브러리)
@@ -932,6 +948,7 @@ scripts/
 └── release.sh                          # 버전 범프 + 태그 + 푸시 자동화
 
 Packages/UnrarKit/                      # UnrarKit + RARLAB unrar 소스를 로컬 Swift 패키지로 포함
+Packages/LlamaCpp/                      # llama.cpp가 배포하는 XCFramework, URL + 체크섬으로 고정
 
 .github/
 ├── FUNDING.yml                         # GitHub Sponsors (sejoung)
@@ -966,25 +983,29 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 읽기
   언어가 공존합니다. 작업은 한 번에 하나, 화면에 보이는 것부터 실행합니다.
   컨트롤러는 책을 작업 단위로 나누고(`TranslationPlan`: 페이지 하나씩, 또는
   세로 스트립을 겹치는 구간으로 나눠 이미지 조각 경계에서 잘린 말풍선도
-  하나로 읽음), 현재 단위를 말풍선 하나씩 번역하는 동안 다음 단위를 OCR하며
-  (Apple Translation은 호출 방식과 무관하게 한 번에 한 문장씩 처리 — 측정값.
-  `TranslationMode`로 저지연 모델(macOS 26.4 이상, 말풍선당 약 0.03초)과
-  고품질 모델(약 0.6초) 중 선택), 항상
-  읽고 있는 페이지 이후의 첫 단위를 다음으로 고릅니다. 작업은 detached task에서
+  하나로 읽음), 현재 단위를 번역하는 동안 다음 단위들을 OCR하며, 항상
+  읽고 있는 페이지 이후의 첫 단위를 다음으로 고릅니다. 한 단위의 새 대사는 최대
+  16개씩 묶어, 작업에서 마지막으로 번역한 6줄을 문맥으로 함께 모델에 넘기고, 책
+  앞에서 나온 대사는 다시 씁니다. 작업은 detached task에서
   돌고 generation 카운터로 보호된 채 메인 액터에 결과를 전달합니다. 단위마다
   `PageAnalyzer`(actor)가 `PageTextRecognizer`(Vision 문서 인식기, 긴 페이지는
   `OCRTiling` 구간으로)로 텍스트를 읽고, `BalloonDetector`(번들된 Core ML
   `ComicTextDetector`)로 말풍선을 찾아 `BubbleGrouper`로 줄을 말풍선으로 묶고,
   OCR이 놓친 검출 박스를 다시 읽으며(`MissedText`), 효과음은 그려진 그대로
   두고(`SoundEffectClassifier`) 말풍선 배경 톤을 샘플링합니다
-  (`BubbleBackgroundSampler`). 이어서 `PageTranslator`가 말풍선마다 번역하고,
-  `SpeechLevel`은 선택적으로 일본어 ↔ 한국어 번역을 온디바이스 모델(Apple
-  Intelligence)로 원문의 말투(존댓말/반말)에 맞춰 고쳐 씁니다. 매니저의
-  `LanguagePackDownloads`가 어떤 언어팩이 설치됐는지·내려받는 중인지 추적합니다. 뷰어는
+  (`BubbleBackgroundSampler`). 이어서 `GemmaTranslator`(전용 스레드의 actor)가
+  Gemma 4 E2B를 llama.cpp로 GPU에서 돌립니다: 앱 전체에 모델 하나, 첫 페이지 OCR
+  동안 올리고 2분간 쓰지 않으면 내리며, 컨텍스트 하나를 요청마다 메모리만 비워
+  다시 쓰고, greedy 디코딩입니다. 프롬프트(`GemmaPrompt`, Windows 버전과 같음)는
+  번호 붙은 `[n] 번역` 줄과 인물마다의 말투 유지를 요구하고, 출력이 써지는 대로
+  줄을 읽어 말풍선마다 바로 표시하며, 모델이 빠뜨린 줄은 따로 다시 묻습니다.
+  매니저의 `TranslationModelStore`가 고정된 GGUF를 진행률과 함께 내려받아 크기와
+  SHA-256을 확인한 뒤 Application Support로 옮기고, 모델을 기다리던 작업은 설치되면
+  다시 시작합니다. 뷰어는
   `TranslatedPage`만 읽습니다: `ImageStackView`가 화면에 있는 페이지마다
   `TranslationOverlayView`를 모든 이미지 위에 두어, 스트립의 말풍선이 조각
   경계를 넘어 그려질 수 있습니다. 완료된 페이지는 Caches 아래에 페이지 id +
-  언어 + 범위 + 모드 기준으로 캐시됩니다(`TranslationStore`). 사용자의 말풍선
+  언어 + 범위 + 모델 revision과 프롬프트 버전 기준으로 캐시됩니다(`TranslationStore`). 사용자의 말풍선
   수정(`PageEdits`, `TranslationEdits` 경유)은 Application Support 아래
   `TranslationEditStore`에 따로 보관되고 표시할 때만 위에 덮어 쓰므로, 캐시를
   비우거나 다시 번역해도 사라지지 않습니다. `AIChatExchange`는 책의 말풍선을
@@ -997,7 +1018,7 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 읽기
   쓰고, 테스트는 protocol 기반 서비스(`ExtractionCacheManaging`,
   `SecurityScopedBookmarking`, `LibraryTreeLoading`, `KeyValueStoring`,
   `SystemSettingsReading`, `SourceChangeMonitoring`, `LibraryDirectoryWatching`,
-  `FilePicking`, `SpeechLevelCorrecting`), 별도의 `AppLocalization`, 임시
+  `FilePicking`, `BalloonTranslating`, `PageAnalyzing`), 별도의 `AppLocalization`, 임시
   디렉터리를 가리키는 `TranslationStore` / `TranslationEditStore`를 주입해 실제
   앱 preference, cache root, sandbox bookmark, 온디바이스 모델을 건드리지 않음.
 - **`nonisolated` 코어 타입** — `ComicPage`, `FolderLoader`, `ArchiveLoader`,

@@ -108,27 +108,6 @@ extension ReaderViewModel {
             }
     }
 
-    /// Match translations' speech levels to the originals' (Settings) —
-    /// Japanese ↔ Korean, with Apple Intelligence.
-    var translationMatchesSpeechLevel: Bool {
-        get { preferences.translationMatchesSpeechLevel }
-        set {
-            guard preferences.translationMatchesSpeechLevel != newValue else { return }
-            preferences.translationMatchesSpeechLevel = newValue
-            reloadTranslations()
-        }
-    }
-
-    /// Fast or accurate model (Settings). Running jobs restart in the new mode.
-    var translationMode: TranslationMode {
-        get { preferences.translationMode }
-        set {
-            guard preferences.translationMode != newValue else { return }
-            preferences.translationMode = newValue
-            reloadTranslations()
-        }
-    }
-
     /// Start translating whenever a book of this series opens.
     var translationAutoTranslatesSeries: Bool {
         get { seriesPreferences.autoTranslate(forSeries: seriesIdentity) }
@@ -488,8 +467,8 @@ extension ReaderViewModel {
     }
 
     /// Translate a corrected original on its own, outside the book's job.
-    /// Needs the language pack like the job does; without it the balloon
-    /// keeps offering to try again and the banner offers the download.
+    /// Needs the model like the job does; without it the balloon keeps
+    /// offering to try again and the banner offers the download.
     private func retranslate(_ bubble: TranslatedBubble, correctedSource: String, pageID: String, into target: TranslationLanguage) {
         guard #available(macOS 26.0, *), let source = translationSourceLanguage, source != target else { return }
         let retranslation = TranslationEdits.Retranslation(
@@ -499,11 +478,17 @@ extension ReaderViewModel {
             target: target
         )
         translationEdits.beginRetranslation(retranslation)
-        let mode = translationMode
+        let translator = translationManager.translator
+        // The balloons before it on its page, as the job would have given.
+        let context = translationContext(before: bubble, pageID: pageID)
         Task { [weak self] in
             let text: String? = await Task.detached(priority: .userInitiated) {
+                guard translator.isReady() else { return nil }
                 do {
-                    return try await PageTranslator(from: source, to: target, mode: mode).translate(correctedSource)
+                    for try await line in translator.translate([correctedSource], context: context, from: source, to: target) {
+                        return line.text
+                    }
+                    return nil
                 } catch {
                     AppLog.error(.reader, "Translating a corrected balloon failed", metadata: ["error": "\(error)"])
                     return nil
@@ -511,11 +496,24 @@ extension ReaderViewModel {
             }.value
             guard let self else { return }
             self.translationEdits.finishRetranslation(retranslation, bubble: bubble, text: text)
-            if text == nil, target == self.translation.target,
-               await TranslationAvailability.status(from: source, to: target, mode: mode) == .needsDownload {
-                self.translation.notice = .needsLanguageDownload(source, target)
+            if text == nil, target == self.translation.target, !translator.isReady() {
+                self.translation.notice = .needsModelDownload
             }
         }
+    }
+
+    /// Up to `TranslationController.contextLines` translated balloons above
+    /// `bubble` on its page, in reading order.
+    private func translationContext(before bubble: TranslatedBubble, pageID: String) -> [TranslationContextLine] {
+        guard let page = translation.pages[pageID] else { return [] }
+        let lines = page.bubbles
+            .filter { $0.rect.minY < bubble.rect.minY && $0.source != bubble.source }
+            .sorted { $0.rect.minY < $1.rect.minY }
+            .compactMap { other -> TranslationContextLine? in
+                guard let text = other.translation, !text.isEmpty else { return nil }
+                return TranslationContextLine(source: other.source, translation: text)
+            }
+        return Array(lines.suffix(TranslationController.contextLines))
     }
 
     // MARK: - Series
@@ -571,8 +569,6 @@ extension ReaderViewModel {
                 scope: scope,
                 source: seriesPreferences.translationSource(forSeries: seriesID),
                 target: target,
-                mode: translationMode,
-                matchSpeechLevel: translationMatchesSpeechLevel,
                 enabled: true,
                 autoStart: true,
                 focusPage: 0
@@ -663,8 +659,6 @@ extension ReaderViewModel {
             scope: translationScope,
             source: seriesPreferences.translationSource(forSeries: seriesIdentity),
             target: target,
-            mode: translationMode,
-            matchSpeechLevel: translationMatchesSpeechLevel,
             enabled: enabled,
             autoStart: enabled && (wasActive || autoStart),
             focusPage: currentPageIndex

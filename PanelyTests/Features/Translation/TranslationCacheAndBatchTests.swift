@@ -13,11 +13,11 @@ struct TranslationCacheLoadTests {
         return page
     }
 
-    private func load(_ store: TranslationStore, _ pages: [ComicPage], mode: TranslationMode, scope: TranslationScope = .page) async -> TranslationController {
-        let controller = TranslationController(store: store, defaults: InMemoryKeyValueStore())
+    private func load(_ store: TranslationStore, _ pages: [ComicPage], scope: TranslationScope = .page) async -> TranslationController {
+        let controller = TranslationController(store: store, defaults: InMemoryKeyValueStore(), translator: ScriptedTranslator())
         controller.reload(
             pages: pages, pageSizes: [], scope: scope, source: .japanese, target: .korean,
-            mode: mode, enabled: true, autoStart: false, focusPage: 0
+            enabled: true, autoStart: false, focusPage: 0
         )
         await controller.cacheTask?.value
         return controller
@@ -28,46 +28,40 @@ struct TranslationCacheLoadTests {
     }
 
     /// Everything on disk for the book is found, whatever else shares the
-    /// folder; missing, unfinished and other books' entries are passed over.
-    /// A fast job takes an accurate translation over its own.
-    @Test(.enabled(if: TranslationMode.isFastAvailable))
-    func everyFinishedEntryOnDiskIsLoadedAndNothingElse() async throws {
+    /// folder; missing, unfinished, other books' entries and another
+    /// translator's (Apple Translation's, before Gemma) are passed over.
+    @Test func everyFinishedEntryOnDiskIsLoadedAndNothingElse() async throws {
         let store = try makeTemporaryTranslationStore()
         let pages = Fixture.makeImagePages(count: 7)
-        func key(_ index: Int, _ mode: TranslationMode, to target: TranslationLanguage = .korean, scope: TranslationScope = .page) -> String {
-            TranslationStore.key(pageID: pages[index].id, from: .japanese, to: target, scope: scope, mode: mode)
+        func key(_ index: Int, translator: String = TranslationModel.cacheRevision, to target: TranslationLanguage = .korean, scope: TranslationScope = .page) -> String {
+            TranslationStore.key(pageID: pages[index].id, from: .japanese, to: target, scope: scope, translator: translator)
         }
-        try store.save(page("A0"), key: key(0, .accurate))
-        try store.save(page("F1"), key: key(1, .fast))
-        try store.save(page("A2"), key: key(2, .accurate))
-        try store.save(page("F2"), key: key(2, .fast))
-        try store.save(page("A3", complete: false), key: key(3, .accurate))
-        try store.save(page("F3"), key: key(3, .fast))
+        try store.save(page("G0"), key: key(0))
+        try store.save(page("A1"), key: key(1, translator: "apple-translation"))
+        try store.save(page("G2"), key: key(2))
+        try store.save(page("A2"), key: key(2, translator: "apple-translation"))
+        try store.save(page("G3", complete: false), key: key(3))
         // 4: nothing. 5: another language. 6: the other scope.
-        try store.save(page("E5"), key: key(5, .accurate, to: .english))
-        try store.save(page("S6"), key: key(6, .accurate, scope: .strip))
+        try store.save(page("E5"), key: key(5, to: .english))
+        try store.save(page("S6"), key: key(6, scope: .strip))
         // Whatever else is in the folder.
         try Data("x".utf8).write(to: store.root.appendingPathComponent("notes.txt"))
         try Data("x".utf8).write(to: store.root.appendingPathComponent(".DS_Store"))
         try Data("{}".utf8).write(to: store.root.appendingPathComponent("not-a-key.json"))
 
-        let fast = await load(store, pages, mode: .fast)
-        #expect(texts(fast, pages) == ["A0", "F1", "A2", "F3", nil, nil, nil])
-        #expect(fast.completedPageIndices == [0, 1, 2, 3])
-        #expect(fast.hasPages)
+        let loaded = await load(store, pages)
+        #expect(texts(loaded, pages) == ["G0", nil, "G2", nil, nil, nil, nil])
+        #expect(loaded.completedPageIndices == [0, 2])
+        #expect(loaded.hasPages)
 
-        let accurate = await load(store, pages, mode: .accurate)
-        #expect(texts(accurate, pages) == ["A0", nil, "A2", nil, nil, nil, nil])
-        #expect(accurate.completedPageIndices == [0, 2])
-
-        let strip = await load(store, pages, mode: .accurate, scope: .strip)
+        let strip = await load(store, pages, scope: .strip)
         #expect(texts(strip, pages) == [nil, nil, nil, nil, nil, nil, "S6"])
     }
 
     /// The listing is the store's own names: what `save` writes, `existingKeys` lists.
     @Test func existingKeysAreExactlyTheSavedKeys() throws {
         let store = try makeTemporaryTranslationStore()
-        let keys = (0..<20).map { TranslationStore.key(pageID: "page \($0)", from: .japanese, to: .korean, mode: $0.isMultiple(of: 2) ? .fast : .accurate) }
+        let keys = (0..<20).map { TranslationStore.key(pageID: "page \($0)", from: .japanese, to: .korean, translator: $0.isMultiple(of: 2) ? "a" : "b") }
         for key in keys { try store.save(makeTranslatedPage(), key: key) }
         #expect(store.existingKeys() == Set(keys))
         store.remove(keys: Array(keys.prefix(5)))

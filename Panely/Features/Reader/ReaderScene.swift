@@ -171,8 +171,8 @@ private struct ReaderStatusBanner: View {
                 systemImage: "character.bubble",
                 message: notice.message(locale: viewModel.localization.locale)
             ) {
-                if #available(macOS 26.0, *), case let .needsLanguageDownload(source, target) = notice {
-                    LanguagePackDownloadButton(source: source, target: target, mode: viewModel.translation.mode)
+                if notice == .needsModelDownload {
+                    TranslationModelDownloadButton()
                 }
                 Button("Dismiss") {
                     viewModel.dismissTranslationNotice()

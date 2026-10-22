@@ -104,11 +104,35 @@ struct VisualRegressionTests {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(PanelyColor.bgPrimary),
             size: CGSize(width: 380, height: 352),
-            named: "translation-panel",
-            // The language-pack status line ("Checking the language
-            // pack…", then the result) depends on when it's caught.
-            ignoring: [CGRect(x: 28, y: 88, width: 330, height: 22)]
+            named: "translation-panel"
         )
+    }
+
+    /// The model's download under way, as the panel and Settings show it.
+    @Test func translationModelDownload() async throws {
+        let gate = TranslationPermitGate()
+        let store = TranslationModelStore(
+            files: TranslationModelFiles(root: try Fixture.makeTempDir()),
+            downloader: StalledModelDownloader(received: 1_234_567_890, total: TranslationModel.current.bytes, gate: gate)
+        )
+        store.download()
+        try await waitUntil { store.fractionDownloaded != nil && store.fractionDownloaded! > 0 }
+        try await check(
+            VStack {
+                TranslationModelDownloadProgress(model: store)
+                    .padding(PanelySpacing.md)
+                    .frame(width: 340)
+                    .background(PanelyColor.bgSecondary, in: RoundedRectangle(cornerRadius: 10))
+                Spacer(minLength: 0)
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(PanelyColor.bgPrimary),
+            size: CGSize(width: 380, height: 120),
+            named: "translation-model-download"
+        )
+        store.cancelDownload()
+        await gate.open()
     }
 
     /// The Files section of `LibraryFixture` with the open book's folder
