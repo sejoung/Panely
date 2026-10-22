@@ -19,7 +19,8 @@ set -euo pipefail
 #   2. Optionally run tests.
 #   3. Bump MARKETING_VERSION in project.pbxproj.
 #   4. Commit "chore: release vX.Y.Z" + annotated tag.
-#   5. Push main + tag. GitHub Actions release.yml publishes the .zip.
+#   5. Push main + tag. GitHub Actions release.yml publishes the .zip, with
+#      docs/releases/vX.Y.Z.md as the release's description.
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
@@ -104,6 +105,16 @@ fi
 
 if git ls-remote --exit-code --tags origin "$tag" >/dev/null 2>&1; then
     die "tag '$tag' already exists on origin"
+fi
+
+# The release workflow uses docs/releases/<tag>.md as the release's
+# description; without it the release gets only the install steps.
+notes="docs/releases/$tag.md"
+if [[ -f "$notes" ]]; then
+    echo "→ release notes:   $notes"
+else
+    echo "warning: no $notes — the GitHub release will have only the install steps"
+    confirm "release without notes?" || die "write $notes first"
 fi
 
 # --- tests ---
