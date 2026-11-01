@@ -108,20 +108,142 @@ struct LibrarySidebarRenderingTests {
             """)
     }
 
+    /// The overlay sidebar is mounted per reveal over a model that outlives
+    /// it: the second mount must draw the same outline straight away, with
+    /// the folder the user expanded still open and no rescan.
+    @Test func remountingOverTheSameModelKeepsTheTreeWithoutRescanning() async throws {
+        let tempRoot = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+        let library = try Library(in: tempRoot)
+        let model = LibrarySidebarModel()
+        let loader = CountingLiveLoader()
+        let token = UUID()
+
+        let first = await host(library, model: model, loader: loader, refreshToken: token)
+        let outline = try await settledOutline(in: first, rows: 8)
+        outline.expandItem(outline.item(atRow: 7))
+        _ = try await settledOutline(in: first, rows: 10)
+        try await waitUntil { model.scanCompleted && loader.scans == 2 }
+        first.close()
+
+        let second = await host(library, model: model, loader: loader, refreshToken: token)
+        defer { second.close() }
+        let remounted = try await settledOutline(in: second, rows: 10)
+        #expect(Self.shape(of: remounted) == """
+            ▾
+              ·
+              ▸
+              ▾
+                ▸
+                ·
+                ·
+              ▾
+                ·
+                ·
+            """)
+        #expect(loader.scans == 2)
+    }
+
+    /// The Continue Reading section is a view of its own inside the `List`, so
+    /// progress moving doesn't rebuild the tree. It has to stay a real section
+    /// of the outline, appear when a suggestion does, and leave the tree alone.
+    @Test func continueReadingIsASectionOfTheOutlineAndFollowsItsSuggestion() async throws {
+        let tempRoot = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+        let library = try Library(in: tempRoot)
+        let progress = ReadingProgressStore(defaults: InMemoryKeyValueStore(), storeKey: "rp-\(UUID())")
+
+        let hosted = await host(library, continueReading: {
+            progress.progress(forKey: "book", fileIdentityKey: nil).map { ("Book", $0.fraction) }
+        })
+        defer { hosted.close() }
+        _ = try await settledOutline(in: hosted, rows: 8)
+
+        progress.flushImmediately(forKey: "book", fileIdentityKey: nil, page: 1, total: 10, finished: false)
+
+        let outline = try await settledOutline(in: hosted, rows: 10)
+        #expect(Self.shape(of: outline) == """
+            ▾
+              ·
+            ▾
+              ·
+              ▸
+              ▾
+                ▸
+                ·
+                ·
+              ▸
+            """)
+    }
+
+    /// Badges read the progress store in their own leaf view, not in the
+    /// sidebar's body. They still have to appear when progress is written,
+    /// on a nested row as well as a top-level one.
+    @Test func badgesFollowProgressWithoutTheSidebarRendering() async throws {
+        let tempRoot = try Fixture.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: tempRoot) }
+        let library = try Library(in: tempRoot)
+        let progress = ReadingProgressStore(defaults: InMemoryKeyValueStore(), storeKey: "rp-\(UUID())")
+        let activeKey = library.activeBook.standardizedFileURL.path
+
+        let hosted = await host(library, readingBadge: { url in
+            progress.progress(forKey: url.standardizedFileURL.path, fileIdentityKey: nil).map {
+                ReadingBadge.inProgress(fraction: $0.fraction)
+            }
+        })
+        defer { hosted.close() }
+        let outline = try await settledOutline(in: hosted, rows: 8)
+        let bookRow = outline.convert(outline.rect(ofRow: 5), to: hosted.hostingView)
+        let rowRect = hosted.hostingView.isFlipped
+            ? bookRow
+            : CGRect(x: bookRow.minX, y: hosted.size.height - bookRow.maxY, width: bookRow.width, height: bookRow.height)
+        // The open book's row is accent-highlighted anyway, so count the
+        // trailing edge only, where the badge goes.
+        let trailing = CGRect(x: rowRect.maxX - 30, y: rowRect.minY, width: 30, height: rowRect.height)
+        let before = try hosted.capture().accentPixels(in: trailing)
+
+        progress.flushImmediately(forKey: activeKey, fileIdentityKey: nil, page: 4, total: 10, finished: false)
+
+        try await hosted.settle("the badge to draw") {
+            try hosted.capture().accentPixels(in: trailing) > before
+        }
+    }
+
     // MARK: - Helpers
 
-    private func host(_ library: Library) async -> SnapshotRenderer.HostedView {
+    private final class CountingLiveLoader: LibraryTreeLoading, @unchecked Sendable {
+        private let lock = NSLock()
+        private var count = 0
+        var scans: Int { lock.withLock { count } }
+
+        func loadTree(from url: URL, maxDepth: Int) async -> [FileNode] {
+            lock.withLock { count += 1 }
+            return await FileNode.loadTree(from: url, maxDepth: maxDepth)
+        }
+    }
+
+    private func host(
+        _ library: Library,
+        model: LibrarySidebarModel? = nil,
+        loader: any LibraryTreeLoading = LiveLibraryTreeLoader(),
+        refreshToken: UUID = UUID(),
+        readingBadge: @escaping (URL) -> ReadingBadge? = { _ in nil },
+        continueReading: @escaping () -> (title: String, fraction: Double)? = { nil }
+    ) async -> SnapshotRenderer.HostedView {
         await SnapshotRenderer.host(
             LibrarySidebar(
+                model: model ?? LibrarySidebarModel(),
                 rootURL: library.root,
                 activeURL: library.activeBook,
-                refreshToken: UUID(),
+                refreshToken: refreshToken,
                 pinned: true,
                 favorites: [],
                 pageBookmarks: [],
                 volumes: [],
-                libraryTreeLoader: LiveLibraryTreeLoader(),
+                libraryTreeLoader: loader,
                 currentPageIndex: { 0 },
+                readingBadge: readingBadge,
+                continueReading: continueReading,
                 actions: LibrarySidebarActions()
             ),
             size: CGSize(width: 240, height: 720)

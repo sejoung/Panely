@@ -1,5 +1,21 @@
 import Foundation
 
+/// The toolbar's language menus for one set of inputs. Localizing every
+/// language name on every toolbar render would otherwise repeat on each page
+/// turn while the toolbar is up, for lists that almost never change.
+struct ToolbarLanguagesMemo {
+    struct Inputs: Equatable {
+        let locale: Locale
+        let listed: [TranslationLanguage]
+        let source: TranslationLanguage?
+        let suggested: TranslationLanguage?
+    }
+    let inputs: Inputs
+    let languages: [ToolbarTranslationState.Language]
+    let suggestedLanguage: ToolbarTranslationState.Language?
+    let otherLanguages: [ToolbarTranslationState.Language]
+}
+
 extension ReaderViewModel {
     /// Snapshot of the fields `PanelyToolbar` reads. Computed each render so
     /// the toolbar always reflects current viewmodel state — adding a new
@@ -43,21 +59,18 @@ extension ReaderViewModel {
         let source = translationSourceLanguage
         let display = translationDisplayLanguage
         let suggested = listed.contains(display) || display == source ? nil : display
+        let menus = toolbarLanguages(
+            for: .init(locale: locale, listed: listed, source: source, suggested: suggested)
+        )
         return ToolbarTranslationState(
             showsTranslation: translationIsShowing,
             isWorking: translationManager.openBook.contains(where: \.isWorking),
             hasTranslations: translation.hasPages,
             shownLanguage: translationDisplayLanguage,
             shownLanguageName: translationDisplayLanguage.displayName(in: locale),
-            languages: listed.map {
-                ToolbarTranslationState.Language(language: $0, name: $0.displayName(in: locale))
-            },
-            suggestedLanguage: suggested.map {
-                ToolbarTranslationState.Language(language: $0, name: $0.displayName(in: locale))
-            },
-            otherLanguages: TranslationLanguage.allCases
-                .filter { !listed.contains($0) && $0 != source && $0 != suggested }
-                .map { ToolbarTranslationState.Language(language: $0, name: $0.displayName(in: locale)) },
+            languages: menus.languages,
+            suggestedLanguage: menus.suggestedLanguage,
+            otherLanguages: menus.otherLanguages,
             isEditing: isEditingTranslations,
             canEdit: canEditTranslations,
             canTranslateAgain: canTranslateAgain && !translation.isWorking,
@@ -65,6 +78,23 @@ extension ReaderViewModel {
             canExport: canExportCurrentBook,
             canExportSeries: canExportCurrentBook && !translatableSeriesVolumes.isEmpty
         )
+    }
+
+    private func toolbarLanguages(for inputs: ToolbarLanguagesMemo.Inputs) -> ToolbarLanguagesMemo {
+        if let memo = toolbarLanguagesMemo, memo.inputs == inputs { return memo }
+        func entry(_ language: TranslationLanguage) -> ToolbarTranslationState.Language {
+            ToolbarTranslationState.Language(language: language, name: language.displayName(in: inputs.locale))
+        }
+        let memo = ToolbarLanguagesMemo(
+            inputs: inputs,
+            languages: inputs.listed.map(entry),
+            suggestedLanguage: inputs.suggested.map(entry),
+            otherLanguages: TranslationLanguage.allCases
+                .filter { !inputs.listed.contains($0) && $0 != inputs.source && $0 != inputs.suggested }
+                .map(entry)
+        )
+        toolbarLanguagesMemo = memo
+        return memo
     }
 
     /// Builds the toolbar action bundle. Zoom routes through `ViewerController`

@@ -41,6 +41,9 @@ final class ReaderPositionStore {
     /// debounce window restores the page just left, not the one before it.
     private var pending: (key: String, fileIdentityKey: String?, pageIndex: Int)?
     private let defaults: any KeyValueStoring
+    /// See `ReadingProgressStore.writer`.
+    private let writer: LatestWinsDefaultsWriter
+    private var writeGeneration = 0
     private let positionsKey: String
     private let orderKey: String
     private let maxEntries: Int
@@ -51,6 +54,7 @@ final class ReaderPositionStore {
         maxEntries: Int = ReaderPositionStore.maxEntries
     ) {
         self.defaults = defaults
+        self.writer = LatestWinsDefaultsWriter(defaults: defaults)
         self.positionsKey = positionsKey
         self.orderKey = positionsKey + ".order"
         self.maxEntries = maxEntries
@@ -64,7 +68,16 @@ final class ReaderPositionStore {
         if pending?.key != key { saveDebouncer.flush() }
         pending = (key, fileIdentityKey, pageIndex)
         saveDebouncer.schedule { [weak self] in
-            self?.writeNow(key: key, fileIdentityKey: fileIdentityKey, pageIndex: pageIndex)
+            self?.writeNow(key: key, fileIdentityKey: fileIdentityKey, pageIndex: pageIndex, inBackground: true)
+        }
+    }
+
+    /// Land everything still in flight, synchronously (see
+    /// `ReadingProgressStore.flushPendingWrites`).
+    func flushPendingWrites() {
+        saveDebouncer.flush()
+        if !writer.hasCommitted(writeGeneration), let cache, let orderCache {
+            commit(dict: cache, order: orderCache, inBackground: false)
         }
     }
 
@@ -153,11 +166,26 @@ final class ReaderPositionStore {
 
         cache = dict
         orderCache = order
-        defaults.set(dict, forKey: positionsKey)
-        defaults.set(order, forKey: orderKey)
+        commit(dict: dict, order: order, inBackground: false)
     }
 
-    private func writeNow(key: String, fileIdentityKey: String?, pageIndex: Int) {
+    /// Bridging the whole dictionary and order list into `UserDefaults` is
+    /// what's worth keeping off the main thread on a debounced write.
+    private func commit(dict: [String: Int], order: [String], inBackground: Bool) {
+        writeGeneration &+= 1
+        let positionsKey = positionsKey
+        let orderKey = orderKey
+        let values: @Sendable () -> [String: any Sendable]? = {
+            [positionsKey: dict, orderKey: order]
+        }
+        if inBackground {
+            writer.commitInBackground(generation: writeGeneration, values)
+        } else {
+            writer.commit(generation: writeGeneration, values)
+        }
+    }
+
+    private func writeNow(key: String, fileIdentityKey: String?, pageIndex: Int, inBackground: Bool = false) {
         pending = nil
         hydrate()
         guard var dict = cache, var order = orderCache else { return }
@@ -185,8 +213,7 @@ final class ReaderPositionStore {
 
         cache = dict
         orderCache = order
-        defaults.set(dict, forKey: positionsKey)
-        defaults.set(order, forKey: orderKey)
+        commit(dict: dict, order: order, inBackground: inBackground)
     }
 
     /// Drop least-recently-written entries until the dict is back under the

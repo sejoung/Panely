@@ -54,11 +54,18 @@ actor GemmaTranslator: BalloonTranslating {
 
     nonisolated static let contextSize: UInt32 = 8192
     nonisolated static let idleTimeout: Duration = .seconds(120)
+    /// How long a model loaded ahead of a job waits for its first request.
+    /// OCR comes first, and the first time a build runs its models take a
+    /// minute or two to load — unloading then would mean loading the model
+    /// again, without the warm-up, just as the first balloons need it.
+    nonisolated static let firstRequestTimeout: Duration = .seconds(600)
 
     nonisolated let files: TranslationModelFiles
     private let queue = DispatchSerialQueue(label: "io.github.sejoung.Panely.gemma", qos: .utility)
     private var runtime: LlamaRuntime?
     private var unloadTask: Task<Void, Never>?
+    /// What the running idle timer was set to.
+    private(set) var scheduledIdleTimeout: Duration?
 
     nonisolated var unownedExecutor: UnownedSerialExecutor { queue.asUnownedSerialExecutor() }
 
@@ -70,7 +77,7 @@ actor GemmaTranslator: BalloonTranslating {
 
     func prepare() async throws {
         unloadTask?.cancel()
-        defer { scheduleUnload() }
+        defer { scheduleUnload(after: Self.firstRequestTimeout) }
         guard runtime == nil else { return }
         let runtime = try loadRuntime()
         // A few tokens of a real prompt: the GPU's first generation sets up
@@ -164,10 +171,11 @@ actor GemmaTranslator: BalloonTranslating {
         return loaded
     }
 
-    private func scheduleUnload() {
+    private func scheduleUnload(after timeout: Duration = GemmaTranslator.idleTimeout) {
         unloadTask?.cancel()
+        scheduledIdleTimeout = timeout
         unloadTask = Task {
-            try? await Task.sleep(for: Self.idleTimeout)
+            try? await Task.sleep(for: timeout)
             guard !Task.isCancelled else { return }
             self.unload()
             AppLog.info(.reader, "Translation model unloaded after being idle")
@@ -287,16 +295,18 @@ nonisolated enum GemmaPrompt {
     }
 }
 
-/// A llama.cpp model and one context, reused for every request: the
-/// context's memory is cleared before each prompt rather than a new context
-/// made (which costs time and memory). Greedy decoding — the same input
-/// always gives the same translation.
+/// A llama.cpp model and one context, reused for every request. What the next
+/// prompt shares with what the context already holds isn't read again: every
+/// request starts with the same instructions, about a tenth of its time.
+/// Greedy decoding — the same input always gives the same translation.
 ///
 /// Not thread-safe; `GemmaTranslator` owns it.
 nonisolated final class LlamaRuntime {
     private let model: OpaquePointer
     private let context: OpaquePointer
     private let vocab: OpaquePointer
+    /// The tokens the context's memory holds, in order.
+    private var held: [llama_token] = []
 
     private static let backend: Void = {
         llama_log_set({ level, text, _ in
@@ -334,15 +344,16 @@ nonisolated final class LlamaRuntime {
     /// output so far after every token; it returns false to stop early.
     /// Returns the output.
     func generate(prompt: String, maxTokens: Int, onText: (String) -> Bool) throws -> String {
-        llama_memory_clear(llama_get_memory(context), true)
         var tokens = tokenize(prompt)
         let contextSize = Int(llama_n_ctx(context))
         guard tokens.count + maxTokens <= contextSize else {
             throw TranslationModelError.promptTooLong(tokens: tokens.count)
         }
 
+        var start = keepSharedPrefix(of: tokens)
+        // On a failure below the memory is in an unknown state.
+        held = []
         let batchSize = max(1, Int(llama_n_batch(context)))
-        var start = 0
         while start < tokens.count {
             let count = min(batchSize, tokens.count - start)
             let result = tokens.withUnsafeMutableBufferPointer { buffer in
@@ -351,6 +362,7 @@ nonisolated final class LlamaRuntime {
             guard result == 0 else { throw TranslationModelError.decodeFailed(result) }
             start += count
         }
+        var generated = tokens
 
         let sampler = llama_sampler_chain_init(llama_sampler_chain_default_params())
         defer { llama_sampler_free(sampler) }
@@ -371,8 +383,32 @@ nonisolated final class LlamaRuntime {
             guard onText(String(decoding: bytes, as: UTF8.self)) else { break }
             let result = llama_decode(context, llama_batch_get_one(&token, 1))
             guard result == 0 else { throw TranslationModelError.decodeFailed(result) }
+            generated.append(token)
         }
+        held = generated
         return String(decoding: bytes, as: UTF8.self)
+    }
+
+    /// Drop everything in the context's memory after what `tokens` shares with
+    /// it; returns how many of `tokens` are already read. At least the last
+    /// one is always read again, since that's what produces the next token's
+    /// odds. Starts clean if the model's memory can't be cut partway.
+    private func keepSharedPrefix(of tokens: [llama_token]) -> Int {
+        let memory = llama_get_memory(context)
+        var shared = 0
+        let limit = min(held.count, tokens.count - 1)
+        while shared < limit, held[shared] == tokens[shared] { shared += 1 }
+        if shared > 0, llama_memory_seq_rm(memory, 0, llama_pos(shared), -1) {
+            return shared
+        }
+        llama_memory_clear(memory, true)
+        return 0
+    }
+
+    /// Forget what the context holds, so the next prompt is read from scratch.
+    func clearMemory() {
+        llama_memory_clear(llama_get_memory(context), true)
+        held = []
     }
 
     private func tokenize(_ text: String) -> [llama_token] {

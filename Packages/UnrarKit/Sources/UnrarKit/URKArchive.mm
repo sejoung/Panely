@@ -1003,6 +1003,69 @@ NS_DESIGNATED_INITIALIZER
     return success && !actionError;
 }
 
+- (BOOL)extractPrefixesOfFiles:(NSSet<NSString *> *)filePaths
+                      maxBytes:(NSUInteger)maxBytes
+                         error:(NSError * __autoreleasing *)error
+                        action:(void(^)(NSString *filePath, NSData *prefix))action
+{
+    // Panely patch: finding one entry means walking the headers from the start,
+    // so reading the head of every page one call at a time is O(n²) in entries.
+    // This takes them in one walk. Stops quietly at anything unexpected: the
+    // caller reads whatever was not delivered the ordinary way, which reports
+    // the error properly.
+    URKCreateActivity("Extracting File Prefixes");
+
+    __weak URKArchive *welf = self;
+
+    return [self performActionWithArchiveOpen:^(NSError **innerError) {
+        NSUInteger remaining = filePaths.count;
+        int RHCode = 0;
+        URKFileInfo *fileInfo;
+
+        while (remaining > 0 &&
+               [welf readHeader:&RHCode info:&fileInfo] == URKReadHeaderLoopActionContinueReading) {
+            if ([welf headerContainsErrors:innerError]) {
+                return;
+            }
+
+            if (![filePaths containsObject:fileInfo.filename]) {
+                if (RARProcessFile(welf.rarFile, RAR_SKIP, NULL, NULL) != ERAR_SUCCESS) {
+                    return;
+                }
+                continue;
+            }
+
+            NSMutableData *buffer = [NSMutableData data];
+            BOOL (^readBlock)(NSData *) = ^BOOL(NSData *dataChunk) {
+                [buffer appendData:dataChunk];
+                return buffer.length < maxBytes;
+            };
+            RARSetCallback(welf.rarFile, BufferedReadCallbackProc, (long)readBlock);
+            int PFCode = RARProcessFile(welf.rarFile, RAR_TEST, NULL, NULL);
+            RARSetCallback(welf.rarFile, NULL, NULL);
+
+            if (buffer.length >= maxBytes) {
+                action(fileInfo.filename, buffer);
+                remaining--;
+                // Stopping an entry early raises unrar's process-wide error
+                // state, which every later call in this pass would report as
+                // its own failure. The stop was ours, so clear it (callers
+                // serialise UnrarKit, so no other operation can be watching).
+                ErrHandler.Clean();
+                // Still inside the entry's data: this seeks to the next header.
+                if (RARProcessFile(welf.rarFile, RAR_SKIP, NULL, NULL) != ERAR_SUCCESS) {
+                    return;
+                }
+            } else if (PFCode == ERAR_SUCCESS) {
+                action(fileInfo.filename, buffer);
+                remaining--;
+            } else {
+                return;
+            }
+        }
+    } inMode:RAR_OM_EXTRACT error:error];
+}
+
 - (BOOL)isSolid
 {
     // Panely patch: expose the archive-level solid flag so callers can avoid

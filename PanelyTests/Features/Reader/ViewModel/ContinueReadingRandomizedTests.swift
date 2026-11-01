@@ -28,11 +28,14 @@ struct ContinueReadingRandomizedTests {
 
         for step in 0..<250 {
             let label = try await world.performRandomOperation(using: &rng)
-            check(vm, "seed \(seed) step \(step): \(label)")
+            await check(vm, "seed \(seed) step \(step): \(label)")
         }
     }
 
-    private func check(_ vm: ReaderViewModel, _ label: String) {
+    private func check(_ vm: ReaderViewModel, _ label: String) async {
+        // File identities arrive in the background; the first read asks.
+        _ = vm.continueReadingSuggestion
+        await vm.continueReadingIdentities.settled()
         let actual = vm.continueReadingSuggestion
         let expected = referenceSuggestion(vm)
         let comment = Comment(rawValue: label)
@@ -328,7 +331,11 @@ struct ContinueReadingRandomizedTests {
             )
         }
         func candidates(for item: RecentItem) -> [Candidate] {
-            guard let url = vm.recentItems.availableURL(for: item) else { return [] }
+            // A new `URL`, as the app's lookup uses: the stored instance caches
+            // resource values until the next run-loop turn, so whether this
+            // reference saw a replaced file's new identity depended on timing.
+            guard let stored = vm.recentItems.availableURL(for: item) else { return [] }
+            let url = URL(fileURLWithPath: stored.path)
             let keys = PositionKey.keys(for: url, opened: nil, tempRoot: nil)
             var result: [Candidate] = []
             var includedKeys: Set<String> = []

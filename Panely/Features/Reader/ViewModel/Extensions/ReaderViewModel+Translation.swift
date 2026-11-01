@@ -213,7 +213,9 @@ extension ReaderViewModel {
     /// Read on every render, and in the vertical layout `currentImages` is
     /// the whole book while a job changes one page at a time — so each page
     /// is built once and kept (`TranslationMemo`) until something it's made
-    /// of changes.
+    /// of changes. Nor does it look at every page each time: with everything
+    /// else the same, only the pages the jobs wrote since the last read are
+    /// looked at again. The result stays aligned with `currentImages`.
     var translationOverlayPages: [TranslatedPage?] {
         guard translationFeatureAvailable else { return [] }
         let shown = translation
@@ -224,10 +226,11 @@ extension ReaderViewModel {
         let revisions = shown.pageRevisions
         let editedPages = translationEdits.pages
         let retranslating = translationEdits.retranslating
-        let others = translationManager.openBook
-            .filter { $0 !== shown && $0.hasPages }
+        let otherControllers = translationManager.openBook.filter { $0 !== shown && $0.hasPages }
+        let others = otherControllers
             .map { (target: $0.target, pages: $0.pages, revisions: $0.pageRevisions) }
-        return imageLoader.currentPageIDs.map { id in
+        let ids = imageLoader.currentPageIDs
+        func build(_ id: String) -> TranslatedPage? {
             guard let machine = machinePages[id], let revision = revisions[id] else { return nil }
             let edits = editedPages[id]
             let key = TranslationMemo.OverlayKey(
@@ -262,6 +265,35 @@ extension ReaderViewModel {
             translationMemo.overlayPages[id] = .init(key: key, page: page)
             return page
         }
+
+        let controllers = [shown] + otherControllers
+        if let last = translationMemo.overlayBook,
+           last.controllers.count == controllers.count,
+           zip(last.controllers, controllers).allSatisfy({ $0.controller === $1 }),
+           last.target == target, last.includeHidden == includeHidden,
+           last.retranslating == retranslating, last.edits == editedPages, last.ids == ids,
+           let changes = last.pagesChanged() {
+            var result = last.result
+            for id in changes {
+                if let index = last.indices[id] { result[index] = build(id) }
+            }
+            var kept = last
+            kept.result = result
+            kept.controllers = controllers.map { .init(controller: $0, stamp: $0.pagesStamp) }
+            translationMemo.overlayBook = kept
+            return result
+        }
+
+        let result = ids.map(build)
+        let indices = Dictionary(ids.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
+        // A page twice in the book has two slots: left to the full build.
+        translationMemo.overlayBook = indices.count == ids.count ? .init(
+            ids: ids, indices: indices, target: target, includeHidden: includeHidden,
+            edits: editedPages, retranslating: retranslating,
+            controllers: controllers.map { .init(controller: $0, stamp: $0.pagesStamp) },
+            result: result
+        ) : nil
+        return result
     }
 
     /// Indices of pages translated into the shown language (thumbnails, slider).
@@ -612,6 +644,7 @@ extension ReaderViewModel {
     /// are reattached as they are; on a settings change running jobs restart
     /// with the new settings. `autoStart` honours the series' auto-translate.
     func reloadTranslations(autoStart: Bool = false, bookChanged: Bool = false) {
+        warmUpTranslationIfNeeded()
         let editedPageIDs = translationFeatureAvailable && hasSource ? source.pages.map(\.id) : []
         let editScope = translationScope
         Task { await translationEdits.load(pageIDs: editedPageIDs, scope: editScope) }
@@ -639,6 +672,26 @@ extension ReaderViewModel {
                 autoStart: autoStart && target == display && translationAutoTranslatesSeries,
                 restart: !isNew
             )
+        }
+    }
+
+    /// Once per installed build, while translation is on: pay the OCR's first-run
+    /// cost in the background rather than when the reader picks a language.
+    /// Reloads come through here too, which covers turning translation on.
+    func warmUpTranslationIfNeeded() {
+        guard !translationWarmupHandled,
+              translationFeatureAvailable,
+              let warmUp = dependencies.warmUpTranslation
+        else { return }
+        translationWarmupHandled = true
+        let defaults = dependencies.keyValueStore
+        let build = TranslationController.buildIdentifier
+        guard defaults.dictionaryRepresentation()[TranslationController.warmedUpBuildKey] as? String != build else { return }
+        Task.detached(priority: .utility) {
+            await warmUp()
+            await MainActor.run {
+                defaults.set(build, forKey: TranslationController.warmedUpBuildKey)
+            }
         }
     }
 
@@ -722,7 +775,36 @@ extension ReaderViewModel {
             let volumes: [URL]
         }
 
+        /// The whole result of `translationOverlayPages`, and what it was
+        /// made from.
+        struct OverlayBook {
+            struct Source {
+                let controller: TranslationController
+                let stamp: Int
+            }
+
+            let ids: [String]
+            let indices: [String: Int]
+            let target: TranslationLanguage
+            let includeHidden: Bool
+            let edits: [String: PageEdits]
+            let retranslating: Set<TranslationEdits.Retranslation>
+            var controllers: [Source]
+            var result: [TranslatedPage?]
+
+            /// The pages any controller wrote since; `nil` when one can't say.
+            func pagesChanged() -> Set<String>? {
+                var changes = Set<String>()
+                for source in controllers {
+                    guard let changed = source.controller.pagesChanged(since: source.stamp) else { return nil }
+                    changes.formUnion(changed)
+                }
+                return changes
+            }
+        }
+
         var overlayPages: [String: OverlayPage] = [:]
+        var overlayBook: OverlayBook?
         var seriesVolumes: SeriesVolumes?
         var pageIndices: [String: Int]?
     }

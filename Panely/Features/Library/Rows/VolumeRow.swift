@@ -3,16 +3,16 @@ import SwiftUI
 struct VolumeRow: View {
     let url: URL
     let isActive: Bool
-    let badge: ReadingBadge?
+    let readingBadge: (URL) -> ReadingBadge?
     let onTap: () -> Void
 
     private let iconName: String
     private let displayName: String
 
-    init(url: URL, isActive: Bool, badge: ReadingBadge? = nil, onTap: @escaping () -> Void) {
+    init(url: URL, isActive: Bool, readingBadge: @escaping (URL) -> ReadingBadge? = { _ in nil }, onTap: @escaping () -> Void) {
         self.url = url
         self.isActive = isActive
-        self.badge = badge
+        self.readingBadge = readingBadge
         self.onTap = onTap
         // Resolve `isDirectory` once at init instead of on every body
         // evaluation (the previous shape called the resourceValues stat
@@ -43,9 +43,7 @@ struct VolumeRow: View {
                     // would clip exactly the digits that tell volumes apart.
                     .truncationMode(.middle)
                 Spacer(minLength: 0)
-                if let badge {
-                    ReadingBadgeView(badge: badge)
-                }
+                ReadingBadgeLeaf(url: url, readingBadge: readingBadge)
             }
             .contentShape(Rectangle())
             .padding(.vertical, 2)

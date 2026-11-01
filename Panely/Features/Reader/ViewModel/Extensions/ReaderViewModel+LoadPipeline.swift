@@ -222,6 +222,7 @@ extension ReaderViewModel {
     private func startLoad() -> Int {
         unavailableRecentItem = nil
         imageLoader.cancelBackgroundWork()
+        tempDir.cancelExtraction()
         pagedRefreshTask?.cancel()
         ThumbnailLoader.shared.removeAll()
         sourceRenderRevision &+= 1
@@ -351,7 +352,9 @@ extension ReaderViewModel {
         let staging = ReaderTempDirectory.makeSessionCandidate()
 
         do {
-            try await ArchiveLoader.extractAll(from: url, to: staging)
+            let extraction = Task { try await ArchiveLoader.extractAll(from: url, to: staging) }
+            tempDir.trackExtraction(extraction)
+            try await extraction.value
             guard epoch == loadEpoch else {
                 try? FileManager.default.removeItem(at: staging)
                 return nil
@@ -383,6 +386,10 @@ extension ReaderViewModel {
                 }
             }
             return candidate
+        } catch is CancellationError {
+            // Superseded by a newer load (`startLoad`), which owns the UI now.
+            try? FileManager.default.removeItem(at: staging)
+            return nil
         } catch {
             try? FileManager.default.removeItem(at: staging)
             let message = DiagnosticRedactor.redactKnownPaths(in: error.localizedDescription, urls: [url, staging])
@@ -398,26 +405,9 @@ extension ReaderViewModel {
         }
     }
 
-    /// Move a finished extraction into its cache slot and return where the
-    /// tree ended up. If another load filled the slot first, its copy wins and
-    /// the staging dir is discarded; if the move fails, the staging dir is
-    /// used as a plain session dir (removed on book switch) instead.
     private nonisolated static func promoteExtraction(_ staging: URL, toCacheSlot slot: URL) async -> URL {
         await Task.detached(priority: .userInitiated) {
-            let fm = FileManager.default
-            if let existing = try? fm.contentsOfDirectory(atPath: slot.path) {
-                guard existing.isEmpty else {
-                    try? fm.removeItem(at: staging)
-                    return slot
-                }
-                try? fm.removeItem(at: slot)
-            }
-            do {
-                try fm.moveItem(at: staging, to: slot)
-                return slot
-            } catch {
-                return staging
-            }
+            ExtractionCacheStore.promote(staging, toCacheSlot: slot)
         }.value
     }
 

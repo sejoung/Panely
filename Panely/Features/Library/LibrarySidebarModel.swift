@@ -14,10 +14,18 @@ final class LibrarySidebarModel {
     /// root switch (blank + shallow-first repaint) from a same-root refresh
     /// (keep the tree on screen, swap only on a real diff).
     private var lastLoadedRoot: URL?
+    /// Refresh token of the last scan that ran to completion. The model
+    /// outlives the sidebar view (the overlay sidebar is mounted per reveal),
+    /// so a remount re-runs `.task` with nothing new to find; this lets that
+    /// run skip the scan.
+    private var lastCompletedToken: UUID?
 
+    /// `refreshToken` identifies the refresh being asked for: a repeat of a
+    /// completed one for the same root touches nothing but the expansion.
     func reload(
         rootURL: URL?,
         activeURL: URL? = nil,
+        refreshToken: UUID? = nil,
         loader: any LibraryTreeLoading
     ) async {
         guard let rootURL else {
@@ -25,13 +33,20 @@ final class LibrarySidebarModel {
             scanCompleted = false
             expandedNodeIDs = []
             lastLoadedRoot = nil
+            lastCompletedToken = nil
             return
         }
 
         let isRootSwitch = lastLoadedRoot?.standardizedFileURL != rootURL.standardizedFileURL
+        if !isRootSwitch, let refreshToken, refreshToken == lastCompletedToken {
+            expandAncestors(of: activeURL)
+            return
+        }
+
         lastLoadedRoot = rootURL
 
         if isRootSwitch {
+            lastCompletedToken = nil
             // New root: blank and shallow-scan first so the tree paints fast.
             nodes = []
             scanCompleted = false
@@ -59,42 +74,33 @@ final class LibrarySidebarModel {
             expandAncestors(of: activeURL)
         }
         scanCompleted = true
+        lastCompletedToken = refreshToken
     }
 
     func expandAncestors(of activeURL: URL?) {
         guard let activeURL else { return }
-        let active = activeURL.standardizedFileURL
-        let ancestors = Self.ancestorURLs(of: active, in: nodes)
+        let ancestors = Self.ancestorURLs(of: activeURL.standardizedFileURL, in: nodes)
         expandedNodeIDs.formUnion(ancestors)
     }
 
+    /// Runs on the main thread on every book open, so it follows the active
+    /// path down rather than walking the tree: at each level only the one
+    /// folder whose path prefixes it is entered, and the rest of a large
+    /// library is never visited. `[]` when the path doesn't lead to a node.
     private static func ancestorURLs(of activeURL: URL, in nodes: [FileNode]) -> [URL] {
-        for node in nodes {
-            if node.standardizedURL == activeURL {
-                return []
+        let activePath = activeURL.path
+        var ancestors: [URL] = []
+        var level = nodes
+        while true {
+            var next: FileNode?
+            for node in level {
+                let path = node.standardizedURL.path
+                if path == activePath { return ancestors }
+                if next == nil, activePath.hasPrefix(path + "/") { next = node }
             }
-            if let children = node.children,
-               let childPath = ancestorPath(of: activeURL, through: node, children: children) {
-                return childPath
-            }
+            guard let next, let children = next.children else { return [] }
+            ancestors.append(next.id)
+            level = children
         }
-        return []
-    }
-
-    private static func ancestorPath(
-        of activeURL: URL,
-        through node: FileNode,
-        children: [FileNode]
-    ) -> [URL]? {
-        for child in children {
-            if child.standardizedURL == activeURL {
-                return [node.id]
-            }
-            if let grandchildren = child.children,
-               let path = ancestorPath(of: activeURL, through: child, children: grandchildren) {
-                return [node.id] + path
-            }
-        }
-        return nil
     }
 }

@@ -231,7 +231,9 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
   또는 책의 번역 언어, 다른 언어는 **⋯** 메뉴로 시작·중지), 접혀 있는 **이 책과
   시리즈**(책의 언어, 자동 번역, 시리즈 전체 번역). 진행은 페이지 위 표시,
   백그라운드의 모든 일은 **윈도우 → 작업**(`⌥⌘J`), 앱 전체 설정은 ⚙︎ → 설정. 언어 선택과 책의 언어(자동 감지)는
-  시리즈별로 기억
+  시리즈별로 기억. 책의 언어를 아직 모르는 동안에는 패널 맨 위에 두어 감지를 기다리지 않고 직접 고를 수 있음
+- **빠진 페이지 없이** — 실패한 페이지는 나머지를 끝낸 뒤 한 번 더 시도하고, 그래도 실패하면 몇 페이지인지
+  알려 줌. 다시 번역하면 그 페이지만 처리
 - **책 하나에 여러 언어** — 언어마다 작업과 캐시가 따로이며, 말풍선을 클릭하면
   번역·다른 언어 번역·원문을 함께 보여줌(텍스트 선택 가능, 사전 찾기 지원)
 - **AI 채팅으로 다듬기** — 책 전체(또는 고른 페이지)의 말풍선 번호, 원문, 번역을 텍스트 파일로 저장해
@@ -719,7 +721,8 @@ Panely/
 │   │   ├── ZIPArchiveReader.swift      # ZIPFoundation.Archive 감싼 actor
 │   │   │                               # (헤더 전용 읽기용 loadDataPrefix)
 │   │   ├── RARArchiveReader.swift      # UnrarKit URKArchive 감싼 actor
-│   │   │                               # (solid 아카이브는 최초 접근 시 1회 추출)
+│   │   │                               # (solid 아카이브는 1회 추출해 추출 캐시에 보관,
+│   │   │                               # 일반 아카이브의 앞부분 읽기는 한 번에 모아서)
 │   │   ├── NaturalSort.swift           # 로케일 인식 자연 정렬 헬퍼
 │   │   └── ImageLoader.swift           # async NSImage + dimensions(for:) 헤더 읽기
 │   ├── Diagnostics/
@@ -824,7 +827,8 @@ Panely/
 │   │   ├── Pipeline/                   # OCRTiling, TranslationPlan (page / strip), PageAnalyzer,
 │   │   │                               # PageTextRecognizer (Vision), GemmaTranslator (llama.cpp + 프롬프트),
 │   │   │                               # BubbleGrouper, BalloonDetector(Core ML), MissedText,
-│   │   │                               # BubbleBackgroundSampler, TextClassifiers
+│   │   │                               # BubbleBackgroundSampler, TextClassifiers,
+│   │   │                               # TranslationWarmup (빌드마다 OCR 미리 준비)
 │   │   ├── Viewer/                     # TranslationOverlayView (+ 레이아웃, TranslationPatchPainter), 말풍선 팝오버
 │   │   └── UI/                         # 번역 패널, 언어 행, 진행 표시, 작업 목록, 편집 모드 막대,
 │   │                                   # 내보내기 시트, AI 채팅 시트, 작업 창
@@ -855,6 +859,7 @@ Panely/
 │       │   ├── RecentItemsStore.swift          # 재열기 시 북마크 중복 제거
 │       │   ├── ReadingProgressStore.swift      # 책당 진행도 (디바운스, 최근성 상한) → 배지 + 이어보기
 │       │   ├── LastLibraryRootStore.swift      # 마지막 라이브러리 루트 security-scoped 북마크 → 실행 시 복원
+│       │   ├── LatestWinsDefaultsWriter.swift  # 메인 액터 밖에서 최신 값만 기록
 │       │   └── SecurityScopedBookmark.swift    # 공용 북마크 생성/resolve + stale 갱신
 │       └── Rows/                       # 사이드바 row 뷰 (파일당 struct 하나)
 │           ├── FileNodeRow.swift
@@ -996,8 +1001,8 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 읽기
   두고(`SoundEffectClassifier`) 말풍선 배경 톤을 샘플링합니다
   (`BubbleBackgroundSampler`). 이어서 `GemmaTranslator`(전용 스레드의 actor)가
   Gemma 4 E2B를 llama.cpp로 GPU에서 돌립니다: 앱 전체에 모델 하나, 첫 페이지 OCR
-  동안 올리고 2분간 쓰지 않으면 내리며, 컨텍스트 하나를 요청마다 메모리만 비워
-  다시 쓰고, greedy 디코딩입니다. 프롬프트(`GemmaPrompt`, Windows 버전과 같음)는
+  동안 올리고 2분간 쓰지 않으면 내리며, 컨텍스트 하나를 다시 쓰되 앞선 요청과 같은
+  프롬프트 앞부분은 다시 읽지 않고(요청당 약 7% 단축), greedy 디코딩입니다. 프롬프트(`GemmaPrompt`, Windows 버전과 같음)는
   번호 붙은 `[n] 번역` 줄과 인물마다의 말투 유지를 요구하고, 출력이 써지는 대로
   줄을 읽어 말풍선마다 바로 표시하며, 모델이 빠뜨린 줄은 따로 다시 묻습니다.
   매니저의 `TranslationModelStore`가 고정된 GGUF를 진행률과 함께 내려받아 크기와
@@ -1030,7 +1035,9 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 읽기
   스레드 안전한 엔트리 읽기 제공. unrar는 에러 상태를 프로세스 전역 객체에
   두기 때문에 모든 UnrarKit 호출은 공유 락 하나를 추가로 거침. solid RAR
   (하나의 연속 압축 스트림이라 N번째 엔트리를 읽으려면 0..<N을 모두 풀어야
-  함)는 엔트리 단위로 읽지 않고, 최초 접근 시 리더 전용 임시 폴더에 1회 추출.
+  함)는 엔트리 단위로 읽지 않고, 최초 접근 시 추출 캐시에 1회 추출해 다시 열 때는
+  건너뜀. 일반 RAR은 엔트리 하나를 찾을 때마다 헤더를 처음부터 훑기 때문에, 세로
+  모드의 치수 읽기처럼 여러 엔트리의 앞부분이 필요할 때는 한 번에 모아서 읽음.
 - **AppKit 뷰어 코어** — `ViewerContainer`는 SwiftUI지만 스크롤 가능한 줌
   스테이지는 `AppKitImageScroller`(`NSViewRepresentable`)가 `NSScrollView`
   + `CenteringClipView` + 커스텀 `ImageStackView`를 감쌈.

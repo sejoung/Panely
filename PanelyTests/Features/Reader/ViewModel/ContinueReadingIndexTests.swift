@@ -35,7 +35,10 @@ struct ContinueReadingIndexTests {
         func write(_ key: String, alias: String? = nil, page: Int, total: Int = 20, finished: Bool = false) {
             progress.flushImmediately(forKey: key, fileIdentityKey: alias, page: page, total: total, finished: finished)
         }
-        func check(_ label: Comment) {
+        func check(_ label: Comment) async {
+            // File identities arrive in the background; the first read asks.
+            _ = vm.continueReadingSuggestion
+            await vm.continueReadingIdentities.settled()
             let actual = vm.continueReadingSuggestion
             let expected = referenceSuggestion(vm)
             #expect(actual?.id == expected?.id, label)
@@ -46,47 +49,47 @@ struct ContinueReadingIndexTests {
             #expect(actual?.item.id == expected?.item.id, label)
         }
 
-        check("empty")
+        await check("empty")
         write("/elsewhere/Unrelated.cbz", page: 3)
-        check("only an unrelated record")
+        await check("only an unrelated record")
         write(seriesPath + "#Vol01", alias: seriesIdentity + "#Vol01", page: 4)
         write(seriesPath + "#Vol02", page: 1)
         write(seriesPath + "#", page: 2)
-        check("archive inner volumes")
+        await check("archive inner volumes")
         #expect(vm.continueReadingSuggestion?.relativePath == "Vol02")
         write(single.standardizedFileURL.path, page: 5)
-        check("plain archive is freshest")
+        await check("plain archive is freshest")
         write(folderPath + "/Vol01", page: 6)
         write(folderPath + "/Vol03", page: 7)
         write(folderPath + "/Vol02#inner", page: 8)
-        check("folder children, one missing")
+        await check("folder children, one missing")
         #expect(vm.continueReadingSuggestion?.relativePath == "Vol03")
 
         await vm.refreshContinueReadingAvailability()
-        check("missing folder child hidden")
+        await check("missing folder child hidden")
         #expect(vm.continueReadingSuggestion?.relativePath == "Vol01")
 
         // Page turns: existing records move, the key set doesn't.
         write(seriesPath + "#Vol02", page: 9)
-        check("page turn in an inner volume")
+        await check("page turn in an inner volume")
         write(seriesIdentity + "#Vol01", page: 10)
-        check("fresher file-identity alias wins")
+        await check("fresher file-identity alias wins")
         #expect(vm.continueReadingSuggestion?.id == seriesPath + "#Vol01")
         #expect(vm.continueReadingSuggestion?.fraction == 0.55)
         write(folderPath + "/Vol01", page: 19, finished: true)
-        check("finishing a folder child")
+        await check("finishing a folder child")
         write(seriesPath + "#Vol01", alias: seriesIdentity + "#Vol01", page: 19, finished: true)
         write(seriesPath + "#Vol02", page: 19, finished: true)
-        check("finishing every inner volume")
+        await check("finishing every inner volume")
 
         // Key-set and recents changes.
         progress.remove(forKey: single.standardizedFileURL.path, fileIdentityKey: nil)
-        check("removed record")
+        await check("removed record")
         vm.recentItems.record(single, title: "Single Renamed")
         write(single.standardizedFileURL.path, page: 2)
-        check("re-recorded recent with new title")
+        await check("re-recorded recent with new title")
         vm.recentItems.remove(try #require(vm.recentItems.items.first { $0.title == "Single Renamed" }))
-        check("recent removed")
+        await check("recent removed")
     }
 
     @Test func pageTurnReusesTheIndexButStillUpdatesTheSuggestion() {

@@ -45,6 +45,12 @@ struct TranslationPanel: View {
         VStack(alignment: .leading, spacing: PanelySpacing.md) {
             header
 
+            // Up here while it's unknown, not folded away below: this is what a
+            // failed or slow detection needs, and the notice sends readers here.
+            if viewModel.translationSourceLanguage == nil {
+                sourceRow
+            }
+
             if viewModel.translationSourceLanguage != viewModel.translationDisplayLanguage {
                 TranslationPrimaryAction()
             }
@@ -149,7 +155,9 @@ struct TranslationPanel: View {
 
     private var bookSettings: some View {
         VStack(alignment: .leading, spacing: PanelySpacing.sm) {
-            sourceRow
+            if viewModel.translationSourceLanguage != nil {
+                sourceRow
+            }
             Toggle("Translate This Series Automatically", isOn: autoBinding)
 
             let volumes = viewModel.translatableSeriesVolumes
@@ -229,11 +237,15 @@ struct TranslationPanel: View {
                 .labelsHidden()
                 .fixedSize()
             }
-            Text(
-                viewModel.translationSourceLanguage == nil
-                    ? "The book's language is detected when translation starts."
-                    : "Remembered for this series."
-            )
+            Group {
+                if viewModel.translationSourceLanguage != nil {
+                    Text("Remembered for this series.")
+                } else if viewModel.translation.phase == .detectingLanguage {
+                    Text("Detecting now — choose the language to skip this.")
+                } else {
+                    Text("The book's language is detected when translation starts.")
+                }
+            }
             .font(.caption)
             .foregroundStyle(PanelyColor.textSecondary)
         }
@@ -397,9 +409,16 @@ struct TranslationStatusText: View {
     static func text(for translation: TranslationController) -> Text {
         let done = translation.completedPageCount
         let total = translation.bookPageCount
+        if translation.isWaitingForOCR, translation.isWorking {
+            return Text("Preparing OCR — this can take up to a minute…")
+        }
         switch translation.phase {
         case .detectingLanguage:
-            return Text("Detecting the book's language…")
+            if translation.isFirstRunForThisBuild {
+                return Text("Detecting the book's language — the first time after an update takes 1–2 minutes…")
+            } else {
+                return Text("Detecting the book's language…")
+            }
         case .preparing:
             if translation.isFirstRunForThisBuild {
                 return Text("Preparing translation models — the first time takes 1–2 minutes…")

@@ -140,13 +140,7 @@ final class TranslationEdits {
         guard !pageIDs.isEmpty else { return }
         let store = store
         let loaded = await Task.detached(priority: .utility) {
-            var found: [String: PageEdits] = [:]
-            for id in pageIDs {
-                if let edits = store.load(key: TranslationEditStore.key(pageID: id, scope: scope)) {
-                    found[id] = edits
-                }
-            }
-            return found
+            store.loadAll(pageIDs: pageIDs, scope: scope)
         }.value
         guard self.generation == generation else { return }
         pages = loaded

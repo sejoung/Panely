@@ -1845,6 +1845,22 @@
         }
       }
     },
+    "Couldn't translate %lld pages. Translate again to retry them." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Couldn't translate %lld pages. Translate again to retry them."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld페이지를 번역하지 못했습니다. 다시 번역하면 해당 페이지만 재시도합니다."
+          }
+        }
+      }
+    },
     "Couldn't tell which language this book is in. Choose it in the translation panel." : {
       "localizations" : {
         "en" : {
@@ -2021,6 +2037,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "자동 감지"
+          }
+        }
+      }
+    },
+    "Detecting now — choose the language to skip this." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detecting now — choose the language to skip this."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "감지하는 중입니다. 언어를 직접 고르면 건너뜁니다."
+          }
+        }
+      }
+    },
+    "Detecting the book's language — the first time after an update takes 1–2 minutes…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detecting the book's language — the first time after an update takes 1–2 minutes…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "책의 언어를 감지하는 중… 업데이트 후 처음 한 번은 1~2분 걸립니다"
           }
         }
       }
@@ -5260,6 +5308,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "툴바 고정 (⌃⌘T)"
+          }
+        }
+      }
+    },
+    "Preparing OCR — this can take up to a minute…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparing OCR — this can take up to a minute…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OCR 준비 중… 최대 1분 정도 걸릴 수 있습니다"
           }
         }
       }

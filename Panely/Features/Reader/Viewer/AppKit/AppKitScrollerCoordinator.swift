@@ -144,7 +144,12 @@ final class AppKitScrollerCoordinator {
         // every layout. Push the live value into ViewerController so the
         // toolbar's fit-mode highlight tracks the user's zoom in real time —
         // the rest of this method only handles vertical-strip scroll work.
-        viewerController?.currentMagnification = sv.magnification
+        // Runs on every scroll tick, so only write a real change: on toolchains
+        // whose `@Observable` doesn't skip equal values, a write here would
+        // re-render the toolbar per frame (see `AppKitImageScroller.applyFit`).
+        if let viewerController, viewerController.currentMagnification != sv.magnification {
+            viewerController.currentMagnification = sv.magnification
+        }
 
         guard lastLayout.isContinuous,
               let stack = sv.documentView as? ImageStackView else { return }

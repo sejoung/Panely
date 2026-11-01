@@ -11,11 +11,22 @@ final class ReaderTempDirectory {
 
     private let extractionCache: any ExtractionCacheManaging
     var url: URL?
+    private var extraction: Task<Void, Error>?
 
     var isActive: Bool { url != nil }
 
     init(extractionCache: any ExtractionCacheManaging = LiveExtractionCacheManager()) {
         self.extractionCache = extractionCache
+    }
+
+    /// The archive extraction now running, so the next load can stop it.
+    func trackExtraction(_ task: Task<Void, Error>) {
+        extraction = task
+    }
+
+    func cancelExtraction() {
+        extraction?.cancel()
+        extraction = nil
     }
 
     func adopt(_ dir: URL) {

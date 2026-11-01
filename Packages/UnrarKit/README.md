@@ -34,6 +34,9 @@ Search for `Panely patch` to find them.
 1. `URKArchive -isSolid` — exposes the archive-level `ROADF_SOLID` flag.
 2. `URKArchive -closeFile` — frees `ArcName` with `free()` (it is allocated by
    `strdup()`; upstream used `delete`).
+3. `URKArchive -extractPrefixesOfFiles:maxBytes:error:action:` — reads the head
+   of many entries in one pass, since finding an entry walks the headers from
+   the start.
 
 ## Thread safety
 

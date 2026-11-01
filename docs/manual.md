@@ -510,8 +510,14 @@ Translation starts at the page you're on and keeps ahead of you as you read:
 - Balloons appear with a pulsing outline and "…" as soon as they're found, and
   fill in one by one.
 - The line under the button, and the pill over the page, show progress and the
-  time left. The first translation after installing takes a minute or two
-  while the models load — the pill says so.
+  time left.
+- Translating can pause for tens of seconds early on while macOS prepares its
+  OCR models; the pill says **Preparing OCR** when it does. The first launch
+  after an update prepares them in the background for about a minute, if
+  translation is on.
+- A page that fails is tried once more after the rest. If it still fails,
+  Panely tells you how many pages are missing, and translating again does
+  just those pages.
 - Finished pages get a badge in the thumbnail sidebar.
 
 Before the first translation, the big button is **Download Translation Model
@@ -522,8 +528,11 @@ itself. On an M1 Pro a balloon takes about a quarter of a second, a page a
 few seconds; each balloon fills in as soon as its translation is written.
 
 The first time you translate a series, Panely works out which language the
-book is in and remembers it for the series. If it guessed wrong, open **This
-Book & Series** in the panel and change **Book's Language**; the same section
+book is in and remembers it for the series. While the language is unknown,
+**Book's Language** sits at the top of the panel, so you can choose it instead
+of waiting; if detection fails, choosing it starts translating right away. If
+it guessed wrong, open **This Book & Series** in the panel and change **Book's
+Language**; the same section
 holds **Translate This Series Automatically** and **Translate Entire Series**.
 
 In **Vertical scroll** the pages are read as one strip, so a webtoon cut into

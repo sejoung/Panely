@@ -90,14 +90,20 @@ nonisolated struct TranslationExportWriter {
         let bubbles = TranslatedPageRenderer.bubbles(for: index, in: byIndex, scope: scope)
         guard !bubbles.isEmpty else { return (original, ext) }
 
-        guard let source = CGImageSourceCreateWithData(original as CFData, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
-        else { throw ImageLoaderError.decodingFailed }
-        let pageSize = byIndex[index]?.imageSize ?? CGSize(width: image.width, height: image.height)
         let asPNG = ext == "png"
-        guard let rendered = TranslatedPageRenderer.render(image, bubbles: bubbles, pageSize: pageSize),
-              let data = TranslatedPageRenderer.encode(rendered, asPNG: asPNG)
-        else { throw ImageLoaderError.decodingFailed }
+        // Drawing goes through AppKit, which can autorelease what holds on to
+        // the page's bitmap. Nothing promises a pool drains between pages of a
+        // long export, so each page gets its own.
+        let data: Data = try autoreleasepool {
+            guard let source = CGImageSourceCreateWithData(original as CFData, nil),
+                  let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
+            else { throw ImageLoaderError.decodingFailed }
+            let pageSize = byIndex[index]?.imageSize ?? CGSize(width: image.width, height: image.height)
+            guard let rendered = TranslatedPageRenderer.render(image, bubbles: bubbles, pageSize: pageSize),
+                  let data = TranslatedPageRenderer.encode(rendered, asPNG: asPNG)
+            else { throw ImageLoaderError.decodingFailed }
+            return data
+        }
         return (data, asPNG ? "png" : "jpg")
     }
 

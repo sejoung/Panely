@@ -479,6 +479,26 @@ extern NSString *URKErrorDomain;
                              action:(void(^)(NSData *dataChunk, CGFloat percentDecompressed))action;
 
 /**
+ *  Reads the first bytes of several entries in a single pass over the archive.
+ *  Entries that can't be read are simply not delivered. Not for solid archives,
+ *  where stopping inside an entry loses the stream's state.
+ *  Panely patch — not part of upstream UnrarKit.
+ *
+ *  @param filePaths The entries to read
+ *  @param maxBytes  How much of each entry is wanted; at least this much is
+ *                   delivered, or the whole entry if it is smaller
+ *  @param error     Contains an error if the archive couldn't be opened or its
+ *                   headers couldn't be read
+ *  @param action    Called once per entry delivered
+ *
+ *  @return YES if the pass ran
+ */
+- (BOOL)extractPrefixesOfFiles:(NSSet<NSString *> *)filePaths
+                      maxBytes:(NSUInteger)maxBytes
+                         error:(NSError **)error
+                        action:(void(^)(NSString *filePath, NSData *prefix))action;
+
+/**
  *  YES if the archive uses solid compression, NO otherwise (or if it can't be opened).
  *  Panely patch — not part of upstream UnrarKit.
  */

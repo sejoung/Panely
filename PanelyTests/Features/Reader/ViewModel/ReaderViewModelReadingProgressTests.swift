@@ -384,7 +384,7 @@ struct ReaderViewModelReadingProgressTests {
 
     // MARK: - Volume navigation feeds Recents (so Continue Reading tracks it)
 
-    @Test func nextVolumeRecordsTargetInRecents() {
+    @Test func nextVolumeRecordsTargetInRecents() async {
         let vm = makeTestViewModel()
         let v1 = URL(fileURLWithPath: "/lib/Vol01.cbz")
         let v2 = URL(fileURLWithPath: "/lib/Vol02.cbz")
@@ -395,6 +395,7 @@ struct ReaderViewModelReadingProgressTests {
 
         // The volume flip records the target in Recents just like a tree click,
         // so the sidebar's Continue Reading no longer goes stale across volumes.
+        await vm.recentItems.recordingSettled()
         #expect(vm.recentItems.items.contains { $0.path == v2.standardizedFileURL.path })
     }
 

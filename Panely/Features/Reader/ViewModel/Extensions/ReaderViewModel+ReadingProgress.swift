@@ -1,5 +1,85 @@
 import Foundation
 
+/// A row's identity lookup, with the opened/temp context its key depends on.
+nonisolated struct BadgeIdentityRequest: Hashable, Sendable {
+    let url: URL
+    let opened: URL?
+    let tempRoot: URL?
+}
+
+/// Values that need the file system to compute, for readers that can't wait:
+/// a miss answers `nil` now and is looked up off the main thread, together
+/// with whatever else was asked for in the same run-loop pass.
+///
+/// `reader.value(for:)` runs in SwiftUI `body`, on the main thread, for every
+/// row of a library that may live on a network share — where a stat per row
+/// is a visible hang, and an unresponsive mount a long one.
+@MainActor
+final class OffMainLookup<Key: Hashable & Sendable, Value: Hashable & Sendable> {
+    private var known: [Key: Value?] = [:]
+    private var pending: Set<Key> = []
+    private var inFlight: Set<Key> = []
+    private var task: Task<Void, Never>?
+    private let compute: @Sendable (Key) -> Value?
+    /// Called for each key whose value changed, after it is stored.
+    var onChange: (Key, Value?) -> Void = { _, _ in }
+
+    init(compute: @escaping @Sendable (Key) -> Value?) {
+        self.compute = compute
+    }
+
+    func value(for key: Key) -> Value? {
+        if let value = known[key] { return value }
+        pending.insert(key)
+        startIfNeeded()
+        return nil
+    }
+
+    /// Look everything up again (files may have been replaced on disk). The
+    /// old values keep answering until the new ones arrive.
+    func refreshAll() {
+        // Including those being looked up right now, which may have read the
+        // file before whatever prompted this refresh changed it.
+        pending.formUnion(known.keys)
+        pending.formUnion(inFlight)
+        guard !pending.isEmpty else { return }
+        startIfNeeded()
+    }
+
+    /// Finishes when nothing is left to look up.
+    func settled() async {
+        while let task {
+            await task.value
+        }
+    }
+
+    private func startIfNeeded() {
+        guard task == nil else { return }
+        task = Task { [weak self] in
+            await self?.drain()
+            self?.task = nil
+        }
+    }
+
+    private func drain() async {
+        let compute = compute
+        while !pending.isEmpty {
+            let batch = pending
+            pending = []
+            inFlight = batch
+            let results = await Task.detached(priority: .utility) {
+                batch.map { (key: $0, value: compute($0)) }
+            }.value
+            inFlight = []
+            for (key, value) in results {
+                let changed = (known[key] ?? nil) != value
+                known[key] = .some(value)
+                if changed { onChange(key, value) }
+            }
+        }
+    }
+}
+
 private nonisolated struct DirectoryContinueReadingAvailabilityCheck: Sendable {
     let root: URL
     let children: [(key: String, url: URL)]
@@ -15,21 +95,48 @@ extension ReaderViewModel {
     /// opened. Falls back to a total-less "in progress" mark for books that
     /// have a saved page index but no recorded progress (read before progress
     /// tracking existed).
+    ///
+    /// Read from row bodies, so it never touches the file system: the path key
+    /// answers straight away, and the file-identity alias (which only matters
+    /// for a moved or remounted book) joins in once `badgeIdentities` has
+    /// stat'ed it in the background.
     func readingBadge(for url: URL) -> ReadingBadge? {
-        let keys = readingBadgeKeys(for: url)
-        if let progress = readingProgress.progress(forKey: keys.primary, fileIdentityKey: keys.fileIdentity) {
+        // Observation dependency: an alias that turns out to hold this book's
+        // record has to reach the rows that drew without it.
+        _ = readingBadgeIdentityRevision
+        let context = ReadingBadgeKeyMemo.Context(opened: openedSourceURL, tempRoot: tempDir.url)
+        let primary = readingBadgePrimaryKey(for: url, context: context)
+        let identity = badgeIdentities.value(
+            for: BadgeIdentityRequest(url: url, opened: context.opened, tempRoot: context.tempRoot)
+        )
+        return readingBadge(primary: primary, fileIdentity: identity)
+    }
+
+    private func readingBadge(primary: String, fileIdentity: String?) -> ReadingBadge? {
+        if let progress = readingProgress.progress(forKey: primary, fileIdentityKey: fileIdentity) {
             if progress.finished { return .finished }
             return .inProgress(fraction: progress.total > 0 ? progress.fraction : nil)
         }
-        let index = positions.restoredIndex(forKey: keys.primary, fileIdentityKey: keys.fileIdentity)
+        let index = positions.restoredIndex(forKey: primary, fileIdentityKey: fileIdentity)
         return index > 0 ? .inProgress(fraction: nil) : nil
+    }
+
+    /// A file identity arrived for `request`: re-render the badges only if it
+    /// changes what this row shows — not for every book that has no record
+    /// under its alias, which is nearly all of them.
+    func badgeIdentityResolved(_ request: BadgeIdentityRequest, identity: String?) {
+        let primary = PositionKey.make(for: request.url, opened: request.opened, tempRoot: request.tempRoot)
+        if readingBadge(primary: primary, fileIdentity: identity)
+            != readingBadge(primary: primary, fileIdentity: nil) {
+            readingBadgeIdentityRevision &+= 1
+        }
     }
 
     struct ContinueReadingMemo {
         struct Inputs: Equatable {
             let progressRevision: Int
             let recentsRevision: Int
-            let refreshToken: UUID
+            let identityRevision: Int
             let unavailableKeys: Set<String>
         }
         let inputs: Inputs
@@ -38,15 +145,16 @@ extension ReaderViewModel {
 
     /// The structural half of the Continue Reading scan: which progress keys
     /// belong to which available recent source (prefix matches over every
-    /// key), and the file-identity alias of each (a stat per key). None of
-    /// that moves when a page turn rewrites an existing record, so it's kept
-    /// until recents, the progress *key set*, or the library tree change —
-    /// a page turn then only re-reads the records these slots point at.
+    /// key). None of that moves when a page turn rewrites an existing record,
+    /// so it's kept until recents, the progress *key set*, or a file identity
+    /// change — a page turn then only re-reads the records these slots point
+    /// at. Identities come from `continueReadingIdentities`, so building this
+    /// in `body` never stats a file.
     struct ContinueReadingIndexMemo {
         struct Inputs: Equatable {
             let recentsRevision: Int
             let progressKeysRevision: Int
-            let refreshToken: UUID
+            let identityRevision: Int
         }
         let inputs: Inputs
         /// In scan order (recents order; per source: the source itself,
@@ -65,33 +173,25 @@ extension ReaderViewModel {
         let isFolderChild: Bool
     }
 
-    /// `PositionKey.keys` stats the file for its identity; the sidebar asks
-    /// for every visible row on every render. Keys only depend on the URL and
-    /// the opened/temp context, so they're kept until that context changes or
-    /// the library tree is re-scanned (files may have been replaced on disk).
+    /// The path keys of the rows on screen, kept while the opened/temp context
+    /// holds: the sidebar asks for every visible row on every render.
     struct ReadingBadgeKeyMemo {
         struct Context: Equatable {
             let opened: URL?
             let tempRoot: URL?
-            let refreshToken: UUID
         }
         var context: Context?
-        var keys: [URL: PositionKey.Keys] = [:]
+        var primaryKeys: [URL: String] = [:]
     }
 
-    private func readingBadgeKeys(for url: URL) -> PositionKey.Keys {
-        let context = ReadingBadgeKeyMemo.Context(
-            opened: openedSourceURL,
-            tempRoot: tempDir.url,
-            refreshToken: libraryRefreshToken
-        )
+    private func readingBadgePrimaryKey(for url: URL, context: ReadingBadgeKeyMemo.Context) -> String {
         if readingBadgeKeyMemo.context != context {
             readingBadgeKeyMemo = ReadingBadgeKeyMemo(context: context)
         }
-        if let cached = readingBadgeKeyMemo.keys[url] { return cached }
-        let keys = PositionKey.keys(for: url, opened: context.opened, tempRoot: context.tempRoot)
-        readingBadgeKeyMemo.keys[url] = keys
-        return keys
+        if let cached = readingBadgeKeyMemo.primaryKeys[url] { return cached }
+        let primary = PositionKey.make(for: url, opened: context.opened, tempRoot: context.tempRoot)
+        readingBadgeKeyMemo.primaryKeys[url] = primary
+        return primary
     }
 
     struct ContinueReadingSuggestion: Identifiable {
@@ -113,12 +213,11 @@ extension ReaderViewModel {
     /// open) it resolves to whatever you read last — the primary use case.
     var continueReadingSuggestion: ContinueReadingSuggestion? {
         // Reading the revisions (not just the memo) keeps the observation
-        // dependency on both stores alive when the memo hits. The refresh
-        // token re-derives the cached file identities after a tree rescan.
+        // dependency on both stores alive when the memo hits.
         let inputs = ContinueReadingMemo.Inputs(
             progressRevision: readingProgress.revision,
             recentsRevision: recentItems.revision,
-            refreshToken: libraryRefreshToken,
+            identityRevision: continueReadingIdentityRevision,
             unavailableKeys: unavailableContinueReadingKeys
         )
         if let memo = continueReadingMemo, memo.inputs == inputs {
@@ -175,7 +274,7 @@ extension ReaderViewModel {
                 return
             }
             unavailableRecentItem = nil
-            recentItems.record(url, title: displayTitle(for: url))
+            recentItems.recordInBackground(url, title: displayTitle(for: url))
             await load(
                 url: url,
                 intent: .continueReading(relativePath: suggestion.relativePath)
@@ -192,7 +291,7 @@ extension ReaderViewModel {
                 return
             }
             unavailableRecentItem = nil
-            recentItems.record(url, title: displayTitle(for: url))
+            recentItems.recordInBackground(url, title: displayTitle(for: url))
             await load(url: url)
         }
     }
@@ -231,7 +330,7 @@ extension ReaderViewModel {
         let inputs = ContinueReadingIndexMemo.Inputs(
             recentsRevision: recentItems.revision,
             progressKeysRevision: readingProgress.keysRevision,
-            refreshToken: libraryRefreshToken
+            identityRevision: continueReadingIdentityRevision
         )
         if let memo = continueReadingIndexMemo, memo.inputs == inputs {
             return memo.slots
@@ -243,19 +342,20 @@ extension ReaderViewModel {
 
     private func continueReadingSlots(for item: RecentItem) -> [ContinueReadingSlot] {
         guard let url = recentItems.availableURL(for: item) else { return [] }
-        let keys = PositionKey.keys(for: url, opened: nil, tempRoot: nil)
+        let primary = PositionKey.make(for: url, opened: nil, tempRoot: nil)
+        let identity = continueReadingIdentities.value(for: url)
         // The source's own record, or its file-identity alias.
         var slots = [
             ContinueReadingSlot(
-                key: keys.primary,
+                key: primary,
                 item: item,
                 relativePath: nil,
-                fileIdentityKey: keys.fileIdentity,
+                fileIdentityKey: identity,
                 isFolderChild: false
             ),
         ]
 
-        let nestedPrefix = keys.primary + "#"
+        let nestedPrefix = primary + "#"
         for key in readingProgress.entries.keys where key.hasPrefix(nestedPrefix) {
             let relativePath = String(key.dropFirst(nestedPrefix.count))
             guard !relativePath.isEmpty else { continue }
@@ -263,7 +363,7 @@ extension ReaderViewModel {
                 key: key,
                 item: item,
                 relativePath: relativePath,
-                fileIdentityKey: keys.fileIdentity.map { $0 + "#" + relativePath },
+                fileIdentityKey: identity.map { $0 + "#" + relativePath },
                 isFolderChild: false
             ))
         }
@@ -272,7 +372,7 @@ extension ReaderViewModel {
         // Those normal on-disk books key progress by `root/relative/path`
         // rather than zip-in-zip's `root#inner` convention.
         if item.isDirectory {
-            let childPrefix = keys.primary + "/"
+            let childPrefix = primary + "/"
             for key in readingProgress.entries.keys
             where key.hasPrefix(childPrefix) && !key.contains("#") {
                 let relativePath = String(key.dropFirst(childPrefix.count))
@@ -284,7 +384,7 @@ extension ReaderViewModel {
                     key: key,
                     item: item,
                     relativePath: relativePath,
-                    fileIdentityKey: PositionKey.fileIdentity(for: childURL),
+                    fileIdentityKey: continueReadingIdentities.value(for: childURL),
                     isFolderChild: true
                 ))
             }

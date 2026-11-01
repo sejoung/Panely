@@ -50,6 +50,82 @@ struct LibrarySidebarModelTests {
         #expect(arcNode.children?.map(\.name) == ["Vol02"])
     }
 
+    /// The overlay sidebar remounts per reveal over a model that outlives it;
+    /// its `.task` re-running with the same token has nothing to find.
+    @Test func repeatingACompletedRefreshDoesNotRescan() async throws {
+        let root = URL(fileURLWithPath: "/fake-library", isDirectory: true)
+        let active = root.appendingPathComponent("depth-3/Vol01.cbz")
+        let loader = CountingTreeLoader()
+        let model = LibrarySidebarModel()
+        let token = UUID()
+
+        await model.reload(rootURL: root, refreshToken: token, loader: loader)
+        let scans = loader.scans
+        #expect(scans == 2) // shallow + deep
+
+        await model.reload(rootURL: root, activeURL: active, refreshToken: token, loader: loader)
+        #expect(loader.scans == scans)
+        #expect(model.nodes.map(\.name) == ["depth-3"])
+        #expect(model.scanCompleted)
+        #expect(model.expandedNodeIDs.contains(root.appendingPathComponent("depth-3")))
+
+        // A new token is a real refresh.
+        await model.reload(rootURL: root, refreshToken: UUID(), loader: loader)
+        #expect(loader.scans == scans + 1)
+    }
+
+    @Test func aCancelledScanIsNotTreatedAsComplete() async throws {
+        let root = URL(fileURLWithPath: "/fake-library", isDirectory: true)
+        let loader = CountingTreeLoader()
+        let model = LibrarySidebarModel()
+        let token = UUID()
+
+        let cancelled = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            await model.reload(rootURL: root, refreshToken: token, loader: loader)
+        }
+        await cancelled.value
+        #expect(model.nodes.isEmpty)
+
+        await model.reload(rootURL: root, refreshToken: token, loader: loader)
+        #expect(model.nodes.map(\.name) == ["depth-3"])
+        #expect(model.scanCompleted)
+    }
+
+    /// Follows the path rather than walking the tree, so names that only share
+    /// a stem with the active path's folder mustn't be entered or expanded.
+    @Test func expandAncestorsFollowsThePathOnly() async {
+        let root = URL(fileURLWithPath: "/lib", isDirectory: true)
+        func folder(_ path: String, _ children: [FileNode]) -> FileNode {
+            let url = root.appendingPathComponent(path, isDirectory: true)
+            return FileNode(id: url, url: url, name: url.lastPathComponent, kind: .folder, children: children)
+        }
+        func book(_ path: String) -> FileNode {
+            let url = root.appendingPathComponent(path)
+            return FileNode(id: url, url: url, name: url.lastPathComponent, kind: .archive, children: nil)
+        }
+        let tree = [
+            folder("Series", [book("Series/Other.cbz")]),
+            folder("Series A", [folder("Series A/Arc", [book("Series A/Arc/Vol.cbz")])]),
+            folder("Series B", [book("Series B/Vol.cbz")]),
+        ]
+        let model = LibrarySidebarModel()
+        await model.reload(rootURL: root, loader: FixedTreeLoader(tree: tree))
+
+        model.expandAncestors(of: root.appendingPathComponent("Series A/Arc/Vol.cbz"))
+        #expect(model.expandedNodeIDs == [
+            root.appendingPathComponent("Series A", isDirectory: true),
+            root.appendingPathComponent("Series A/Arc", isDirectory: true),
+        ])
+
+        // Not in the tree, top-level, and under a folder without the book.
+        model.expandedNodeIDs = []
+        model.expandAncestors(of: root.appendingPathComponent("Series B/Missing.cbz"))
+        model.expandAncestors(of: root.appendingPathComponent("Series", isDirectory: true))
+        model.expandAncestors(of: URL(fileURLWithPath: "/elsewhere/Vol.cbz"))
+        #expect(model.expandedNodeIDs.isEmpty)
+    }
+
     @Test func reloadUsesInjectedTreeLoader() async {
         let model = LibrarySidebarModel()
 
@@ -238,6 +314,29 @@ private nonisolated struct NestedLibraryTreeLoader: LibraryTreeLoading {
             ),
         ]
     }
+}
+
+private final class CountingTreeLoader: LibraryTreeLoading, @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+    var scans: Int { lock.withLock { count } }
+
+    func loadTree(from url: URL, maxDepth: Int) async -> [FileNode] {
+        lock.withLock { count += 1 }
+        let folder = url.appendingPathComponent("depth-3")
+        let book = folder.appendingPathComponent("Vol01.cbz")
+        return [
+            FileNode(id: folder, url: folder, name: "depth-3", kind: .folder, children: [
+                FileNode(id: book, url: book, name: "Vol01", kind: .archive, children: nil),
+            ]),
+        ]
+    }
+}
+
+private struct FixedTreeLoader: LibraryTreeLoading {
+    let tree: [FileNode]
+
+    func loadTree(from url: URL, maxDepth: Int) async -> [FileNode] { tree }
 }
 
 private actor SuspendedLibraryTreeLoader: LibraryTreeLoading {

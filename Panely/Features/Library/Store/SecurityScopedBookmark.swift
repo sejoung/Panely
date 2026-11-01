@@ -43,6 +43,12 @@ nonisolated extension SecurityScopedBookmarking {
     }
 }
 
+/// `resolveRefreshing`'s result, for handing back from a detached resolve.
+nonisolated struct ResolvedBookmark: Sendable {
+    let url: URL
+    let refreshed: (data: Data, path: String)?
+}
+
 nonisolated struct LiveSecurityScopedBookmarkResolver: SecurityScopedBookmarking {
     func data(for url: URL) throws -> Data {
         try SecurityScopedBookmark.data(for: url)

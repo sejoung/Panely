@@ -42,6 +42,7 @@ final class ReaderImageLoader {
     // MARK: - Cache + async state
 
     private let imageCache = ReaderImageMemoryCache()
+    private let inFlightDecodes = ReaderInFlightDecodes()
 
     /// Header-derived page dimensions keyed by `ComicPage.id`. Lets a
     /// paged → vertical toggle (or any vertical rebuild of the same book)
@@ -315,15 +316,21 @@ final class ReaderImageLoader {
         let window = ReaderVerticalImageWindow(pageCount: source.pageCount)
         evictPagesOutsideKeepWindow(visibleRange: range, window: window)
 
-        let needed = window.loadIndices(
-            forVisibleRange: range,
-            excluding: loadedPageIndices.union(failedPageIndices)
+        let needed = ReaderVerticalImageWindow.visibleFirst(
+            window.loadIndices(
+                forVisibleRange: range,
+                excluding: loadedPageIndices.union(failedPageIndices)
+            ),
+            visibleRange: range
         )
         guard !needed.isEmpty else { return }
 
         let generation = self.generation
+        let decodes = inFlightDecodes
+        let held = decodes.hold(ids: needed.compactMap { source.pages.indices.contains($0) ? source.pages[$0].id : nil })
         lazyLoadTask?.cancel()
         lazyLoadTask = Task { [weak self] in
+            defer { decodes.release(held) }
             await self?.loadPagesBatched(needed, source: source, generation: generation, onError: onError)
         }
     }
@@ -371,12 +378,11 @@ final class ReaderImageLoader {
         currentImages = newImages
     }
 
-    /// Load `indices` concurrently and apply ALL results in a single
-    /// `currentImages` assignment. Single SwiftUI render = single
-    /// updateNSView = single setImages incremental swap, regardless of how
-    /// many pages were just loaded. Critical when zoom-out triggers many
-    /// pages to load at once — without batching, each completion fires its
-    /// own re-render and the main thread saturates.
+    /// Load `indices` concurrently, applying results at most once per
+    /// `batchFlushInterval` (and at the end of each chunk). The first finished
+    /// page shows at once, so what's on screen doesn't wait for the slowest
+    /// page of the batch, while a zoom-out that loads many pages still can't
+    /// fire one re-render per completion and saturate the main thread.
     private func loadPagesBatched(
         _ indices: [Int],
         source: ComicSource,
@@ -384,7 +390,9 @@ final class ReaderImageLoader {
         onError: @MainActor @escaping (String) -> Void
     ) async {
         guard !indices.isEmpty else { return }
-        var loaded: [(Int, LoadedImage)] = []
+        var pending: [(Int, LoadedImage)] = []
+        var lastFlush: ContinuousClock.Instant?
+        let clock = ContinuousClock()
         let maxConcurrent = ReaderImageLoadingPolicy.lazyConcurrencyLimit
 
         // Decode in bounded chunks. Decoding is CPU-heavy so spawning every
@@ -407,11 +415,24 @@ final class ReaderImageLoader {
                 for await (pageIndex, result) in group {
                     // nil: the decode was cancelled mid-flight, not failed.
                     guard let result else { continue }
-                    loaded.append((pageIndex, result))
+                    pending.append((pageIndex, result))
+                    let now = clock.now
+                    if lastFlush.map({ $0.duration(to: now) >= Self.batchFlushInterval }) ?? true {
+                        applyLoaded(pending, generation: generation)
+                        pending.removeAll()
+                        lastFlush = now
+                    }
                 }
             }
+            applyLoaded(pending, generation: generation)
+            pending.removeAll()
         }
+    }
 
+    /// Upper bound on how often a lazy batch re-renders the strip.
+    private static let batchFlushInterval: Duration = .milliseconds(50)
+
+    private func applyLoaded(_ loaded: [(Int, LoadedImage)], generation: Int) {
         // A newer refresh() invalidated this book — don't mark its pages
         // "loaded" against the now-current book's state. A batch that was
         // merely cancelled by a newer `setVisibleRange` still applies what it
@@ -438,17 +459,19 @@ final class ReaderImageLoader {
     }
 
     /// Load real images for pages in `[index - radius ... index + radius]`
-    /// that aren't already loaded. Concurrent with bounded fan-out.
-    /// Updates `currentImages` once at the end so SwiftUI re-renders the
-    /// strip a single time instead of per loaded image.
+    /// that aren't already loaded, nearest first. Concurrent with bounded
+    /// fan-out; see `loadPagesBatched` for how results reach `currentImages`.
     private func ensureWindowLoaded(
         around index: Int,
         source: ComicSource,
         generation: Int,
         onError: @MainActor @escaping (String) -> Void
     ) async {
-        let needed = ReaderVerticalImageWindow(pageCount: source.pageCount)
-            .initialIndices(around: index, excluding: loadedPageIndices.union(failedPageIndices))
+        let needed = ReaderVerticalImageWindow.visibleFirst(
+            ReaderVerticalImageWindow(pageCount: source.pageCount)
+                .initialIndices(around: index, excluding: loadedPageIndices.union(failedPageIndices)),
+            visibleRange: index..<(index + 1)
+        )
         guard !needed.isEmpty else { return }
 
         await loadPagesBatched(needed, source: source, generation: generation, onError: onError)
@@ -458,10 +481,6 @@ final class ReaderImageLoader {
 
     private func cachedImage(for page: ComicPage) -> NSImage? {
         imageCache.image(for: page)
-    }
-
-    private func cacheImage(_ image: NSImage, for page: ComicPage) {
-        imageCache.store(image, for: page)
     }
 
     static func estimatedBitmapCost(of image: NSImage) -> Int {
@@ -503,9 +522,7 @@ final class ReaderImageLoader {
             return .image(cached)
         }
         do {
-            let image = try await ImageLoader.load(page)
-            cacheImage(image, for: page)
-            return .image(image)
+            return .image(try await sharedDecode(page))
         } catch {
             if error is CancellationError || Task.isCancelled { return nil }
             // Only surface the error if this decode still belongs to the
@@ -523,33 +540,45 @@ final class ReaderImageLoader {
         }
     }
 
+    /// The decode for `page`, joined with any already running. Caches from
+    /// the decode itself: once the pixels exist they're worth keeping even if
+    /// whoever asked has since been cancelled (a superseded preload's page is
+    /// often the next one the reader turns to).
+    private func sharedDecode(_ page: ComicPage) async throws -> NSImage {
+        let cache = imageCache
+        return try await inFlightDecodes.image(forID: page.id) {
+            let image = try await ImageLoader.load(page)
+            cache.store(image, for: page)
+            return image
+        }
+    }
+
     // MARK: - Paged preload
 
     private func preloadIfNeeded(_ page: ComicPage) async {
         if cachedImage(for: page) != nil { return }
         if Task.isCancelled { return }
-        guard let image = try? await ImageLoader.load(page) else { return }
-        // Don't pollute the cache with work the caller no longer wants —
-        // important for rapid keyboard navigation where pages stream past
-        // faster than decode completes.
-        if Task.isCancelled { return }
-        cacheImage(image, for: page)
+        _ = try? await sharedDecode(page)
+    }
+
+    /// Page indices to preload around the visible spread: the pages ahead
+    /// first, nearest first, since that's where reading goes next — then the
+    /// ones behind, which were usually just read and are still cached.
+    static func preloadIndices(pageIndex: Int, step: Int, pageCount: Int) -> [Int] {
+        guard pageCount > 0 else { return [] }
+        let visibleEnd = min(pageIndex + step, pageCount)
+        let radius = ReaderImageLoadingPolicy.preloadRadius
+        let start = max(0, pageIndex - radius * step)
+        let end = min(pageCount, visibleEnd + radius * step)
+        return Array(visibleEnd..<max(visibleEnd, end)) + (start..<pageIndex).reversed()
     }
 
     private func pagesToPreload() -> [ComicPage] {
-        guard !lastSource.pages.isEmpty else { return [] }
-        let step = lastNavigationStep
-        let visibleEnd = min(lastPageIndex + step, lastSource.pageCount)
-        let preloadRadius = ReaderImageLoadingPolicy.preloadRadius
-        let start = max(0, lastPageIndex - preloadRadius * step)
-        let end = min(lastSource.pageCount, visibleEnd + preloadRadius * step)
-
-        var result: [ComicPage] = []
-        let visibleRange = lastPageIndex..<visibleEnd
-        for i in start..<end where !visibleRange.contains(i) {
-            result.append(lastSource.pages[i])
-        }
-        return result
+        Self.preloadIndices(
+            pageIndex: lastPageIndex,
+            step: lastNavigationStep,
+            pageCount: lastSource.pages.count
+        ).map { lastSource.pages[$0] }
     }
 
     private func schedulePreload() {
@@ -557,9 +586,13 @@ final class ReaderImageLoader {
         let pages = pagesToPreload()
         guard !pages.isEmpty else { return }
 
+        // `refresh()` deliberately doesn't cancel this: the page in flight may
+        // be exactly what the new spread needs, and it can join that decode.
+        // The generation check stops the loop from starting any further pages.
+        let generation = self.generation
         preloadTask = Task { [weak self] in
             for page in pages {
-                if Task.isCancelled { return }
+                guard !Task.isCancelled, generation == self?.generation else { return }
                 await self?.preloadIfNeeded(page)
             }
         }

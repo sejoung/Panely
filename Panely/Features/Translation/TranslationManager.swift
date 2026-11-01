@@ -249,7 +249,8 @@ final class TranslationManager {
         }
     }
 
-    private func dropFinishedBackground() {
+    /// Let go of background controllers with nothing left to do.
+    func dropFinishedBackground() {
         background.removeAll { !Self.isWorthKeeping($0) }
     }
 

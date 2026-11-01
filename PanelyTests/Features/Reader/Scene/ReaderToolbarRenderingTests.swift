@@ -76,7 +76,56 @@ struct ReaderToolbarRenderingTests {
         try await expectShape(in: hosted, "□ □ ■ | ■ □ □ □ ■ □ □ □ □ □ | □ □ □ □ | □ □ □ ·", "Volume 3 of 3: no next volume")
     }
 
+    /// While hidden the toolbar keeps its last state, so page turns don't
+    /// rebuild it. Showing it has to catch up with what happened meanwhile, and
+    /// from there on it follows page turns again.
+    @Test func aHiddenToolbarCatchesUpWhenShown() async throws {
+        let vm = SnapshotSampleContent.loadedViewModel()
+        let book = try #require(vm.currentSourceURL)
+        vm.pageBookmarks.pageBookmarksByBook[vm.positionKey(for: book)] = [PageBookmark(pageIndex: 3)]
+        let visibility = ToolbarVisibility()
+        AppLocalization.shared.apply(.english)
+        let hosted = await SnapshotRenderer.host(
+            VisibilityDrivenToolbar(visibility: visibility)
+                .environment(vm)
+                .environment(ViewerController())
+                .environment(\.locale, Locale(identifier: "en"))
+                .padding(PanelySpacing.md),
+            size: SnapshotRenderer.toolbarSize
+        )
+        defer { hosted.close() }
+        let dark = "□ □ ■ | ■ □ □ □ ■ □ □ □ □ □ | □ □ □ □ | · □ □ □"
+        let lit = "□ □ ■ | ■ □ □ □ ■ □ □ □ □ □ | □ ■ □ □ | · □ □ □"
+
+        vm.currentPageIndex = 3
+        visibility.shown = true
+        try await expectShape(in: hosted, lit, "shown after turning to the bookmarked page while hidden")
+
+        vm.currentPageIndex = 4
+        try await expectShape(in: hosted, dark, "a page turn while shown")
+
+        visibility.shown = false
+        try await Task.sleep(for: .milliseconds(100))
+        vm.currentPageIndex = 3
+        try await Task.sleep(for: .milliseconds(100))
+        visibility.shown = true
+        try await expectShape(in: hosted, lit, "hidden, turned, shown again")
+    }
+
     // MARK: - Helpers
+
+    @Observable
+    final class ToolbarVisibility {
+        var shown = false
+    }
+
+    private struct VisibilityDrivenToolbar: View {
+        let visibility: ToolbarVisibility
+
+        var body: some View {
+            ReaderToolbarOverlay(shown: visibility.shown)
+        }
+    }
 
     private func host(_ vm: ReaderViewModel) async -> SnapshotRenderer.HostedView {
         AppLocalization.shared.apply(.english)

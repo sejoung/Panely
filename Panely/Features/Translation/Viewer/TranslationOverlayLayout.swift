@@ -325,6 +325,19 @@ nonisolated enum TranslationPatchPainter {
         let size: CGSize
     }
 
+    private static func featherRadius(glyph: CGFloat) -> CGFloat {
+        max(6, glyph * 0.8)
+    }
+
+    /// How far past its patch a balloon's paint can land, in the drawing's
+    /// points. A solid patch's edge is only antialiased. A feathered one fades
+    /// out over its shadow, whose radius isn't scaled with the view when the
+    /// reader is zoomed out, so this leaves it plenty: a redraw clipped short
+    /// would leave a visible step in the fade.
+    static func paintReach(background: BubbleBackground, glyph: CGFloat) -> CGFloat {
+        background.isUniform ? 2 : featherRadius(glyph: glyph) * 3
+    }
+
     /// - Parameters:
     ///   - glyph: the balloon's glyph size at the drawing scale.
     ///   - fitted: a previous fit of the same text to the same patch size.
@@ -351,7 +364,7 @@ nonisolated enum TranslationPatchPainter {
             NSGraphicsContext.saveGraphicsState()
             let shadow = NSShadow()
             shadow.shadowColor = fill
-            shadow.shadowBlurRadius = max(6, glyph * 0.8)
+            shadow.shadowBlurRadius = featherRadius(glyph: glyph)
             shadow.shadowOffset = .zero
             shadow.set()
             fill.withAlphaComponent(0.92).setFill()

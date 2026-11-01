@@ -192,6 +192,16 @@ struct ReaderViewModelTranslationExportTests {
         #expect(reloaded.history == setup.vm.translationExports.history)
     }
 
+    /// A book that's only here for its cache doesn't stay in memory: nothing
+    /// else would let go of it until some later job ended.
+    @Test func anExportedBooksIdleControllerIsLetGo() async throws {
+        let setup = try await makeSetup()
+        export(setup)
+        try await waitUntil(timeout: Self.exportTimeout) { !setup.vm.translationExports.history.isEmpty || !setup.vm.translationExports.stoppedJobs.isEmpty }
+        #expect(!setup.vm.translationExports.history.isEmpty)
+        #expect(setup.vm.translationManager.background.isEmpty)
+    }
+
     @Test func hiddenBalloonsAreLeftOut() async throws {
         let setup = try await makeSetup()
         var edits = PageEdits()

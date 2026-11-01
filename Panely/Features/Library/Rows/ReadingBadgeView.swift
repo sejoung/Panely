@@ -41,3 +41,17 @@ private struct ReadingProgressRing: View {
         .frame(width: 11, height: 11)
     }
 }
+
+/// A row's badge, looked up in this view's own `body`. Each progress write
+/// invalidates whatever read the progress store, so reading it here costs one
+/// tiny view per row rather than the row, or the whole list.
+struct ReadingBadgeLeaf: View {
+    let url: URL
+    let readingBadge: (URL) -> ReadingBadge?
+
+    var body: some View {
+        if let badge = readingBadge(url) {
+            ReadingBadgeView(badge: badge)
+        }
+    }
+}

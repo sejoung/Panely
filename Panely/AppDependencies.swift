@@ -40,6 +40,9 @@ nonisolated struct AppDependencies {
     let makeLastLibraryRoot: @MainActor () -> LastLibraryRootStore
     let makeReaderTempDirectory: @MainActor () -> ReaderTempDirectory
     let makeReaderLibraryScope: @MainActor () -> ReaderLibraryScope
+    /// Gets the OCR's first-run cost over with (`TranslationWarmup`). `nil` in
+    /// tests, which shouldn't spend a minute compiling models.
+    var warmUpTranslation: (@Sendable () async -> Void)? = nil
 
     static let live: AppDependencies = {
         let keyValueStore = LiveKeyValueStore()
@@ -65,7 +68,10 @@ nonisolated struct AppDependencies {
             makeReadingProgress: { ReadingProgressStore(defaults: keyValueStore) },
             makeLastLibraryRoot: { LastLibraryRootStore(defaults: keyValueStore) },
             makeReaderTempDirectory: { ReaderTempDirectory(extractionCache: extractionCache) },
-            makeReaderLibraryScope: { ReaderLibraryScope() }
+            makeReaderLibraryScope: { ReaderLibraryScope() },
+            warmUpTranslation: {
+                if #available(macOS 26.0, *) { await TranslationWarmup.run() }
+            }
         )
     }()
 }

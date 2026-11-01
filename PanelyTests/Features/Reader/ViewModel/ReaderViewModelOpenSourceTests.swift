@@ -8,7 +8,7 @@ import Foundation
 @MainActor
 struct ReaderViewModelOpenSourceTests {
 
-    @Test func openSourceRecordsPickedFileAsRecent() {
+    @Test func openSourceRecordsPickedFileAsRecent() async {
         let picked = URL(fileURLWithPath: "/lib/book.cbz")
         let picker = TestFilePicker(urlToReturn: picked)
         let vm = ReaderViewModel(dependencies: makeTestDependencies(filePicker: picker))
@@ -18,8 +18,9 @@ struct ReaderViewModelOpenSourceTests {
         // Open panel allows both files and folders…
         #expect(picker.lastRequest?.canChooseFiles == true)
         #expect(picker.lastRequest?.canChooseDirectories == true)
-        // …and the chosen URL is recorded as a recent (the synchronous effect;
-        // the async load is fire-and-forget).
+        // …and the chosen URL is recorded as a recent (its bookmark is minted
+        // off the main thread; the async load is fire-and-forget).
+        await vm.recentItems.recordingSettled()
         #expect(vm.recentItems.items.first?.path == picked.standardizedFileURL.path)
     }
 

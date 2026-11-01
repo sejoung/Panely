@@ -9,8 +9,8 @@ struct SidebarHost: View {
     let requestFocus: () -> Void
 
     var body: some View {
-        let suggestion = viewModel.continueReadingSuggestion
-        return LibrarySidebar(
+        LibrarySidebar(
+            model: viewModel.librarySidebarModel,
             rootURL: viewModel.libraryRootURL,
             activeURL: viewModel.sidebarActiveURL,
             refreshToken: viewModel.libraryRefreshToken,
@@ -21,12 +21,14 @@ struct SidebarHost: View {
             otherBookmarkedBooks: viewModel.otherBookmarkedBooks,
             volumes: viewModel.sidebarVolumes,
             libraryTreeLoader: viewModel.dependencies.libraryTreeLoader,
-            // A closure, read only by the bookmark rows: reading the page
-            // here would re-render the whole sidebar on every page turn.
+            // These three are closures, read only by the rows that show them:
+            // reading the page or the progress here would re-render the whole
+            // sidebar on every page turn or progress write.
             currentPageIndex: { viewModel.currentPageIndex },
             readingBadge: { viewModel.readingBadge(for: $0) },
-            continueReadingTitle: suggestion?.title,
-            continueReadingFraction: suggestion?.fraction ?? 0,
+            continueReading: {
+                viewModel.continueReadingSuggestion.map { ($0.title, $0.fraction) }
+            },
             actions: sidebarActions
         )
     }

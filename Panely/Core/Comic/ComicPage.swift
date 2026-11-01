@@ -43,6 +43,12 @@ nonisolated struct ComicPage: Identifiable, Sendable {
         let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
         let modified = (attributes?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
         let size = (attributes?[.size] as? NSNumber)?.int64Value ?? -1
-        return "\(size):\(modified)"
+        return contentSignature(size: size, modified: modified)
+    }
+
+    /// The signature's format. Page ids key the persisted translation cache, so
+    /// changing this orphans every saved translation of a folder book.
+    static func contentSignature(size: Int64, modified: TimeInterval) -> String {
+        "\(size):\(modified)"
     }
 }

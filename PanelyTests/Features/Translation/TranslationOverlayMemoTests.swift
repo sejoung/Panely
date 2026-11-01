@@ -397,6 +397,53 @@ struct TranslationOverlayMemoTests {
         await gate.open()
     }
 
+    /// A vertical book's whole list isn't looked at again for one page: a job
+    /// writing one page leaves the others' slots alone, and the array stays
+    /// aligned with the pages. Reads with nothing changed are served as they
+    /// are, and anything but a job's write builds it all again.
+    @Test(.enabled(if: TranslationController.isSupportedOnThisMac))
+    func oneChangedPageIsAllThatIsLookedAtAgain() async throws {
+        let gate = TranslationPermitGate()
+        let vm = makeViewModel(gate: gate, bubbles: 1)
+        vm.layout = .vertical
+        let book = Book(url: URL(fileURLWithPath: "/series/slots/vol1.cbz"), pages: Fixture.makeImagePages(count: 5, title: "s"))
+        try await open(vm, book)
+        let korean = try #require(vm.translationManager.openBook.first { $0.target == .korean })
+        vm.translationManager.start(korean)
+        try await waitUntil { korean.pages[book.pages[0].id] != nil }
+        let ids = vm.imageLoader.currentPageIDs
+        #expect(ids.count == 5)
+        #expect(vm.translationOverlayPages.count == ids.count)
+
+        // A mark no build would make, in another page's slot.
+        let target = try #require(ids.firstIndex(of: book.pages[0].id))
+        let other = (target + 1) % ids.count
+        var marked = TranslatedPage(imageWidth: 1, imageHeight: 1, bubbles: [])
+        marked.pageID = "mark"
+        func mark() throws {
+            var last = try #require(vm.translationMemo.overlayBook)
+            last.result[other] = marked
+            vm.translationMemo.overlayBook = last
+        }
+        try mark()
+        #expect(vm.translationOverlayPages[other] == marked, "nothing changed: served as it was")
+
+        let before = try #require(korean.pages[book.pages[0].id]?.bubbles.first)
+        #expect(before.translation == nil)
+        await gate.release(1)
+        try await waitUntil { korean.pages[book.pages[0].id]?.bubbles.first?.translation != nil }
+        vm.translationManager.pause(korean)
+        let pages = vm.translationOverlayPages
+        #expect(pages.count == ids.count)
+        #expect(pages[target]?.bubbles.first?.translation != nil, "the written page is new")
+        #expect(pages[other] == marked, "the others aren't looked at")
+
+        // Anything else invalidates the lot.
+        vm.isEditingTranslations = true
+        #expect(vm.translationOverlayPages == reference(vm))
+        await gate.open()
+    }
+
     /// The panel's hidden-balloon list keeps the book's page indices until
     /// the book changes; the next book's balloons are listed at its own.
     @Test func hiddenBalloonsAreListedAtTheOpenBooksPages() async throws {

@@ -28,6 +28,9 @@ struct LibrarySidebarActions {
 }
 
 struct LibrarySidebar: View {
+    /// Owned by the caller: this view is mounted per overlay reveal, and the
+    /// tree has to outlive that.
+    let model: LibrarySidebarModel
     let rootURL: URL?
     let activeURL: URL?
     let refreshToken: UUID
@@ -45,12 +48,14 @@ struct LibrarySidebar: View {
     /// sidebar with its file tree. A closure for that reason: a plain value
     /// would make every page turn a new `LibrarySidebar`.
     let currentPageIndex: () -> Int
+    /// Read only by the badges themselves, and `continueReading` only by its
+    /// section, for the reason `currentPageIndex` is a closure: progress is
+    /// written about once per page, and reading it in this body would rebuild
+    /// the whole tree each time.
     var readingBadge: (URL) -> ReadingBadge? = { _ in nil }
-    var continueReadingTitle: String? = nil
-    var continueReadingFraction: Double = 0
+    var continueReading: () -> (title: String, fraction: Double)? = { nil }
     let actions: LibrarySidebarActions
 
-    @State private var model = LibrarySidebarModel()
     @State private var expandedBookmarkBooks: Set<String> = []
 
     var body: some View {
@@ -65,7 +70,12 @@ struct LibrarySidebar: View {
         .frame(width: 240)
         .background(PanelyColor.bgSecondary)
         .task(id: taskID) {
-            await model.reload(rootURL: rootURL, activeURL: activeURL, loader: libraryTreeLoader)
+            await model.reload(
+                rootURL: rootURL,
+                activeURL: activeURL,
+                refreshToken: refreshToken,
+                loader: libraryTreeLoader
+            )
         }
         .onChange(of: activeURL) { _, newValue in
             model.expandAncestors(of: newValue)
@@ -139,7 +149,11 @@ struct LibrarySidebar: View {
         // redundant evaluations across Volumes + Files sections.
         let activeStdURL = activeURL?.standardizedFileURL
         return List {
-            continueReadingSection()
+            ContinueReadingSection(
+                suggestion: continueReading,
+                onOpen: actions.onContinueReading,
+                onRemove: actions.onRemoveContinueReading
+            )
             volumesSection(activeStdURL: activeStdURL)
             favoritesSection(activeStdURL: activeStdURL)
             bookmarksSection
@@ -151,41 +165,6 @@ struct LibrarySidebar: View {
     }
 
     @ViewBuilder
-    private func continueReadingSection() -> some View {
-        if let title = continueReadingTitle {
-            Section(header: sectionHeader("Continue Reading", systemImage: "book.fill")) {
-                Button(action: actions.onContinueReading) {
-                    HStack(spacing: PanelySpacing.sm) {
-                        Image(systemName: "book.fill")
-                            .foregroundStyle(PanelyColor.accentPrimary)
-                            .frame(width: 16)
-                        Text(title)
-                            .font(PanelyTypography.body)
-                            .foregroundStyle(PanelyColor.textPrimary)
-                            .lineLimit(1)
-                            // Match the file tree: keep the trailing volume
-                            // number visible instead of clipping it with a
-                            // tail ellipsis.
-                            .truncationMode(.middle)
-                        Spacer(minLength: 0)
-                        ReadingBadgeView(badge: .inProgress(fraction: continueReadingFraction))
-                    }
-                    .contentShape(Rectangle())
-                    .padding(.vertical, 2)
-                    .help(title)
-                }
-                .buttonStyle(.plain)
-                .listRowBackground(Color.clear)
-                .contextMenu {
-                    Button("Remove from Continue Reading", role: .destructive) {
-                        actions.onRemoveContinueReading()
-                    }
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
     private func volumesSection(activeStdURL: URL?) -> some View {
         if volumes.count > 1 {
             Section(header: volumesHeader) {
@@ -193,7 +172,7 @@ struct LibrarySidebar: View {
                     VolumeRow(
                         url: url,
                         isActive: isActiveVolume(url, activeURL: activeStdURL),
-                        badge: readingBadge(url),
+                        readingBadge: readingBadge,
                         onTap: { actions.onSelectVolume(url) }
                     )
                     .listRowBackground(Color.clear)
@@ -356,9 +335,8 @@ struct LibrarySidebar: View {
                     FileTreeNodeRow(
                         node: node,
                         isActive: activeStdURL == node.standardizedURL,
-                        badge: readingBadge(node.url),
                         activeStdURL: activeStdURL,
-                        expandedNodeIDs: $model.expandedNodeIDs,
+                        expandedNodeIDs: Bindable(model).expandedNodeIDs,
                         readingBadge: readingBadge,
                         onSelect: actions.onSelect,
                         onExport: actions.onExportTranslation
@@ -370,13 +348,7 @@ struct LibrarySidebar: View {
     }
 
     private func sectionHeader(_ title: LocalizedStringKey, systemImage: String) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: systemImage)
-                .font(.system(size: 10, weight: .medium))
-            Text(title)
-                .font(PanelyTypography.caption)
-        }
-        .foregroundStyle(PanelyColor.textSecondary)
+        SidebarSectionHeader(title: title, systemImage: systemImage)
     }
 
     private var taskID: String {
@@ -439,6 +411,61 @@ struct LibrarySidebar: View {
     }
 }
 
+private struct SidebarSectionHeader: View {
+    let title: LocalizedStringKey
+    let systemImage: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: systemImage)
+                .font(.system(size: 10, weight: .medium))
+            Text(title)
+                .font(PanelyTypography.caption)
+        }
+        .foregroundStyle(PanelyColor.textSecondary)
+    }
+}
+
+/// The "Continue Reading" section. Its own view so that progress moving (the
+/// suggestion's ring) re-renders this section, not the sidebar with its tree.
+private struct ContinueReadingSection: View {
+    let suggestion: () -> (title: String, fraction: Double)?
+    let onOpen: () -> Void
+    let onRemove: () -> Void
+
+    var body: some View {
+        if let suggestion = suggestion() {
+            Section(header: SidebarSectionHeader(title: "Continue Reading", systemImage: "book.fill")) {
+                Button(action: onOpen) {
+                    HStack(spacing: PanelySpacing.sm) {
+                        Image(systemName: "book.fill")
+                            .foregroundStyle(PanelyColor.accentPrimary)
+                            .frame(width: 16)
+                        Text(suggestion.title)
+                            .font(PanelyTypography.body)
+                            .foregroundStyle(PanelyColor.textPrimary)
+                            .lineLimit(1)
+                            // Match the file tree: keep the trailing volume
+                            // number visible instead of clipping it with a
+                            // tail ellipsis.
+                            .truncationMode(.middle)
+                        Spacer(minLength: 0)
+                        ReadingBadgeView(badge: .inProgress(fraction: suggestion.fraction))
+                    }
+                    .contentShape(Rectangle())
+                    .padding(.vertical, 2)
+                    .help(suggestion.title)
+                }
+                .buttonStyle(.plain)
+                .listRowBackground(Color.clear)
+                .contextMenu {
+                    Button("Remove from Continue Reading", role: .destructive, action: onRemove)
+                }
+            }
+        }
+    }
+}
+
 /// A bookmark row in the open book's section. Reads the current page itself
 /// (through `currentPageIndex`), so its body — not the sidebar's — is what a
 /// page turn invalidates.
@@ -467,7 +494,6 @@ private struct CurrentBookBookmarkRow: View {
 private struct FileTreeNodeRow: View {
     let node: FileNode
     let isActive: Bool
-    let badge: ReadingBadge?
     let activeStdURL: URL?
     @Binding var expandedNodeIDs: Set<URL>
     let readingBadge: (URL) -> ReadingBadge?
@@ -481,7 +507,6 @@ private struct FileTreeNodeRow: View {
                     FileTreeNodeRow(
                         node: child,
                         isActive: activeStdURL == child.standardizedURL,
-                        badge: readingBadge(child.url),
                         activeStdURL: activeStdURL,
                         expandedNodeIDs: $expandedNodeIDs,
                         readingBadge: readingBadge,
@@ -501,7 +526,7 @@ private struct FileTreeNodeRow: View {
         FileNodeRow(
             node: node,
             isActive: isActive,
-            badge: badge,
+            readingBadge: readingBadge,
             onTap: { onSelect(node.url) }
         )
         .contextMenu {
@@ -545,6 +570,7 @@ private struct FileTreeNodeRow: View {
 
 #Preview {
     LibrarySidebar(
+        model: LibrarySidebarModel(),
         rootURL: URL(fileURLWithPath: "/Users/demo/Comics/OnePiece"),
         activeURL: nil,
         refreshToken: UUID(),

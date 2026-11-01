@@ -34,11 +34,32 @@ extension ReaderViewModel {
     }
 
     /// Open a favorite book, resolving its security-scoped bookmark the same
-    /// way recent items do.
+    /// way recent items do: off the main thread, since it may mount a volume.
     func openFavorite(_ favorite: FavoriteBook) {
-        guard let url = favorites.resolve(favorite) else { return }
-        recentItems.record(url, title: displayTitle(for: url))
-        Task { await load(url: url, intent: .favorite(innerPath: favorite.innerPath)) }
+        let request = beginOpenRequest()
+        Task {
+            guard let url = await favorites.resolveOffMain(favorite),
+                  isCurrentOpenRequest(request) else { return }
+            recentItems.recordInBackground(url, title: displayTitle(for: url))
+            await load(url: url, intent: .favorite(innerPath: favorite.innerPath))
+        }
+    }
+
+    /// An open whose bookmark is resolved first can finish that after the user
+    /// has already opened something else. It then has to give way, or the book
+    /// asked for earlier would replace the later one.
+    struct OpenRequest: Equatable {
+        let generation: Int
+        let loadEpoch: Int
+    }
+
+    private func beginOpenRequest() -> OpenRequest {
+        openRequestGeneration &+= 1
+        return OpenRequest(generation: openRequestGeneration, loadEpoch: loadEpoch)
+    }
+
+    private func isCurrentOpenRequest(_ request: OpenRequest) -> Bool {
+        request == OpenRequest(generation: openRequestGeneration, loadEpoch: loadEpoch)
     }
 
     // MARK: - Page bookmark toggle + queries
@@ -127,18 +148,21 @@ extension ReaderViewModel {
             jumpToBookmark(bookmark)
             return
         }
-        guard let target = resolveBookmarkedBook(forKey: book.key) else {
-            AppLog.error(.load, "Bookmarked book could not be resolved")
-            errorMessage = String(localized: "This bookmarked book can no longer be opened.", bundle: .localized)
-            return
-        }
-        AppLog.info(
-            .load,
-            "Bookmark open requested",
-            metadata: ["source": "\(DiagnosticRedactor.describe(target.url))"]
-        )
-        recentItems.record(target.url, title: displayTitle(for: target.url))
+        let request = beginOpenRequest()
         Task {
+            let target = await resolveBookmarkedBook(forKey: book.key)
+            guard isCurrentOpenRequest(request) else { return }
+            guard let target else {
+                AppLog.error(.load, "Bookmarked book could not be resolved")
+                errorMessage = String(localized: "This bookmarked book can no longer be opened.", bundle: .localized)
+                return
+            }
+            AppLog.info(
+                .load,
+                "Bookmark open requested",
+                metadata: ["source": "\(DiagnosticRedactor.describe(target.url))"]
+            )
+            recentItems.recordInBackground(target.url, title: displayTitle(for: target.url))
             await load(
                 url: target.url,
                 intent: .bookmark(innerPath: target.innerPath, pageIndex: bookmark.pageIndex)
@@ -146,10 +170,10 @@ extension ReaderViewModel {
         }
     }
 
-    private func resolveBookmarkedBook(forKey key: String) -> (url: URL, innerPath: String?)? {
+    private func resolveBookmarkedBook(forKey key: String) async -> (url: URL, innerPath: String?)? {
         if let ref = pageBookmarks.bookRef(forKey: key) {
             if let data = ref.bookmarkData,
-               let result = dependencies.bookmarkResolver.resolveRefreshing(data) {
+               let result = await resolveOffMain(data) {
                 let url = result.url.standardizedFileURL
                 var updated = ref
                 var updatedKey = key
@@ -169,7 +193,7 @@ extension ReaderViewModel {
                 pageBookmarks.setBookRef(updated, forKey: updatedKey)
                 return (url, ref.innerPath)
             }
-            return openableURL(forPath: ref.path).map { ($0, ref.innerPath) }
+            return await openableURL(forPath: ref.path).map { ($0, ref.innerPath) }
         }
 
         // No saved reference: the key is the book's path, or `outer#inner`
@@ -183,24 +207,36 @@ extension ReaderViewModel {
             searchStart = key.index(after: hash)
         }
         for candidate in candidates {
-            if let url = openableURL(forPath: candidate.path) {
+            if let url = await openableURL(forPath: candidate.path) {
                 return (url, candidate.innerPath)
             }
         }
         return nil
     }
 
+    /// The user is opening this book, so the resolve may mount its volume;
+    /// that's why it can't happen on the main thread.
+    private func resolveOffMain(_ data: Data) async -> ResolvedBookmark? {
+        let resolver = dependencies.bookmarkResolver
+        return await Task.detached(priority: .userInitiated) {
+            resolver.resolveRefreshing(data).map { ResolvedBookmark(url: $0.url, refreshed: $0.refreshed) }
+        }.value
+    }
+
     /// A URL for `path` the sandbox will let us read: already reachable, or
     /// covered by a recent / favorite / remembered-folder grant.
-    private func openableURL(forPath path: String) -> URL? {
+    private func openableURL(forPath path: String) async -> URL? {
         let url = URL(fileURLWithPath: path).standardizedFileURL
-        if FileManager.default.fileExists(atPath: url.path) { return url }
+        let exists = await Task.detached(priority: .userInitiated) {
+            FileManager.default.fileExists(atPath: url.path)
+        }.value
+        if exists { return url }
         if let item = recentItems.items.first(where: { $0.path == url.path }),
-           let resolved = recentItems.resolve(item) {
+           let resolved = await recentItems.resolveOffMain(item) {
             return resolved
         }
         if let favorite = favorites.favorites.first(where: { $0.path == url.path }),
-           let resolved = favorites.resolve(favorite) {
+           let resolved = await favorites.resolveOffMain(favorite) {
             return resolved
         }
         // `prepareScope` re-finds this grant and opens the book under it.

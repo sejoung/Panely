@@ -49,11 +49,12 @@ nonisolated enum ImageLoader {
     /// explicitly — otherwise a superseded page (slider scrub, fast paging)
     /// would still pay for a full decode. `work` starts with a cancellation
     /// check, so a task cancelled before it got a thread does no work.
-    private static func detached<T: Sendable>(
+    static func detached<T: Sendable>(
+        priority: TaskPriority = .userInitiated,
         _ work: @escaping @Sendable () throws -> T
     ) async throws -> T {
         try Task.checkCancellation()
-        let task = Task.detached(priority: .userInitiated) {
+        let task = Task.detached(priority: priority) {
             try Task.checkCancellation()
             return try work()
         }

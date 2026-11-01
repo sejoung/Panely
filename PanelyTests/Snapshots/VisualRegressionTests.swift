@@ -108,6 +108,25 @@ struct VisualRegressionTests {
         )
     }
 
+    /// The book's language has to be choosable without unfolding anything
+    /// while it's unknown: that's what a slow or failed detection needs.
+    @Test func translationPanelUnknownLanguage() async throws {
+        let vm = try TranslationSnapshotContent.unknownLanguageViewModel()
+        try await check(
+            VStack {
+                TranslationPanel()
+                    .environment(vm)
+                    .background(PanelyColor.bgSecondary, in: RoundedRectangle(cornerRadius: 10))
+                Spacer(minLength: 0)
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(PanelyColor.bgPrimary),
+            size: CGSize(width: 380, height: 440),
+            named: "translation-panel-unknown-language"
+        )
+    }
+
     /// The model's download under way, as the panel and Settings show it.
     @Test func translationModelDownload() async throws {
         let gate = TranslationPermitGate()

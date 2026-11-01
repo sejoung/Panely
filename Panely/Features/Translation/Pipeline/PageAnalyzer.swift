@@ -276,19 +276,33 @@ nonisolated enum TranslationLanguageDetector {
         for index in TranslationController.translationOrder(count: pages.count, startingAt: start).prefix(maxPages) {
             if Task.isCancelled { return nil }
             guard let cgImage = try? await PageAnalyzer.decode(pages[index]) else { continue }
-            var request = RecognizeDocumentsRequest()
-            request.textRecognitionOptions.recognitionLanguages = TranslationLanguage.allCases.map(\.localeLanguage)
-            request.textRecognitionOptions.automaticallyDetectLanguage = true
             // Only the start of a tall strip: enough text to tell, a fraction of the work.
             let probe = cgImage.height > cgImage.width * 3
                 ? cgImage.cropping(to: CGRect(x: 0, y: 0, width: cgImage.width, height: cgImage.width * 3)) ?? cgImage
                 : cgImage
-            guard let observations = try? await request.perform(on: probe) else { continue }
+            guard let observations = try? await makeRequest().perform(on: probe) else { continue }
             text += observations.flatMap { $0.document.paragraphs.map(\.transcript) }.joined(separator: " ")
-            if let language = TranslationLanguageClassifier.classify(text), text.count >= 12 {
-                return language
+            if isConclusive(text) {
+                return TranslationLanguageClassifier.classify(text)
             }
         }
         return TranslationLanguageClassifier.classify(text)
+    }
+
+    /// The request detection reads a page with, every candidate language on.
+    static func makeRequest() -> RecognizeDocumentsRequest {
+        var request = RecognizeDocumentsRequest()
+        request.textRecognitionOptions.recognitionLanguages = TranslationLanguage.allCases.map(\.localeLanguage)
+        request.textRecognitionOptions.automaticallyDetectLanguage = true
+        return request
+    }
+
+    /// Whether `text` settles it without reading further. English doesn't: a
+    /// Korean edition's cover can read "The labyrinth of magic", and a title
+    /// page has little else. A book that really is English just reads its few
+    /// pages and comes out English at the end.
+    static func isConclusive(_ text: String) -> Bool {
+        guard text.count >= 12, let language = TranslationLanguageClassifier.classify(text) else { return false }
+        return language != .english
     }
 }

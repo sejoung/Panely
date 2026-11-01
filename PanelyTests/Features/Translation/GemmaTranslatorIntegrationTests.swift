@@ -26,6 +26,36 @@ struct GemmaTranslatorIntegrationTests {
         return answers
     }
 
+    /// Reusing what the context already holds mustn't change a translation:
+    /// the same prompts through a shared memory and read from scratch.
+    @Test func reusingThePromptsStartGivesTheSameAnswers() throws {
+        let runtime = try LlamaRuntime(
+            path: GemmaTranslator.shared.files.fileURL.path,
+            contextSize: GemmaTranslator.contextSize,
+            gpuLayers: 99
+        )
+        let batches = [
+            ["おはようございます。", "今日はいい天気ですね。"],
+            ["どこへ行くんだ?", "お前には関係ない!"],
+            ["おはようございます。", "明日は雨が降るそうです。"],
+            ["おはようございます。", "今日はいい天気ですね。"],
+            ["ありがとう。"],
+        ]
+        let prompts = batches.map {
+            (GemmaPrompt.build(lines: $0, context: [], from: .japanese, to: .korean), GemmaPrompt.maxTokens($0))
+        }
+        let reusing = try prompts.map { try runtime.generate(prompt: $0.0, maxTokens: $0.1) { _ in true } }
+        // A request stopped partway leaves unfinished output in the memory.
+        _ = try runtime.generate(prompt: prompts[1].0, maxTokens: prompts[1].1) { _ in false }
+        let afterStop = try runtime.generate(prompt: prompts[1].0, maxTokens: prompts[1].1) { _ in true }
+        let fresh = try prompts.map { prompt -> String in
+            runtime.clearMemory()
+            return try runtime.generate(prompt: prompt.0, maxTokens: prompt.1) { _ in true }
+        }
+        #expect(reusing == fresh)
+        #expect(afterStop == fresh[1])
+    }
+
     @Test func japaneseIntoKoreanKeepsEachSpeakersSpeechLevel() async throws {
         let lines = [
             "遅いぞ、何してたんだよ！",

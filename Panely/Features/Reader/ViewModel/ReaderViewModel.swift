@@ -120,6 +120,26 @@ final class ReaderViewModel {
     /// file-identity stats and full progress-key scans on the main thread.
     @ObservationIgnored var continueReadingMemo: ContinueReadingMemo?
     @ObservationIgnored var readingBadgeKeyMemo = ReadingBadgeKeyMemo()
+    /// File identities of the sidebar's rows and of Continue Reading's books,
+    /// stat'ed off the main thread. Each revision is bumped when an arriving
+    /// identity changes what its reader shows.
+    ///
+    /// Both stat through a new `URL`: an instance caches resource values until
+    /// the next run-loop turn, which a background thread never gets, so a
+    /// re-lookup through the same one would keep a replaced file's old identity.
+    @ObservationIgnored let badgeIdentities = OffMainLookup<BadgeIdentityRequest, String> {
+        PositionKey.keys(
+            for: URL(fileURLWithPath: $0.url.path),
+            opened: $0.opened.map { URL(fileURLWithPath: $0.path) },
+            tempRoot: $0.tempRoot
+        ).fileIdentity
+    }
+    @ObservationIgnored let continueReadingIdentities = OffMainLookup<URL, String> {
+        PositionKey.fileIdentity(for: URL(fileURLWithPath: $0.path))
+    }
+    @ObservationIgnored var translationWarmupHandled = false
+    var readingBadgeIdentityRevision = 0
+    var continueReadingIdentityRevision = 0
     /// Which progress keys belong to which recent source — the part of the
     /// Continue Reading scan that a page turn can't change.
     @ObservationIgnored var continueReadingIndexMemo: ContinueReadingIndexMemo?
@@ -129,9 +149,18 @@ final class ReaderViewModel {
     var isLoading: Bool = false
     var loadingMessage: String = ""
 
-    var currentSourceURL: URL?
+    var currentSourceURL: URL? {
+        didSet { updateCurrentSiblingIndex() }
+    }
     var pendingSourceURL: URL?
-    var siblings: [URL] = []
+    var siblings: [URL] = [] {
+        didSet { updateCurrentSiblingIndex() }
+    }
+    /// The open book's place in `siblings`. Stored rather than searched for:
+    /// the slider and the toolbar read it (through their volume counters and
+    /// buttons) on every page turn, and a flat library can have thousands of
+    /// siblings. Only the two properties above can change it.
+    private(set) var currentSiblingIndex: Int?
     /// True when the open book's folder can't be listed — it was opened on
     /// its own, so the sandbox grant covers just that file. Volume stepping
     /// then needs a folder grant before it can find the neighbours.
@@ -172,7 +201,16 @@ final class ReaderViewModel {
     var wantsPreviousVolumePrompt: Bool = false
 
     var openedSourceURL: URL?
-    var libraryRefreshToken: UUID = UUID()
+    /// Whether `openedSourceURL` is a directory, once a stat has said so
+    /// (see `libraryRootURL`, which `body` reads).
+    @ObservationIgnored var openedSourceKindMemo: (url: URL, isDirectory: Bool)?
+    var libraryRefreshToken: UUID = UUID() {
+        didSet {
+            // A rescan means files may have been replaced on disk.
+            badgeIdentities.refreshAll()
+            continueReadingIdentities.refreshAll()
+        }
+    }
     var explicitLibraryRootURL: URL?
 
     /// Monotonic counter incremented at the start of every `load(url:)` call.
@@ -187,6 +225,17 @@ final class ReaderViewModel {
     /// Volumes the last "translate entire series" couldn't queue (archives
     /// inside archives), shown in the translation panel.
     var seriesTranslationSkipped: [String] = []
+
+    /// The Files tree. Lives here, not in the sidebar view: the overlay
+    /// sidebar is mounted per reveal, and a model owned by the view would be
+    /// rebuilt each time — blank tree, full rescan, expansion lost.
+    @ObservationIgnored let librarySidebarModel = LibrarySidebarModel()
+    /// Identifies an open request that does async work before its `load` (see
+    /// `beginOpenRequest`).
+    @ObservationIgnored var openRequestGeneration = 0
+    /// The toolbar's language menus, kept between renders
+    /// (`ReaderViewModel+Toolbar`).
+    @ObservationIgnored var toolbarLanguagesMemo: ToolbarLanguagesMemo?
 
     // MARK: - UI-state forwarding to `ReaderPreferences`
     //
@@ -380,6 +429,12 @@ final class ReaderViewModel {
         localization.apply(preferences.appLanguage)
         preferences.refreshAppleLanguagesOverride()
 
+        badgeIdentities.onChange = { [weak self] request, identity in
+            self?.badgeIdentityResolved(request, identity: identity)
+        }
+        continueReadingIdentities.onChange = { [weak self] _, _ in
+            self?.continueReadingIdentityRevision &+= 1
+        }
         observeAppTermination()
 
         // Fire-and-forget: a previous session may have crashed mid-extraction
@@ -389,6 +444,20 @@ final class ReaderViewModel {
         Task.detached(priority: .background) {
             ReaderTempDirectory.cleanupStaleEntries(extractionCache: extractionCache)
         }
+        warmUpTranslationIfNeeded()
+    }
+
+    private func updateCurrentSiblingIndex() {
+        var index: Int?
+        if let target = currentSourceURL?.standardizedFileURL.path {
+            // Same rule as `URL.isAncestor(of:)`, with the target's path
+            // standardized once instead of per sibling.
+            index = siblings.firstIndex {
+                let sibling = $0.standardizedFileURL.path
+                return sibling == target || target.hasPrefix(sibling + "/")
+            }
+        }
+        if currentSiblingIndex != index { currentSiblingIndex = index }
     }
 
     /// Flush any pending debounced save when the process is about to exit.
@@ -414,6 +483,9 @@ final class ReaderViewModel {
                 // `flushPositionImmediately` — current book only — can't reach.
                 self?.flushPendingPositionWrites()
                 self?.flushPositionImmediately()
+                // Nothing runs after this notification, so a debounced save
+                // still being encoded in the background has to land here.
+                self?.flushPendingPositionWrites()
             }
         }
         _ = NotificationCenter.default.addObserver(

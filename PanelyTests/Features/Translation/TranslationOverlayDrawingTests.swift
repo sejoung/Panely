@@ -364,6 +364,201 @@ struct TranslationOverlayDrawingTests {
             #expect(mismatched == 0, "\(what): \(mismatched) pixels differ from a new overlay")
         }
     }
+
+    // MARK: - Partial redraws as a page fills in
+
+    /// A job's updates ask to redraw only what they change — and redrawing
+    /// just that, over what was there, leaves no stale pixels: patches come,
+    /// change, get cut back by a neighbour and go, over artwork (whose feather
+    /// reaches past the patch) as much as in a balloon.
+    @Test func aPageFillingInRedrawsOnlyWhatChangedAndLeavesNoStalePixels() {
+        func page(_ edit: (inout [TranslatedBubble]) -> Void) -> TranslatedPage {
+            // Over artwork, close enough for their feathers to meet.
+            var above = Self.overArtwork
+            above.id = 0
+            above.rect = CGRect(x: 60, y: 40, width: 220, height: 40)
+            above.translation = nil
+            var below = Self.overArtwork
+            below.id = 1
+            below.rect = CGRect(x: 60, y: 108, width: 220, height: 40)
+            below.translation = nil
+            var aside = Self.upper
+            aside.id = 2
+            aside.rect = CGRect(x: 360, y: 200, width: 40, height: 180)
+            aside.isVertical = true
+            aside.translation = "처음엔 넓은 자리에 그려지는 번역"
+            var bubbles = [above, below, aside]
+            edit(&bubbles)
+            return Self.page(bubbles)
+        }
+        let overlay = makeOverlay(page { _ in })
+        InvalidationRecorder.install(on: overlay)
+        var neighbour = Self.upper
+        neighbour.id = 3
+        neighbour.rect = CGRect(x: 420, y: 200, width: 40, height: 180)
+        neighbour.isVertical = true
+        neighbour.translation = "옆"
+
+        let steps: [(String, TranslatedPage)] = [
+            ("a translation over artwork arrives", page { $0[0].translation = "그림 위의 번역" }),
+            ("the one below it arrives", page { $0[0].translation = "그림 위의 번역"; $0[1].translation = "아래" }),
+            ("its text changes", page { $0[0].translation = "고친 번역"; $0[1].translation = "아래" }),
+            ("its tone is resampled", page { $0[0].translation = "고친 번역"; $0[1].translation = "아래"; $0[1].background = .white }),
+            ("a neighbour cuts a patch back", page { $0[0].translation = "고친 번역"; $0[1].translation = "아래"; $0[1].background = .white; $0.append(neighbour) }),
+            ("the neighbour goes", page { $0[0].translation = "고친 번역"; $0[1].translation = "아래"; $0[1].background = .white }),
+            ("a feathered patch goes", page { $0[0].translation = nil; $0[1].translation = "아래"; $0[1].background = .white }),
+        ]
+        for (what, next) in steps {
+            expectPartialRedraw(of: overlay, what) {
+                overlay.update(page: next, showsTranslation: true, pageOrigin: .zero, scale: 1)
+            }
+            let drawn = render(overlay)
+            #expect(differences(drawn, render(makeOverlay(next))).isEmpty, "\(what): differs from a new overlay")
+        }
+    }
+
+    /// Edit mode's marks follow a balloon's edits: the badge and the hidden
+    /// outline come and go like the patches do.
+    @Test func editMarksRedrawOnlyWhereTheyChange() {
+        var plain = Self.edited
+        plain.edit = nil
+        let overlay = makeOverlay(Self.page([Self.upper, plain]), editing: true)
+        InvalidationRecorder.install(on: overlay)
+        var hidden = Self.edited
+        hidden.edit?.isHidden = true
+        for (what, bubble) in [("the badge appears", Self.edited), ("the balloon is hidden", hidden), ("back to plain", plain)] {
+            let next = Self.page([Self.upper, bubble])
+            expectPartialRedraw(of: overlay, what) {
+                overlay.update(page: next, showsTranslation: true, isEditing: true, pageOrigin: .zero, scale: 1)
+            }
+            #expect(differences(render(overlay), render(makeOverlay(next, editing: true))).isEmpty, "\(what): differs from a new overlay")
+        }
+    }
+
+    /// A balloon leaving takes the hover with it, and the ring around another
+    /// balloon goes too when the list of balloons changes.
+    @Test func losingTheHoverRedrawsItsRing() {
+        let start = Self.page([Self.upper, Self.edited])
+        let overlay = makeOverlay(start)
+        InvalidationRecorder.install(on: overlay)
+        let area = TranslationOverlayLayout.layout(for: start).hitAreas[Self.upper.id]!
+        overlay.mouseMoved(with: event(.mouseMoved, at: center(area), in: overlay))
+        let next = Self.page([Self.upper, Self.edited, Self.pending])
+        expectPartialRedraw(of: overlay, "a balloon found while hovering another") {
+            overlay.update(page: next, showsTranslation: true, pageOrigin: .zero, scale: 1)
+        }
+        #expect(differences(render(overlay), render(makeOverlay(next))).isEmpty)
+    }
+
+    /// Everything's redrawn when that's what changed: the view growing exposes
+    /// area nothing has drawn in; patches swapping order change their overlap.
+    @Test func changesThatAffectEverythingStillRedrawEverything() {
+        var first = Self.overArtwork
+        first.id = 0
+        var second = Self.overArtwork
+        second.id = 1
+        second.rect = first.rect.offsetBy(dx: 0, dy: 60)
+        let overlay = makeOverlay(Self.page([first, second]))
+        InvalidationRecorder.install(on: overlay)
+
+        InvalidationRecorder.reset()
+        overlay.update(page: Self.page([second, first]), showsTranslation: true, pageOrigin: .zero, scale: 1)
+        #expect(InvalidationRecorder.didInvalidateEverything, "patches swapped order")
+
+        InvalidationRecorder.reset()
+        overlay.update(page: Self.page([second, first]), showsTranslation: false, pageOrigin: .zero, scale: 1)
+        #expect(InvalidationRecorder.didInvalidateEverything, "translations switched off")
+
+        InvalidationRecorder.reset()
+        overlay.frame.size.height += 100
+        overlay.update(page: Self.page([second]), showsTranslation: false, pageOrigin: .zero, scale: 1)
+        #expect(InvalidationRecorder.didInvalidateEverything, "the view grew")
+
+        InvalidationRecorder.reset()
+        overlay.update(page: Self.page([second]), showsTranslation: false, pageOrigin: CGPoint(x: 0, y: 10), scale: 1)
+        #expect(InvalidationRecorder.didInvalidateEverything, "the page moved")
+    }
+
+    // MARK: - Fits
+
+    /// Overlays come and go as pages scroll; a page coming back reuses its
+    /// fits, and they draw exactly what fitting again would.
+    @Test func aNewOverlayForTheSamePageDoesNotFitAgain() {
+        let cache = TranslationFitCache()
+        let first = makeOverlay(Self.readingPage)
+        first.fitCache = cache
+        let original = render(first)
+        let fits = cache.misses
+        #expect(fits == 3)
+
+        let again = makeOverlay(Self.readingPage)
+        again.fitCache = cache
+        #expect(render(again) == original)
+        #expect(cache.misses == fits)
+
+        // Another size is another fit.
+        let zoomed = makeOverlay(Self.readingPage, scale: 1.5)
+        zoomed.fitCache = cache
+        _ = render(zoomed)
+        #expect(cache.misses == fits + 3)
+    }
+
+    /// The same through the stack: scrolled out of its window and back.
+    @Test func scrollingAPageAwayAndBackDoesNotFitAgain() throws {
+        let size = Self.pageSize
+        let stack = ImageStackView()
+        stack.setImages((0..<8).map { _ in NSImage(size: size) }, axis: .vertical)
+        let window = CGRect(origin: .zero, size: size)
+        stack.refreshVisibleViews(visibleRect: window)
+        var page = Self.readingPage
+        page.bubbles[0].translation = "스크롤 테스트만을 위한 번역 \(UUID().uuidString)"
+        stack.setTranslationOverlay([page] + Array(repeating: nil, count: 7), showsTranslation: true)
+        func overlay() -> TranslationOverlayView? { stack.subviews.compactMap { $0 as? TranslationOverlayView }.first }
+        let first = try #require(overlay())
+        let original = render(first)
+        let fits = TranslationFitCache.shared.misses
+
+        stack.refreshVisibleViews(visibleRect: window.offsetBy(dx: 0, dy: size.height * 6))
+        #expect(overlay() == nil)
+        stack.refreshVisibleViews(visibleRect: window)
+        let back = try #require(overlay())
+        #expect(back !== first)
+        #expect(render(back) == original)
+        #expect(TranslationFitCache.shared.misses == fits)
+    }
+
+    @Test func theFitCacheStaysBoundedAndKeepsWhatIsInUse() {
+        let cache = TranslationFitCache(generationSize: 4)
+        let fitted = TranslationPatchPainter.Fitted(text: "", string: NSAttributedString(), outline: nil, size: .zero)
+        func key(_ index: Int) -> TranslationFitCache.Key {
+            .init(text: "\(index)", width: 10, height: 10, glyph: 10, isDark: false, isUniform: true)
+        }
+        cache.store(fitted, for: key(0))
+        for index in 1..<1000 {
+            // Looked up all along, this one is kept through everything.
+            #expect(cache.fitted(for: key(0)) != nil, "at \(index)")
+            cache.store(fitted, for: key(index))
+            #expect(cache.count <= 8)
+        }
+        #expect(cache.fitted(for: key(1)) == nil)
+    }
+
+    // MARK: - The pending view
+
+    /// Nothing pending: no layer to keep around, and none shows.
+    @Test func thePendingViewIsHiddenUnlessSomethingIsPending() throws {
+        var finished = Self.readingPage
+        finished.bubbles.removeAll { $0.translation == nil }
+        let overlay = makeOverlay(finished)
+        let pendingView = try #require(overlay.subviews.first)
+        #expect(pendingView.isHidden)
+
+        overlay.update(page: Self.readingPage, showsTranslation: true, pageOrigin: .zero, scale: 1)
+        #expect(!pendingView.isHidden)
+
+        overlay.update(page: finished, showsTranslation: true, pageOrigin: .zero, scale: 1)
+        #expect(pendingView.isHidden)
+    }
 }
 
 /// Records what a view asks to redraw. The overlay is `final`, so instead

@@ -23,12 +23,37 @@ nonisolated struct TranslationEditStore: Sendable {
     /// aren't — edits hold for whatever the book is shown in.
     static func key(pageID: String, scope: TranslationScope) -> String {
         let composite = "\(pageID)|\(scope.rawValue)"
-        return SHA256.hash(data: Data(composite.utf8)).prefix(16).map { String(format: "%02x", $0) }.joined()
+        return TranslationStore.hex(SHA256.hash(data: Data(composite.utf8)).prefix(16))
     }
 
     func load(key: String) -> PageEdits? {
         guard let data = try? Data(contentsOf: fileURL(forKey: key)) else { return nil }
         return try? JSONDecoder().decode(PageEdits.self, from: data)
+    }
+
+    /// The keys with edits on disk — one directory listing, so a book's many
+    /// pages without edits don't each cost a failed open.
+    func existingKeys() -> Set<String> {
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: root.path)) ?? []
+        var keys = Set<String>(minimumCapacity: names.count)
+        for name in names where name.hasSuffix(".json") {
+            keys.insert(String(name.dropLast(5)))
+        }
+        return keys
+    }
+
+    /// The edits of `pageIDs` read in `scope`, by page id.
+    func loadAll(pageIDs: [String], scope: TranslationScope) -> [String: PageEdits] {
+        let existing = existingKeys()
+        var found: [String: PageEdits] = [:]
+        guard !existing.isEmpty else { return found }
+        for id in pageIDs {
+            let key = Self.key(pageID: id, scope: scope)
+            if existing.contains(key), let edits = load(key: key) {
+                found[id] = edits
+            }
+        }
+        return found
     }
 
     /// Saving a page with no edits left deletes its file.

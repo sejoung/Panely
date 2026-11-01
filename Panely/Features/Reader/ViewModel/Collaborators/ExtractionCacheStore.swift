@@ -98,6 +98,28 @@ nonisolated enum ExtractionCacheStore {
         return url
     }
 
+    /// Move a finished extraction into its cache slot and return where the
+    /// tree ended up. The slot has no completion marker (any non-empty dir is a
+    /// hit), which is why extractions never happen in place. If another load
+    /// filled the slot first, its copy wins and `staging` is discarded; if the
+    /// move fails, `staging` itself is returned for use as a plain session dir.
+    static func promote(_ staging: URL, toCacheSlot slot: URL) -> URL {
+        let fm = FileManager.default
+        if let existing = try? fm.contentsOfDirectory(atPath: slot.path) {
+            guard existing.isEmpty else {
+                try? fm.removeItem(at: staging)
+                return slot
+            }
+            try? fm.removeItem(at: slot)
+        }
+        do {
+            try fm.moveItem(at: staging, to: slot)
+            return slot
+        } catch {
+            return staging
+        }
+    }
+
     static func enforceBudget(
         limit: UInt64 = cacheBudgetBytes,
         excluding activeURL: URL? = nil,

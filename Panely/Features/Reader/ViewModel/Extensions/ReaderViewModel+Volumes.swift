@@ -30,15 +30,6 @@ extension ReaderViewModel {
 
     // MARK: - Sibling lookup
 
-    var currentSiblingIndex: Int? {
-        guard let current = currentSourceURL else { return nil }
-        let target = current.standardizedFileURL
-        return siblings.firstIndex {
-            let sibling = $0.standardizedFileURL
-            return sibling == target || sibling.isAncestor(of: target)
-        }
-    }
-
     var hasMultipleVolumes: Bool { siblings.count > 1 }
 
     var canGoPreviousVolume: Bool {
@@ -173,7 +164,7 @@ extension ReaderViewModel {
     /// outer archive is already the recent entry.
     private func recordVolumeRecent(_ url: URL) {
         guard !tempDir.isActive else { return }
-        recentItems.record(url, title: displayTitle(for: url))
+        recentItems.recordInBackground(url, title: displayTitle(for: url))
     }
 
     // MARK: - End-of-volume card

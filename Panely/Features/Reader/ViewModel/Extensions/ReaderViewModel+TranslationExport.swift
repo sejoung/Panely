@@ -158,6 +158,10 @@ extension ReaderViewModel {
     /// The book's pages and translations (translated first if needed), with
     /// the reader's edits laid over them.
     private func prepareTranslationExport(_ job: TranslationExportJob) async throws -> PreparedExport {
+        // The writer gets what it needs; a volume that's only here for its
+        // cache shouldn't stay in memory until some later job ends. A series'
+        // worth of them would otherwise add up.
+        defer { translationManager.dropFinishedBackground() }
         let url = job.bookURL
         let target = job.options.target
         let isOpenBook = hasSource && currentSourceURL?.standardizedFileURL == url.standardizedFileURL
@@ -264,11 +268,7 @@ extension ReaderViewModel {
         }
         let store = dependencies.translationEditStore
         return await Task.detached(priority: .utility) {
-            var edits: [String: PageEdits] = [:]
-            for id in pageIDs {
-                if let pageEdits = store.load(key: TranslationEditStore.key(pageID: id, scope: scope)) { edits[id] = pageEdits }
-            }
-            return edits
+            store.loadAll(pageIDs: pageIDs, scope: scope)
         }.value
     }
 

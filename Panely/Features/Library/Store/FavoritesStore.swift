@@ -77,6 +77,24 @@ final class FavoritesStore {
         return result.url
     }
 
+    /// `resolve`, with the resolution itself off the main thread: it may mount
+    /// the favorite's volume, which can stall for seconds on a network share.
+    func resolveOffMain(_ favorite: FavoriteBook) async -> URL? {
+        let bookmarks = bookmarks
+        let data = favorite.bookmarkData
+        let result = await Task.detached(priority: .userInitiated) {
+            bookmarks.resolveRefreshing(data).map { ResolvedBookmark(url: $0.url, refreshed: $0.refreshed) }
+        }.value
+        guard let result else { return nil }
+        if let refreshed = result.refreshed,
+           let idx = favorites.firstIndex(where: { $0.id == favorite.id }) {
+            favorites[idx].bookmarkData = refreshed.data
+            favorites[idx].path = refreshed.path
+            save()
+        }
+        return result.url
+    }
+
     func removeFavorite(_ favorite: FavoriteBook) {
         favorites.removeAll { $0.id == favorite.id }
         save()

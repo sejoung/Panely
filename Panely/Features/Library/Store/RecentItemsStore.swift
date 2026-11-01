@@ -32,6 +32,7 @@ final class RecentItemsStore {
 
     private let bookmarks: any SecurityScopedBookmarking
     private let defaults: any KeyValueStoring
+    @ObservationIgnored private var recordingTask: Task<Void, Never>?
     private(set) var items: [RecentItem] = [] {
         didSet { revision &+= 1 }
     }
@@ -55,56 +56,134 @@ final class RecentItemsStore {
         load()
     }
 
+    /// The file-system half of recording a book: minting a security-scoped
+    /// bookmark (or probing an existing one for staleness) and checking its
+    /// kind. No store state, so it can run off the main thread.
+    private nonisolated struct RecordProbe: Sendable {
+        var refreshedBookmark: Data?
+        var newBookmark: Data?
+        var isDirectory = false
+    }
+
+    private nonisolated static func probe(
+        url: URL,
+        existingBookmark: Data?,
+        bookmarks: any SecurityScopedBookmarking
+    ) -> RecordProbe {
+        if let existingBookmark {
+            // Only a staleness probe — `url` is already open — so never mount.
+            guard bookmarks.resolve(existingBookmark, allowingMount: false)?.isStale == true else {
+                return RecordProbe()
+            }
+            return RecordProbe(refreshedBookmark: bookmarks.refreshedData(for: url))
+        }
+        // Bookmark creation can fail (e.g., URL not user-accessible). Skip silently.
+        guard let data = try? bookmarks.data(for: url) else { return RecordProbe() }
+        return RecordProbe(newBookmark: data, isDirectory: bookmarks.isDirectory(url))
+    }
+
     func record(_ url: URL, title: String) {
+        let path = url.standardizedFileURL.path
+        let existing = items.first(where: { $0.path == path })?.bookmarkData
+        apply(
+            Self.probe(url: url, existingBookmark: existing, bookmarks: bookmarks),
+            url: url,
+            title: title
+        )
+    }
+
+    /// `record` for the open paths: the bookmark work happens off the main
+    /// thread (a network volume makes it slow), and each request waits for the
+    /// one before it so recency order still follows the order books were
+    /// opened in. Awaiting `recordingSettled()` waits for them all.
+    func recordInBackground(_ url: URL, title: String) {
+        let previous = recordingTask
+        let bookmarks = bookmarks
+        recordingTask = Task { [weak self] in
+            await previous?.value
+            guard let self else { return }
+            let path = url.standardizedFileURL.path
+            let existing = self.items.first(where: { $0.path == path })?.bookmarkData
+            let probe = await Task.detached(priority: .userInitiated) {
+                Self.probe(url: url, existingBookmark: existing, bookmarks: bookmarks)
+            }.value
+            self.apply(probe, url: url, title: title)
+        }
+    }
+
+    func recordingSettled() async {
+        await recordingTask?.value
+    }
+
+    private func apply(_ probe: RecordProbe, url: URL, title: String) {
         let path = url.standardizedFileURL.path
         if let existingIndex = items.firstIndex(where: { $0.path == path }) {
             var existing = items.remove(at: existingIndex)
             existing.openedAt = Date()
             existing.title = title
-            // Only a staleness probe — `url` is already open — so never mount.
-            if bookmarks.resolve(existing.bookmarkData, allowingMount: false)?.isStale == true,
-               let refreshed = bookmarks.refreshedData(for: url) {
+            if let refreshed = probe.refreshedBookmark {
                 existing.bookmarkData = refreshed
             }
             items.insert(existing, at: 0)
-            availabilityByID[existing.id] = .available(url.standardizedFileURL)
+            setAvailability(.available(url.standardizedFileURL), for: existing.id)
             save()
             return
         }
 
-        do {
-            let item = RecentItem(
-                id: UUID(),
-                path: path,
-                title: title,
-                openedAt: Date(),
-                bookmarkData: try bookmarks.data(for: url),
-                isDirectory: bookmarks.isDirectory(url)
-            )
-            items.insert(item, at: 0)
-            availabilityByID[item.id] = .available(url.standardizedFileURL)
+        guard let bookmark = probe.newBookmark else { return }
+        let item = RecentItem(
+            id: UUID(),
+            path: path,
+            title: title,
+            openedAt: Date(),
+            bookmarkData: bookmark,
+            isDirectory: probe.isDirectory
+        )
+        items.insert(item, at: 0)
+        setAvailability(.available(url.standardizedFileURL), for: item.id)
 
-            if items.count > Self.maxItems {
-                let retained = Array(items.prefix(Self.maxItems))
-                let retainedIDs = Set(retained.map(\.id))
-                items = retained
-                availabilityByID = availabilityByID.filter { retainedIDs.contains($0.key) }
-            }
-
-            save()
-        } catch {
-            // Bookmark creation failed (e.g., URL not user-accessible). Skip silently.
+        if items.count > Self.maxItems {
+            let retained = Array(items.prefix(Self.maxItems))
+            let retainedIDs = Set(retained.map(\.id))
+            items = retained
+            availabilityByID = availabilityByID.filter { retainedIDs.contains($0.key) }
         }
+
+        save()
+    }
+
+    /// Assigns only a real change. Every assignment notifies observers and
+    /// bumps `revision`, whatever the value; the availability sweep on each
+    /// app activation mostly confirms what's already known, and shouldn't
+    /// invalidate the sidebar and the Continue Reading index for that.
+    private func setAvailability(_ availability: RecentItemAvailability, for id: UUID) {
+        guard availabilityByID[id] != availability else { return }
+        availabilityByID[id] = availability
     }
 
     /// `allowingMount: false` for lookups the user didn't ask for (see
     /// `SecurityScopedBookmarking.resolve(_:allowingMount:)`).
     func resolve(_ item: RecentItem, allowingMount: Bool = true) -> URL? {
-        guard let result = bookmarks.resolveRefreshing(
-            item.bookmarkData,
-            allowingMount: allowingMount
-        ) else {
-            availabilityByID[item.id] = .invalidBookmark
+        let result = bookmarks.resolveRefreshing(item.bookmarkData, allowingMount: allowingMount)
+            .map { ResolvedBookmark(url: $0.url, refreshed: $0.refreshed) }
+        return applyResolution(result, to: item)
+    }
+
+    /// `resolve`, with the resolution itself off the main thread: it may mount
+    /// the item's volume, which can stall for seconds on a network share.
+    func resolveOffMain(_ item: RecentItem, allowingMount: Bool = true) async -> URL? {
+        let bookmarks = bookmarks
+        let data = item.bookmarkData
+        let result = await Task.detached(priority: .userInitiated) {
+            bookmarks.resolveRefreshing(data, allowingMount: allowingMount)
+                .map { ResolvedBookmark(url: $0.url, refreshed: $0.refreshed) }
+        }.value
+        return applyResolution(result, to: item)
+    }
+
+    private func applyResolution(_ result: ResolvedBookmark?, to item: RecentItem) -> URL? {
+        guard let result else {
+            setAvailability(.invalidBookmark, for: item.id)
             return nil
         }
         let url = result.url.standardizedFileURL
@@ -120,7 +199,7 @@ final class RecentItemsStore {
             }
             if changed { save() }
         }
-        availabilityByID[item.id] = .available(url)
+        setAvailability(.available(url), for: item.id)
         return url
     }
 
@@ -234,10 +313,10 @@ final class RecentItemsStore {
 
         switch check {
         case .invalidBookmark:
-            availabilityByID[item.id] = .invalidBookmark
+            setAvailability(.invalidBookmark, for: item.id)
             return RecentItemRefreshResult(availability: .invalidBookmark, migration: nil)
         case .temporarilyUnavailable:
-            availabilityByID[item.id] = .temporarilyUnavailable
+            setAvailability(.temporarilyUnavailable, for: item.id)
             return RecentItemRefreshResult(availability: .temporarilyUnavailable, migration: nil)
         case .available(let url, let refreshedData):
             let oldPath = items[index].path
@@ -253,7 +332,7 @@ final class RecentItemsStore {
             }
             if changed { save() }
             let availability = RecentItemAvailability.available(url.standardizedFileURL)
-            availabilityByID[item.id] = availability
+            setAvailability(availability, for: item.id)
             let migration = oldPath == newPath
                 ? nil
                 : RecentItemPathMigration(oldPath: oldPath, newPath: newPath)

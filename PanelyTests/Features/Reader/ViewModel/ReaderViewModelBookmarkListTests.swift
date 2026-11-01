@@ -99,6 +99,7 @@ struct ReaderViewModelBookmarkListTests {
         let book = try #require(vm.otherBookmarkedBooks.first)
         vm.openBookmark(try #require(book.bookmarks.first), in: book)
 
+        try await waitUntil { vm.errorMessage != nil }
         #expect(vm.errorMessage == "This bookmarked book can no longer be opened.")
         #expect(vm.currentSourceURL == nil)
     }

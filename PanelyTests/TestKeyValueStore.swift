@@ -1,7 +1,9 @@
 import Foundation
 @testable import Panely
 
+/// Locked: stores commit debounced writes from a background task.
 final class InMemoryKeyValueStore: KeyValueStoring, @unchecked Sendable {
+    private let lock = NSLock()
     private var storage: [String: Any]
 
     init(_ storage: [String: Any] = [:]) {
@@ -9,27 +11,27 @@ final class InMemoryKeyValueStore: KeyValueStoring, @unchecked Sendable {
     }
 
     func data(forKey key: String) -> Data? {
-        storage[key] as? Data
+        lock.withLock { storage[key] as? Data }
     }
 
     func dictionary(forKey key: String) -> [String: Any]? {
-        storage[key] as? [String: Any]
+        lock.withLock { storage[key] as? [String: Any] }
     }
 
     func array(forKey key: String) -> [Any]? {
-        storage[key] as? [Any]
+        lock.withLock { storage[key] as? [Any] }
     }
 
     func dictionaryRepresentation() -> [String: Any] {
-        storage
+        lock.withLock { storage }
     }
 
     func set(_ value: Any?, forKey key: String) {
-        storage[key] = value
+        lock.withLock { storage[key] = value }
     }
 
     func removeObject(forKey key: String) {
-        storage.removeValue(forKey: key)
+        _ = lock.withLock { storage.removeValue(forKey: key) }
     }
 }
 

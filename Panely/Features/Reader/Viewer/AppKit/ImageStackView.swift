@@ -50,6 +50,13 @@ final class ImageStackView: NSView {
 
     @discardableResult
     func setImages(_ newImages: [NSImage], axis: Axis) -> Bool {
+        // The same array as last time: nothing to do. Every SwiftUI update of the
+        // viewer lands here (a translated balloon, a page-index change), and on
+        // a long strip comparing every page's size each time isn't free.
+        if self.axis == axis, Self.sharesStorage(newImages, currentImages) {
+            return false
+        }
+
         let sameCount = newImages.count == currentImages.count
         let sameAxis = self.axis == axis
         let sameGeometry = sameCount && zip(newImages, currentImages).allSatisfy { newImage, currentImage in
@@ -100,6 +107,12 @@ final class ImageStackView: NSView {
         // Vertical mode: views are created lazily by refreshVisibleViews
         // (called by AppKitImageScroller's bounds observer).
         return true
+    }
+
+    private static func sharesStorage(_ a: [NSImage], _ b: [NSImage]) -> Bool {
+        a.count == b.count && a.withUnsafeBufferPointer { aBuffer in
+            b.withUnsafeBufferPointer { aBuffer.baseAddress == $0.baseAddress }
+        }
     }
 
     /// Materializes NSImageViews for pages whose frames intersect

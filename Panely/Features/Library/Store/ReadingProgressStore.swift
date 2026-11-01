@@ -45,6 +45,11 @@ final class ReadingProgressStore {
     /// Vol 2 drops Vol 1's "finished" record.
     private var pendingKey: String?
     private let defaults: any KeyValueStoring
+    /// Debounced writes encode a snapshot off the main thread through this;
+    /// everything else (and `flushPendingWrites`) commits synchronously
+    /// through it, so an older background encode can't land on top.
+    private let writer: LatestWinsDefaultsWriter
+    private var writeGeneration = 0
     private let storeKey: String
     private let maxEntries: Int
     /// Injectable clock so eviction-by-recency is deterministically testable.
@@ -57,6 +62,7 @@ final class ReadingProgressStore {
         clock: @MainActor @escaping () -> Date = { Date() }
     ) {
         self.defaults = defaults
+        self.writer = LatestWinsDefaultsWriter(defaults: defaults)
         self.storeKey = storeKey
         self.maxEntries = maxEntries
         self.clock = clock
@@ -171,8 +177,16 @@ final class ReadingProgressStore {
         settlePendingWrite(unlessFor: key)
         pendingKey = key
         saveDebouncer.schedule { [weak self] in
-            self?.writeNow(key: key, fileIdentityKey: fileIdentityKey, page: page, total: total, finished: finished)
+            self?.writeNow(key: key, fileIdentityKey: fileIdentityKey, page: page, total: total, finished: finished, inBackground: true)
         }
+    }
+
+    /// Land everything still in flight, synchronously: a debounced write and
+    /// any background encode that may not have finished. For app termination,
+    /// which exits without giving a background task another chance to run.
+    func flushPendingWrites() {
+        saveDebouncer.flush()
+        if !writer.hasCommitted(writeGeneration) { persist() }
     }
 
     func flushImmediately(forKey key: String, fileIdentityKey: String?, page: Int, total: Int, finished: Bool) {
@@ -199,7 +213,14 @@ final class ReadingProgressStore {
         if pendingKey != key { saveDebouncer.flush() }
     }
 
-    private func writeNow(key: String, fileIdentityKey: String?, page: Int, total: Int, finished: Bool) {
+    private func writeNow(
+        key: String,
+        fileIdentityKey: String?,
+        page: Int,
+        total: Int,
+        finished: Bool,
+        inBackground: Bool = false
+    ) {
         let existing = entries[key] ?? fileIdentityKey.flatMap { entries[$0] }
         // Preserve completion while the underlying page count is unchanged.
         // If the book is replaced with a different-length edition, recompute
@@ -213,13 +234,18 @@ final class ReadingProgressStore {
             finished: effectiveFinished,
             updatedAt: clock()
         )
-        store(progress, forKey: key, fileIdentityKey: fileIdentityKey)
+        store(progress, forKey: key, fileIdentityKey: fileIdentityKey, inBackground: inBackground)
     }
 
     /// Write `progress` under both keys in place — one `entries` mutation
     /// (one revision bump) and no copy of the whole dictionary — then evict
     /// and persist.
-    private func store(_ progress: ReadingProgress, forKey key: String, fileIdentityKey: String?) {
+    private func store(
+        _ progress: ReadingProgress,
+        forKey key: String,
+        fileIdentityKey: String?,
+        inBackground: Bool = false
+    ) {
         // Only a new key can change the key set (eviction runs only once a
         // new key pushes the count over the cap).
         let addsKey = entries[key] == nil
@@ -234,7 +260,11 @@ final class ReadingProgressStore {
             dict.capByRecency(to: maxEntries) { $0.updatedAt }
         }
         if addsKey { keysRevision &+= 1 }
-        persist()
+        if inBackground {
+            persistInBackground()
+        } else {
+            persist()
+        }
     }
 
     /// Mutates `entries` through its `_modify` accessor, so the dictionary
@@ -244,6 +274,26 @@ final class ReadingProgressStore {
     }
 
     private func persist() {
-        defaults.saveCodable(entries, forKey: storeKey)
+        writeGeneration &+= 1
+        writer.commit(generation: writeGeneration, Self.encoding(entries, forKey: storeKey))
+    }
+
+    /// At a normal reading pace nearly every page turn outlasts the debounce,
+    /// so this is the common write; the dictionary is a cheap copy-on-write
+    /// snapshot, and encoding up to `maxEntries` of it happens off the main
+    /// thread.
+    private func persistInBackground() {
+        writeGeneration &+= 1
+        writer.commitInBackground(generation: writeGeneration, Self.encoding(entries, forKey: storeKey))
+    }
+
+    private nonisolated static func encoding(
+        _ entries: [String: ReadingProgress],
+        forKey key: String
+    ) -> @Sendable () -> [String: any Sendable]? {
+        {
+            guard let data = try? JSONEncoder().encode(entries) else { return nil }
+            return [key: data]
+        }
     }
 }

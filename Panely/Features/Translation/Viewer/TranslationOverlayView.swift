@@ -47,22 +47,20 @@ final class TranslationOverlayView: NSView {
     private var pendingPopover: Task<Void, Never>?
     private var trackingArea: NSTrackingArea?
     private let pendingView = PendingBubblesView()
-    /// Fitted text per balloon, with what it was fitted to. Fitting is a
-    /// small binary search per balloon; redraws (hover, scroll) reuse it, and
-    /// so does a page update that leaves the balloon's patch as it was — a
-    /// job fills a page in one balloon at a time.
-    private var fittedText: [Int: (fit: FitKey, fitted: TranslationPatchPainter.Fitted)] = [:]
+    /// Fitted text, outliving this view: overlays are made and dropped as
+    /// pages scroll in and out, and a page coming back shouldn't fit again.
+    var fitCache = TranslationFitCache.shared
     /// The page's translations laid out together (page pixels), and the
     /// page they were laid out for.
     private var layout = TranslationOverlayLayout.PageLayout()
     private var layoutPage: TranslatedPage?
-
-    /// What a fit depends on besides the text (which `Fitted` checks itself).
-    private struct FitKey: Equatable {
-        let size: CGSize
-        let glyph: CGFloat
-        let background: BubbleBackground
-    }
+    /// What's been asked to be painted, to tell what a page update changes.
+    /// `layout` can't serve: `ImageStackView` prepares the new one before
+    /// calling `update`.
+    private var paintState = PaintState()
+    /// The size last painted at: growing the view exposes area nothing has
+    /// drawn in, whatever the balloons did.
+    private var paintedSize: CGSize = .zero
 
     override var isFlipped: Bool { true }
 
@@ -87,22 +85,22 @@ final class TranslationOverlayView: NSView {
         let geometryChanged = pageOrigin != self.pageOrigin || scale != self.scale
         let modeChanged = isEditing != self.isEditing
         guard page != self.page || showsTranslation != self.showsTranslation || modeChanged || geometryChanged else { return }
+        var hoverCleared: Int?
         if page?.bubbles.map(\.id) != self.page?.bubbles.map(\.id) {
+            hoverCleared = hoveredBubbleID
             hoveredBubbleID = nil
         }
+        // Painted the same way as before, so only what changed needs painting.
+        let canRedrawPart = page != nil && self.page != nil && showsTranslation == self.showsTranslation
+            && !modeChanged && !geometryChanged && bounds.size == paintedSize
         // The open popover belongs to the other mode.
         if page == nil || modeChanged { closePopover() }
         if page != self.page {
             if let page {
                 _ = preparedLayout(for: page)
-                // Fits of balloons that left the page go; the rest are checked
-                // against their patch when drawn.
-                let ids = Set(page.bubbles.map(\.id) + layout.drawn.map(\.bubble.id))
-                fittedText = fittedText.filter { ids.contains($0.key) }
             } else {
                 layout = TranslationOverlayLayout.PageLayout()
                 layoutPage = nil
-                fittedText = [:]
             }
         }
         self.page = page
@@ -111,7 +109,86 @@ final class TranslationOverlayView: NSView {
         self.pageOrigin = pageOrigin
         self.scale = scale
         pendingView.update(rects: pendingRects(), glyph: pendingGlyph())
-        needsDisplay = true
+
+        let state = PaintState(page: page, layout: layout)
+        // A job fills a page in a balloon at a time, and repainting every
+        // balloon each time (over artwork, a blur each) runs on the main thread.
+        if canRedrawPart, let changed = state.areasChanged(since: paintState, scale: scale) {
+            for area in changed { setNeedsDisplay(inView(area.rect).insetBy(dx: -area.reach, dy: -area.reach)) }
+            if let hoverCleared, let ring = paintState.marks.first(where: { $0.id == hoverCleared }) {
+                setNeedsDisplay(inView(ring.area).insetBy(dx: -Self.markReach, dy: -Self.markReach))
+            }
+        } else {
+            needsDisplay = true
+        }
+        paintState = state
+        paintedSize = bounds.size
+    }
+
+    /// How far a balloon's marks (the hover ring above all) reach past its
+    /// hit area and patch.
+    private static let markReach: CGFloat = 4
+
+    /// Everything about a page that shows, in page pixels.
+    private struct PaintState {
+        struct Patch: Equatable {
+            let id: Int
+            let translation: String?
+            let background: BubbleBackground
+            let glyph: Double
+            let rect: CGRect
+        }
+
+        struct Mark: Equatable {
+            let id: Int
+            let patch: CGRect
+            let area: CGRect
+            let isHidden: Bool
+            let isEdited: Bool
+            let glyph: Double
+        }
+
+        var patches: [Patch] = []
+        var marks: [Mark] = []
+
+        init() {}
+
+        init(page: TranslatedPage?, layout: TranslationOverlayLayout.PageLayout) {
+            guard let page else { return }
+            patches = layout.drawn.map {
+                Patch(id: $0.bubble.id, translation: $0.bubble.translation, background: $0.bubble.background, glyph: $0.bubble.glyphSize, rect: $0.patch)
+            }
+            marks = page.bubbles.map { bubble in
+                let patch = layout.patches[bubble.id] ?? TranslationOverlayLayout.patchRect(for: bubble, imageSize: page.imageSize)
+                return Mark(
+                    id: bubble.id, patch: patch, area: layout.hitAreas[bubble.id] ?? patch,
+                    isHidden: bubble.edit?.isHidden == true, isEdited: bubble.edit != nil, glyph: bubble.glyphSize
+                )
+            }
+        }
+
+        /// What has to be repainted to get from `old` to this: both where a
+        /// changed balloon was and where it is, each with how far its paint
+        /// reaches (view points). `nil` when patches that stayed swapped
+        /// places: the later one paints over the earlier, so their overlap
+        /// can change anywhere.
+        func areasChanged(since old: PaintState, scale: CGFloat) -> [(rect: CGRect, reach: CGFloat)]? {
+            let keptOld = old.patches.filter { patches.contains($0) }
+            let keptNew = patches.filter { old.patches.contains($0) }
+            guard keptOld == keptNew else { return nil }
+            var areas: [(rect: CGRect, reach: CGFloat)] = []
+            func addPatch(_ patch: Patch) {
+                areas.append((patch.rect, TranslationPatchPainter.paintReach(background: patch.background, glyph: CGFloat(patch.glyph) * scale)))
+            }
+            func addMark(_ mark: Mark) {
+                areas.append((mark.patch.union(mark.area), TranslationOverlayView.markReach))
+            }
+            old.patches.filter { !patches.contains($0) }.forEach(addPatch)
+            patches.filter { !old.patches.contains($0) }.forEach(addPatch)
+            old.marks.filter { !marks.contains($0) }.forEach(addMark)
+            marks.filter { !old.marks.contains($0) }.forEach(addMark)
+            return areas
+        }
     }
 
     // MARK: - Geometry
@@ -422,15 +499,16 @@ final class TranslationOverlayView: NSView {
                 let patch = inView(rect)
                 // Over artwork a patch is feathered past its edge
                 // (`TranslationPatchPainter`): a redraw next to it repaints it.
-                let bleed = max(6, CGFloat(bubble.glyphSize) * scale * 0.8)
-                guard patch.insetBy(dx: -bleed, dy: -bleed).intersects(dirtyRect),
+                let reach = TranslationPatchPainter.paintReach(background: bubble.background, glyph: CGFloat(bubble.glyphSize) * scale)
+                guard patch.insetBy(dx: -reach, dy: -reach).intersects(dirtyRect),
                       let translation = bubble.translation else { continue }
                 drawTranslation(translation, of: bubble, in: patch)
             }
         }
         for bubble in page.bubbles {
             let area = hitAreaInView(bubble)
-            guard area.intersects(dirtyRect) || patchInView(bubble).intersects(dirtyRect) else { continue }
+            // With its reach: a redraw beside a balloon clears the ring around it too.
+            guard area.union(patchInView(bubble)).insetBy(dx: -Self.markReach, dy: -Self.markReach).intersects(dirtyRect) else { continue }
             if bubble.edit?.isHidden == true {
                 drawHiddenOutline(around: patchInView(bubble), glyph: CGFloat(bubble.glyphSize) * scale)
             } else if showsTranslation, isEditing, bubble.edit != nil {
@@ -458,16 +536,19 @@ final class TranslationOverlayView: NSView {
 
     private func drawTranslation(_ translation: String, of bubble: TranslatedBubble, in patch: CGRect) {
         let glyph = CGFloat(bubble.glyphSize) * scale
-        let fit = FitKey(size: patch.size, glyph: glyph, background: bubble.background)
-        let cached = fittedText[bubble.id]
+        let key = TranslationFitCache.Key(
+            text: translation, width: patch.width, height: patch.height, glyph: glyph,
+            isDark: bubble.background.isDark, isUniform: bubble.background.isUniform
+        )
+        let cached = fitCache.fitted(for: key)
         let fitted = TranslationPatchPainter.draw(
             translation,
             background: bubble.background,
             glyph: glyph,
             in: patch,
-            fitted: cached?.fit == fit ? cached?.fitted : nil
+            fitted: cached
         )
-        fittedText[bubble.id] = fitted.map { (fit, $0) }
+        if cached == nil, let fitted { fitCache.store(fitted, for: key) }
     }
 
     /// Edit mode: where a hidden balloon is — the original shows through,
@@ -539,6 +620,58 @@ final class TranslationOverlayView: NSView {
     }
 }
 
+/// Text fitted to patches, for every overlay. Fitting is a small binary search
+/// of CoreText measuring per balloon, on the main thread while drawing, and
+/// its result depends only on what's in the key — so it holds for a balloon
+/// wherever and whenever it's drawn again.
+///
+/// Bounded by keeping two generations: entries used lately survive, the rest
+/// go when the older generation does. Each is a few short attributed strings.
+final class TranslationFitCache {
+    static let shared = TranslationFitCache()
+
+    /// What a fit depends on: the color and outline come from the tone.
+    struct Key: Hashable {
+        let text: String
+        let width: CGFloat
+        let height: CGFloat
+        let glyph: CGFloat
+        let isDark: Bool
+        let isUniform: Bool
+    }
+
+    private let generationSize: Int
+    private var current: [Key: TranslationPatchPainter.Fitted] = [:]
+    private var previous: [Key: TranslationPatchPainter.Fitted] = [:]
+
+    /// At most twice this many entries are kept.
+    init(generationSize: Int = 1024) {
+        self.generationSize = max(1, generationSize)
+    }
+
+    var count: Int { current.count + previous.count }
+    /// Lookups that found nothing — fits about to be worked out.
+    private(set) var misses = 0
+
+    func fitted(for key: Key) -> TranslationPatchPainter.Fitted? {
+        if let hit = current[key] { return hit }
+        guard let hit = previous[key] else {
+            misses += 1
+            return nil
+        }
+        store(hit, for: key)
+        return hit
+    }
+
+    func store(_ fitted: TranslationPatchPainter.Fitted, for key: Key) {
+        if current.count >= generationSize {
+            previous = current
+            current = [:]
+        }
+        current[key] = fitted
+    }
+}
+
 /// Dashed outlines with "…" over balloons whose translation is on its way,
 /// pulsing gently. A separate view so the pulse animates only these marks,
 /// not the finished translations around them.
@@ -552,6 +685,10 @@ private final class PendingBubblesView: NSView {
         super.init(frame: frameRect)
         wantsLayer = true
         layerContentsRedrawPolicy = .onSetNeedsDisplay
+        // Most pages shown have nothing pending, and `update` leaves a view
+        // with no rects alone: without this each would keep a page-sized
+        // layer with nothing in it.
+        isHidden = true
     }
 
     @available(*, unavailable)

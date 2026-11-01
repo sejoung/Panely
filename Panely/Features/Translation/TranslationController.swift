@@ -48,6 +48,8 @@ final class TranslationController {
         case needsModelDownload
         case couldNotDetectLanguage
         case failed(String)
+        /// The job finished, but these pages didn't translate even on a retry.
+        case pagesFailed(Int)
 
         func message(locale: Locale) -> String {
             switch self {
@@ -57,6 +59,8 @@ final class TranslationController {
                 return String(localized: "Couldn't tell which language this book is in. Choose it in the translation panel.", bundle: .localized)
             case let .failed(reason):
                 return String(localized: "Translation stopped: \(reason)", bundle: .localized)
+            case let .pagesFailed(count):
+                return String(localized: "Couldn't translate \(count) pages. Translate again to retry them.", bundle: .localized)
             }
         }
     }
@@ -74,6 +78,14 @@ final class TranslationController {
     /// until the page changes (`ReaderViewModel.translationOverlayPages`).
     @ObservationIgnored private(set) var pageRevisions: [String: Int] = [:]
     private static var nextPageRevision = 0
+    /// The revision of the latest write to `pages`.
+    @ObservationIgnored private(set) var pagesStamp = 0
+    /// Which pages recent writes touched, so a reader of a whole book's pages
+    /// can look at just those (`pagesChanged(since:)`). Holds every write after
+    /// `pageChangeFloor`.
+    @ObservationIgnored private var pageChanges: [(stamp: Int, id: String)] = []
+    @ObservationIgnored private var pageChangeFloor = 0
+    private static let maxPageChanges = 512
     private(set) var phase: Phase = .idle
     /// Indices of pages whose translation is complete (cached or finished).
     private(set) var completedPageIndices: Set<Int> = []
@@ -86,6 +98,9 @@ final class TranslationController {
     /// the case where model loading takes a minute or two.
     private(set) var isFirstRunForThisBuild: Bool
     var notice: Notice?
+    /// OCR has kept the job waiting for a while. The system sometimes spends
+    /// tens of seconds preparing a model mid-book, which otherwise looks stuck.
+    private(set) var isWaitingForOCR = false
 
     let store: TranslationStore
     /// The book this controller translates (its file or folder path) and a
@@ -121,7 +136,9 @@ final class TranslationController {
 
     @ObservationIgnored private let defaults: any KeyValueStoring
     @ObservationIgnored private var bookPages: [ComicPage] = []
-    @ObservationIgnored private var pageSizes: [CGSize] = []
+    /// The book's page sizes (strip scope): handed in, or read by the first
+    /// job that needs them and kept for the next.
+    @ObservationIgnored private(set) var pageSizes: [CGSize] = []
     /// The language this controller translates into (one controller per book
     /// and language — see `TranslationManager`).
     @ObservationIgnored private(set) var target: TranslationLanguage = .english
@@ -133,6 +150,9 @@ final class TranslationController {
     @ObservationIgnored private var finishedUnits: Set<Int> = []
     /// Units that failed; their pages aren't cached, so they retry next time.
     @ObservationIgnored private var failedUnits: Set<Int> = []
+    /// Units that failed once and go round again after everything else: the
+    /// OCR's failures have been passing ones.
+    @ObservationIgnored private var unitsToRetry: Set<Int> = []
     @ObservationIgnored private var focusPage = 0
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var jobTask: Task<Void, Never>?
@@ -148,6 +168,8 @@ final class TranslationController {
     @ObservationIgnored var makeAnalyzer: (@Sendable ([ComicPage], TranslationLanguage) -> any PageAnalyzing)?
 
     nonisolated static let maxConsecutiveFailures = 3
+    /// How long OCR may keep a job waiting before the status says so.
+    @ObservationIgnored var ocrWaitNoticeDelay: Duration = .seconds(5)
     /// Units read ahead of the one being translated. A page takes the model
     /// a few seconds; two pages of OCR in flight keep it fed without OCR
     /// running far ahead of a reader who jumps around.
@@ -222,6 +244,8 @@ final class TranslationController {
         plan = nil
         finishedUnits = []
         failedUnits = []
+        unitsToRetry = []
+        isWaitingForOCR = false
         secondsPerPage = nil
         notice = nil
     }
@@ -269,7 +293,9 @@ final class TranslationController {
     /// Change the book's language (user choice in the panel).
     func setSource(_ language: TranslationLanguage) {
         guard language != source else { return }
-        let wasWorking = isWorking || phase == .paused
+        // Having told the reader to choose the language, get on with it once
+        // they have.
+        let wasWorking = isWorking || phase == .paused || notice == .couldNotDetectLanguage
         reload(
             pages: bookPages,
             pageSizes: pageSizes,
@@ -363,6 +389,8 @@ final class TranslationController {
         plan = nil
         finishedUnits = []
         failedUnits = []
+        unitsToRetry = []
+        isWaitingForOCR = false
         focusPage = indices.min() ?? focusPage
         let store = store
         let target = target
@@ -402,6 +430,7 @@ final class TranslationController {
         jobTask = nil
         phase = newPhase
         translatingSince = nil
+        isWaitingForOCR = false
         releaseAccess()
         // Balloons left mid-flight stay pending; a resumed job redoes their unit.
         if wasRunning { onJobEnded?() }
@@ -428,6 +457,7 @@ final class TranslationController {
         let focus = focusPage
         let translator = translator
         let makeAnalyzer = makeAnalyzer
+        let ocrWaitNoticeDelay = ocrWaitNoticeDelay
         phase = knownSource == nil ? .detectingLanguage : .preparing
         AppLog.info(.reader, "Translation started", metadata: [
             "pages": "\(bookPages.count)", "scope": "\(scope.rawValue)", "target": "\(target.rawValue)",
@@ -461,10 +491,12 @@ final class TranslationController {
             if scope == .strip {
                 var sizes = knownSizes
                 if sizes.count != bookPages.count {
-                    sizes = []
-                    for page in bookPages {
-                        sizes.append((try? await ImageLoader.dimensions(for: page)) ?? .zero)
+                    sizes = await Self.readPageSizes(of: bookPages)
+                    guard !Task.isCancelled else {
+                        preparing.cancel()
+                        return
                     }
+                    await self?.rememberPageSizes(sizes, generation: generation)
                 }
                 plan = .strip(StripLayout(pageSizes: sizes))
             } else {
@@ -501,12 +533,15 @@ final class TranslationController {
                 preparing.cancel()
                 for entry in lookahead { entry.analysis.cancel() }
             }
-            func publish(_ translation: String, to balloons: [(pageIndex: Int, bubbleID: Int)]) async {
+            func publish(_ translations: [TranslationPublication]) async {
+                guard !translations.isEmpty else { return }
                 let start = ContinuousClock.now
-                for balloon in balloons {
-                    await self?.setTranslation(translation, pageIndex: balloon.pageIndex, bubbleID: balloon.bubbleID, generation: generation)
-                }
+                // One hop for the lot: each is a change the viewer redraws for.
+                await self?.setTranslations(translations, generation: generation)
                 stats.publishing += start.duration(to: .now)
+            }
+            func publish(_ translation: String, to balloons: [(pageIndex: Int, bubbleID: Int)]) async {
+                await publish(balloons.map { TranslationPublication(text: translation, pageIndex: $0.pageIndex, bubbleID: $0.bubbleID) })
             }
 
             await fillLookahead(excluding: nil)
@@ -523,12 +558,19 @@ final class TranslationController {
                     // the job doesn't reach: pausing passes it on, so OCR
                     // stops with the job instead of running to the end.
                     let pending = lookahead.map(\.analysis)
+                    let waitingNotice = Task { [weak self] in
+                        try await Task.sleep(for: ocrWaitNoticeDelay)
+                        await self?.setWaitingForOCR(true, generation: generation)
+                    }
+                    defer { waitingNotice.cancel() }
                     let analyses = try await withTaskCancellationHandler {
                         try await analysisTask.value
                     } onCancel: {
                         analysisTask.cancel()
                         for task in pending { task.cancel() }
                     }
+                    waitingNotice.cancel()
+                    await self?.setWaitingForOCR(false, generation: generation)
                     // Finished regardless (or had nothing to cancel): the
                     // unit is left for the resumed job, not marked done.
                     try Task.checkCancellation()
@@ -541,10 +583,11 @@ final class TranslationController {
                     // (here or earlier in the book) take the same translation.
                     var waiting: [String: [(pageIndex: Int, bubbleID: Int)]] = [:]
                     var texts: [String] = []
+                    var reused: [TranslationPublication] = []
                     for item in queue {
                         if let known = translatedTexts[item.source] {
                             stats.reused += 1
-                            await publish(known, to: [(item.pageIndex, item.bubbleID)])
+                            reused.append(TranslationPublication(text: known, pageIndex: item.pageIndex, bubbleID: item.bubbleID))
                         } else if waiting[item.source] != nil {
                             stats.reused += 1
                             waiting[item.source]?.append((item.pageIndex, item.bubbleID))
@@ -553,6 +596,7 @@ final class TranslationController {
                             texts.append(item.source)
                         }
                     }
+                    await publish(reused)
                     // Nothing new on this unit: no need to wait for the model.
                     if !texts.isEmpty {
                         let prepareStart = ContinuousClock.now
@@ -591,10 +635,13 @@ final class TranslationController {
                     AppLog.error(.reader, "Translation unit failed", metadata: ["unit": "\(unit.id)", "error": "\(error)"])
                     lastError = error
                     unitFailed = true
+                    await self?.setWaitingForOCR(false, generation: generation)
                     await fillLookahead(excluding: unit.id)
                 }
                 await self?.finishUnit(unit.id, failed: unitFailed, generation: generation)
                 stats.units += 1
+                // A unit going round again, when nothing else is left to claim.
+                if unitFailed { await fillLookahead(excluding: nil) }
                 consecutiveFailures = unitFailed ? consecutiveFailures + 1 : 0
                 if consecutiveFailures >= Self.maxConsecutiveFailures {
                     cancelLookahead()
@@ -618,29 +665,85 @@ final class TranslationController {
         let scope = scope
         let ids = bookPages.map(\.id)
         // Hashing every page's key is work too: all of it off the main actor.
-        let cached = await Task.detached(priority: .utility) {
+        let entries = await Task.detached(priority: .utility) {
             // One directory listing instead of a failed open per missing entry.
             let existing = store.existingKeys()
-            var found: [(Int, String, TranslatedPage)] = []
-            guard !existing.isEmpty else { return found }
-            for (index, id) in ids.enumerated() {
+            guard !existing.isEmpty else { return [(index: Int, key: String)]() }
+            return ids.enumerated().compactMap { index, id -> (index: Int, key: String)? in
                 let key = TranslationStore.key(pageID: id, from: source, to: target, scope: scope)
-                if existing.contains(key), let page = store.load(key: key), page.isComplete {
-                    found.append((index, id, page))
-                }
+                return existing.contains(key) ? (index, key) : nil
             }
-            return found
         }.value
-        guard self.generation == generation else { return }
-        var loaded: [(String, TranslatedPage)] = []
-        var completed = completedPageIndices
-        for (index, id, page) in cached where pages[id]?.isComplete != true {
-            loaded.append((id, page))
-            completed.insert(index)
+        let keys = Dictionary(entries.map { ($0.index, $0.key) }, uniquingKeysWith: { first, _ in first })
+        // Reading a long book takes a while; the pages being read shouldn't
+        // wait for the rest of it.
+        for batch in Self.cacheLoadBatches(indices: entries.map(\.index), focus: focusPage) {
+            guard self.generation == generation else { return }
+            let batchKeys = batch.compactMap { index in keys[index].map { (index, $0) } }
+            let cached = await Task.detached(priority: .utility) {
+                batchKeys.compactMap { index, key -> (Int, TranslatedPage)? in
+                    guard let page = store.load(key: key), page.isComplete else { return nil }
+                    return (index, page)
+                }
+            }.value
+            guard self.generation == generation else { return }
+            var loaded: [(String, TranslatedPage)] = []
+            var completed = completedPageIndices
+            for (index, page) in cached where pages[ids[index]]?.isComplete != true {
+                loaded.append((ids[index], page))
+                completed.insert(index)
+            }
+            guard !loaded.isEmpty else { continue }
+            setPages(loaded)
+            completedPageIndices = completed
         }
-        guard !loaded.isEmpty else { return }
-        setPages(loaded)
-        completedPageIndices = completed
+    }
+
+    /// Pages of the first batch: about what can be on screen around the focus.
+    nonisolated static let firstCacheBatch = 8
+    nonisolated static let cacheBatch = 200
+
+    /// `indices` nearest `focus` first, in batches: a small one for what's on
+    /// screen, then larger ones so the rest doesn't redraw the viewer per page.
+    nonisolated static func cacheLoadBatches(indices: [Int], focus: Int) -> [[Int]] {
+        let ordered = indices.sorted {
+            let (a, b) = (abs($0 - focus), abs($1 - focus))
+            return a != b ? a < b : $0 > $1
+        }
+        guard ordered.count > firstCacheBatch else { return ordered.isEmpty ? [] : [ordered] }
+        return [Array(ordered.prefix(firstCacheBatch))] + stride(from: firstCacheBatch, to: ordered.count, by: cacheBatch).map {
+            Array(ordered[$0..<min($0 + cacheBatch, ordered.count)])
+        }
+    }
+
+    /// Reads at most this many pages' headers at once: enough to get through
+    /// a folder quickly, without flooding the disk or the archive's actor.
+    nonisolated static let concurrentSizeReads = 8
+
+    /// The pages' sizes, in page order; `.zero` for a page that can't be read.
+    @concurrent
+    nonisolated static func readPageSizes(of pages: [ComicPage]) async -> [CGSize] {
+        var sizes = [CGSize](repeating: .zero, count: pages.count)
+        await withTaskGroup(of: (Int, CGSize).self) { group in
+            for (index, page) in pages.enumerated() {
+                if index >= concurrentSizeReads, let (done, size) = await group.next() {
+                    sizes[done] = size
+                }
+                group.addTask { (index, (try? await ImageLoader.dimensions(for: page)) ?? .zero) }
+            }
+            for await (done, size) in group {
+                sizes[done] = size
+            }
+        }
+        return sizes
+    }
+
+    /// Keep what a job read for the next: pausing and resuming would otherwise
+    /// read every page's header again. Not with a page that couldn't be read —
+    /// the next job tries it again, as it would have.
+    private func rememberPageSizes(_ sizes: [CGSize], generation: Int) {
+        guard self.generation == generation, sizes.count == bookPages.count, !sizes.contains(.zero) else { return }
+        pageSizes = sizes
     }
 
     // MARK: - Pages
@@ -649,7 +752,9 @@ final class TranslationController {
     /// `removeAllPages`), so `hasPages` and `pageRevisions` follow it.
     private func setPage(_ page: TranslatedPage?, for id: String) {
         pages[id] = page
-        pageRevisions[id] = page == nil ? nil : Self.makePageRevision()
+        let revision = Self.makePageRevision()
+        pageRevisions[id] = page == nil ? nil : revision
+        notePageChange(id, revision: revision)
         updateHasPages()
     }
 
@@ -659,7 +764,9 @@ final class TranslationController {
         var updated = pages
         for (id, page) in changes {
             updated[id] = page
-            pageRevisions[id] = Self.makePageRevision()
+            let revision = Self.makePageRevision()
+            pageRevisions[id] = revision
+            notePageChange(id, revision: revision)
         }
         pages = updated
         updateHasPages()
@@ -668,7 +775,33 @@ final class TranslationController {
     private func removeAllPages() {
         if !pages.isEmpty { pages = [:] }
         pageRevisions = [:]
+        // Everything changed: no list of pages says so.
+        pagesStamp = Self.makePageRevision()
+        pageChanges = []
+        pageChangeFloor = pagesStamp
         updateHasPages()
+    }
+
+    private func notePageChange(_ id: String, revision: Int) {
+        pagesStamp = revision
+        pageChanges.append((revision, id))
+        if pageChanges.count > Self.maxPageChanges {
+            let dropped = Self.maxPageChanges / 2
+            pageChangeFloor = pageChanges[dropped - 1].stamp
+            pageChanges.removeFirst(dropped)
+        }
+    }
+
+    /// The pages written since `stamp` (an earlier `pagesStamp`); `nil` when
+    /// that's too long ago to say, or everything changed.
+    func pagesChanged(since stamp: Int) -> Set<String>? {
+        guard stamp >= pageChangeFloor else { return nil }
+        var changed = Set<String>()
+        for change in pageChanges.reversed() {
+            guard change.stamp > stamp else { break }
+            changed.insert(change.id)
+        }
+        return changed
     }
 
     private func updateHasPages() {
@@ -694,13 +827,31 @@ final class TranslationController {
         self.plan = plan
         finishedUnits = plan.unitsAlreadyDone(completePages: completedPageIndices)
         failedUnits = []
+        unitsToRetry = []
         pagesCompletedThisJob = 0
+        // Balloons a failed job blanked so they'd stop pulsing: this job asks
+        // for them again. (Complete pages keep theirs: the model really left
+        // those empty.)
+        for (index, page) in bookPages.enumerated() where !completedPageIndices.contains(index) {
+            guard var translated = pages[page.id], translated.bubbles.contains(where: { $0.translation == "" }) else { continue }
+            for bubble in translated.bubbles.indices where translated.bubbles[bubble].translation == "" {
+                translated.bubbles[bubble].translation = nil
+            }
+            setPage(translated, for: page.id)
+        }
         return true
     }
 
     private func claimNextUnit(excluding inFlight: Set<Int>, generation: Int) -> TranslationUnit? {
         guard self.generation == generation, let plan else { return nil }
-        return plan.nextUnit(excluding: finishedUnits.union(inFlight), focusPage: focusPage)
+        let unavailable = finishedUnits.union(inFlight)
+        return plan.nextUnit(excluding: unavailable.union(unitsToRetry), focusPage: focusPage)
+            ?? plan.nextUnit(excluding: unavailable, focusPage: focusPage)
+    }
+
+    private func setWaitingForOCR(_ waiting: Bool, generation: Int) {
+        guard self.generation == generation, isWaitingForOCR != waiting else { return }
+        isWaitingForOCR = waiting
     }
 
     /// Fold a unit's balloons into the pages; returns the balloons still to
@@ -739,16 +890,31 @@ final class TranslationController {
         return queue
     }
 
-    private func setTranslation(_ text: String, pageIndex: Int, bubbleID: Int, generation: Int) {
-        guard self.generation == generation, bookPages.indices.contains(pageIndex) else { return }
-        let id = bookPages[pageIndex].id
-        guard var page = pages[id], let index = page.bubbles.firstIndex(where: { $0.id == bubbleID }) else { return }
-        page.bubbles[index].translation = text
-        setPage(page, for: id)
+    /// Fill balloons in, each page written once however many of its balloons
+    /// changed.
+    private func setTranslations(_ translations: [TranslationPublication], generation: Int) {
+        guard self.generation == generation else { return }
+        for (pageIndex, group) in Dictionary(grouping: translations, by: \.pageIndex) where bookPages.indices.contains(pageIndex) {
+            let id = bookPages[pageIndex].id
+            guard var page = pages[id] else { continue }
+            var changed = false
+            for translation in group {
+                guard let index = page.bubbles.firstIndex(where: { $0.id == translation.bubbleID }) else { continue }
+                page.bubbles[index].translation = translation.text
+                changed = true
+            }
+            if changed { setPage(page, for: id) }
+        }
     }
 
     private func finishUnit(_ unitID: Int, failed: Bool, generation: Int) {
         guard self.generation == generation, let plan else { return }
+        if failed, unitsToRetry.insert(unitID).inserted {
+            // Not finished: `claimNextUnit` hands it out again once the others
+            // are done. Its balloons keep pulsing until then.
+            AppLog.info(.reader, "Translation unit will be retried", metadata: ["unit": "\(unitID)"])
+            return
+        }
         finishedUnits.insert(unitID)
         if failed, let unit = plan.units.first(where: { $0.id == unitID }) {
             failedUnits.insert(unitID)
@@ -774,11 +940,13 @@ final class TranslationController {
                 bubbles: []
             )
             guard page.pendingCount == 0 else { continue }
+            // Left incomplete, so translating again picks up just these pages.
+            guard !failedPages.contains(index) else { continue }
             page.isComplete = true
             setPage(page, for: id)
             completedPageIndices.insert(index)
             pagesCompletedThisJob += 1
-            if !failedPages.contains(index), let source, page.imageWidth > 0 {
+            if let source, page.imageWidth > 0 {
                 toSave.append((TranslationStore.key(pageID: id, from: source, to: target, scope: scope), page))
             }
         }
@@ -792,16 +960,30 @@ final class TranslationController {
         }
     }
 
+    private var failedPagesNotice: Notice? {
+        guard let plan, !failedUnits.isEmpty else { return nil }
+        let pages = plan.units.filter { failedUnits.contains($0.id) }.flatMap(\.pageIndices)
+        return .pagesFailed(Set(pages).subtracting(completedPageIndices).count)
+    }
+
     private func finishJob(generation: Int, notice: Notice?) {
         guard self.generation == generation else { return }
         jobTask = nil
         phase = .idle
         translatingSince = nil
+        isWaitingForOCR = false
         releaseAccess()
-        self.notice = notice
-        AppLog.info(.reader, "Translation finished", metadata: ["notice": "\(String(describing: notice))"])
+        self.notice = notice ?? failedPagesNotice
+        AppLog.info(.reader, "Translation finished", metadata: ["notice": "\(String(describing: self.notice))"])
         onJobEnded?()
     }
+}
+
+/// A translation on its way to a balloon.
+private nonisolated struct TranslationPublication: Sendable {
+    let text: String
+    let pageIndex: Int
+    let bubbleID: Int
 }
 
 /// Where a job's time went, logged when it ends — translating should be

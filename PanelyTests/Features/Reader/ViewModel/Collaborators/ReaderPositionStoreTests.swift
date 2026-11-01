@@ -105,7 +105,7 @@ struct ReaderPositionStoreTests {
 
         // …until the quiet period ends (flushed here; `DebouncerTests` covers
         // the timing).
-        fixture.store.saveDebouncer.flush()
+        fixture.store.flushPendingWrites()
 
         let reloaded = fixture.reloadedStore()
         #expect(reloaded.restoredIndex(forKey: key, fileIdentityKey: nil) == 3)
@@ -137,7 +137,7 @@ struct ReaderPositionStoreTests {
         // Nothing reached the defaults yet.
         #expect(fixture.reloadedStore().restoredIndex(forKey: "book", fileIdentityKey: nil) == 2)
 
-        fixture.store.saveDebouncer.flush()
+        fixture.store.flushPendingWrites()
         #expect(fixture.reloadedStore().restoredIndex(forKey: "book", fileIdentityKey: nil) == 9)
     }
 

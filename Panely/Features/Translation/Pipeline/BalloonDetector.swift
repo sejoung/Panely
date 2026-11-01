@@ -28,15 +28,37 @@ nonisolated struct DetectedRegion: Equatable, Sendable {
 ///
 /// Runs on the GPU: the Neural Engine's float16 math drifts on this model
 /// (boxes ~13% off), the GPU matches the original (measured). ~70 ms a page.
+///
+/// Let go after two idle minutes, like the translation model: it's only used
+/// while a job runs, and the app may read on for hours after one.
 actor BalloonDetector {
     static let shared = BalloonDetector()
 
+    nonisolated static let defaultIdleTimeout: Duration = .seconds(120)
+
+    private let idleTimeout: Duration
     private var model: MLModel?
     private var unavailable = false
+    private var unloadTask: Task<Void, Never>?
+    /// Detections suspended partway; the model isn't idle until they're done.
+    private var running = 0
+
+    init(idleTimeout: Duration = BalloonDetector.defaultIdleTimeout) {
+        self.idleTimeout = idleTimeout
+    }
+
+    var isModelLoaded: Bool { model != nil }
 
     /// What's on `image`, or `nil` when the model can't run (then the caller
     /// groups text without it).
     func detect(_ image: CGImage) async -> [DetectedRegion]? {
+        unloadTask?.cancel()
+        unloadTask = nil
+        running += 1
+        defer {
+            running -= 1
+            if running == 0 { scheduleUnload() }
+        }
         guard let model = loadModel() else { return nil }
         let chunks = BalloonDetection.chunks(width: image.width, height: image.height)
         var found: [DetectedRegion] = []
@@ -58,6 +80,17 @@ actor BalloonDetector {
             return nil
         }
         return chunks.count > 1 ? BalloonDetection.deduplicate(found) : found
+    }
+
+    private func scheduleUnload() {
+        guard model != nil else { return }
+        let idleTimeout = idleTimeout
+        unloadTask = Task {
+            try? await Task.sleep(for: idleTimeout)
+            guard !Task.isCancelled else { return }
+            self.model = nil
+            AppLog.info(.reader, "Balloon detector unloaded after being idle")
+        }
     }
 
     private func detectWhole(_ image: CGImage, model: MLModel) async throws -> [DetectedRegion] {

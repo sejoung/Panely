@@ -45,6 +45,25 @@ struct LibraryChangeFilterTests {
         #expect(!filter.isRelevant(path: "/Lib/Vol01.cbz", flags: flags(kFSEventStreamEventFlagItemIsFile, kFSEventStreamEventFlagItemModified)))
     }
 
+    /// Sync daemons and indexers touch folders' xattrs and metadata constantly;
+    /// a folder's place in the tree only depends on its existence and name.
+    @Test func folderMetadataChangesAreIgnored() {
+        for change in [
+            kFSEventStreamEventFlagItemXattrMod,
+            kFSEventStreamEventFlagItemInodeMetaMod,
+            kFSEventStreamEventFlagItemFinderInfoMod,
+            kFSEventStreamEventFlagItemChangeOwner,
+            kFSEventStreamEventFlagItemModified,
+        ] {
+            #expect(!filter.isRelevant(path: "/Lib/Series", flags: flags(kFSEventStreamEventFlagItemIsDir, change)))
+        }
+        #expect(filter.isRelevant(path: "/Lib/Series", flags: flags(
+            kFSEventStreamEventFlagItemIsDir,
+            kFSEventStreamEventFlagItemXattrMod,
+            kFSEventStreamEventFlagItemRemoved
+        )))
+    }
+
     @Test func unclassifiableEventsStillRescan() {
         // Dropped history / root changes.
         #expect(filter.isRelevant(path: "/Lib/A/B/C/D/x.txt", flags: flags(kFSEventStreamEventFlagMustScanSubDirs)))

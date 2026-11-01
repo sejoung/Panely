@@ -100,10 +100,21 @@ extension ReaderViewModel {
         // parent is unreadable — `contentsOfDirectory` silently fails and
         // the Files tree shows the misleading "No books to show" prompt.
         if let opened = openedSourceURL {
-            let isDir = (try? opened.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
-            return isDir ? opened : opened.deletingLastPathComponent()
+            return openedSourceIsDirectory(opened) ? opened : opened.deletingLastPathComponent()
         }
         return currentSourceURL?.deletingLastPathComponent()
+    }
+
+    /// `libraryRootURL` is read from the sidebar's `body`, so the stat happens
+    /// once per opened source, not on every render. Only a stat that succeeded
+    /// is remembered: a source that's missing right now may yet appear.
+    private func openedSourceIsDirectory(_ opened: URL) -> Bool {
+        if let memo = openedSourceKindMemo, memo.url == opened { return memo.isDirectory }
+        guard let isDirectory = (try? opened.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory else {
+            return false
+        }
+        openedSourceKindMemo = (opened, isDirectory)
+        return isDirectory
     }
 
     var sidebarActiveURL: URL? {
@@ -128,7 +139,7 @@ extension ReaderViewModel {
             "Open panel selected",
             metadata: ["source": "\(DiagnosticRedactor.describe(url))"]
         )
-        recentItems.record(url, title: displayTitle(for: url))
+        recentItems.recordInBackground(url, title: displayTitle(for: url))
         Task { await load(url: url) }
     }
 
@@ -138,7 +149,7 @@ extension ReaderViewModel {
             "Open URL requested",
             metadata: ["source": "\(DiagnosticRedactor.describe(url))"]
         )
-        recentItems.record(url, title: displayTitle(for: url))
+        recentItems.recordInBackground(url, title: displayTitle(for: url))
         Task { await load(url: url) }
     }
 
@@ -179,7 +190,7 @@ extension ReaderViewModel {
             "Library URL selected",
             metadata: ["source": "\(DiagnosticRedactor.describe(url))"]
         )
-        recentItems.record(url, title: displayTitle(for: url))
+        recentItems.recordInBackground(url, title: displayTitle(for: url))
         Task { await load(url: url, intent: .librarySelection) }
     }
 
@@ -216,7 +227,7 @@ extension ReaderViewModel {
             return
         }
 
-        recentItems.record(folderURL, title: displayTitle(for: folderURL))
+        recentItems.recordInBackground(folderURL, title: displayTitle(for: folderURL))
         explicitLibraryRootURL = folderURL
         dismissVolumeNotice()
 
@@ -458,8 +469,8 @@ extension ReaderViewModel {
     /// the longer persistence debounce never leaves a write hanging while the
     /// app sits in the background.
     func flushPendingPositionWrites() {
-        positions.saveDebouncer.flush()
-        readingProgress.saveDebouncer.flush()
+        positions.flushPendingWrites()
+        readingProgress.flushPendingWrites()
     }
 
     /// Context the current book's `PositionKey.Keys` were derived from.

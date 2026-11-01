@@ -114,7 +114,10 @@ nonisolated enum ArchiveLoader {
         to destination: URL,
         maxExtractedBytes limit: UInt64 = Self.maxExtractedBytes
     ) async throws {
-        try await Task.detached(priority: .userInitiated) {
+        // Cancellable because a superseded load would otherwise keep expanding
+        // up to `maxExtractedBytes` in the background for a book nobody wants.
+        let cancellation = ExtractionCancellation()
+        let task = Task.detached(priority: .userInitiated) {
             let fm = FileManager.default
             do {
                 try checkDeclaredArchiveSize(
@@ -128,7 +131,7 @@ nonisolated enum ArchiveLoader {
                     at: destination,
                     withIntermediateDirectories: true
                 )
-                try extractArchive(at: url, to: destination)
+                try extractArchive(at: url, to: destination, cancellation: cancellation)
                 // Running cumulative byte count, threaded through the nested
                 // descent so each step only sums the bytes it just added
                 // instead of re-walking the whole growing tree (O(n) overall
@@ -140,13 +143,45 @@ nonisolated enum ArchiveLoader {
                     root: destination,
                     depth: 0,
                     maxExtractedBytes: limit,
-                    totalBytes: &totalBytes
+                    totalBytes: &totalBytes,
+                    cancellation: cancellation
                 )
             } catch {
                 try? fm.removeItem(at: destination)
-                throw error
+                // The readers report a cancelled `Progress` in their own terms.
+                throw Task.isCancelled ? CancellationError() : error
             }
-        }.value
+        }
+        try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
+            cancellation.cancel()
+        }
+    }
+
+    /// Reaches into the archive being expanded right now: `Task.isCancelled`
+    /// is only checked between archives, and one archive can take minutes.
+    private nonisolated final class ExtractionCancellation: @unchecked Sendable {
+        private let lock = NSLock()
+        private var isCancelled = false
+        private var current: Progress?
+
+        func cancel() {
+            lock.withLock {
+                isCancelled = true
+                current?.cancel()
+            }
+        }
+
+        func makeProgress() -> Progress {
+            lock.withLock {
+                let progress = Progress(totalUnitCount: 0)
+                if isCancelled { progress.cancel() }
+                current = progress
+                return progress
+            }
+        }
     }
 
     private static let maxNestingDepth = 3
@@ -156,7 +191,8 @@ nonisolated enum ArchiveLoader {
         root: URL,
         depth: Int,
         maxExtractedBytes limit: UInt64,
-        totalBytes: inout UInt64
+        totalBytes: inout UInt64,
+        cancellation: ExtractionCancellation
     ) throws {
         guard depth < maxNestingDepth else { return }
 
@@ -167,6 +203,7 @@ nonisolated enum ArchiveLoader {
         )
 
         for entry in contents {
+            try Task.checkCancellation()
             let isDir = (try? entry.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
 
             if isDir {
@@ -175,7 +212,8 @@ nonisolated enum ArchiveLoader {
                     root: root,
                     depth: depth + 1,
                     maxExtractedBytes: limit,
-                    totalBytes: &totalBytes
+                    totalBytes: &totalBytes,
+                    cancellation: cancellation
                 )
                 continue
             }
@@ -193,7 +231,7 @@ nonisolated enum ArchiveLoader {
                 cleanup: root
             )
             try FileManager.default.createDirectory(at: destDir, withIntermediateDirectories: true)
-            try extractArchive(at: entry, to: destDir)
+            try extractArchive(at: entry, to: destDir, cancellation: cancellation)
             try FileManager.default.removeItem(at: entry)
             // Net change to the running total: drop the now-removed archive
             // file, add the bytes it expanded into. Only the new folder is
@@ -206,7 +244,8 @@ nonisolated enum ArchiveLoader {
                 root: root,
                 depth: depth + 1,
                 maxExtractedBytes: limit,
-                totalBytes: &totalBytes
+                totalBytes: &totalBytes,
+                cancellation: cancellation
             )
         }
     }
@@ -233,10 +272,15 @@ nonisolated enum ArchiveLoader {
         try checkLimit(saturatedAdd(base, declared), limit: limit, cleanup: cleanup)
     }
 
-    private static func extractArchive(at url: URL, to destination: URL) throws {
+    private static func extractArchive(
+        at url: URL,
+        to destination: URL,
+        cancellation: ExtractionCancellation
+    ) throws {
+        let progress = cancellation.makeProgress()
         switch ArchiveFormat.detect(at: url) {
-        case .zip: try FileManager.default.unzipItem(at: url, to: destination)
-        case .rar: try RARArchiveReader.extractAll(from: url, to: destination)
+        case .zip: try FileManager.default.unzipItem(at: url, to: destination, progress: progress)
+        case .rar: try RARArchiveReader.extractAll(from: url, to: destination, progress: progress)
         case nil: throw ArchiveReaderError.cannotOpen(url)
         }
     }

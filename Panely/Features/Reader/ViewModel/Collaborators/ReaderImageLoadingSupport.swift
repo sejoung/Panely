@@ -53,6 +53,104 @@ final class ReaderImageMemoryCache {
     }
 }
 
+/// One decode per page, however many callers want it. A page already decoding
+/// for preload (or for a lazy batch the user just scrolled past) is joined
+/// rather than decoded a second time — ImageIO can't be interrupted, so
+/// starting over costs a full decode on top of the one still running.
+///
+/// The decode runs in its own task so that it outlives any one caller, and is
+/// cancelled only when every caller has gone.
+@MainActor
+final class ReaderInFlightDecodes {
+    fileprivate final class Entry {
+        let token: Int
+        let task: Task<NSImage, Error>
+        var waiters = 0
+
+        init(token: Int, task: Task<NSImage, Error>) {
+            self.token = token
+            self.task = task
+        }
+    }
+
+    private var entries: [String: Entry] = [:]
+    private var nextToken = 0
+
+    var activeCount: Int { entries.count }
+
+    func image(
+        forID id: String,
+        decode: @escaping @MainActor () async throws -> NSImage
+    ) async throws -> NSImage {
+        let entry = entries[id] ?? start(id: id, decode: decode)
+        entry.waiters += 1
+        return try await withTaskCancellationHandler {
+            try await entry.task.value
+        } onCancel: {
+            Task { @MainActor [weak self] in
+                self?.release(entry, id: id)
+            }
+        }
+    }
+
+    private func start(
+        id: String,
+        decode: @escaping @MainActor () async throws -> NSImage
+    ) -> Entry {
+        nextToken &+= 1
+        let token = nextToken
+        // Runs on the main actor, so it can't reach `defer` before `entries`
+        // has been filled in below.
+        let task = Task { @MainActor [weak self] in
+            defer {
+                if let self, self.entries[id]?.token == token {
+                    self.entries[id] = nil
+                }
+            }
+            return try await decode()
+        }
+        let entry = Entry(token: token, task: task)
+        entries[id] = entry
+        return entry
+    }
+
+    /// Keeps whichever of these pages are decoding alive until `release`.
+    ///
+    /// A replacement batch needs this: cancelling the old batch and starting
+    /// the new one both go through the main actor, and the cancellation gets
+    /// there first — so without a hold, a page both batches want would lose its
+    /// last caller and be cancelled just before the new batch asked for it.
+    struct Hold {
+        fileprivate let entries: [(id: String, entry: Entry)]
+    }
+
+    func hold(ids: [String]) -> Hold {
+        Hold(entries: ids.compactMap { id in
+            guard let entry = entries[id] else { return nil }
+            entry.waiters += 1
+            return (id, entry)
+        })
+    }
+
+    func release(_ hold: Hold) {
+        for (id, entry) in hold.entries {
+            release(entry, id: id)
+        }
+    }
+
+    /// A caller was cancelled. Only the last one out stops the decode, and it
+    /// also forgets the entry so a later request starts afresh instead of
+    /// joining a task that is about to throw `CancellationError`.
+    private func release(_ entry: Entry, id: String) {
+        entry.waiters -= 1
+        guard entry.waiters <= 0 else { return }
+        entry.task.cancel()
+        if entries[id]?.token == entry.token {
+            entries[id] = nil
+        }
+    }
+}
+
 nonisolated enum ReaderImageLoadingPolicy {
     static let preloadRadius = 2
     static let lazyWindowRadius = 3
@@ -66,6 +164,17 @@ nonisolated enum ReaderImageLoadingPolicy {
 
 nonisolated struct ReaderVerticalImageWindow {
     let pageCount: Int
+
+    /// `indices` ordered for decoding: on-screen pages first, then outward.
+    /// Batches decode in chunks, so ascending order would make the viewer wait
+    /// for the off-screen pages above it before showing what's in view.
+    static func visibleFirst(_ indices: [Int], visibleRange range: Range<Int>) -> [Int] {
+        func distance(_ i: Int) -> Int {
+            if i < range.lowerBound { return range.lowerBound - i }
+            return i < range.upperBound ? 0 : i - (range.upperBound - 1)
+        }
+        return indices.sorted { (distance($0), $0) < (distance($1), $1) }
+    }
 
     func initialIndices(around index: Int, excluding loaded: Set<Int>) -> [Int] {
         guard pageCount > 0 else { return [] }

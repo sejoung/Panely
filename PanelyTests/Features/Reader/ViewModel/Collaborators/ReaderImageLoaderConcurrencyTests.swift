@@ -89,11 +89,58 @@ struct ReaderImageLoaderConcurrencyTests {
         gate.open()
 
         try await waitUntil { loader.loadedPageIndices.contains(gatedIndex) }
-        #expect(gate.sawCancellation.first == true, "the superseded batch's read should see its cancellation")
+        // The replacement batch still wants this page, so it joins the read
+        // already running rather than cancelling it and reading it again.
+        #expect(gate.arrivals == 1, "a page still wanted must not be read twice")
+        #expect(gate.sawCancellation.first == false)
         #expect(errors.isEmpty)
         #expect(loader.failedPageIndices.isEmpty)
         // The decoded page, not its gray placeholder (a drawing-handler image
         // with no bitmap rep).
         #expect(loader.currentImages[gatedIndex].representations.contains { $0.pixelsWide > 0 })
+    }
+
+    /// Scrolled far enough that nothing wants the page any more: its read is
+    /// cancelled, which isn't a failure, and scrolling back loads it again.
+    @Test func lazyReadNobodyWantsIsCancelledWithoutFailing() async throws {
+        let gate = ReadGate()
+        defer { gate.open() }
+        let open = ReadGate(open: true)
+        let gatedIndex = 20
+        let pages: [ComicPage] = try (0..<30).map { i in
+            try GatedArchiveReader.page(
+                named: "\(i).png",
+                size: CGSize(width: 30, height: 40 + i),
+                gate: i == gatedIndex ? gate : open
+            )
+        }
+        let source = ComicSource(title: "Strip", pages: pages)
+        let loader = ReaderImageLoader()
+        var errors: [String] = []
+
+        await loader.refresh(
+            source: source,
+            layout: .vertical,
+            currentPageIndex: 0,
+            navigationStep: 1,
+            isCancelled: { false },
+            onError: { errors.append($0) }
+        )
+
+        loader.setVisibleRange(20..<21, source: source, layout: .vertical) { errors.append($0) }
+        try await waitUntil { gate.arrivals >= 1 }
+        loader.setVisibleRange(5..<6, source: source, layout: .vertical) { errors.append($0) }
+        // The cancellation reaches the shared decode through a main-actor hop.
+        try await Task.sleep(for: .milliseconds(50))
+        gate.open()
+
+        try await waitUntil { !gate.sawCancellation.isEmpty }
+        #expect(gate.sawCancellation.first == true)
+        #expect(errors.isEmpty)
+        #expect(loader.failedPageIndices.isEmpty)
+
+        loader.setVisibleRange(20..<21, source: source, layout: .vertical) { errors.append($0) }
+        try await waitUntil { loader.loadedPageIndices.contains(gatedIndex) }
+        #expect(errors.isEmpty)
     }
 }

@@ -242,6 +242,23 @@ enum TranslationSnapshotContent {
         return vm
     }
 
+    /// A series whose language nobody has detected or chosen yet.
+    static func unknownLanguageViewModel() throws -> ReaderViewModel {
+        AppLocalization.shared.apply(.english)
+        let vm = SnapshotSampleContent.loadedViewModel(
+            layout: .double,
+            direction: .rightToLeft,
+            sidebarPinned: false,
+            pageIndex: 0,
+            pageCount: 24
+        )
+        vm.appLanguage = .english
+        vm.translationTargetLanguage = .english
+        try installModel(in: vm)
+        vm.translationEnabled = true
+        return vm
+    }
+
     /// The translation model "downloaded", as most readers will see the
     /// panel and Settings: a file of the pinned size — sparse, so it takes no
     /// disk space — which is all they look at.

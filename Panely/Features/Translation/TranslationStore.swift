@@ -39,7 +39,7 @@ nonisolated struct TranslationStore: Sendable {
 
     /// Lowercase hex, without a `String(format:)` per byte — a book's keys
     /// are made for every page and language each time it opens.
-    private static func hex(_ bytes: some Sequence<UInt8>) -> String {
+    static func hex(_ bytes: some Sequence<UInt8>) -> String {
         let digits = Array("0123456789abcdef".utf8)
         var out: [UInt8] = []
         out.reserveCapacity(32)

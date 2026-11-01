@@ -263,6 +263,11 @@ written into your files.
   in the background **Window → Jobs** (`⌥⌘J`), app-wide choices ⚙︎ → Settings. The language
   shown and the book's own language (detected on first use) are remembered per
   series
+- **No page left behind** — a page that fails is tried once more after the
+  rest; if it still fails, Panely says how many are missing, and translating
+  again does just those. While a series' language is unknown, **Book's
+  Language** sits at the top of the panel so you can choose it instead of
+  waiting for detection
 - **Several languages per book** — each language is a separate job and cache;
   clicking a balloon shows its translation, the other languages and the
   original side by side (selectable, so Look Up works)
@@ -807,7 +812,8 @@ Panely/
 │   │   ├── ZIPArchiveReader.swift      # actor around ZIPFoundation.Archive
 │   │   │                               # (loadDataPrefix for header-only reads)
 │   │   ├── RARArchiveReader.swift      # actor around UnrarKit's URKArchive
-│   │   │                               # (solid archives served from a one-time extraction)
+│   │   │                               # (solid archives extracted once into the extraction cache;
+│   │   │                               # entry heads of other archives read in one pass)
 │   │   ├── NaturalSort.swift           # locale-aware natural ordering helper
 │   │   └── ImageLoader.swift           # async NSImage + dimensions(for:) header read
 │   ├── Diagnostics/
@@ -912,7 +918,8 @@ Panely/
 │   │   ├── Pipeline/                   # OCRTiling, TranslationPlan (page / strip), PageAnalyzer,
 │   │   │                               # PageTextRecognizer (Vision), GemmaTranslator (llama.cpp + prompt),
 │   │   │                               # BubbleGrouper, BalloonDetector (Core ML), MissedText,
-│   │   │                               # BubbleBackgroundSampler, TextClassifiers
+│   │   │                               # BubbleBackgroundSampler, TextClassifiers,
+│   │   │                               # TranslationWarmup (prepares OCR once per build)
 │   │   ├── Viewer/                     # TranslationOverlayView (+ layout, TranslationPatchPainter), balloon popover
 │   │   └── UI/                         # TranslationPanel, language rows, progress pill, job list, edit-mode bar,
 │   │                                   # export sheet, AI chat sheet, Jobs window
@@ -943,6 +950,7 @@ Panely/
 │       │   ├── RecentItemsStore.swift          # bookmark dedup on repeat opens
 │       │   ├── ReadingProgressStore.swift      # per-book progress (debounced, recency-capped) → badges + Continue Reading
 │       │   ├── LastLibraryRootStore.swift      # security-scoped bookmark of the last library root → reopen on launch
+│       │   ├── LatestWinsDefaultsWriter.swift  # debounced latest-wins commit off the main actor
 │       │   └── SecurityScopedBookmark.swift    # shared bookmark create/resolve + stale refresh
 │       └── Rows/                       # sidebar row views (one struct per file)
 │           ├── FileNodeRow.swift
@@ -1087,7 +1095,8 @@ Panely.entitlements                     # sandbox + user-selected read-write + a
   background tone (`BubbleBackgroundSampler`). `GemmaTranslator` (an actor on
   its own thread) then runs Gemma 4 E2B with llama.cpp on the GPU: one model
   for the app, loaded while OCR reads the first page and let go after two idle
-  minutes, one context reused with its memory cleared per request, greedy
+  minutes, one context reused, without reading again the start of the prompt it shares with
+  the last request (about 7% off each request), greedy
   decoding. The prompt (`GemmaPrompt`, the same as the Windows version's) asks
   for numbered `[n] translation` lines and for each speaker's speech level to
   be kept; lines are read off the output as they're written, so each balloon
@@ -1124,7 +1133,9 @@ Panely.entitlements                     # sandbox + user-selected read-write + a
   process-wide global, so every UnrarKit call additionally goes through one
   shared lock. Solid RARs (one continuous compressed stream, where reading
   entry N means decompressing 0..<N) are extracted once on first access into
-  a reader-owned temp directory instead of being read per entry.
+  the extraction cache, so reopening skips it, instead of being read per entry.
+  Other RARs read the heads of many entries in one pass (the vertical layout's
+  dimension pre-pass), since finding one entry walks the headers from the start.
 - **AppKit viewer core** — `ViewerContainer` is SwiftUI, but the scrollable
   zoomable stage is `AppKitImageScroller` (`NSViewRepresentable`) wrapping
   `NSScrollView` + `CenteringClipView` + a custom `ImageStackView`.

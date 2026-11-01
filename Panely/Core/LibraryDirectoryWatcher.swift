@@ -203,13 +203,15 @@ nonisolated struct LibraryChangeFilter: Sendable {
         }) {
             return false
         }
-        if isDirectory { return true }
-
-        // A file only shows up as a supported archive, and only its
-        // existence and name matter — not content or metadata rewrites.
-        guard let name = components.last,
-              ArchiveLoader.supportedExtensions.contains((name as NSString).pathExtension.lowercased())
-        else { return false }
+        // A folder shows up by name alone and a file only as a supported
+        // archive. For either, only existence and name matter: not content
+        // rewrites, nor the xattr and metadata changes sync daemons and
+        // indexers make to folders all the time.
+        if !isDirectory {
+            guard let name = components.last,
+                  ArchiveLoader.supportedExtensions.contains((name as NSString).pathExtension.lowercased())
+            else { return false }
+        }
         let structural = kFSEventStreamEventFlagItemCreated
             | kFSEventStreamEventFlagItemRemoved
             | kFSEventStreamEventFlagItemRenamed

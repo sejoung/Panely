@@ -87,11 +87,44 @@ struct ReadingProgressStoreTests {
         #expect(ReadingProgressStore(defaults: defaults, storeKey: key).progress(forKey: "b", fileIdentityKey: nil) == nil)
 
         // Flushed rather than waited out; `DebouncerTests` covers the timing.
-        store.saveDebouncer.flush()
+        store.flushPendingWrites()
 
         // Rapid calls coalesce into a single write of the last value.
         let reloaded = ReadingProgressStore(defaults: defaults, storeKey: key)
         #expect(reloaded.progress(forKey: "b", fileIdentityKey: nil)?.page == 3)
+    }
+
+    /// The debounce firing updates memory at once and encodes off the main
+    /// thread, so the defaults catch up shortly after.
+    @Test func debounceFiringPersistsInTheBackground() async throws {
+        let defaults = InMemoryKeyValueStore()
+        let key = "rp-\(UUID())"
+        let store = ReadingProgressStore(defaults: defaults, storeKey: key)
+
+        store.record(forKey: "b", fileIdentityKey: nil, page: 3, total: 10, finished: false)
+        store.saveDebouncer.flush()
+
+        #expect(store.progress(forKey: "b", fileIdentityKey: nil)?.page == 3)
+        try await waitUntil {
+            ReadingProgressStore(defaults: defaults, storeKey: key)
+                .progress(forKey: "b", fileIdentityKey: nil)?.page == 3
+        }
+    }
+
+    /// App termination: the debounce has fired or hasn't, and its encode has
+    /// finished or hasn't. Either way the latest value is on disk on return.
+    @Test func flushPendingWritesLandsEverythingSynchronously() {
+        let defaults = InMemoryKeyValueStore()
+        let key = "rp-\(UUID())"
+        let store = ReadingProgressStore(defaults: defaults, storeKey: key)
+
+        store.record(forKey: "b", fileIdentityKey: nil, page: 1, total: 10, finished: false)
+        store.saveDebouncer.flush()
+        store.record(forKey: "b", fileIdentityKey: nil, page: 2, total: 10, finished: false)
+        store.flushPendingWrites()
+
+        #expect(ReadingProgressStore(defaults: defaults, storeKey: key)
+            .progress(forKey: "b", fileIdentityKey: nil)?.page == 2)
     }
 
     @Test func capEvictsLeastRecentlyUpdated() {
