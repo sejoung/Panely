@@ -50,6 +50,18 @@ extension ReaderViewModel {
         }
     }
 
+    /// Opening the panel expresses translation intent before the start button
+    /// is pressed. Loading stays on the translator's executor, away from UI.
+    func prepareTranslationForInteraction() async {
+        guard translationFeatureAvailable, hasSource, dependencies.translator.isReady(), !Task.isCancelled else { return }
+        do { try await dependencies.translator.prepare() }
+        catch is CancellationError { }
+        catch {
+            // A job retries preparation and reports its own failure normally.
+            AppLog.error(.reader, "Translation preparation failed", metadata: ["error": "\(error)"])
+        }
+    }
+
     // MARK: - Languages
 
     /// Default language for series without their own choice: the chosen one,

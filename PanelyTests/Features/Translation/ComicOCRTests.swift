@@ -26,6 +26,23 @@ struct ComicOCRDecodingTests {
         #expect(throws: ComicOCRError.self) { try ComicOCRDecoding.ctc([], shape: [1, 10, 3], dictionary: ["a", "b"]) }
     }
 
+    @Test func ctcBatchesKeepBlankStateAndConfidenceSeparate() throws {
+        let values: [Float] = [0, 0.9, 0.1, 1, 0, 0, 0, 0.8, 0.2,
+                               0, 0.1, 0.9, 0, 0.2, 0.8, 1, 0, 0]
+        let decoded = try ComicOCRDecoding.ctcBatch(values, shape: [2, 3, 3], dictionary: ["a", "b"])
+        #expect(decoded.map(\.text) == ["aa", "b"])
+        #expect(abs(decoded[0].confidence - 0.85) < 0.0001)
+        #expect(decoded[1].confidence == 0.9)
+        let transposed = (0..<2).flatMap { b in (0..<3).flatMap { c in (0..<5).map { t -> Float in
+            t >= 3 ? (c == 0 ? 1 : 0) : values[b * 9 + t * 3 + c]
+        } } }
+        #expect(try ComicOCRDecoding.ctcBatch(transposed, shape: [2, 3, 5], dictionary: ["a", "b"]).map(\.text) == ["aa", "b"])
+        let logits = try ComicOCRDecoding.ctcBatch([0, 2, -1, 0, -1, 2], shape: [2, 1, 3], dictionary: ["a", "b"])
+        #expect(logits.map(\.text) == ["a", "b"])
+        #expect(abs(logits[0].confidence - logits[1].confidence) < 0.0001)
+        #expect(throws: ComicOCRError.self) { try ComicOCRDecoding.ctcBatch(values, shape: [3, 3, 3], dictionary: ["a", "b"]) }
+    }
+
     @Test func dbRejectsNoiseAndClipsExpandedBoxes() throws {
         var map = [Float](repeating: 0, count: 20 * 20)
         for y in 0..<4 { for x in 0..<8 { map[y * 20 + x] = 0.9 } }
@@ -149,6 +166,22 @@ struct ComicOCRIntegrationTests {
         await engine.unload()
     }
 
+    @Test func batchedReadersMatchOneLineAtATime() async throws {
+        let root = try await Self.prepared.value
+        let single = ComicOCREngine(root: root, recognitionBatchSize: 1)
+        let batched = ComicOCREngine(root: root, recognitionBatchSize: 8)
+        for (language, text) in [(TranslationLanguage.english, "Hello world\nGood morning\nThank you"),
+                                 (.korean, "안녕하세요\n오늘은 좋은 날\n감사합니다"),
+                                 (.chineseSimplified, "你好世界\n今天天气很好\n谢谢你")] {
+            let image = try await page(text)
+            let reference = try await single.recognize(image, language: language, detections: nil)
+            try #require(reference.count >= 2)
+            #expect(try await batched.recognize(image, language: language, detections: nil) == reference)
+        }
+        await single.unload()
+        await batched.unload()
+    }
+
     /// Optional local diagnostics. Pages are staged in the test host's cache;
     /// only timings, counts and digests are printed, never recognized text.
     @Test(.enabled(if: ProcessInfo.processInfo.environment["PANELY_OCR_PROFILE_DIR"] != nil))
@@ -160,24 +193,41 @@ struct ComicOCRIntegrationTests {
         let limits = try (ProcessInfo.processInfo.environment["PANELY_OCR_PROFILE_LIMITS"] ?? "2400")
             .split(separator: ",").map { try #require(Int($0)) }
         try #require(!limits.isEmpty && limits.allSatisfy { (32...2400).contains($0) })
-        var baseline: [Int: [String]] = [:]
-        for limit in limits {
-            let engine = ComicOCREngine(root: try await Self.prepared.value, lineDetectionMaxDimension: limit)
-            for repetition in 1...2 {
-                for (index, file) in files.enumerated() {
-                    let source = try #require(CGImageSourceCreateWithURL(file as CFURL, nil))
-                    let image = try #require(CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary))
-                    let start = ContinuousClock.now
-                    let regions = try await engine.recognize(image, language: .korean, detections: nil)
-                    let digest = SHA256.hash(data: Data(regions.map(\.text).joined(separator: "\n").utf8))
-                        .prefix(8).map { String(format: "%02x", $0) }.joined()
-                    let texts = regions.map(\.text)
-                    if limit == limits.first { baseline[index] = texts }
-                    let same = texts == baseline[index]
-                    print("OCRBENCH profile=realPage device=\(ProcessInfo.processInfo.environment["PANELY_OCR_LINE_DEVICE"] ?? "cpu") limit=\(limit) run=\(repetition) page=\(index) size=\(image.width)x\(image.height) seconds=\(start.duration(to: .now)) regions=\(regions.count) digest=\(digest) matchesBaseline=\(same)")
+        let threadCounts = try (ProcessInfo.processInfo.environment["PANELY_OCR_PROFILE_THREADS"] ?? "2")
+            .split(separator: ",").map { try #require(Int($0)) }
+        try #require(!threadCounts.isEmpty && threadCounts.allSatisfy { (1...4).contains($0) })
+        var baseline: [Int: [TextRegion]] = [:]
+        for threads in threadCounts {
+            for limit in limits {
+                var reference: [Int: [TextRegion]] = [:]
+                for batchSize in [1, 8] {
+                    let engine = ComicOCREngine(root: try await Self.prepared.value, lineDetectionMaxDimension: limit,
+                                                recognitionBatchSize: batchSize, lineDetectionThreads: threads)
+                    for repetition in 1...2 {
+                        for (index, file) in files.enumerated() {
+                            let source = try #require(CGImageSourceCreateWithURL(file as CFURL, nil))
+                            let image = try #require(CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary))
+                            let start = ContinuousClock.now
+                            let regions = try await engine.recognize(image, language: .korean, detections: nil)
+                            let elapsed = start.duration(to: .now)
+                            let digest = SHA256.hash(data: Data(regions.map(\.text).joined(separator: "\n").utf8))
+                                .prefix(8).map { String(format: "%02x", $0) }.joined()
+                            if batchSize == 1 {
+                                reference[index] = regions
+                                if limit == limits.first {
+                                    if threads == threadCounts.first { baseline[index] = regions }
+                                    else { #expect(regions == baseline[index], "Thread count changes OCR on page index \(index)") }
+                                }
+                            } else {
+                                #expect(regions == reference[index], "Batched OCR differs on page index \(index), limit \(limit)")
+                            }
+                            let same = regions.map(\.text) == baseline[index]?.map(\.text)
+                            print("OCRBENCH profile=realPage device=\(ProcessInfo.processInfo.environment["PANELY_OCR_LINE_DEVICE"] ?? "cpu") threads=\(threads) limit=\(limit) batch=\(batchSize) run=\(repetition) page=\(index) size=\(image.width)x\(image.height) seconds=\(elapsed) regions=\(regions.count) digest=\(digest) matchesBaseline=\(same)")
+                        }
+                    }
+                    await engine.unload()
                 }
             }
-            await engine.unload()
         }
     }
 }

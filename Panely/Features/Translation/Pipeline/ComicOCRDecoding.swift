@@ -17,26 +17,44 @@ nonisolated enum ComicOCRDecoding {
     }
 
     static func ctc(_ values: [Float], shape: [Int], dictionary: [String]) throws -> (text: String, confidence: Float) {
-        guard shape.count == 3, shape[0] == 1, shape[1] > 0, shape[2] > 0,
-              values.count == shape[1] * shape[2] else { throw ComicOCRError.invalidOutput }
+        guard shape.first == 1 else { throw ComicOCRError.invalidOutput }
+        return try ctcBatch(values, shape: shape, dictionary: dictionary)[0]
+    }
+
+    static func ctcBatch(_ values: [Float], shape: [Int], dictionary: [String]) throws -> [(text: String, confidence: Float)] {
+        guard shape.count == 3, shape.allSatisfy({ $0 > 0 }),
+              values.count == shape[0] * shape[1] * shape[2] else { throw ComicOCRError.invalidOutput }
         // Use the dictionary size, not T > C: long English lines can have more steps than classes.
         let validClasses = [dictionary.count + 1, dictionary.count + 2]
         let transposed = !validClasses.contains(shape[2]) && validClasses.contains(shape[1])
         let steps = shape[transposed ? 2 : 1], classes = shape[transposed ? 1 : 2]
         guard validClasses.contains(classes) else { throw ComicOCRError.invalidOutput }
+        return try (0..<shape[0]).map { batch in
+            try Task.checkCancellation()
+            return decodeCTC(values, offset: batch * steps * classes, steps: steps, classes: classes, transposed: transposed, dictionary: dictionary)
+        }
+    }
+
+    private static func decodeCTC(_ values: [Float], offset: Int, steps: Int, classes: Int, transposed: Bool, dictionary: [String]) -> (text: String, confidence: Float) {
         var text = "", last = -1, count = 0
         var confidence: Float = 0
         for t in 0..<steps {
-            let row = (0..<classes).map { values[transposed ? $0 * steps + t : t * classes + $0] }
-            guard let best = row.indices.max(by: { row[$0] < row[$1] }) else { continue }
+            let base = offset + (transposed ? t : t * classes), stride = transposed ? steps : 1
+            var best = 0, maximum = values[base], logits = false
+            for c in 0..<classes {
+                let value = values[base + c * stride]
+                if value > maximum { best = c; maximum = value }
+                if value < 0 || value > 1 { logits = true }
+            }
             if best != 0, best != last {
                 let character = best <= dictionary.count ? dictionary[best - 1] : " "
                 if !character.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) {
                     text += character
-                    if row.contains(where: { $0 < 0 || $0 > 1 }) {
-                        let maximum = row[best]
-                        confidence += 1 / row.reduce(Float(0)) { $0 + exp($1 - maximum) }
-                    } else { confidence += row[best] }
+                    if logits {
+                        var sum: Float = 0
+                        for c in 0..<classes { sum += exp(values[base + c * stride] - maximum) }
+                        confidence += 1 / sum
+                    } else { confidence += maximum }
                     count += 1
                 }
             }

@@ -121,6 +121,7 @@ struct TranslationPanel: View {
         }
         .padding(PanelySpacing.md)
         .frame(width: 340, alignment: .leading)
+        .task { await viewModel.prepareTranslationForInteraction() }
     }
 
     private var header: some View {

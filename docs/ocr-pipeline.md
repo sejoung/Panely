@@ -13,9 +13,13 @@ Gemma installation downloads only missing files; interrupted packs can resume
 without downloading files already verified. Settings can remove a partial pack.
 Models are stored in Application Support, not Caches.
 
-`ComicOCREngine` shares sessions across books, bounds CPU execution to two
-threads per session and releases sessions after two idle minutes. Japanese crops
-are encoded in batches of at most eight. PP-OCR uses BGR normalization, DB
+`ComicOCREngine` shares sessions across books, uses four CPU threads for line
+detection and two for reading, and releases sessions after two idle minutes.
+Japanese crops are encoded in batches of at most eight. PP readers also group
+up to eight lines of exactly the same input width. Each crop keeps its original
+padding and resolution, and results are restored to the original line order
+before publication. CTC decoding scans the output without allocating a class
+array at every time step. PP-OCR uses BGR normalization, DB
 connected-component line finding and CTC decoding with language dictionaries.
 Vertical Chinese/Japanese lines rotate counterclockwise for PP-OCR. Japanese
 glyph size and direction come from detected text lines. Tall images are tiled
@@ -32,6 +36,16 @@ are published. A failure after partial publication fails/retries the unit rather
 than mixing two engines' different balloon boundaries on the page. Normal startup
 no longer compiles all five Vision language models. The fallback's first use can
 still be slow. Cache revisions distinguish comic OCR from the Vision path.
+
+Opening the translation panel prepares an already installed Gemma model on
+its own executor. This does not download models or start a translation job.
+Preparation is shared with jobs: repeated preparation uses the loaded runtime.
+Gemma stays loaded for ten idle minutes (previously two), allowing short reading
+breaks and repeated panel openings to reuse it. Model removal explicitly unloads
+it. This retains about 3.5 GB of mapped model memory longer; it moves cold setup
+earlier when the panel opens, but cannot eliminate a cold load when translation
+starts immediately. Runtime logs separate backend initialization, model loading,
+context creation and the short generation warm-up.
 
 ## Verification
 
@@ -81,9 +95,27 @@ between devices on these four pages; this is not an accuracy assessment.
 
 CPU line detection took 0.469–0.519 s/page, while reading the 2–15 detected
 lines took 0.042–0.295 s/page. Full-page line detection was the larger cost on
-these samples. PP recognition currently runs one line at a time. Width-grouped
-batch reading, as used by Windows, remains an optimization candidate, but its
-speed and output must be measured before adoption.
+these samples. These initial measurements used two detector threads and
+one-line recognition.
+
+A follow-up on 24 evenly spaced Korean pages from the same book compared
+two passes through each configuration. All 192 OCR runs returned identical
+text, geometry and region ordering. Average page times (including session
+creation on each configuration's first page) were:
+
+| Detector threads / recognition batch limit | Mean OCR (s/page) |
+| --- | ---: |
+| 2 / 1 (reference) | 0.793 |
+| 2 / 8 | 0.768 |
+| 4 / 1 | 0.643 |
+| 4 / 8 (new default) | 0.631 |
+
+The combined change reduced mean OCR time by about 20% on this local sample.
+This is an OCR-only result, without simultaneous Gemma generation; full-book
+translation speed and quality on other books/hardware are not established by
+this comparison. The resolution cap remains 2400. Detailed timings showed
+model inference dominating line detection (about 0.43 s with two threads),
+with preprocessing around 0.03 s and postprocessing around 0.003 s.
 
 To repeat with local images, put them in a directory readable by the sandboxed
 Debug test host (for example its Caches directory), then run:
@@ -91,14 +123,18 @@ Debug test host (for example its Caches directory), then run:
 ```sh
 TEST_RUNNER_PANELY_OCR_PROFILE_DIR=/path/to/pages scripts/test-ocr.sh SWIFT_OPTIMIZATION_LEVEL=-O
 TEST_RUNNER_PANELY_OCR_PROFILE_DIR=/path/to/pages PANELY_OCR_LINE_DEVICE=coreml scripts/test-ocr.sh SWIFT_OPTIMIZATION_LEVEL=-O
+TEST_RUNNER_PANELY_OCR_PROFILE_DIR=/path/to/pages TEST_RUNNER_PANELY_OCR_PROFILE_THREADS=2,4 scripts/test-ocr.sh SWIFT_OPTIMIZATION_LEVEL=-O
 ```
 
 The optional real-page test assumes Korean input and prints timings, counts
 and text digests, without recognized text or image paths. To compare detector
 resolution caps in the same run, also set
 `TEST_RUNNER_PANELY_OCR_PROFILE_LIMITS=2400,1920,1600,1280`. Each cap gets fresh
-sessions and two passes; `matchesBaseline` compares recognized strings with
-the first cap. The normal pipeline retains the 2400-pixel cap.
+sessions and two passes, for both single-line and batched reading.
+`matchesBaseline` compares recognized strings with the first cap. Batched
+results are asserted equal to single-line results, including region geometry;
+thread comparisons also assert equality at the first cap. The normal pipeline
+retains the 2400-pixel cap.
 
 On the four Korean pages above, a 1600-pixel cap reduced second-pass OCR to
 0.340–0.530 s/page, but two pages' text differed from the baseline and one
@@ -106,9 +142,9 @@ returned fewer regions. A 1280-pixel cap changed all four pages' text. These
 differences are not scored against a human transcription, so lower resolution
 is not adopted as the default based on this speed test.
 
-Production
-`Comic OCR completed` info logs now record image dimensions, line count,
-line-detection time and reading time. Translation job `analysisWaitSeconds`
+Production `Comic OCR completed` info logs record image dimensions, line count,
+thread/batch settings, line-detection time (preparation, session loading,
+inference and postprocessing separately) and reading time. Translation job `analysisWaitSeconds`
 measures exposed pipeline waiting, including decoding/detection/grouping and
 queueing; it is not a direct measurement of OCR compute time.
 

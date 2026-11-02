@@ -151,6 +151,32 @@ struct TranslationControllerTests {
 
 @MainActor
 struct ReaderViewModelTranslationTests {
+    @Test(.enabled(if: TranslationController.isSupportedOnThisMac))
+    func openingThePanelPreparesOnlyAnAvailableModelForAnOpenBook() async throws {
+        let translator = ScriptedTranslator()
+        let vm = ReaderViewModel(dependencies: makeTestDependencies(translator: translator))
+        await vm.prepareTranslationForInteraction()
+        #expect(translator.prepareCount == 0)
+        vm.translationEnabled = true
+        await vm.prepareTranslationForInteraction()
+        #expect(translator.prepareCount == 0, "no open book")
+        vm.currentSourceURL = URL(fileURLWithPath: "/books/test")
+        vm.source = ComicSource(title: "Test", pages: Fixture.makeImagePages(count: 1))
+        await vm.prepareTranslationForInteraction()
+        #expect(translator.prepareCount == 1)
+        #expect(translator.requests.isEmpty, "preparation doesn't start translating")
+        vm.translationEnabled = false
+        await vm.prepareTranslationForInteraction()
+        #expect(translator.prepareCount == 1)
+
+        let missing = ScriptedTranslator(ready: { false })
+        let other = ReaderViewModel(dependencies: makeTestDependencies(translator: missing))
+        other.translationEnabled = true
+        other.source = ComicSource(title: "Test", pages: Fixture.makeImagePages(count: 1))
+        await other.prepareTranslationForInteraction()
+        #expect(missing.prepareCount == 0, "opening the panel doesn't download a model")
+    }
+
     @Test func featureIsOffByDefault() {
         let vm = makeTestViewModel()
         #expect(vm.translationEnabled == false)

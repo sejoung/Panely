@@ -455,7 +455,8 @@ Assist**. The same tab sets:
   with a progress bar and **Cancel**, and checked before it's used. **Delete
   Translation Model…** frees the space; books already translated stay
   translated. Nothing you read leaves your Mac. While translating it uses
-  about 3.5 GB of memory, and lets it go two minutes after the last balloon.
+  about 3.5 GB of memory. Opening the translation panel prepares an installed
+  model ahead of use; it is released after ten idle minutes.
 - **Your Edits** — how many pages you've corrected, and a button to delete
   the edits. They're stored apart from the cache.
 - **Translation Cache** — how much space finished translations take, and a

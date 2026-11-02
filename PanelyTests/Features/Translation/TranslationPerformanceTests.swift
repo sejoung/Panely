@@ -166,10 +166,11 @@ struct TranslationPerformanceTests {
 
     // MARK: - Letting go
 
-    /// The model loaded ahead of a job waits out slow first-run OCR; once
-    /// it's been used, the ordinary idle time applies.
-    @Test func theModelWaitsLongerForAJobsFirstRequest() async throws {
-        #expect(GemmaTranslator.firstRequestTimeout >= GemmaTranslator.idleTimeout * 5)
+    /// Keep the model across short reading breaks, with bounded retention
+    /// both before its first request and after a job.
+    @Test func theModelStaysAvailableAcrossReadingBreaks() async throws {
+        #expect(GemmaTranslator.firstRequestTimeout >= GemmaTranslator.idleTimeout)
+        #expect(GemmaTranslator.idleTimeout == .seconds(600))
         let missing = TranslationModelFiles(root: try Fixture.makeTempDir())
         let translator = GemmaTranslator(files: missing)
         try? await translator.prepare()
@@ -181,6 +182,17 @@ struct TranslationPerformanceTests {
             Issue.record("translated without a model")
         } catch {}
         #expect(await translator.scheduledIdleTimeout == GemmaTranslator.idleTimeout, "a request ran")
+    }
+
+    @Test func cancelledPreparationDoesNotLoadOrRetainAModel() async throws {
+        let translator = GemmaTranslator(files: TranslationModelFiles(root: try Fixture.makeTempDir()))
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            try await translator.prepare()
+        }
+        await #expect(throws: CancellationError.self) { try await task.value }
+        #expect(await translator.runtimeLoadCount == 0)
+        #expect(await translator.scheduledIdleTimeout == nil)
     }
 
     @Test(.enabled(if: Bundle.main.url(forResource: "ComicTextDetector", withExtension: "mlmodelc") != nil))

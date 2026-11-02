@@ -10,6 +10,23 @@ import Testing
 /// it loads 3.3 GB and takes a few seconds.
 @Suite(.serialized, .enabled(if: TestTier.model && GemmaTranslator.shared.isReady(), TestTier.modelReason))
 struct GemmaTranslatorIntegrationTests {
+    @Test func panelPreparationAndTranslationReuseOneRuntime() async throws {
+        let translator = GemmaTranslator()
+        let start = ContinuousClock.now
+        try await translator.prepare()
+        let prepared = ContinuousClock.now
+        #expect(await translator.runtimeLoadCount == 1)
+        try await translator.prepare()
+        #expect(await translator.runtimeLoadCount == 1)
+        var answers: [TranslatedLine] = []
+        for try await line in translator.translate(["こんにちは。"], context: [], from: .japanese, to: .korean) { answers.append(line) }
+        #expect(answers.count == 1)
+        #expect(await translator.runtimeLoadCount == 1)
+        #expect(await translator.scheduledIdleTimeout == .seconds(600))
+        print("GEMMA preparation=\(start.duration(to: prepared)) reuseAndTranslation=\(prepared.duration(to: .now)) loads=\(await translator.runtimeLoadCount)")
+        await translator.unload()
+    }
+
     private func translate(
         _ lines: [String],
         context: [TranslationContextLine] = [],

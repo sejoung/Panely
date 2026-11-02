@@ -45,7 +45,7 @@ nonisolated protocol BalloonTranslating: Sendable {
 /// is asked for again on its own.
 ///
 /// One model in memory for the whole app (about 3.5 GB, most of it the
-/// memory-mapped file), loaded on first use and let go after two idle
+/// memory-mapped file), loaded on first use and let go after ten idle
 /// minutes. Requests run one at a time on the actor's own thread: generating
 /// is seconds of blocking work that mustn't sit on Swift's shared pool.
 actor GemmaTranslator: BalloonTranslating {
@@ -53,16 +53,15 @@ actor GemmaTranslator: BalloonTranslating {
     static let shared = GemmaTranslator()
 
     nonisolated static let contextSize: UInt32 = 8192
-    nonisolated static let idleTimeout: Duration = .seconds(120)
-    /// How long a model loaded ahead of a job waits for its first request.
-    /// OCR comes first, and the first time a build runs its models take a
-    /// minute or two to load — unloading then would mean loading the model
-    /// again, without the warm-up, just as the first balloons need it.
-    nonisolated static let firstRequestTimeout: Duration = .seconds(600)
+    nonisolated static let idleTimeout: Duration = .seconds(600)
+    /// Panel preparation and completed requests share the reading-break window.
+    nonisolated static let firstRequestTimeout: Duration = idleTimeout
 
     nonisolated let files: TranslationModelFiles
     private let queue = DispatchSerialQueue(label: "io.github.sejoung.Panely.gemma", qos: .utility)
     private var runtime: LlamaRuntime?
+    /// Successful loads, useful for verifying reuse without timing assertions.
+    private(set) var runtimeLoadCount = 0
     private var unloadTask: Task<Void, Never>?
     /// What the running idle timer was set to.
     private(set) var scheduledIdleTimeout: Duration?
@@ -76,16 +75,24 @@ actor GemmaTranslator: BalloonTranslating {
     nonisolated func isReady() -> Bool { files.isInstalled }
 
     func prepare() async throws {
+        try Task.checkCancellation()
         unloadTask?.cancel()
         defer { scheduleUnload(after: Self.firstRequestTimeout) }
         guard runtime == nil else { return }
         let runtime = try loadRuntime()
+        let warmupStart = ContinuousClock.now
         // A few tokens of a real prompt: the GPU's first generation sets up
         // its pipelines, which would otherwise hold up the first balloons.
         _ = try runtime.generate(
             prompt: GemmaPrompt.build(lines: ["こんにちは"], context: [], from: .japanese, to: .korean),
             maxTokens: 4
         ) { _ in true }
+        AppLog.info(.reader, "Translation model warmed", metadata: ["seconds": "\(Self.seconds(warmupStart.duration(to: .now)))"])
+    }
+
+    private static func seconds(_ duration: Duration) -> String {
+        let parts = duration.components
+        return String(format: "%.3f", Double(parts.seconds) + Double(parts.attoseconds) / 1e18)
     }
 
     nonisolated func translate(
@@ -106,6 +113,7 @@ actor GemmaTranslator: BalloonTranslating {
     func unload() {
         unloadTask?.cancel()
         unloadTask = nil
+        scheduledIdleTimeout = nil
         runtime = nil
     }
 
@@ -163,6 +171,7 @@ actor GemmaTranslator: BalloonTranslating {
             loaded = try LlamaRuntime(path: files.fileURL.path, contextSize: Self.contextSize, gpuLayers: 0)
         }
         runtime = loaded
+        runtimeLoadCount += 1
         let elapsed = start.duration(to: .now).components
         let seconds = Double(elapsed.seconds) + Double(elapsed.attoseconds) / 1e18
         AppLog.info(.reader, "Translation model loaded", metadata: [
@@ -318,12 +327,15 @@ nonisolated final class LlamaRuntime {
     }()
 
     init(path: String, contextSize: UInt32, gpuLayers: Int32) throws {
+        let start = ContinuousClock.now
         _ = Self.backend
+        let backendReady = ContinuousClock.now
         var modelParams = llama_model_default_params()
         modelParams.n_gpu_layers = gpuLayers
         guard let model = llama_model_load_from_file(path, modelParams) else {
             throw TranslationModelError.loadFailed
         }
+        let modelReady = ContinuousClock.now
         var contextParams = llama_context_default_params()
         contextParams.n_ctx = contextSize
         guard let context = llama_init_from_model(model, contextParams) else {
@@ -333,6 +345,16 @@ nonisolated final class LlamaRuntime {
         self.model = model
         self.context = context
         vocab = llama_model_get_vocab(model)
+        func seconds(_ duration: Duration) -> String {
+            let parts = duration.components
+            return String(format: "%.3f", Double(parts.seconds) + Double(parts.attoseconds) / 1e18)
+        }
+        AppLog.info(.reader, "Translation runtime prepared", metadata: [
+            "backendSeconds": "\(seconds(start.duration(to: backendReady)))",
+            "modelSeconds": "\(seconds(backendReady.duration(to: modelReady)))",
+            "contextSeconds": "\(seconds(modelReady.duration(to: .now)))",
+            "gpuLayers": "\(gpuLayers)",
+        ])
     }
 
     deinit {

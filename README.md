@@ -251,8 +251,8 @@ written into your files.
   lines already translated, so names, who's speaking and each speaker's
   speech level carry over: casual lines stay casual, polite ones polite.
   About 0.25 s a balloon on an M1 Pro, each balloon shown as soon as its line
-  is written; the model is loaded while OCR reads the first page and let go
-  after two idle minutes
+  is written; opening the translation panel prepares the installed model ahead
+  of use, and it is released after ten idle minutes
 - **One place per job** — the toolbar's translate button switches original ↔
   translation (`⇧⌘T`); the language name beside it ("Korean ▾") is a menu to
   switch or add languages and open the panel or edit mode. The **translation panel** is only about translating this book:
@@ -1110,7 +1110,7 @@ Panely.entitlements                     # sandbox + user-selected read-write + a
   sound effects as drawn (`SoundEffectClassifier`) and samples each balloon's
   background tone (`BubbleBackgroundSampler`). `GemmaTranslator` (an actor on
   its own thread) then runs Gemma 4 E2B with llama.cpp on the GPU: one model
-  for the app, loaded while OCR reads the first page and let go after two idle
+  for the app, prepared when the translation panel opens and let go after ten idle
   minutes, one context reused, without reading again the start of the prompt it shares with
   the last request (about 7% off each request), greedy
   decoding. The prompt (`GemmaPrompt`, the same as the Windows version's) asks

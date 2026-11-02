@@ -8,14 +8,18 @@ actor ComicOCREngine {
     static let shared = ComicOCREngine()
     let root: URL
     private let lineDetectionMaxDimension: Int
+    private let recognitionBatchSize: Int
+    private let lineDetectionThreads: Int
     private var environment: ORTEnv?
     private var sessions: [String: ORTSession] = [:]
     private var dictionaries: [String: [String]] = [:]
     private var idleTask: Task<Void, Never>?
 
-    init(root: URL = TranslationModelFiles.defaultRoot(), lineDetectionMaxDimension: Int = 2400) {
+    init(root: URL = TranslationModelFiles.defaultRoot(), lineDetectionMaxDimension: Int = 2400, recognitionBatchSize: Int = 8, lineDetectionThreads: Int = 4) {
         self.root = root
         self.lineDetectionMaxDimension = lineDetectionMaxDimension
+        self.recognitionBatchSize = min(8, max(1, recognitionBatchSize))
+        self.lineDetectionThreads = min(4, max(1, lineDetectionThreads))
     }
 
     nonisolated func isReady(for language: TranslationLanguage) -> Bool {
@@ -28,7 +32,8 @@ actor ComicOCREngine {
         idleTask?.cancel()
         defer { scheduleUnload() }
         let start = ContinuousClock.now
-        let lines = try detectLines(image)
+        var lineMetrics = LineDetectionMetrics()
+        let lines = try detectLines(image, metrics: &lineMetrics)
         let linesFinished = ContinuousClock.now
         var result: [TextRegion] = []
         var boxes = lines
@@ -68,7 +73,12 @@ actor ComicOCREngine {
         AppLog.info(.reader, "Comic OCR completed", metadata: [
             "language": "\(language.rawValue)", "regions": "\(result.count)", "lines": "\(lines.count)",
             "width": "\(image.width)", "height": "\(image.height)",
+            "lineThreads": "\(lineDetectionThreads)", "recognitionBatchSize": "\(recognitionBatchSize)",
             "lineDetectionSeconds": "\(seconds(start.duration(to: linesFinished)))",
+            "linePreparationSeconds": "\(seconds(lineMetrics.preparation))",
+            "lineSessionSeconds": "\(seconds(lineMetrics.session))",
+            "lineInferenceSeconds": "\(seconds(lineMetrics.inference))",
+            "linePostprocessingSeconds": "\(seconds(lineMetrics.postprocessing))",
             "readingSeconds": "\(seconds(linesFinished.duration(to: .now)))",
             "seconds": "\(seconds(start.duration(to: .now)))",
         ])
@@ -110,7 +120,7 @@ actor ComicOCREngine {
         if environment == nil { environment = try ORTEnv(loggingLevel: .error) }
         let path = try ComicOCRModels.url(file, at: root).path
         let options = try ORTSessionOptions()
-        try options.setIntraOpNumThreads(2)
+        try options.setIntraOpNumThreads(file == "ch_PP-OCRv5_mobile_det.onnx" ? Int32(lineDetectionThreads) : 2)
         try options.setGraphOptimizationLevel(.all)
         // CPU is the baseline. Core ML is opt-in for benchmarking the dynamic
         // DB graph; small recognizers and the quantized decoder stay on CPU.
@@ -129,7 +139,7 @@ actor ComicOCREngine {
                   file == "ch_PP-OCRv5_mobile_det.onnx" else { throw error }
             AppLog.error(.reader, "Core ML line detector failed to load; using CPU", metadata: ["error": "\(error)"])
             let cpu = try ORTSessionOptions()
-            try cpu.setIntraOpNumThreads(2)
+            try cpu.setIntraOpNumThreads(Int32(lineDetectionThreads))
             try cpu.setGraphOptimizationLevel(.all)
             session = try ORTSession(env: environment!, modelPath: path, sessionOptions: cpu)
         }
@@ -156,16 +166,32 @@ actor ComicOCREngine {
         return value
     }
 
+    private struct LineDetectionMetrics {
+        var preparation = Duration.zero, session = Duration.zero, inference = Duration.zero, postprocessing = Duration.zero
+    }
+
     private func detectLines(_ image: CGImage) throws -> [CGRect] {
+        var metrics = LineDetectionMetrics()
+        return try detectLines(image, metrics: &metrics)
+    }
+
+    private func detectLines(_ image: CGImage, metrics: inout LineDetectionMetrics) throws -> [CGRect] {
         var lines: [CGRect] = []
         for (index, tile) in OCRTiling.tiles(width: image.width, height: image.height).enumerated() {
             try Task.checkCancellation()
+            let preparationStart = ContinuousClock.now
             guard let crop = image.cropping(to: CGRect(x: 0, y: tile.top, width: image.width, height: tile.height)) else { continue }
             let size = ComicOCRDecoding.detectorSize(width: crop.width, height: crop.height, maxDimension: lineDetectionMaxDimension)
             let input = try OCRPixels(crop, width: size.width, height: size.height).tensor()
+            let sessionStart = ContinuousClock.now
+            metrics.preparation += preparationStart.duration(to: sessionStart)
             let detector = try session("ch_PP-OCRv5_mobile_det.onnx")
             guard let name = try detector.inputNames().first else { throw ComicOCRError.invalidOutput }
+            let inferenceStart = ContinuousClock.now
+            metrics.session += sessionStart.duration(to: inferenceStart)
             let output = try run(detector, inputs: [name: input])
+            let postprocessingStart = ContinuousClock.now
+            metrics.inference += inferenceStart.duration(to: postprocessingStart)
             let shape = try output.tensorTypeAndShapeInfo().shape.map(\.intValue)
             guard shape.count == 4, shape[0] == 1, shape[1] == 1 else { throw ComicOCRError.invalidOutput }
             let boxes = try ComicOCRDecoding.boxes(Self.floats(output), width: shape[3], height: shape[2])
@@ -179,15 +205,20 @@ actor ComicOCREngine {
                     if !lines.contains(where: { OCRTiling.overlapFraction($0, rect) > 0.5 }) { lines.append(rect) }
                 }
             }
+            metrics.postprocessing += postprocessingStart.duration(to: .now)
         }
         return lines.sorted { $0.minY < $1.minY }
     }
 
     private func readLines(_ image: CGImage, lines: [CGRect], recognizer: String, language: TranslationLanguage) throws -> [(region: TextRegion, confidence: Float)] {
+        guard !lines.isEmpty else { return [] }
         let reader = try session("\(recognizer)_PP-OCRv5_rec_mobile_infer.onnx")
         let dict = try dictionary(recognizer == "ch" ? "ppocrv5_dict.txt" : "ppocrv5_\(recognizer)_dict.txt")
         guard let name = try reader.inputNames().first else { throw ComicOCRError.invalidOutput }
-        return try lines.map { rect in
+        // Exact widths keep each crop's original padding and tensor geometry.
+        // Reordering inference never changes the published line order.
+        var groups: [Int: [(index: Int, region: TextRegion, pixels: OCRPixels)]] = [:]
+        for (index, rect) in lines.enumerated() {
             try Task.checkCancellation()
             guard let crop = image.cropping(to: rect.integral) else { throw ComicOCRError.invalidImage }
             let vertical = language.isWrittenVertically && rect.height > rect.width * 1.5
@@ -195,11 +226,30 @@ actor ComicOCREngine {
             if vertical && recognizer == "ch" { pixels = pixels.rotatedCounterClockwise() }
             let width = min(4096, max(320, Int(ceil(48 * Double(pixels.width) / Double(pixels.height)))))
             let scaledWidth = min(width, max(1, Int(ceil(48 * Double(pixels.width) / Double(pixels.height)))))
-            let input = try pixels.resized(width: scaledWidth, height: 48).tensor(paddedWidth: width)
-            let output = try run(reader, inputs: [name: input])
-            let decoded = try ComicOCRDecoding.ctc(Self.floats(output), shape: output.tensorTypeAndShapeInfo().shape.map(\.intValue), dictionary: dict)
-            return (TextRegion(text: decoded.text, rect: rect, isVertical: vertical, glyphSize: max(1, (vertical ? rect.width : rect.height) * 0.8)), decoded.confidence)
+            let region = TextRegion(text: "", rect: rect, isVertical: vertical, glyphSize: max(1, (vertical ? rect.width : rect.height) * 0.8))
+            groups[width, default: []].append((index, region, try pixels.resized(width: scaledWidth, height: 48)))
         }
+        var result = [(region: TextRegion, confidence: Float)?](repeating: nil, count: lines.count)
+        for width in groups.keys.sorted() {
+            let group = groups[width]!
+            for start in stride(from: 0, to: group.count, by: recognitionBatchSize) {
+                try Task.checkCancellation()
+                let batch = group[start..<min(start + recognitionBatchSize, group.count)]
+                var values: [Float] = []
+                values.reserveCapacity(batch.count * 3 * 48 * width)
+                for item in batch { values += item.pixels.normalized(paddedWidth: width) }
+                let input = try Self.tensor(values, shape: [batch.count, 3, 48, width])
+                let output = try run(reader, inputs: [name: input])
+                let shape = try output.tensorTypeAndShapeInfo().shape.map(\.intValue)
+                guard shape.first == batch.count else { throw ComicOCRError.invalidOutput }
+                let decoded = try ComicOCRDecoding.ctcBatch(Self.floats(output), shape: shape, dictionary: dict)
+                for (item, text) in zip(batch, decoded) {
+                    let r = item.region
+                    result[item.index] = (TextRegion(text: text.text, rect: r.rect, isVertical: r.isVertical, glyphSize: r.glyphSize), text.confidence)
+                }
+            }
+        }
+        return try result.map { guard let item = $0 else { throw ComicOCRError.invalidOutput }; return item }
     }
 
     private func readManga(_ image: CGImage, boxes: [CGRect], lines: [CGRect]) throws -> [TextRegion] {

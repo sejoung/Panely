@@ -29,7 +29,7 @@ nonisolated struct DetectedRegion: Equatable, Sendable {
 /// Runs on the GPU: the Neural Engine's float16 math drifts on this model
 /// (boxes ~13% off), the GPU matches the original (measured). ~70 ms a page.
 ///
-/// Let go after two idle minutes, like the translation model: it's only used
+/// Let go after two idle minutes: it's only used
 /// while a job runs, and the app may read on for hours after one.
 actor BalloonDetector {
     static let shared = BalloonDetector()
