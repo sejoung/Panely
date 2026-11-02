@@ -31,17 +31,15 @@ jobs:
             spm-${{ runner.os }}-
 
       - name: Build Release
-        run: |
-          set -o pipefail
-          xcodebuild \
-            -project Panely.xcodeproj \
-            -scheme Panely \
-            -configuration Release \
-            -destination 'platform=macOS' \
-            -derivedDataPath build/DerivedData \
-            CODE_SIGN_IDENTITY="-" \
-            CODE_SIGNING_REQUIRED=YES \
-            build
+        run: scripts/check-release.sh --derived-data build/DerivedData
+
+      - name: Upload build diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-build-diagnostics-${{ github.run_attempt }}
+          path: build/release-checks
+          retention-days: 7
 
       - name: Package app
         id: package

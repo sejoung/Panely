@@ -525,6 +525,7 @@ Terminal) and move the result straight to `/Applications`.
 scripts/test.sh          # fast tier (= plain `xcodebuild test`, what CI runs)
 scripts/test.sh --only TranslationControllerTests --repeat 5
 scripts/test.sh --skip-build --only DebouncerTests
+scripts/check-release.sh # optimized universal Release build + architecture/signature checks
 scripts/test-slow.sh     # + slow tier: real FSEvents, real Vision OCR, every random seed
 scripts/test-visual.sh   # screenshot comparisons against PanelyTests/Snapshots/Reference/
 scripts/test-model.sh [--model PATH]             # the real translation model (Gemma via llama.cpp)
@@ -538,6 +539,11 @@ and stops on failure. Full logs, exact commands and `.xcresult` bundles are save
 run under `build/test-results/<timestamp-PID>/`; override the paths with `--results-dir`
 and `--derived-data`. Repeat `--only` to select several suites; legacy `-only-testing:...`
 arguments still work. See `scripts/test.sh --help`. CI archives the same runner's results.
+
+CI also runs `scripts/check-release.sh` to build the optimized app for both arm64
+and x86_64, the same check used by the release workflow. Build logs, the toolchain
+version, command and `.xcresult` are saved under `build/release-checks/` and
+retained by CI, including failed release builds.
 
 The tiers are set in `PanelyTests/TestTiers.swift`; the slow and visual tiers
 are opt-in through `PANELY_SLOW_TESTS=1` / `PANELY_VISUAL_TESTS=1` (the

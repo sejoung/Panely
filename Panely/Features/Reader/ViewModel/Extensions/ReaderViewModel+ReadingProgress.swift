@@ -28,6 +28,11 @@ final class OffMainLookup<Key: Hashable & Sendable, Value: Hashable & Sendable> 
         self.compute = compute
     }
 
+    // No actor-bound cleanup is needed. An explicit nonisolated deinit avoids
+    // Swift 6.3's Release optimizer crash on synthesized generic isolated deinits
+    // when targeting macOS 14: https://github.com/swiftlang/swift/issues/90625
+    nonisolated deinit {}
+
     func value(for key: Key) -> Value? {
         if let value = known[key] { return value }
         pending.insert(key)

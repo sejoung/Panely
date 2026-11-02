@@ -51,10 +51,16 @@ jobs:
           python3 -m unittest discover -s scripts/tests -p 'test_test_runner.py'
           scripts/test.sh --results-dir build/ci-test-results
 
+      # Debug on the host does not exercise the optimized Intel code path.
+      - name: Verify universal Release build
+        run: scripts/check-release.sh
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: ci-test-results-${{ github.run_attempt }}
-          path: build/ci-test-results
+          path: |
+            build/ci-test-results
+            build/release-checks
           retention-days: 7

@@ -457,6 +457,7 @@ LaunchServices 캐시에 남을 수 있으니, 우클릭 → "다음으로 압�
 scripts/test.sh          # fast 티어 (= 일반 `xcodebuild test`, CI가 실행하는 것)
 scripts/test.sh --only TranslationControllerTests --repeat 5
 scripts/test.sh --skip-build --only DebouncerTests
+scripts/check-release.sh # 최적화한 Universal Release 빌드와 아키텍처·서명 검사
 scripts/test-slow.sh     # + slow 티어: 실제 FSEvents, 실제 Vision OCR, 모든 랜덤 시드
 scripts/test-visual.sh   # PanelyTests/Snapshots/Reference/ 기준 스크린샷 비교
 scripts/test-model.sh [--model PATH]             # 실제 번역 모델(llama.cpp로 돌리는 Gemma) 테스트
@@ -470,6 +471,11 @@ scripts/benchmark-translation.sh [--book PATH]   # 번역 단계별·작업 전�
 `--results-dir`, `--derived-data`로 위치를 바꿀 수 있습니다. `--only`는 여러 번 지정할 수 있고
 기존 `-only-testing:...` 인수도 지원합니다. 전체 옵션은 `scripts/test.sh --help`로 확인합니다.
 CI는 동일한 스크립트의 결과를 아티팩트로 보관합니다.
+
+CI는 `scripts/check-release.sh`로 최적화한 arm64·x86_64 앱도 빌드하고 아키텍처와
+서명을 검사하며, 릴리스 워크플로도 같은 검사를 사용합니다. 빌드 로그, 도구 버전,
+실행 명령과 `.xcresult`는 `build/release-checks/`에 저장하며 CI와 실패한 릴리스
+빌드의 아티팩트로 보관합니다.
 
 티어는 `PanelyTests/TestTiers.swift`에서 정합니다. slow와 visual 티어는
 `PANELY_SLOW_TESTS=1` / `PANELY_VISUAL_TESTS=1`로 켜는 opt-in이며(벤치마크

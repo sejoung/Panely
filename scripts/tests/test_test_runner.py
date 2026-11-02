@@ -24,6 +24,9 @@ class TestRunnerTests(unittest.TestCase):
         stub = bin_dir / "xcodebuild"
         stub.write_text(f"#!{sys.executable}\n" + textwrap.dedent('''\
             import json, os, pathlib, sys
+            if '-version' in sys.argv:
+                print('Xcode test fixture')
+                sys.exit(0)
             records = pathlib.Path(os.environ['PANELY_RUNNER_STUB_RECORDS'])
             count = len(records.read_text().splitlines()) if records.exists() else 0
             args = sys.argv[1:]
@@ -36,11 +39,31 @@ class TestRunnerTests(unittest.TestCase):
             print('unfiltered diagnostic details', flush=True)
             if count + 1 == int(os.environ.get('PANELY_RUNNER_STUB_FAIL_AT', '0')):
                 sys.exit(65)
+            if args[0] == 'build':
+                app = pathlib.Path(args[args.index('-derivedDataPath') + 1]) / 'Build/Products/Release/Panely.app'
+                (app / 'Contents/MacOS').mkdir(parents=True)
+                (app / 'Contents/MacOS/Panely').write_text('fixture executable')
+                print('** BUILD SUCCEEDED **')
+                sys.exit(0)
             if os.environ.get('PANELY_RUNNER_STUB_QUIET') != '1':
                 print('✔ Test run with 1 test passed.')
                 print('** TEST SUCCEEDED **')
         '''))
         stub.chmod(0o755)
+        for name in ('lipo', 'codesign'):
+            verification = bin_dir / name
+            verification.write_text(f"#!{sys.executable}\n" + textwrap.dedent('''\
+                import json, os, pathlib, sys
+                tool = pathlib.Path(sys.argv[0]).name
+                records = pathlib.Path(os.environ['PANELY_RUNNER_STUB_RECORDS']).with_name('verifications.jsonl')
+                with records.open('a') as output:
+                    output.write(json.dumps({'tool': tool, 'args': sys.argv[1:]}) + '\\n')
+                target = sys.argv[1] if tool == 'lipo' else sys.argv[-1]
+                if not pathlib.Path(target).exists():
+                    sys.exit(7)
+                sys.exit(int(os.environ.get('PANELY_VERIFY_FAIL_' + tool.upper(), '0')))
+            '''))
+            verification.chmod(0o755)
         self.environment = dict(os.environ, PATH=str(bin_dir) + os.pathsep + os.environ['PATH'],
                                 PANELY_RUNNER_STUB_RECORDS=str(self.records))
 
@@ -120,6 +143,37 @@ class TestRunnerTests(unittest.TestCase):
                 self.assertIn('-only-testing:PanelyTests/SelectedSuite', call['args'])
                 if script == 'test-visual.sh':
                     self.assertNotIn('-only-testing:PanelyTests/VisualRegressionTests', call['args'])
+
+    def test_release_check_builds_both_architectures_and_verifies_the_app(self):
+        result = self.run_script(script='check-release.sh')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        args = self.invocations()[0]['args']
+        self.assertEqual(args[0], 'build')
+        self.assertEqual(args[args.index('-configuration') + 1], 'Release')
+        self.assertEqual(args[args.index('-destination') + 1], 'generic/platform=macOS')
+        self.assertIn('ARCHS=arm64 x86_64', args)
+        self.assertIn('ONLY_ACTIVE_ARCH=NO', args)
+        self.assertFalse(any('Onone' in arg for arg in args))
+        checks = [json.loads(line) for line in (self.root / 'verifications.jsonl').read_text().splitlines()]
+        self.assertEqual([c['tool'] for c in checks], ['lipo', 'lipo', 'codesign'])
+        self.assertEqual(checks[0]['args'][1:], ['-verify_arch', 'arm64'])
+        self.assertEqual(checks[1]['args'][1:], ['-verify_arch', 'x86_64'])
+        self.assertIn('unfiltered diagnostic details', next(self.results.glob('*/build.log')).read_text())
+        self.assertTrue(next(self.results.glob('*/build.xcresult')).is_dir())
+        self.assertTrue(next(self.results.glob('*/build.command')).is_file())
+        self.assertTrue(next(self.results.glob('*/toolchain.log')).is_file())
+
+    def test_release_build_failure_preserves_exit_code_and_skips_verification(self):
+        result = self.run_script(script='check-release.sh', flags={'PANELY_RUNNER_STUB_FAIL_AT': '1'})
+        self.assertEqual(result.returncode, 65)
+        self.assertIn('exit 65', result.stderr)
+        self.assertFalse((self.root / 'verifications.jsonl').exists())
+        self.assertIn('unfiltered diagnostic details', next(self.results.glob('*/build.log')).read_text())
+
+    def test_release_check_rejects_a_missing_architecture(self):
+        result = self.run_script(script='check-release.sh', flags={'PANELY_VERIFY_FAIL_LIPO': '42'})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('missing a required architecture', result.stderr)
 
 
 if __name__ == '__main__':
