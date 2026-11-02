@@ -69,6 +69,49 @@ run recognized the same strings but took 5.797 s on its first sample and
 CPU-only run. CPU is therefore the default. Core ML remains available for
 comparison on other hardware; its session creation can fall back to CPU.
 
+A local check on four 1500×2109 Korean comic pages (2026-11-02, two passes,
+optimized Debug) measured the following. This times OCR only, without image
+decoding, RT-DETR or translation. Output text digests and region counts matched
+between devices on these four pages; this is not an accuracy assessment.
+
+| Measurement | CPU (s/page) | Core ML (s/page) |
+| --- | ---: | ---: |
+| Second pass, full OCR | 0.512–0.768 | 0.740–0.983 |
+| First real page, new OCR sessions | 0.717 | 6.809 |
+
+CPU line detection took 0.469–0.519 s/page, while reading the 2–15 detected
+lines took 0.042–0.295 s/page. Full-page line detection was the larger cost on
+these samples. PP recognition currently runs one line at a time. Width-grouped
+batch reading, as used by Windows, remains an optimization candidate, but its
+speed and output must be measured before adoption.
+
+To repeat with local images, put them in a directory readable by the sandboxed
+Debug test host (for example its Caches directory), then run:
+
+```sh
+TEST_RUNNER_PANELY_OCR_PROFILE_DIR=/path/to/pages scripts/test-ocr.sh SWIFT_OPTIMIZATION_LEVEL=-O
+TEST_RUNNER_PANELY_OCR_PROFILE_DIR=/path/to/pages PANELY_OCR_LINE_DEVICE=coreml scripts/test-ocr.sh SWIFT_OPTIMIZATION_LEVEL=-O
+```
+
+The optional real-page test assumes Korean input and prints timings, counts
+and text digests, without recognized text or image paths. To compare detector
+resolution caps in the same run, also set
+`TEST_RUNNER_PANELY_OCR_PROFILE_LIMITS=2400,1920,1600,1280`. Each cap gets fresh
+sessions and two passes; `matchesBaseline` compares recognized strings with
+the first cap. The normal pipeline retains the 2400-pixel cap.
+
+On the four Korean pages above, a 1600-pixel cap reduced second-pass OCR to
+0.340–0.530 s/page, but two pages' text differed from the baseline and one
+returned fewer regions. A 1280-pixel cap changed all four pages' text. These
+differences are not scored against a human transcription, so lower resolution
+is not adopted as the default based on this speed test.
+
+Production
+`Comic OCR completed` info logs now record image dimensions, line count,
+line-detection time and reading time. Translation job `analysisWaitSeconds`
+measures exposed pipeline waiting, including decoding/detection/grouping and
+queueing; it is not a direct measurement of OCR compute time.
+
 Fast tests cover CTC layouts (including long English lines), blank-separated
 repeated characters, manga token termination and normalization, DB thresholding,
 crop clipping, BGR/grayscale preprocessing, rotation, cancellation, complete

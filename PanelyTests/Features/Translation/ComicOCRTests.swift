@@ -1,5 +1,7 @@
 import AppKit
+import CryptoKit
 import Foundation
+import ImageIO
 import Testing
 @testable import Panely
 
@@ -145,5 +147,37 @@ struct ComicOCRIntegrationTests {
             #expect(TranslationLanguageClassifier.classify(evidence) == language, "\(language): \(evidence)")
         }
         await engine.unload()
+    }
+
+    /// Optional local diagnostics. Pages are staged in the test host's cache;
+    /// only timings, counts and digests are printed, never recognized text.
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["PANELY_OCR_PROFILE_DIR"] != nil))
+    func profileRealPages() async throws {
+        let directory = URL(fileURLWithPath: try #require(ProcessInfo.processInfo.environment["PANELY_OCR_PROFILE_DIR"]))
+        let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+            .filter { ["jpg", "jpeg", "png", "webp"].contains($0.pathExtension.lowercased()) }.sorted { $0.lastPathComponent < $1.lastPathComponent }
+        try #require(!files.isEmpty)
+        let limits = try (ProcessInfo.processInfo.environment["PANELY_OCR_PROFILE_LIMITS"] ?? "2400")
+            .split(separator: ",").map { try #require(Int($0)) }
+        try #require(!limits.isEmpty && limits.allSatisfy { (32...2400).contains($0) })
+        var baseline: [Int: [String]] = [:]
+        for limit in limits {
+            let engine = ComicOCREngine(root: try await Self.prepared.value, lineDetectionMaxDimension: limit)
+            for repetition in 1...2 {
+                for (index, file) in files.enumerated() {
+                    let source = try #require(CGImageSourceCreateWithURL(file as CFURL, nil))
+                    let image = try #require(CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary))
+                    let start = ContinuousClock.now
+                    let regions = try await engine.recognize(image, language: .korean, detections: nil)
+                    let digest = SHA256.hash(data: Data(regions.map(\.text).joined(separator: "\n").utf8))
+                        .prefix(8).map { String(format: "%02x", $0) }.joined()
+                    let texts = regions.map(\.text)
+                    if limit == limits.first { baseline[index] = texts }
+                    let same = texts == baseline[index]
+                    print("OCRBENCH profile=realPage device=\(ProcessInfo.processInfo.environment["PANELY_OCR_LINE_DEVICE"] ?? "cpu") limit=\(limit) run=\(repetition) page=\(index) size=\(image.width)x\(image.height) seconds=\(start.duration(to: .now)) regions=\(regions.count) digest=\(digest) matchesBaseline=\(same)")
+                }
+            }
+            await engine.unload()
+        }
     }
 }

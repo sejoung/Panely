@@ -45,9 +45,9 @@ nonisolated enum ComicOCRDecoding {
         return (text.trimmingCharacters(in: .whitespacesAndNewlines), count > 0 ? confidence / Float(count) : 0)
     }
 
-    static func detectorSize(width: Int, height: Int) -> (width: Int, height: Int) {
+    static func detectorSize(width: Int, height: Int, maxDimension: Int = 2400) -> (width: Int, height: Int) {
         var ratio = max(1, 960 / Double(max(1, min(width, height))))
-        ratio = min(ratio, 2400 / Double(max(1, max(width, height))))
+        ratio = min(ratio, Double(max(32, maxDimension)) / Double(max(1, max(width, height))))
         func snap(_ value: Int) -> Int { max(32, Int((Double(value) * ratio / 32).rounded()) * 32) }
         return (snap(width), snap(height))
     }

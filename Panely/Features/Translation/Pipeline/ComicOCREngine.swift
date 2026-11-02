@@ -7,12 +7,16 @@ import OnnxRuntimeBindings
 actor ComicOCREngine {
     static let shared = ComicOCREngine()
     let root: URL
+    private let lineDetectionMaxDimension: Int
     private var environment: ORTEnv?
     private var sessions: [String: ORTSession] = [:]
     private var dictionaries: [String: [String]] = [:]
     private var idleTask: Task<Void, Never>?
 
-    init(root: URL = TranslationModelFiles.defaultRoot()) { self.root = root }
+    init(root: URL = TranslationModelFiles.defaultRoot(), lineDetectionMaxDimension: Int = 2400) {
+        self.root = root
+        self.lineDetectionMaxDimension = lineDetectionMaxDimension
+    }
 
     nonisolated func isReady(for language: TranslationLanguage) -> Bool {
         ComicOCRModels.isInstalled(at: root, manga: false)
@@ -25,6 +29,7 @@ actor ComicOCREngine {
         defer { scheduleUnload() }
         let start = ContinuousClock.now
         let lines = try detectLines(image)
+        let linesFinished = ContinuousClock.now
         var result: [TextRegion] = []
         var boxes = lines
         if language == .japanese {
@@ -56,8 +61,16 @@ actor ComicOCREngine {
             }
             throw error
         }
-        AppLog.debug(.reader, "Comic OCR completed", metadata: [
-            "language": "\(language.rawValue)", "regions": "\(result.count)", "duration": "\(start.duration(to: .now))",
+        func seconds(_ duration: Duration) -> String {
+            let parts = duration.components
+            return String(format: "%.3f", Double(parts.seconds) + Double(parts.attoseconds) / 1e18)
+        }
+        AppLog.info(.reader, "Comic OCR completed", metadata: [
+            "language": "\(language.rawValue)", "regions": "\(result.count)", "lines": "\(lines.count)",
+            "width": "\(image.width)", "height": "\(image.height)",
+            "lineDetectionSeconds": "\(seconds(start.duration(to: linesFinished)))",
+            "readingSeconds": "\(seconds(linesFinished.duration(to: .now)))",
+            "seconds": "\(seconds(start.duration(to: .now)))",
         ])
         return result
     }
@@ -148,7 +161,7 @@ actor ComicOCREngine {
         for (index, tile) in OCRTiling.tiles(width: image.width, height: image.height).enumerated() {
             try Task.checkCancellation()
             guard let crop = image.cropping(to: CGRect(x: 0, y: tile.top, width: image.width, height: tile.height)) else { continue }
-            let size = ComicOCRDecoding.detectorSize(width: crop.width, height: crop.height)
+            let size = ComicOCRDecoding.detectorSize(width: crop.width, height: crop.height, maxDimension: lineDetectionMaxDimension)
             let input = try OCRPixels(crop, width: size.width, height: size.height).tensor()
             let detector = try session("ch_PP-OCRv5_mobile_det.onnx")
             guard let name = try detector.inputNames().first else { throw ComicOCRError.invalidOutput }
