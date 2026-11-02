@@ -77,12 +77,9 @@ if [[ $run_tests -eq 1 ]]; then
     test_log="$LOG_DIR/install-local-test.log"
     echo "→ running tests (log: $test_log)..."
     set +e
-    xcodebuild test \
-        -project Panely.xcodeproj \
-        -scheme Panely \
-        -destination "$destination" \
-        -derivedDataPath "$DERIVED_DATA" \
-        CODE_SIGN_IDENTITY="-" \
+    "$SCRIPT_DIR/test.sh" \
+        --derived-data "$DERIVED_DATA" \
+        --results-dir "$LOG_DIR/install-local-tests" \
         > "$test_log" 2>&1
     test_exit=$?
     set -e

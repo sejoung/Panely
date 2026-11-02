@@ -32,7 +32,7 @@ struct TranslationModelStoreTests {
         #expect(model.url.absoluteString.contains("/resolve/\(model.revision)/"))
         #expect(model.url.host == "huggingface.co")
         #expect(model.sha256.count == 64)
-        #expect(TranslationModel.cacheRevision == "gemma-4-e2b-it-q4_0@675cff42a74c+p1")
+        #expect(TranslationModel.cacheRevision == "gemma-4-e2b-it-q4_0@675cff42a74c+p1+\(ComicOCRModels.cacheRevision)")
     }
 
     @Test func installChecksSizeAndHashBeforeMovingIntoPlace() throws {
@@ -60,10 +60,11 @@ struct TranslationModelStoreTests {
         #expect(!files.isInstalled)
     }
 
-    @Test func hashIsReadInPiecesAndMatchesCryptoKit() throws {
+    @Test nonisolated func hashIsReadInPiecesAndMatchesCryptoKit() throws {
         let file = try Fixture.makeTempDir().appendingPathComponent("big")
         // Bigger than one 8 MB piece.
-        let data = Data((0..<(9 << 20)).map { UInt8(truncatingIfNeeded: $0 &* 31) })
+        var data = Data(repeating: 0x5A, count: 8 << 20)
+        data.append(Data(repeating: 0xA5, count: 1 << 20))
         try data.write(to: file)
         let expected = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
         #expect(try TranslationModelFiles.sha256(of: file) == expected)
@@ -137,5 +138,25 @@ struct TranslationModelStoreTests {
         // Already there: nothing to download.
         store.download()
         #expect(store.isInstalled)
+    }
+
+    @Test func upgradingDownloadsOnlyMissingOCRFilesAndRemovesTheWholePack() async throws {
+        let files = try makeFiles()
+        let staging = files.root.deletingLastPathComponent().appendingPathComponent("primary.download")
+        try Self.content.write(to: staging)
+        try files.install(downloadedFile: staging)
+        let first = TranslationModel(id: "ocr", displayName: "OCR", revision: "pinned", fileName: "encoder.onnx",
+            bytes: Int64(Self.content.count), sha256: files.model.sha256, url: files.model.url, license: "Apache-2.0")
+        let second = TranslationModel(id: "ocr", displayName: "OCR", revision: "pinned", fileName: "decoder.onnx",
+            bytes: Int64(Self.content.count), sha256: files.model.sha256, url: files.model.url, license: "Apache-2.0")
+        let store = TranslationModelStore(files: files, downloader: DataModelDownloader(data: Self.content), additionalModels: [first, second])
+        #expect(!store.isInstalled)
+        #expect(store.remainingBytes == Int64(Self.content.count * 2))
+        store.download()
+        try await waitUntil { store.isInstalled }
+        #expect(store.remainingBytes == 0)
+        #expect(store.package.allSatisfy { $0.isInstalled })
+        #expect(await store.remove() == Int64(Self.content.count * 3))
+        #expect(store.package.allSatisfy { !$0.isInstalled })
     }
 }

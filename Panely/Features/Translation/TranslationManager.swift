@@ -204,6 +204,7 @@ final class TranslationManager {
         }
         dropFinishedBackground()
         await (translator as? GemmaTranslator)?.unload()
+        await ComicOCREngine.shared.unload()
         await model.remove()
     }
 

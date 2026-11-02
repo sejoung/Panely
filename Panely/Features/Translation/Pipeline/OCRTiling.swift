@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
 
-/// One block of text Vision found, in page pixels (top-left origin).
+/// One block of recognized text, in page pixels (top-left origin).
 nonisolated struct TextRegion: Equatable, Sendable {
     var text: String
     var rect: CGRect

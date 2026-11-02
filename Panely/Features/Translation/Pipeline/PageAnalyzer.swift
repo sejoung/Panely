@@ -8,6 +8,31 @@ import Vision
 /// to a job directly.
 nonisolated protocol PageAnalyzing: Sendable {
     func analyze(_ unit: TranslationUnit, plan: TranslationPlan) async throws -> [PageAnalysis]
+    func analyze(_ unit: TranslationUnit, plan: TranslationPlan, publishing: @escaping @Sendable ([PageAnalysis]) -> Void) async throws
+}
+
+nonisolated extension PageAnalyzing {
+    func analyze(_ unit: TranslationUnit, plan: TranslationPlan, publishing: @escaping @Sendable ([PageAnalysis]) -> Void) async throws {
+        publishing(try await analyze(unit, plan: plan))
+    }
+
+    func start(_ unit: TranslationUnit, plan: TranslationPlan) -> PageAnalysisRun {
+        let (stream, sink) = AsyncThrowingStream<[PageAnalysis], any Error>.makeStream()
+        let task = Task {
+            do {
+                try await analyze(unit, plan: plan) { sink.yield($0) }
+                sink.finish()
+            } catch { sink.finish(throwing: error) }
+        }
+        sink.onTermination = { _ in task.cancel() }
+        return PageAnalysisRun(stream: stream, task: task)
+    }
+}
+
+nonisolated struct PageAnalysisRun: Sendable {
+    let stream: AsyncThrowingStream<[PageAnalysis], any Error>
+    let task: Task<Void, Never>
+    func cancel() { task.cancel() }
 }
 
 /// Balloons found on one page by one unit of work, still untranslated.
@@ -47,28 +72,80 @@ actor PageAnalyzer: PageAnalyzing {
     }
 
     func analyze(_ unit: TranslationUnit, plan: TranslationPlan) async throws -> [PageAnalysis] {
+        try await analyze(unit, plan: plan, forceVision: false)
+    }
+
+    private func analyze(_ unit: TranslationUnit, plan: TranslationPlan, forceVision: Bool) async throws -> [PageAnalysis] {
         if let band = unit.band, let layout = plan.layout {
-            return try await analyzeBand(band, layout: layout)
+            return try await analyzeBand(band, layout: layout, forceVision: forceVision)
         }
         guard let index = unit.pageIndices.first else { return [] }
-        return [try await analyzePage(index)]
+        return [try await analyzePage(index, forceVision: forceVision)]
+    }
+
+    func analyze(_ unit: TranslationUnit, plan: TranslationPlan, publishing: @escaping @Sendable ([PageAnalysis]) -> Void) async throws {
+        guard PageTextRecognizer.configuredBackend != .vision, ComicOCREngine.shared.isReady(for: language) else {
+            publishing(try await analyze(unit, plan: plan))
+            return
+        }
+        let image: CGImage
+        if let band = unit.band, let layout = plan.layout { image = try await renderBand(band, layout: layout) }
+        else if let index = unit.pageIndices.first { image = try await Self.decode(pages[index]) }
+        else { return }
+        let detections = await BalloonDetector.shared.detect(image)
+        let language = language
+        do {
+            _ = try await ComicOCREngine.shared.recognize(image, language: language, detections: detections) { regions in
+                var drafts = BubbleGrouper.group(regions, language: language, detections: detections)
+                if let band = unit.band, let layout = plan.layout {
+                    drafts = drafts.filter {
+                        OCRTiling.isWhole($0.rect, bandHeight: Int(band.height), isFirst: band.isFirst, isLast: band.isLast)
+                            && band.ownedRange.contains($0.rect.midY + band.top)
+                    }
+                    var byPage: [Int: [TranslatedBubble]] = [:]
+                    for draft in drafts {
+                        let page = layout.page(containingY: draft.rect.midY + band.top)
+                        let pageRect = layout.pageRect(page)
+                        byPage[page, default: []] += Self.makeBubbles(language: language, from: [draft], sampling: image) {
+                            $0.offsetBy(dx: -pageRect.minX, dy: band.top - pageRect.minY)
+                        }
+                    }
+                    publishing(byPage.keys.sorted().map { PageAnalysis(pageIndex: $0, imageSize: layout.pageSizes[$0], bubbles: byPage[$0] ?? []) })
+                } else if let index = unit.pageIndices.first {
+                    publishing([PageAnalysis(pageIndex: index, imageSize: CGSize(width: image.width, height: image.height),
+                        bubbles: Self.makeBubbles(language: language, from: drafts, sampling: image) { $0 })])
+                }
+            }
+            // Empty pages and strip slices still need their image size and a
+            // completion record, even if no text was published.
+            if let band = unit.band, let layout = plan.layout {
+                publishing(layout.pages(intersecting: band.ownedRange).map { PageAnalysis(pageIndex: $0, imageSize: layout.pageSizes[$0], bubbles: []) })
+            } else if let index = unit.pageIndices.first {
+                publishing([PageAnalysis(pageIndex: index, imageSize: CGSize(width: image.width, height: image.height), bubbles: [])])
+            }
+        } catch {
+            try Task.checkCancellation()
+            if error as? ComicOCRError == .partialFailure || PageTextRecognizer.configuredBackend == .comic { throw error }
+            AppLog.error(.reader, "Comic OCR failed before publication; using Vision", metadata: ["error": "\(error)"])
+            publishing(try await analyze(unit, plan: plan, forceVision: true))
+        }
     }
 
     // MARK: - Page scope
 
-    private func analyzePage(_ index: Int) async throws -> PageAnalysis {
+    private func analyzePage(_ index: Int, forceVision: Bool) async throws -> PageAnalysis {
         let image = try await Self.decode(pages[index])
-        let (regions, detections) = try await recognize(image)
+        let (regions, detections) = try await recognize(image, forceVision: forceVision)
         let drafts = BubbleGrouper.group(regions, language: language, detections: detections)
-        let bubbles = makeBubbles(from: drafts, sampling: image) { $0 }
+        let bubbles = Self.makeBubbles(language: language, from: drafts, sampling: image) { $0 }
         return PageAnalysis(pageIndex: index, imageSize: CGSize(width: image.width, height: image.height), bubbles: bubbles)
     }
 
     // MARK: - Strip scope
 
-    private func analyzeBand(_ band: StripBand, layout: StripLayout) async throws -> [PageAnalysis] {
+    private func analyzeBand(_ band: StripBand, layout: StripLayout, forceVision: Bool) async throws -> [PageAnalysis] {
         let image = try await renderBand(band, layout: layout)
-        let (recognized, detections) = try await recognize(image)
+        let (recognized, detections) = try await recognize(image, forceVision: forceVision)
         let regions = recognized
             .filter { OCRTiling.isWhole($0.rect, bandHeight: Int(band.height), isFirst: band.isFirst, isLast: band.isLast) }
         let drafts = BubbleGrouper.group(regions, language: language, detections: detections)
@@ -78,7 +155,7 @@ actor PageAnalyzer: PageAnalyzing {
         for draft in drafts {
             let page = layout.page(containingY: draft.rect.midY + band.top)
             let pageRect = layout.pageRect(page)
-            let bubbles = makeBubbles(from: [draft], sampling: image) { rect in
+            let bubbles = Self.makeBubbles(language: language, from: [draft], sampling: image) { rect in
                 // band coordinates → that page's own pixel coordinates
                 rect.offsetBy(dx: -pageRect.minX, dy: band.top - pageRect.minY)
             }
@@ -122,9 +199,20 @@ actor PageAnalyzer: PageAnalyzing {
     /// second look at text boxes OCR left empty reads (`MissedText`). `nil`
     /// detections when the detector can't run: the text is then grouped by
     /// its layout.
-    private func recognize(_ image: CGImage) async throws -> ([TextRegion], [DetectedRegion]?) {
+    private func recognize(_ image: CGImage, forceVision: Bool) async throws -> ([TextRegion], [DetectedRegion]?) {
+        if !forceVision, PageTextRecognizer.configuredBackend != .vision, ComicOCREngine.shared.isReady(for: language) {
+            let detections = await BalloonDetector.shared.detect(image)
+            do {
+                let regions = try await ComicOCREngine.shared.recognize(image, language: language, detections: detections)
+                return (regions.filter { !$0.text.isEmpty }, detections)
+            } catch {
+                try Task.checkCancellation()
+                if PageTextRecognizer.configuredBackend == .comic { throw error }
+                AppLog.error(.reader, "Comic page OCR failed; using Vision", metadata: ["error": "\(error)"])
+            }
+        } else if !forceVision, PageTextRecognizer.configuredBackend == .comic { throw TranslationModelError.notInstalled }
         async let detections = BalloonDetector.shared.detect(image)
-        let regions = try await PageTextRecognizer(language: language).recognize(image)
+        let regions = try await VisionPageTextRecognizer(language: language).recognize(image)
         guard let found = await detections else { return (regions, nil) }
         return (regions + (try await reread(MissedText.boxesToReread(found, regions: regions), in: image)), found)
     }
@@ -157,7 +245,7 @@ actor PageAnalyzer: PageAnalyzing {
         let crop = MissedText.cropRect(for: box.rect, in: CGSize(width: image.width, height: image.height))
         let scale = MissedText.scale(for: crop)
         guard crop.width >= 4, crop.height >= 4, let enlarged = enlarge(image, crop: crop, scale: scale) else { return [] }
-        return try await PageTextRecognizer(language: language).recognize(enlarged)
+        return try await VisionPageTextRecognizer(language: language).recognize(enlarged)
             .filter { !MissedText.isNoise($0.text) }
             .map { MissedText.mapBack($0, crop: crop, scale: scale) }
     }
@@ -174,7 +262,8 @@ actor PageAnalyzer: PageAnalyzing {
         return context.makeImage()
     }
 
-    private func makeBubbles(
+    private nonisolated static func makeBubbles(
+        language: TranslationLanguage,
         from drafts: [BubbleDraft],
         sampling image: CGImage,
         toPageCoordinates: (CGRect) -> CGRect
@@ -209,7 +298,7 @@ actor PageAnalyzer: PageAnalyzing {
     /// Whether the translation may spread into the balloon's room: only a
     /// flat-toned balloon with nothing else in it. A line OCR missed would
     /// otherwise be painted over, untranslated.
-    private func roomIsEmpty(in balloon: CGRect, around textArea: CGRect, background: BubbleBackground, image: CGImage) -> Bool {
+    private nonisolated static func roomIsEmpty(in balloon: CGRect, around textArea: CGRect, background: BubbleBackground, image: CGImage) -> Bool {
         guard background.isUniform else { return false }
         let room = TranslationOverlayLayout.roomInside(balloon)
         return BubbleBackgroundSampler.inkShare(image, in: room, excluding: textArea, background: background) < Self.maxInkInBalloonRoom
@@ -280,8 +369,20 @@ nonisolated enum TranslationLanguageDetector {
             let probe = cgImage.height > cgImage.width * 3
                 ? cgImage.cropping(to: CGRect(x: 0, y: 0, width: cgImage.width, height: cgImage.width * 3)) ?? cgImage
                 : cgImage
-            guard let observations = try? await makeRequest().perform(on: probe) else { continue }
-            text += observations.flatMap { $0.document.paragraphs.map(\.transcript) }.joined(separator: " ")
+            var evidence: String?
+            if PageTextRecognizer.configuredBackend != .vision,
+               ComicOCRModels.isInstalled(at: TranslationModelFiles.defaultRoot(), manga: false) {
+                do { evidence = try await ComicOCREngine.shared.languageEvidence(probe) }
+                catch {
+                    if Task.isCancelled { return nil }
+                    AppLog.error(.reader, "Comic language detection failed; using Vision", metadata: ["error": "\(error)"])
+                }
+            }
+            if let evidence { text += evidence + " " }
+            else {
+                guard let observations = try? await makeRequest().perform(on: probe) else { continue }
+                text += observations.flatMap { $0.document.paragraphs.map(\.transcript) }.joined(separator: " ")
+            }
             if isConclusive(text) {
                 return TranslationLanguageClassifier.classify(text)
             }

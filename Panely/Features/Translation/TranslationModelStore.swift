@@ -6,7 +6,7 @@ import Observation
 /// status banner and Settings all show the same download, and it carries on
 /// while books are switched.
 ///
-/// The download is 3.3 GB. It goes to a staging file next to the model, is
+/// Gemma and the OCR pack download once (about 3.5 GB together). It goes to a staging file next to the model, is
 /// checked against the pinned size and hash (`TranslationModelFiles.install`)
 /// and only then moved into place; a failed or damaged download never leaves
 /// a model that looks installed.
@@ -24,21 +24,30 @@ final class TranslationModelStore {
 
     private(set) var state: State
     let files: TranslationModelFiles
+    let package: [TranslationModelFiles]
     /// The model was installed — jobs waiting for it start again.
     @ObservationIgnored var onInstalled: (() -> Void)?
     @ObservationIgnored private let downloader: any TranslationModelDownloading
     @ObservationIgnored private var task: Task<Void, Never>?
+    @ObservationIgnored private var downloadID = UUID()
+    @ObservationIgnored private var activeFileID = UUID()
     /// When progress was last published: the delegate reports every few
     /// kilobytes, far more often than anyone can see.
     @ObservationIgnored private var lastProgress: ContinuousClock.Instant?
 
-    init(files: TranslationModelFiles = TranslationModelFiles(), downloader: any TranslationModelDownloading = URLSessionModelDownloader()) {
+    init(files: TranslationModelFiles = TranslationModelFiles(), downloader: any TranslationModelDownloading = URLSessionModelDownloader(), additionalModels: [TranslationModel]? = nil) {
         self.files = files
+        package = [files] + (additionalModels ?? (files.model == .current ? ComicOCRModels.files : []))
+            .map { TranslationModelFiles(root: files.root, model: $0) }
         self.downloader = downloader
-        state = files.isInstalled ? .installed : .notInstalled
+        state = package.allSatisfy(\.isInstalled) ? .installed : .notInstalled
     }
 
     var model: TranslationModel { files.model }
+    var totalBytes: Int64 { package.reduce(0) { $0 + $1.model.bytes } }
+    var remainingBytes: Int64 { package.filter { !$0.isInstalled }.reduce(0) { $0 + $1.model.bytes } }
+    var hasInstalledFiles: Bool { package.contains { $0.isInstalled } }
+    private var packageInstalled: Bool { package.allSatisfy(\.isInstalled) }
     var isInstalled: Bool { state == .installed }
 
     var isDownloading: Bool {
@@ -57,77 +66,98 @@ final class TranslationModelStore {
     /// Look at the disk again (removed by hand, say).
     func refresh() {
         guard !isDownloading else { return }
-        state = files.isInstalled ? .installed : .notInstalled
+        state = packageInstalled ? .installed : .notInstalled
     }
 
     func download() {
-        guard !isDownloading, !files.isInstalled else {
+        guard !isDownloading, !packageInstalled else {
             refresh()
             return
         }
-        let files = files
+        let pending = package.filter { !$0.isInstalled }
         let downloader = downloader
-        let staging = files.root.appendingPathComponent("\(files.model.id).download")
-        state = .downloading(received: 0, total: files.model.bytes)
+        let total = remainingBytes
+        let runID = UUID()
+        downloadID = runID
+        state = .downloading(received: 0, total: total)
         lastProgress = nil
         AppLog.info(.reader, "Translation model download started", metadata: ["model": "\(files.model.id)"])
         task = Task { [weak self] in
-            // Progress arrives on the download's own queue; only the latest
-            // matters.
-            let (updates, sink) = AsyncStream.makeStream(of: (Int64, Int64).self, bufferingPolicy: .bufferingNewest(1))
-            let watcher = Task { [weak self] in
-                for await (received, total) in updates {
-                    self?.progress(received: received, total: total)
+            var completed: Int64 = 0
+            for files in pending {
+                let fileID = UUID()
+                self?.activeFileID = fileID
+                let staging = files.root.appendingPathComponent("\(files.model.id)-\(files.model.fileName)-\(UUID().uuidString).download")
+                // Progress arrives on the download's own queue; only the latest
+                // matters.
+                let (updates, sink) = AsyncStream.makeStream(of: (Int64, Int64).self, bufferingPolicy: .bufferingNewest(1))
+                let watcher = Task { [weak self] in
+                    for await (received, total) in updates {
+                        guard let self, self.downloadID == runID, self.activeFileID == fileID else { continue }
+                        self.progress(received: received, total: total)
+                    }
+                }
+                defer {
+                    sink.finish()
+                    watcher.cancel()
+                }
+                do {
+                    try Task.checkCancellation()
+                    try FileManager.default.createDirectory(at: files.root, withIntermediateDirectories: true)
+                    let offset = completed
+                    try await downloader.download(from: files.model.url, to: staging) { received, _ in
+                        sink.yield((offset + received, 0))
+                    }
+                    try Task.checkCancellation()
+                    self?.state = .verifying
+                    try await Task.detached(priority: .utility) {
+                        defer { try? FileManager.default.removeItem(at: staging) }
+                        try files.install(downloadedFile: staging)
+                    }.value
+                    try Task.checkCancellation()
+                    completed += files.model.bytes
+                    self?.state = .downloading(received: completed, total: total)
+                } catch {
+                    try? FileManager.default.removeItem(at: staging)
+                    guard !Task.isCancelled, !(error is CancellationError) else { return }
+                    AppLog.error(.reader, "Translation model download failed", metadata: ["error": "\(error)"])
+                    self?.finish(.failed(error.localizedDescription))
+                    return
                 }
             }
-            defer {
-                sink.finish()
-                watcher.cancel()
-            }
-            do {
-                try FileManager.default.createDirectory(at: files.root, withIntermediateDirectories: true)
-                try await downloader.download(from: files.model.url, to: staging) { received, total in
-                    sink.yield((received, total))
-                }
-                try Task.checkCancellation()
-                self?.state = .verifying
-                try await Task.detached(priority: .utility) {
-                    defer { try? FileManager.default.removeItem(at: staging) }
-                    try files.install(downloadedFile: staging)
-                }.value
-                try Task.checkCancellation()
-                self?.finish(.installed)
-            } catch {
-                try? FileManager.default.removeItem(at: staging)
-                guard !Task.isCancelled, !(error is CancellationError) else { return }
-                AppLog.error(.reader, "Translation model download failed", metadata: ["error": "\(error)"])
-                self?.finish(.failed(error.localizedDescription))
-            }
+            self?.finish(.installed)
         }
     }
 
     func cancelDownload() {
+        downloadID = UUID()
         task?.cancel()
         task = nil
-        state = files.isInstalled ? .installed : .notInstalled
+        state = packageInstalled ? .installed : .notInstalled
     }
 
     /// Delete the model (Settings). Returns the bytes freed.
     @discardableResult
     func remove() async -> Int64 {
         cancelDownload()
-        let files = files
-        let freed = await Task.detached(priority: .utility) { files.remove() }.value
+        let package = package
+        let freed = await Task.detached(priority: .utility) {
+            let bytes = package.reduce(Int64(0)) { total, files in
+                total + ((try? FileManager.default.attributesOfItem(atPath: files.fileURL.path)[.size] as? NSNumber)?.int64Value ?? 0)
+            }
+            for directory in Set(package.map(\.directory)) { try? FileManager.default.removeItem(at: directory) }
+            return bytes
+        }.value
         state = .notInstalled
         return freed
     }
 
     private func progress(received: Int64, total: Int64) {
-        guard case .downloading = state else { return }
+        guard case let .downloading(previous, expected) = state else { return }
         let now = ContinuousClock.now
-        if let lastProgress, received < total, lastProgress.duration(to: now) < .milliseconds(250) { return }
+        if let lastProgress, received < expected, lastProgress.duration(to: now) < .milliseconds(250) { return }
         lastProgress = now
-        state = .downloading(received: received, total: total > 0 ? total : files.model.bytes)
+        state = .downloading(received: max(previous, min(received, expected)), total: expected)
     }
 
     private func finish(_ state: State) {

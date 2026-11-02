@@ -37,13 +37,4 @@ fi
 # without the prefix.
 export TEST_RUNNER_PANELY_MODEL_TESTS=1
 
-xcodebuild test \
-  -project Panely.xcodeproj \
-  -scheme Panely \
-  -destination 'platform=macOS' \
-  -derivedDataPath "${PANELY_DERIVED_DATA_PATH:-/private/tmp/PanelyDerivedData}" \
-  CODE_SIGN_IDENTITY="-" \
-  -only-testing:PanelyTests/GemmaTranslatorIntegrationTests \
-  "$@" \
-  2>&1 | grep -E "error:|✘ |GEMMA|Test run with|^\*\* " \
-    | sed '/com\.apple\.linkd\.autoShortcut/d'
+exec "$SCRIPT_DIR/test.sh" --only GemmaTranslatorIntegrationTests "$@"

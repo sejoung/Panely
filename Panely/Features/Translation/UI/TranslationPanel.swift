@@ -568,7 +568,7 @@ struct TranslationPrimaryAction: View {
             .buttonStyle(.bordered)
             .controlSize(.large)
         case .downloadModel:
-            prominentButton("Download Translation Model (\(TranslationModelSize.text(model.model.bytes)))", systemImage: "arrow.down.circle") {
+            prominentButton("Download Translation Model (\(TranslationModelSize.text(model.remainingBytes)))", systemImage: "arrow.down.circle") {
                 model.download()
             }
         case .downloadingModel:
@@ -680,7 +680,7 @@ struct TranslationModelDownloadButton: View {
                 }
             }
         } else {
-            Button("Download (\(TranslationModelSize.text(model.model.bytes)))…") {
+            Button("Download (\(TranslationModelSize.text(model.remainingBytes)))…") {
                 model.download()
             }
         }

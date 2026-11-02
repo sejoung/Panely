@@ -240,9 +240,10 @@ follow the story; it doesn't replace a real translation, and the original is
 always one click (or `⇧⌘T`) away. Nothing leaves the Mac and nothing is
 written into your files.
 
-- **On-device** — Vision's document recognizer (OCR, including vertical
-  Japanese) + Google's **Gemma 4 E2B** run in the app with llama.cpp on the
-  GPU. The model (3.35 GB) is downloaded once, with a progress bar, from the
+- **On-device** — manga-ocr int8 for Japanese (including vertical text),
+  PP-OCRv5 mobile for Chinese, English and Korean, and Google's **Gemma 4 E2B**
+  run in the app with llama.cpp on the GPU. The models (~3.51 GB together,
+  including ~160 MB of OCR) are downloaded once, with a progress bar, from the
   translation panel, the status banner or **Settings → Experimental**, and
   checked against a pinned SHA-256 before it's used
 - **One model, in context** — every language pair, no modes. A page's
@@ -415,6 +416,8 @@ replaces `/Applications/Panely.app`; use `--debug` to keep them apart.
 
 Panely uses Swift Package Manager:
 
+- **[ONNX Runtime](https://github.com/microsoft/onnxruntime-swift-package-manager)** (MIT), pinned to 1.24.2 — runs manga-ocr and PP-OCRv5 in process.
+
 - **[ZIPFoundation](https://github.com/weichsel/ZIPFoundation)** — CBZ/ZIP archive reading &amp; extraction
 - **[swift-log](https://github.com/apple/swift-log)** — logging facade behind `AppLog`
   (OSLog + the bounded diagnostic log file)
@@ -436,9 +439,10 @@ Bundled model (translation assist):
   `scripts/convert-text-detector.py`; the script's header explains the
   workarounds and how its boxes were checked against the original
 
-Downloaded model (translation assist, once, from the translation panel or
+Downloaded models (translation assist, once, from the translation panel or
 Settings — not part of the app):
 
+- **[manga-ocr int8](https://huggingface.co/ogkalu/manga-ocr-onnx)** (~117 MB) and **[PP-OCRv5 mobile](https://huggingface.co/ogkalu/ppocr-v5-onnx)** (~43 MB), Apache-2.0 — pinned revisions, sizes and SHA-256 in `ComicOCRModels`. See [OCR implementation and verification](docs/ocr-pipeline.md).
 - **[Gemma 4 E2B](https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf)**
   by Google (Apache-2.0) — instruction-tuned, QAT 4-bit GGUF, 3.35 GB.
   Pinned to one revision, size and SHA-256 in `TranslationModel` (the same
@@ -519,11 +523,21 @@ Terminal) and move the result straight to `/Applications`.
 
 ```bash
 scripts/test.sh          # fast tier (= plain `xcodebuild test`, what CI runs)
+scripts/test.sh --only TranslationControllerTests --repeat 5
+scripts/test.sh --skip-build --only DebouncerTests
 scripts/test-slow.sh     # + slow tier: real FSEvents, real Vision OCR, every random seed
 scripts/test-visual.sh   # screenshot comparisons against PanelyTests/Snapshots/Reference/
 scripts/test-model.sh [--model PATH]             # the real translation model (Gemma via llama.cpp)
+scripts/test-ocr.sh SWIFT_OPTIMIZATION_LEVEL=-O   # real OCR; downloads the pinned OCR test pack once
 scripts/benchmark-translation.sh [--book PATH]   # time each translation stage and whole jobs
 ```
+
+Local runs, CI and the tier wrappers all use `scripts/test.sh`. Debug is the default.
+`--repeat` builds on the first run, starts a separate test process for each repetition,
+and stops on failure. Full logs, exact commands and `.xcresult` bundles are saved per
+run under `build/test-results/<timestamp-PID>/`; override the paths with `--results-dir`
+and `--derived-data`. Repeat `--only` to select several suites; legacy `-only-testing:...`
+arguments still work. See `scripts/test.sh --help`. CI archives the same runner's results.
 
 The tiers are set in `PanelyTests/TestTiers.swift`; the slow and visual tiers
 are opt-in through `PANELY_SLOW_TESTS=1` / `PANELY_VISUAL_TESTS=1` (the
@@ -916,7 +930,7 @@ Panely/
 │   │   │                               # TranslationExportJob (options, records), TranslationExportWriter
 │   │   │                               # (CBZ / ZIP / folder), TranslatedPageRenderer
 │   │   ├── Pipeline/                   # OCRTiling, TranslationPlan (page / strip), PageAnalyzer,
-│   │   │                               # PageTextRecognizer (Vision), GemmaTranslator (llama.cpp + prompt),
+│   │   │                               # PageTextRecognizer (comic OCR / Vision fallback), GemmaTranslator (llama.cpp + prompt),
 │   │   │                               # BubbleGrouper, BalloonDetector (Core ML), MissedText,
 │   │   │                               # BubbleBackgroundSampler, TextClassifiers,
 │   │   │                               # TranslationWarmup (prepares OCR once per build)
@@ -1087,10 +1101,12 @@ Panely.entitlements                     # sandbox + user-selected read-write + a
   the job's last six translations as context; lines seen earlier in the book
   are reused. Work runs in a detached task and reports back to the
   main actor under a generation counter. Per unit, `PageAnalyzer` (an actor)
-  reads the text with `PageTextRecognizer` (Vision's document recognizer, tall
-  pages in `OCRTiling` bands), finds balloons with `BalloonDetector` (the
-  bundled Core ML `ComicTextDetector`), groups lines into balloons with
-  `BubbleGrouper`, rereads detector boxes OCR missed (`MissedText`), leaves
+  finds balloons with `BalloonDetector` (the bundled Core ML RT-DETR), then
+  reads Japanese text crops with manga-ocr int8 and other languages with
+  PP-OCRv5 mobile (`ComicOCREngine`, ONNX Runtime). Complete balloon batches
+  stream to translation while the rest of the page is being read. Tall pages
+  use `OCRTiling` bands. `PageTextRecognizer` keeps Vision as a fallback;
+  its missed boxes are reread by `MissedText`. `BubbleGrouper` joins lines, leaves
   sound effects as drawn (`SoundEffectClassifier`) and samples each balloon's
   background tone (`BubbleBackgroundSampler`). `GemmaTranslator` (an actor on
   its own thread) then runs Gemma 4 E2B with llama.cpp on the GPU: one model

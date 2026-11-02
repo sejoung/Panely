@@ -80,6 +80,32 @@ struct TranslationJobTests {
         #expect(saved?.bubbles.count == 20)
     }
 
+    @Test func completedBalloonsTranslateWhileTheRestOfThePageIsStillBeingRead() async throws {
+        let translator = ScriptedTranslator()
+        let gate = TranslationPermitGate()
+        let controller = try makeController(translator, texts: [:])
+        controller.makeAnalyzer = { _, _ in StreamingTestAnalyzer(gate: gate) }
+        let pages = Fixture.makeImagePages(count: 1)
+        controller.reload(pages: pages, pageSizes: [], scope: .page, source: .japanese, target: .korean,
+            enabled: true, autoStart: false, focusPage: 0)
+        await controller.cacheTask?.value
+        controller.start()
+        do {
+            try await waitUntil { controller.pages[pages[0].id]?.bubbles.first?.translation == "ko:先" }
+            #expect(controller.isWorking)
+            #expect(controller.completedPageIndices.isEmpty)
+            #expect(translator.requests.map(\.lines) == [["先"]])
+        } catch {
+            await gate.open()
+            throw error
+        }
+        await gate.open()
+        try await waitUntil { !controller.isWorking }
+        #expect(translator.requests.map(\.lines) == [["先"], ["後"]])
+        #expect(translator.requests.last?.context == [TranslationContextLine(source: "先", translation: "ko:先")])
+        #expect(controller.completedPageIndices == [0])
+    }
+
     @Test func aRepeatedLineOnOnePageIsAskedForOnce() async throws {
         let translator = ScriptedTranslator()
         let controller = try makeController(translator, texts: [0: ["はい", "いいえ", "はい"]])
@@ -175,5 +201,20 @@ struct TranslationJobTests {
         try await waitUntil { controller.completedPageIndices == [0, 1] }
         #expect(controller.notice == nil)
         #expect(translator.requests.count == 2)
+    }
+}
+
+private struct StreamingTestAnalyzer: PageAnalyzing {
+    let gate: TranslationPermitGate
+    func analyze(_ unit: TranslationUnit, plan: TranslationPlan) async throws -> [PageAnalysis] {
+        try await StubPageAnalyzer(texts: [0: ["先", "後"]]).analyze(unit, plan: plan)
+    }
+    func analyze(_ unit: TranslationUnit, plan: TranslationPlan, publishing: @escaping @Sendable ([PageAnalysis]) -> Void) async throws {
+        let full = try await analyze(unit, plan: plan)
+        let first = full.map { PageAnalysis(pageIndex: $0.pageIndex, imageSize: $0.imageSize, bubbles: Array($0.bubbles.prefix(1))) }
+        publishing(first)
+        await gate.pass()
+        try Task.checkCancellation()
+        publishing(full.map { PageAnalysis(pageIndex: $0.pageIndex, imageSize: $0.imageSize, bubbles: Array($0.bubbles.suffix(1))) })
     }
 }

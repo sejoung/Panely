@@ -33,15 +33,7 @@ cd "$PROJECT_ROOT"
 rm -rf "$SANDBOX_CACHE"
 
 echo "▶︎ Recording reference snapshots…"
-xcodebuild test \
-  -project Panely.xcodeproj \
-  -scheme Panely \
-  -destination 'platform=macOS' \
-  -derivedDataPath "$DERIVED_DATA_PATH" \
-  -only-testing:PanelyTests/VisualRegressionTests \
-  CODE_SIGN_IDENTITY="-" \
-  2>&1 | grep -E "📸|error:|✘ Test|Test run with|^\*\* " \
-    | sed '/com\.apple\.linkd\.autoShortcut/d'
+"$SCRIPT_DIR/test.sh" --derived-data "$DERIVED_DATA_PATH" --only VisualRegressionTests
 
 if [[ ! -f "$SANDBOX_CACHE/reference-snapshots.json" ]]; then
   echo "✗ Nothing recorded in $SANDBOX_CACHE"

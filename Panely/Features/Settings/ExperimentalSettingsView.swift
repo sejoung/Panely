@@ -52,7 +52,7 @@ struct ExperimentalSettingsView: View {
                     LabeledContent(model.model.displayName) {
                         switch model.state {
                         case .installed:
-                            Text("Downloaded · \(TranslationModelSize.text(model.model.bytes))")
+                            Text("Downloaded · \(TranslationModelSize.text(model.totalBytes))")
                         case .notInstalled, .failed:
                             Text("Not downloaded")
                         case .downloading, .verifying:
@@ -61,20 +61,21 @@ struct ExperimentalSettingsView: View {
                     }
                     if model.isDownloading {
                         TranslationModelDownloadProgress(model: model)
-                    } else if model.isInstalled {
-                        Button("Delete Translation Model…", role: .destructive) {
-                            confirmsDeletingModel = true
-                        }
-                        .confirmationDialog("Delete the translation model?", isPresented: $confirmsDeletingModel) {
-                            Button("Delete Model", role: .destructive) {
-                                Task { await deleteModel() }
-                            }
-                        } message: {
-                            Text("Books already translated stay translated. Translating anything else downloads the model again (\(TranslationModelSize.text(model.model.bytes))).")
-                        }
                     } else {
-                        Button("Download (\(TranslationModelSize.text(model.model.bytes)))") {
-                            model.download()
+                        if !model.isInstalled {
+                            Button("Download (\(TranslationModelSize.text(model.remainingBytes)))") { model.download() }
+                        }
+                        if model.hasInstalledFiles {
+                            Button("Delete Translation Model…", role: .destructive) {
+                                confirmsDeletingModel = true
+                            }
+                            .confirmationDialog("Delete the translation model?", isPresented: $confirmsDeletingModel) {
+                                Button("Delete Model", role: .destructive) {
+                                    Task { await deleteModel() }
+                                }
+                            } message: {
+                                Text("Books already translated stay translated. Translating anything else downloads the model again (\(TranslationModelSize.text(model.totalBytes))).")
+                            }
                         }
                     }
                     if case let .failed(reason) = model.state {
@@ -82,10 +83,10 @@ struct ExperimentalSettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.orange)
                     }
-                    Text("One model translates every language pair on your Mac. It reads each page's balloons together with the lines before them, so names and each speaker's speech level — polite or casual — carry over. Downloaded once from Hugging Face; nothing you read leaves your Mac. Uses about 3.5 GB of memory while translating.")
+                    Text("Includes manga-ocr for Japanese and PP-OCRv5 for Chinese, English and Korean. One translation model handles every language pair on your Mac. It reads each page's balloons together with the lines before them, so names and each speaker's speech level — polite or casual — carry over. Downloaded once from Hugging Face; nothing you read leaves your Mac. Uses about 3.5 GB of memory while translating.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text("Gemma 4 by Google (Apache License 2.0), run with llama.cpp (MIT License).")
+                    Text("Gemma 4, manga-ocr and PP-OCRv5 (Apache License 2.0), run with llama.cpp and ONNX Runtime (MIT License).")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

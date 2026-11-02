@@ -2,14 +2,20 @@ import AppKit
 import CoreGraphics
 import Vision
 
-/// Runs the OCR once on a made-up page. The first OCR after a new build is
-/// installed has the system compile its models, which took about a minute on an
-/// M1 Pro (measured) and would otherwise land on the reader's first translation.
+/// Prepares balloon detection during normal startup. Explicit Vision mode also
+/// warms its language models: historically their first compile after a new build
+/// took about a minute on an M1 Pro. Comic OCR avoids that preparation entirely.
 @available(macOS 26.0, *)
 nonisolated enum TranslationWarmup {
     static func run() async {
         guard let page = makeSamplePage() else { return }
-        var detection = TranslationLanguageDetector.makeRequest()
+        // Normal startup never compiles Vision's five language models. The OCR
+        // pack loads on demand; Vision's cold start is reserved for fallback.
+        if PageTextRecognizer.configuredBackend != .vision {
+            _ = await BalloonDetector.shared.detect(page)
+            return
+        }
+        let detection = TranslationLanguageDetector.makeRequest()
         _ = try? await detection.perform(on: page)
         for language in TranslationLanguage.allCases {
             _ = try? await PageTextRecognizer(language: language).recognize(page)

@@ -82,7 +82,7 @@ struct TranslationControllerTests {
         let controller = TranslationController(store: store, defaults: InMemoryKeyValueStore())
 
         reload(controller, pages: pages)
-        try await waitUntil { !controller.pages.isEmpty }
+        await controller.cacheTask?.value
 
         #expect(controller.pages.keys.sorted() == [pages[1].id])
         #expect(controller.pages[pages[1].id]?.bubbles.first?.translation == "하나")
@@ -117,7 +117,7 @@ struct TranslationControllerTests {
         try store.save(makeTranslatedPage(), key: TranslationStore.key(pageID: pages[0].id, from: .japanese, to: .korean))
         let controller = TranslationController(store: store, defaults: InMemoryKeyValueStore())
         reload(controller, pages: pages)
-        try await waitUntil { !controller.pages.isEmpty }
+        await controller.cacheTask?.value
 
         let removed = await controller.clearCache()
 
@@ -133,7 +133,7 @@ struct TranslationControllerTests {
         try store.save(makeTranslatedPage(), key: TranslationStore.key(pageID: pages[0].id, from: .japanese, to: .korean))
         let controller = TranslationController(store: store, defaults: InMemoryKeyValueStore())
         reload(controller, pages: pages)
-        try await waitUntil { controller.completedPageCount == 1 }
+        await controller.cacheTask?.value
 
         controller.start()
 
@@ -423,7 +423,7 @@ struct ReaderViewModelTranslationLanguageTests {
         vm.currentSourceURL = URL(fileURLWithPath: "/series/a/vol1.cbz")
         vm.translationSourceLanguage = source
         vm.source = ComicSource(title: "Vol 1", pages: pages)
-        try await waitUntil { vm.translationLanguagesForBook.count == 2 }
+        try await awaitTranslationCaches(in: vm)
 
         // Both languages are listed, the shown one first, each with its own count.
         #expect(vm.translationLanguagesForBook.map(\.target) == [.korean, .english])
@@ -453,7 +453,7 @@ struct ReaderViewModelTranslationLanguageTests {
         vm.currentSourceURL = URL(fileURLWithPath: "/series/b/vol1.cbz")
         vm.translationSourceLanguage = source
         vm.source = ComicSource(title: "Vol 1", pages: pages)
-        try await waitUntil { vm.translation.hasPages }
+        try await awaitTranslationCaches(in: vm)
         vm.currentPageIndex = 0
         await vm.refreshImages()
 

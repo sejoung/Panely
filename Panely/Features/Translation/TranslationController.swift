@@ -520,13 +520,13 @@ final class TranslationController {
             var stats = TranslationJobStats()
             defer { AppLog.info(.reader, "Translation job stats", metadata: stats.metadata) }
 
-            var lookahead: [(unit: TranslationUnit, analysis: Task<[PageAnalysis], any Error>)] = []
+            var lookahead: [(unit: TranslationUnit, analysis: PageAnalysisRun)] = []
             func fillLookahead(excluding current: Int?) async {
                 // A paused job mustn't start more OCR on its way out.
                 while lookahead.count < Self.lookahead, !Task.isCancelled {
                     let inFlight = Set(lookahead.map(\.unit.id) + [current].compactMap { $0 })
                     guard let unit = await self?.claimNextUnit(excluding: inFlight, generation: generation) else { return }
-                    lookahead.append((unit, Task { try await analyzer.analyze(unit, plan: plan) }))
+                    lookahead.append((unit, analyzer.start(unit, plan: plan)))
                 }
             }
             func cancelLookahead() {
@@ -553,80 +553,78 @@ final class TranslationController {
                 let (unit, analysisTask) = lookahead.removeFirst()
                 var unitFailed = false
                 do {
-                    let waitStart = ContinuousClock.now
+                    var waitStart = ContinuousClock.now
                     // The analyses are tasks of their own, which cancelling
                     // the job doesn't reach: pausing passes it on, so OCR
                     // stops with the job instead of running to the end.
-                    let pending = lookahead.map(\.analysis)
                     let waitingNotice = Task { [weak self] in
                         try await Task.sleep(for: ocrWaitNoticeDelay)
                         await self?.setWaitingForOCR(true, generation: generation)
                     }
                     defer { waitingNotice.cancel() }
-                    let analyses = try await withTaskCancellationHandler {
-                        try await analysisTask.value
-                    } onCancel: {
-                        analysisTask.cancel()
-                        for task in pending { task.cancel() }
-                    }
-                    waitingNotice.cancel()
-                    await self?.setWaitingForOCR(false, generation: generation)
-                    // Finished regardless (or had nothing to cancel): the
-                    // unit is left for the resumed job, not marked done.
-                    try Task.checkCancellation()
-                    stats.analysisWait += waitStart.duration(to: .now)
-                    let queue = await self?.merge(analyses, generation: generation) ?? []
-                    // Prefetch: the next units' OCR overlaps this unit's translation.
-                    await fillLookahead(excluding: unit.id)
+                    defer { analysisTask.cancel() }
+                    for try await analyses in analysisTask.stream {
+                        waitingNotice.cancel()
+                        await self?.setWaitingForOCR(false, generation: generation)
+                        // Finished regardless (or had nothing to cancel): the
+                        // unit is left for the resumed job, not marked done.
+                        try Task.checkCancellation()
+                        stats.analysisWait += waitStart.duration(to: .now)
+                        let queue = await self?.merge(analyses, generation: generation) ?? []
+                        // Prefetch: the next units' OCR overlaps this unit's translation.
+                        await fillLookahead(excluding: unit.id)
 
-                    // Each text once, in reading order; balloons repeating it
-                    // (here or earlier in the book) take the same translation.
-                    var waiting: [String: [(pageIndex: Int, bubbleID: Int)]] = [:]
-                    var texts: [String] = []
-                    var reused: [TranslationPublication] = []
-                    for item in queue {
-                        if let known = translatedTexts[item.source] {
-                            stats.reused += 1
-                            reused.append(TranslationPublication(text: known, pageIndex: item.pageIndex, bubbleID: item.bubbleID))
-                        } else if waiting[item.source] != nil {
-                            stats.reused += 1
-                            waiting[item.source]?.append((item.pageIndex, item.bubbleID))
-                        } else {
-                            waiting[item.source] = [(item.pageIndex, item.bubbleID)]
-                            texts.append(item.source)
-                        }
-                    }
-                    await publish(reused)
-                    // Nothing new on this unit: no need to wait for the model.
-                    if !texts.isEmpty {
-                        let prepareStart = ContinuousClock.now
-                        try await preparing.value
-                        stats.preparing += prepareStart.duration(to: .now)
-                        for start in stride(from: 0, to: texts.count, by: Self.chunkSize) {
-                            let chunk = Array(texts[start..<min(start + Self.chunkSize, texts.count)])
-                            let translateStart = ContinuousClock.now
-                            var answered = Set<String>()
-                            let lines = translator.translate(chunk, context: Array(recent.suffix(Self.contextLines)), from: source, to: target)
-                            for try await line in lines where chunk.indices.contains(line.index) {
-                                let text = chunk[line.index]
-                                guard answered.insert(text).inserted else { continue }
-                                translatedTexts[text] = line.text
-                                recent.append(TranslationContextLine(source: text, translation: line.text))
-                                await publish(line.text, to: waiting[text] ?? [])
+                        // Each text once, in reading order; balloons repeating it
+                        // (here or earlier in the book) take the same translation.
+                        var waiting: [String: [(pageIndex: Int, bubbleID: Int)]] = [:]
+                        var texts: [String] = []
+                        var reused: [TranslationPublication] = []
+                        for item in queue {
+                            if let known = translatedTexts[item.source] {
+                                stats.reused += 1
+                                reused.append(TranslationPublication(text: known, pageIndex: item.pageIndex, bubbleID: item.bubbleID))
+                            } else if waiting[item.source] != nil {
+                                stats.reused += 1
+                                waiting[item.source]?.append((item.pageIndex, item.bubbleID))
+                            } else {
+                                waiting[item.source] = [(item.pageIndex, item.bubbleID)]
+                                texts.append(item.source)
                             }
-                            try Task.checkCancellation()
-                            stats.translating += translateStart.duration(to: .now)
-                            stats.translated += chunk.count
-                            // The model never answered these: shown as balloons
-                            // that couldn't be translated, and asked again
-                            // should the text come up later.
-                            for text in chunk where !answered.contains(text) {
-                                stats.unanswered += 1
-                                await publish("", to: waiting[text] ?? [])
-                            }
-                            recent = Array(recent.suffix(Self.contextLines))
                         }
+                        await publish(reused)
+                        // Nothing new on this unit: no need to wait for the model.
+                        if !texts.isEmpty {
+                            let prepareStart = ContinuousClock.now
+                            try await preparing.value
+                            stats.preparing += prepareStart.duration(to: .now)
+                            for start in stride(from: 0, to: texts.count, by: Self.chunkSize) {
+                                let chunk = Array(texts[start..<min(start + Self.chunkSize, texts.count)])
+                                let translateStart = ContinuousClock.now
+                                var answered = Set<String>()
+                                let lines = translator.translate(chunk, context: Array(recent.suffix(Self.contextLines)), from: source, to: target)
+                                for try await line in lines where chunk.indices.contains(line.index) {
+                                    let text = chunk[line.index]
+                                    guard answered.insert(text).inserted else { continue }
+                                    translatedTexts[text] = line.text
+                                    recent.append(TranslationContextLine(source: text, translation: line.text))
+                                    await publish(line.text, to: waiting[text] ?? [])
+                                }
+                                try Task.checkCancellation()
+                                stats.translating += translateStart.duration(to: .now)
+                                stats.translated += chunk.count
+                                // The model never answered these: shown as balloons
+                                // that couldn't be translated, and asked again
+                                // should the text come up later.
+                                for text in chunk where !answered.contains(text) {
+                                    stats.unanswered += 1
+                                    await publish("", to: waiting[text] ?? [])
+                                }
+                                recent = Array(recent.suffix(Self.contextLines))
+                            }
+                        }
+                        waitStart = .now
                     }
+                    try Task.checkCancellation()
                 } catch {
                     if Task.isCancelled || error is CancellationError {
                         cancelLookahead()

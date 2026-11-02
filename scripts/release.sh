@@ -126,38 +126,12 @@ else
     echo "→ running tests (set SKIP_TESTS=1 to skip)..."
     echo "  log: $test_log"
 
-    # Pin the destination to the host arch — `platform=macOS` alone matches
-    # both arm64 and x86_64 destinations on Apple Silicon and prints a
-    # WARNING. Use uname for a stable single-destination spec.
-    arch=$(uname -m)
-    case "$arch" in
-        arm64)  destination='platform=macOS,arch=arm64' ;;
-        x86_64) destination='platform=macOS,arch=x86_64' ;;
-        *)      destination='platform=macOS' ;;
-    esac
-
-    # Save the full log; suppress only the noisiest build-system chatter so
-    # actual test failures stay visible. Don't grep for specific result
-    # markers — that hides anything that doesn't match the assumed format
-    # and was the cause of false-positive "tests failed" reports.
-    #
-    # `clean test` (not just `test`) — releases are infrequent and the
-    # extra ~30 s of from-scratch build is cheap insurance against stale
-    # DerivedData states that occasionally desync the codesign phase
-    # (e.g., "code object is not signed at all" on Panely.app because
-    # PanelyTests.xctest's own CodeSign step got skipped on incremental).
+    # Keep the release's clean build, using the same runner and saved results
+    # as local work and CI. This command only runs after release pre-flight.
     set +e
-    # SnapshotGalleryTests is gated off by default and is enabled only by
-    # `scripts/generate-snapshots.sh` when the manual needs updating.
-    xcodebuild clean test \
-        -project Panely.xcodeproj \
-        -scheme Panely \
-        -destination "$destination" \
-        CODE_SIGN_IDENTITY="-" \
-        CODE_SIGNING_REQUIRED=NO \
-        2>&1 | tee "$test_log" \
-             | grep -vE '^(builtin-|/Applications/Xcode|cd |export |    )' \
-             | grep -vE '(SwiftCompile|SwiftDriver|SwiftMergeGeneratedHeaders|CodeSign|Touch |GenerateDSYM|CompileC |ProcessInfoPlist|RegisterExecutionPolicyException|CopySwiftLibs|CreateBuildDirectory)'
+    "$SCRIPT_DIR/test.sh" --clean \
+        --results-dir "$REPO_ROOT/build/release-tests" \
+        CODE_SIGNING_REQUIRED=NO 2>&1 | tee "$test_log"
     test_exit=${PIPESTATUS[0]}
     set -e
 

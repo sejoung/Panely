@@ -10,7 +10,7 @@ import Vision
 /// `BubbleGrouper` builds balloons from. Tall strips are read band by band
 /// (see `OCRTiling`).
 @available(macOS 26.0, *)
-nonisolated struct PageTextRecognizer {
+nonisolated struct VisionPageTextRecognizer {
     let language: TranslationLanguage
 
     func recognize(_ image: CGImage) async throws -> [TextRegion] {
@@ -67,5 +67,31 @@ nonisolated struct PageTextRecognizer {
                 )
             }
         }
+    }
+}
+
+/// Production selects comic OCR when its pack is present. Explicit engines
+/// support reproducible comparisons without silently timing a fallback.
+@available(macOS 26.0, *)
+nonisolated struct PageTextRecognizer {
+    enum Backend: String, Sendable { case automatic, comic, vision }
+    let language: TranslationLanguage
+    var backend: Backend = .automatic
+
+    static var configuredBackend: Backend {
+        Backend(rawValue: ProcessInfo.processInfo.environment["PANELY_OCR_ENGINE"] ?? "") ?? .automatic
+    }
+
+    func recognize(_ image: CGImage) async throws -> [TextRegion] {
+        let selected = backend == .automatic ? Self.configuredBackend : backend
+        if selected != .vision, ComicOCREngine.shared.isReady(for: language) {
+            do { return try await ComicOCREngine.shared.recognize(image, language: language, detections: nil) }
+            catch {
+                try Task.checkCancellation()
+                if selected == .comic { throw error }
+                AppLog.error(.reader, "Comic OCR failed; using Vision", metadata: ["error": "\(error)"])
+            }
+        } else if selected == .comic { throw TranslationModelError.notInstalled }
+        return try await VisionPageTextRecognizer(language: language).recognize(image)
     }
 }

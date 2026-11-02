@@ -217,8 +217,9 @@ Panely는 사용자를 방해하지 않는 만화 리더입니다. 필요 없을
 대신하지 않음. 원문은 언제나 클릭 한 번(또는 `⇧⌘T`)으로 볼 수 있고, 어떤
 데이터도 Mac 밖으로 나가지 않으며 원본 파일도 건드리지 않음.
 
-- **기기 내 처리** — Vision 문서 인식(OCR, 세로쓰기 일본어 포함) + Google의
-  **Gemma 4 E2B**를 llama.cpp로 앱 안에서 GPU로 실행. 모델(3.35GB)은 번역 패널,
+- **기기 내 처리** — 일본어(세로쓰기 포함)는 manga-ocr int8, 중국어·영어·한국어는
+  PP-OCRv5 mobile로 읽고 Google의 **Gemma 4 E2B**를 llama.cpp로 앱 안에서 GPU로 실행.
+  모델(합계 약 3.51GB, OCR 약 160MB 포함)은 번역 패널,
   상태 배너, **설정 → 실험적 기능**에서 진행 막대와 함께 한 번 다운로드하고,
   고정된 SHA-256으로 검증한 뒤에만 사용
 - **모델 하나, 문맥까지** — 모든 언어 조합을 옵션 없이 한 모델로. 페이지의 말풍선을
@@ -362,6 +363,7 @@ Panely는 Swift Package Manager를 사용합니다:
   업스트림에 SwiftPM 매니페스트가 없어 `Packages/UnrarKit`에 로컬 패키지로
   vendoring했고, RARLAB의 최신 UnRAR 소스로 빌드. 버전과 로컬 패치는
   `Packages/UnrarKit/README.md` 참고
+- **[ONNX Runtime](https://github.com/microsoft/onnxruntime-swift-package-manager)** (MIT), 1.24.2 고정 — manga-ocr와 PP-OCRv5를 앱 안에서 실행. [OCR 구현·검증](docs/ocr-pipeline.md) 참조.
 - **[llama.cpp](https://github.com/ggml-org/llama.cpp)** (MIT) — 번역 모델을 앱
   안에서 GPU(Metal)로 실행. llama.cpp가 직접 배포하는 XCFramework를
   `Packages/LlamaCpp/Package.swift`에 URL과 체크섬으로 고정
@@ -376,6 +378,7 @@ Panely는 Swift Package Manager를 사용합니다:
 
 다운로드하는 모델(번역 보조, 번역 패널이나 설정에서 한 번 — 앱에 포함되지 않음):
 
+- **[manga-ocr int8](https://huggingface.co/ogkalu/manga-ocr-onnx)**(약 117MB), **[PP-OCRv5 mobile](https://huggingface.co/ogkalu/ppocr-v5-onnx)**(약 43MB), Apache-2.0 — `ComicOCRModels`에 revision·크기·SHA-256 고정.
 - **[Gemma 4 E2B](https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf)**
   (Google, Apache-2.0) — 지시 튜닝, QAT 4비트 GGUF, 3.35GB. `TranslationModel`에
   revision·크기·SHA-256을 고정했고(Windows 버전과 같은 파일), 설치 전에 검증
@@ -452,11 +455,21 @@ LaunchServices 캐시에 남을 수 있으니, 우클릭 → "다음으로 압�
 
 ```bash
 scripts/test.sh          # fast 티어 (= 일반 `xcodebuild test`, CI가 실행하는 것)
+scripts/test.sh --only TranslationControllerTests --repeat 5
+scripts/test.sh --skip-build --only DebouncerTests
 scripts/test-slow.sh     # + slow 티어: 실제 FSEvents, 실제 Vision OCR, 모든 랜덤 시드
 scripts/test-visual.sh   # PanelyTests/Snapshots/Reference/ 기준 스크린샷 비교
 scripts/test-model.sh [--model PATH]             # 실제 번역 모델(llama.cpp로 돌리는 Gemma) 테스트
+scripts/test-ocr.sh SWIFT_OPTIMIZATION_LEVEL=-O   # 실제 OCR; 고정된 OCR 테스트 팩을 한 번 다운로드
 scripts/benchmark-translation.sh [--book PATH]   # 번역 단계별·작업 전체 소요 시간 측정
 ```
+
+로컬·CI·각 티어는 모두 `scripts/test.sh`를 공통 실행기로 사용합니다. 기본은 Debug이며,
+`--repeat`는 첫 실행에서 빌드한 뒤 별도 테스트 프로세스로 반복하고 실패하면 즉시 멈춥니다.
+`build/test-results/<실행 시각-PID>/`에 회차별 전체 로그, 실행 명령, `.xcresult`를 저장하며,
+`--results-dir`, `--derived-data`로 위치를 바꿀 수 있습니다. `--only`는 여러 번 지정할 수 있고
+기존 `-only-testing:...` 인수도 지원합니다. 전체 옵션은 `scripts/test.sh --help`로 확인합니다.
+CI는 동일한 스크립트의 결과를 아티팩트로 보관합니다.
 
 티어는 `PanelyTests/TestTiers.swift`에서 정합니다. slow와 visual 티어는
 `PANELY_SLOW_TESTS=1` / `PANELY_VISUAL_TESTS=1`로 켜는 opt-in이며(벤치마크
@@ -825,7 +838,7 @@ Panely/
 │   │   │                               # TranslationExportJob(옵션, 기록), TranslationExportWriter
 │   │   │                               # (CBZ / ZIP / 폴더), TranslatedPageRenderer
 │   │   ├── Pipeline/                   # OCRTiling, TranslationPlan (page / strip), PageAnalyzer,
-│   │   │                               # PageTextRecognizer (Vision), GemmaTranslator (llama.cpp + 프롬프트),
+│   │   │                               # PageTextRecognizer (만화 OCR / Vision 대체 경로), GemmaTranslator (llama.cpp + 프롬프트),
 │   │   │                               # BubbleGrouper, BalloonDetector(Core ML), MissedText,
 │   │   │                               # BubbleBackgroundSampler, TextClassifiers,
 │   │   │                               # TranslationWarmup (빌드마다 OCR 미리 준비)
@@ -994,10 +1007,11 @@ Panely.entitlements                     # 샌드박스 + 사용자 선택 읽기
   16개씩 묶어, 작업에서 마지막으로 번역한 6줄을 문맥으로 함께 모델에 넘기고, 책
   앞에서 나온 대사는 다시 씁니다. 작업은 detached task에서
   돌고 generation 카운터로 보호된 채 메인 액터에 결과를 전달합니다. 단위마다
-  `PageAnalyzer`(actor)가 `PageTextRecognizer`(Vision 문서 인식기, 긴 페이지는
-  `OCRTiling` 구간으로)로 텍스트를 읽고, `BalloonDetector`(번들된 Core ML
-  `ComicTextDetector`)로 말풍선을 찾아 `BubbleGrouper`로 줄을 말풍선으로 묶고,
-  OCR이 놓친 검출 박스를 다시 읽으며(`MissedText`), 효과음은 그려진 그대로
+  `PageAnalyzer`(actor)가 `BalloonDetector`(번들된 Core ML RT-DETR)로 영역을 찾고,
+  `ComicOCREngine`(ONNX Runtime)이 일본어는 manga-ocr int8, 나머지 언어는 PP-OCRv5로
+  읽습니다. 인식이 끝난 말풍선 묶음부터 번역에 전달해 나머지 OCR과 겹쳐 실행합니다.
+  긴 페이지는 `OCRTiling`으로 나누며, `PageTextRecognizer`는 Vision을 대체 경로로 남깁니다.
+  Vision 경로에서는 놓친 검출 박스를 다시 읽으며(`MissedText`), `BubbleGrouper`로 줄을 묶고 효과음은 그려진 그대로
   두고(`SoundEffectClassifier`) 말풍선 배경 톤을 샘플링합니다
   (`BubbleBackgroundSampler`). 이어서 `GemmaTranslator`(전용 스레드의 actor)가
   Gemma 4 E2B를 llama.cpp로 GPU에서 돌립니다: 앱 전체에 모델 하나, 첫 페이지 OCR

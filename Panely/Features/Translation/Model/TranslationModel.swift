@@ -45,7 +45,7 @@ nonisolated struct TranslationModel: Sendable, Equatable {
     /// What the cache keys on: translations from another model, revision or
     /// prompt (or from Apple Translation, before this) aren't reused.
     static var cacheRevision: String {
-        "\(current.id)@\(current.revision.prefix(12))+p\(promptVersion)"
+        "\(current.id)@\(current.revision.prefix(12))+p\(promptVersion)+\(ComicOCRModels.cacheRevision)"
     }
 }
 

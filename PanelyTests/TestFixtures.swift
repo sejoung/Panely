@@ -145,15 +145,42 @@ private final class FixtureBundleToken {}
 /// seconds. Never wait out a fixed sleep instead.
 @MainActor
 func waitUntil(
-    timeout: Duration = .seconds(10),
+    timeout: Duration = .seconds(30),
+    sourceLocation: SourceLocation = #_sourceLocation,
     _ condition: () -> Bool
 ) async throws {
     let deadline = ContinuousClock.now + timeout
     while !condition() {
         guard ContinuousClock.now < deadline else {
-            Issue.record("condition not met within \(timeout)")
-            return
+            Issue.record("condition not met within \(timeout)", sourceLocation: sourceLocation)
+            throw TestWaitTimeout()
         }
         try await Task.sleep(for: .milliseconds(10))
+    }
+}
+
+private struct TestWaitTimeout: Error {}
+
+/// The source's didSet configures translations on the next main-actor turn.
+/// Once configured, await the cache tasks themselves: a language can be listed
+/// or a first page published before its full cache has finished loading.
+@MainActor
+func awaitTranslationCaches(in viewModel: ReaderViewModel) async throws {
+    while true {
+        try await waitUntil {
+            viewModel.translation.isConfigured
+                && viewModel.translation.bookPageCount == viewModel.source.pages.count
+                && viewModel.translation.bookPageCount > 0
+        }
+        let pending = viewModel.translationManager.openBook.map { ($0, $0.cacheTask) }
+        for (_, task) in pending { await task?.value }
+        // A queued source change can replace controllers (or restart their
+        // cache loads) while the earlier, now-cancelled tasks are awaited.
+        let current = viewModel.translationManager.openBook
+        guard current.count == pending.count,
+              zip(current, pending).allSatisfy({ controller, previous in
+                  controller === previous.0 && controller.cacheTask == previous.1
+              }) else { continue }
+        return
     }
 }

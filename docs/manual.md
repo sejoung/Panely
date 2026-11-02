@@ -504,17 +504,18 @@ Translation starts at the page you're on and keeps ahead of you as you read:
   room inside its balloon — when nothing else is drawn there — so a long one
   isn't squeezed into the original's narrow lines. **Hide** is for whatever still
   slips through (see below).
-- If the detector finds a text area but OCR returns no text, Panely automatically
-  reads that area again, enlarged. Use the drag-to-add steps below for anything
-  still missed.
+- Japanese uses manga-ocr; Chinese, English and Korean use PP-OCRv5 mobile.
+  Complete balloon batches go to translation as soon as they are read. Vision
+  remains a fallback if the OCR pack is missing or cannot run; that path also
+  rereads missed text areas enlarged. Use the drag-to-add steps below for anything missed.
 - Balloons appear with a pulsing outline and "…" as soon as they're found, and
   fill in one by one.
 - The line under the button, and the pill over the page, show progress and the
   time left.
-- Translating can pause for tens of seconds early on while macOS prepares its
-  OCR models; the pill says **Preparing OCR** when it does. The first launch
-  after an update prepares them in the background for about a minute, if
-  translation is on.
+- The translation download includes about 160 MB of OCR models. Existing
+  installations download only missing files. Normal startup skips Vision's
+  language-model preparation; the Vision fallback can still have a slow first run.
+  The pill says **Preparing OCR** if recognition takes a while.
 - A page that fails is tried once more after the rest. If it still fails,
   Panely tells you how many pages are missing, and translating again does
   just those pages.

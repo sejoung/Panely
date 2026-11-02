@@ -22,6 +22,8 @@ jobs:
   build:
     name: Build
     runs-on: macos-latest
+    env:
+      PANELY_DERIVED_DATA_PATH: ${{ runner.temp }}/PanelyDerivedData
 
     steps:
       - name: Checkout
@@ -36,20 +38,23 @@ jobs:
           path: |
             ~/Library/Caches/org.swift.swiftpm
             ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+            ${{ runner.temp }}/PanelyDerivedData/SourcePackages
           key: spm-${{ runner.os }}-${{ hashFiles('**/Package.resolved', '**/*.xcodeproj/project.pbxproj') }}
           restore-keys: |
             spm-${{ runner.os }}-
 
       - name: Build & Test
         run: |
-          set -o pipefail
           # Fast tier only. SnapshotGalleryTests (scripts/generate-snapshots.sh),
           # VisualRegressionTests (scripts/test-visual.sh) and the slow tier
           # (scripts/test-slow.sh) are opt-in; see PanelyTests/TestTiers.swift.
-          xcodebuild test \
-            -project Panely.xcodeproj \
-            -scheme Panely \
-            -configuration Debug \
-            -destination 'platform=macOS' \
-            CODE_SIGN_IDENTITY="-" \
-            CODE_SIGNING_REQUIRED=YES
+          python3 -m unittest discover -s scripts/tests -p 'test_test_runner.py'
+          scripts/test.sh --results-dir build/ci-test-results
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-test-results-${{ github.run_attempt }}
+          path: build/ci-test-results
+          retention-days: 7

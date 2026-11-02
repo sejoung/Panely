@@ -1,7 +1,6 @@
 import Foundation
 
-/// Languages the translation assist reads from and translates into — the set
-/// both Vision's document recognizer and Apple Translation cover for comics.
+/// Languages supported by the comic OCR readers, Vision fallback and translator.
 nonisolated enum TranslationLanguage: String, CaseIterable, Identifiable, Codable, Sendable {
     case japanese = "ja"
     case chineseSimplified = "zh-Hans"

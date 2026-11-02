@@ -1,6 +1,38 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Includes manga-ocr for Japanese and PP-OCRv5 for Chinese, English and Korean. One translation model handles every language pair on your Mac. It reads each page's balloons together with the lines before them, so names and each speaker's speech level — polite or casual — carry over. Downloaded once from Hugging Face; nothing you read leaves your Mac. Uses about 3.5 GB of memory while translating." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Includes manga-ocr for Japanese and PP-OCRv5 for Chinese, English and Korean. One translation model handles every language pair on your Mac. It reads each page's balloons together with the lines before them, so names and each speaker's speech level — polite or casual — carry over. Downloaded once from Hugging Face; nothing you read leaves your Mac. Uses about 3.5 GB of memory while translating."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일본어는 manga-ocr, 중국어·영어·한국어는 PP-OCRv5로 읽습니다. 하나의 번역 모델이 Mac에서 모든 언어 쌍을 번역합니다. 앞선 대사와 함께 읽어 이름과 인물별 존댓말·반말을 이어 갑니다. Hugging Face에서 한 번 내려받으며 읽는 내용은 Mac 밖으로 보내지 않습니다. 번역 중 메모리는 약 3.5GB를 사용합니다."
+          }
+        }
+      }
+    },
+    "Gemma 4, manga-ocr and PP-OCRv5 (Apache License 2.0), run with llama.cpp and ONNX Runtime (MIT License)." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemma 4, manga-ocr and PP-OCRv5 (Apache License 2.0), run with llama.cpp and ONNX Runtime (MIT License)."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemma 4, manga-ocr, PP-OCRv5(Apache License 2.0)를 llama.cpp와 ONNX Runtime(MIT License)으로 실행합니다."
+          }
+        }
+      }
+    },
     "" : {
 
     },
